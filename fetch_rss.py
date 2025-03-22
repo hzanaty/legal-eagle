@@ -1,89 +1,74 @@
 import feedparser
 import openai
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 import os
-from dotenv import load_dotenv  # ✅ Correct import
-from pathlib import Path
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
+from dotenv import load_dotenv
 
-# Try to load .env only if it exists (for local runs)
-if Path("key.env").is_file():
-    load_dotenv("key.env")
-
-# Read API credentials securely
+# Load environment variables
+load_dotenv("key.env")  # If running locally
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-# Email Configuration
-# ✅ Read credentials from .env
+# Email details
+SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
 EMAIL_SENDER = os.getenv("EMAIL_SENDER")
-EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 EMAIL_RECEIVER = os.getenv("EMAIL_RECEIVER")
-SMTP_SERVER = os.getenv("SMTP_SERVER")
-SMTP_PORT = int(os.getenv("SMTP_PORT"))
 
-# Define the RSS feed URL
-rss_url = "https://saudigazette.com.sa/rssFeed/0"
+# RSS feed URL
+RSS_FEED_URL = "https://saudigazette.com.sa/rssFeed/0"
 
-# Fetch and parse the RSS feed
-feed = feedparser.parse(rss_url)
-
-# Function to summarize articles using OpenAI
+# Summarize description using OpenAI
 def summarize_text(text):
-    prompt = f"Summarize this news article in 3-4 sentences:\n\n{text}"
+    prompt = f"Please summarize this news article in 1-2 sentences:\n\n{text}"
+    try:
+        response = openai.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        return f"⚠️ Failed to summarize: {e}"
 
-    response = openai.chat.completions.create(
-        model="gpt-4o",  
-        messages=[{"role": "user", "content": prompt}]
-    )
-    
-    return response.choices[0].message.content.strip()
+# Fetch and process RSS feed
+feed = feedparser.parse(RSS_FEED_URL)
+summaries = []
 
-# Prepare email content
-email_subject = "📩 Daily News Summary from Saudi Gazette"
-email_body = "<h2>Latest News</h2>"
+print("📰 Latest News from Saudi Gazette:\n")
 
-for entry in feed.entries:  # Read all articles
+for entry in feed.entries:
     title = entry.title
     link = entry.link
-    description = entry.get("description", entry.get("summary", "No Description Available"))
-    pub_date = entry.get("published", "No Publication Date Available")
+    description = entry.description
+    pub_date = entry.published
 
-    # Summarize the article description using AI
     summary = summarize_text(description)
 
-    # Print progress to terminal
     print(f"🔹 {title}")
     print(f"📅 {pub_date}")
-    print(f"🔗 {link}")
-    print(f"📝 Summary: {description}\n")
+    print(f"📝 {summary}\n")
 
-    # Add to email body
-    email_body += f"""
-    <p><strong>🔹 {title}</strong></p>
-    <p><strong>📝 Summary:</strong> {summary}</p>
-    <p><strong>📅 Published:</strong> {pub_date}</p>
-    <p><strong>🔗 <a href='{link}'>Read Full Article</a></strong></p>
-    <hr>
-    """
+    summaries.append(f"<p><strong>{title}</strong><br><em>{pub_date}</em><br>{summary}<br><a href='{link}'>Read more</a></p><hr>")
 
-# Send email function
+# Prepare email content
+email_subject = "🗞️ Daily Saudi Gazette RSS Summary"
+email_body = "<h2>Here are today’s headlines:</h2>" + "".join(summaries)
+
+# ✅ Print the email preview before sending
+print("\n📧 Preview of Email Content:")
+print(f"Subject: {email_subject}")
+print(email_body)
+
+# Send the email using SendGrid
 def send_email(subject, body):
-    msg = MIMEMultipart()
-    msg["From"] = EMAIL_SENDER
-    msg["To"] = EMAIL_RECEIVER
-    msg["Subject"] = subject
-    msg.attach(MIMEText(body, "html"))  # Send as HTML
-
+    message = Mail(
+        from_email=EMAIL_SENDER,
+        to_emails=EMAIL_RECEIVER,
+        subject=subject,
+        html_content=body
+    )
     try:
-        server = smtplib.SMTP()
-        server.connect(SMTP_SERVER, SMTP_PORT)
-        server.ehlo()  # 👈 Add this line
-        server.starttls()
-        server.ehlo()  # 👈 Re-identify after starting TLS
-        server.login(EMAIL_SENDER, EMAIL_PASSWORD)
-        server.sendmail(EMAIL_SENDER, EMAIL_RECEIVER, msg.as_string())
-        server.quit()
+        sg = SendGridAPIClient(SENDGRID_API_KEY)
+        response = sg.send(message)
         print("✅ Email sent successfully!")
     except Exception as e:
         print(f"❌ Failed to send email: {e}")
