@@ -1,66 +1,73 @@
 import feedparser
 import os
+import base64
 from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
-from base64 import urlsafe_b64encode
-import openai
+from openai import OpenAI
 
 # Load environment variables
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+from dotenv import load_dotenv
+load_dotenv()
+
+# RSS Feed URL
+RSS_URL = "https://saudigazette.com.sa/rssFeed/0"
+
+# Gmail and OAuth
 EMAIL_SENDER = os.getenv("EMAIL_SENDER")
-EMAIL_TO = os.getenv("EMAIL_TO")
+EMAIL_RECEIVER = os.getenv("EMAIL_RECEIVER")
 
-openai.api_key = OPENAI_API_KEY
+# OpenAI setup
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=OPENAI_API_KEY)
 
-rss_url = "https://saudigazette.com.sa/rssFeed/0"
-
-# Function to summarize text using OpenAI
+# Function to summarize text with OpenAI
 def summarize_text(text):
-    prompt = f"Summarize this article for HCM and Payroll relevance only: {text}"
-    response = openai.ChatCompletion.create(
+    prompt = f"Summarize the following news article in just one single line:\n{text}"
+    response = client.chat.completions.create(
         model="gpt-4o",
         messages=[{"role": "user", "content": prompt}]
     )
-    return response.choices[0].message.content.strip()
+    return response.choices[0].message.content
 
-# Gmail service
-def create_gmail_service():
-    creds = Credentials.from_authorized_user_file("token.json", ["https://www.googleapis.com/auth/gmail.send"])
-    service = build("gmail", "v1", credentials=creds)
-    return service
-
-# Send email via Gmail API
+# Function to send email using Gmail API
 def send_email(subject, body):
-    message = MIMEMultipart()
-    message["To"] = EMAIL_TO
-    message["From"] = EMAIL_SENDER
-    message["Subject"] = subject
-    message.attach(MIMEText(body, "html"))
+    creds = Credentials.from_authorized_user_file('token.json', ['https://www.googleapis.com/auth/gmail.send'])
+    service = build('gmail', 'v1', credentials=creds)
 
-    raw_message = urlsafe_b64encode(message.as_bytes()).decode()
-    service = create_gmail_service()
+    message = MIMEText(body, "plain")
+    message['to'] = EMAIL_RECEIVER
+    message['from'] = EMAIL_SENDER
+    message['subject'] = subject
+
+    raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
+    create_message = {'raw': raw_message}
+
     try:
-        result = service.users().messages().send(userId="me", body={"raw": raw_message}).execute()
-        print(f"✅ Email sent successfully! Message ID: {result['id']}")
+        send_message = service.users().messages().send(userId="me", body=create_message).execute()
+        print("✅ Email sent successfully!")
     except Exception as e:
         print(f"❌ Failed to send email: {e}")
 
-# Process feed
-feed = feedparser.parse(rss_url)
-email_body = ""
-print("📰 Saudi Gazette Articles:")
+# Parse RSS feed
+feed = feedparser.parse(RSS_URL)
 
+# Build summary content
+print("📰 Latest News from Saudi Gazette:\n")
+summary_lines = []
 for entry in feed.entries:
     title = entry.title
     link = entry.link
-    description = entry.description
-    pub_date = entry.published
+    description = entry.get("description", "No description available.")
 
-    print(f"\n📌 {title}\n{link}\n📅 {pub_date}\n{description}\n")
+    print(f"🔹 {title}\n{link}\n📄 Description: {description}\n")
 
     summary = summarize_text(description)
-    email_body += f"<h3>{title}</h3><p><strong>Date:</strong> {pub_date}</p><p>{summary}</p><a href='{link}'>Read more</a><hr>"
+    summary_lines.append(f"📰 {title}\n🔗 {link}\n📝 Summary: {summary}\n")
 
-send_email("🗞️ Daily Saudi Gazette Summary", email_body)
+# Prepare final email content
+email_subject = "🗞️ Daily News Summary: Saudi Gazette"
+email_body = "\n\n".join(summary_lines)
+
+# Send the email
+send_email(email_subject, email_body)
