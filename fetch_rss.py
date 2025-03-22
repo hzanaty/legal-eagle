@@ -76,7 +76,8 @@ def send_email(subject, body):
     msg.attach(MIMEText(body, "html"))  # Send as HTML
 
     try:
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+        server = smtplib.SMTP()
+        server.connect(SMTP_SERVER, SMTP_PORT)
         server.ehlo()  # 👈 Add this line
         server.starttls()
         server.ehlo()  # 👈 Re-identify after starting TLS
