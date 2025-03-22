@@ -1,39 +1,56 @@
 import feedparser
-import openai
 import os
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail, Email, To, Content
-from dotenv import load_dotenv
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
+from base64 import urlsafe_b64encode
+import openai
 
 # Load environment variables
-load_dotenv("key.env")  # If running locally
-openai.api_key = os.getenv("OPENAI_API_KEY")
-
-# Email details
-SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 EMAIL_SENDER = os.getenv("EMAIL_SENDER")
-EMAIL_RECEIVER = os.getenv("EMAIL_RECEIVER")
+EMAIL_TO = os.getenv("EMAIL_TO")
 
-# RSS feed URL
-RSS_FEED_URL = "https://saudigazette.com.sa/rssFeed/0"
+openai.api_key = OPENAI_API_KEY
 
-# Summarize description using OpenAI
+rss_url = "https://saudigazette.com.sa/rssFeed/0"
+
+# Function to summarize text using OpenAI
 def summarize_text(text):
-    prompt = f"Please summarize this news article in 1-2 sentences:\n\n{text}"
+    prompt = f"Summarize this article for HCM and Payroll relevance only: {text}"
+    response = openai.ChatCompletion.create(
+        model="gpt-4o",
+        messages=[{"role": "user", "content": prompt}]
+    )
+    return response.choices[0].message.content.strip()
+
+# Gmail service
+def create_gmail_service():
+    creds = Credentials.from_authorized_user_file("token.json", ["https://www.googleapis.com/auth/gmail.send"])
+    service = build("gmail", "v1", credentials=creds)
+    return service
+
+# Send email via Gmail API
+def send_email(subject, body):
+    message = MIMEMultipart()
+    message["To"] = EMAIL_TO
+    message["From"] = EMAIL_SENDER
+    message["Subject"] = subject
+    message.attach(MIMEText(body, "html"))
+
+    raw_message = urlsafe_b64encode(message.as_bytes()).decode()
+    service = create_gmail_service()
     try:
-        response = openai.chat.completions.create(
-            model="gpt-4o",
-            messages=[{"role": "user", "content": prompt}]
-        )
-        return response.choices[0].message.content.strip()
+        result = service.users().messages().send(userId="me", body={"raw": raw_message}).execute()
+        print(f"✅ Email sent successfully! Message ID: {result['id']}")
     except Exception as e:
-        return f"⚠️ Failed to summarize: {e}"
+        print(f"❌ Failed to send email: {e}")
 
-# Fetch and process RSS feed
-feed = feedparser.parse(RSS_FEED_URL)
-summaries = []
-
-print("📰 Latest News from Saudi Gazette:\n")
+# Process feed
+feed = feedparser.parse(rss_url)
+email_body = ""
+print("📰 Saudi Gazette Articles:")
 
 for entry in feed.entries:
     title = entry.title
@@ -41,37 +58,9 @@ for entry in feed.entries:
     description = entry.description
     pub_date = entry.published
 
+    print(f"\n📌 {title}\n{link}\n📅 {pub_date}\n{description}\n")
+
     summary = summarize_text(description)
+    email_body += f"<h3>{title}</h3><p><strong>Date:</strong> {pub_date}</p><p>{summary}</p><a href='{link}'>Read more</a><hr>"
 
-    print(f"🔹 {title}")
-    print(f"📅 {pub_date}")
-    print(f"📝 {summary}\n")
-
-    summaries.append(f"<p><strong>{title}</strong><br><em>{pub_date}</em><br>{summary}<br><a href='{link}'>Read more</a></p><hr>")
-
-# Prepare email content
-email_subject = "🗞️ Daily Saudi Gazette RSS Summary"
-email_body = "<h2>Here are today’s headlines:</h2>" + "".join(summaries)
-
-# ✅ Print the email preview before sending
-print("\n📧 Preview of Email Content:")
-print(f"Subject: {email_subject}")
-print(email_body)
-
-# Send the email using SendGrid
-def send_email(subject, body):
-    message = Mail(
-        from_email=Email(EMAIL_SENDER, name="Hany Zanaty"),
-        to_emails=EMAIL_RECEIVER,
-        subject=subject,
-        html_content=body
-    )
-    try:
-        sg = SendGridAPIClient(SENDGRID_API_KEY)
-        response = sg.send(message)
-        print("✅ Email sent successfully!")
-    except Exception as e:
-        print(f"❌ Failed to send email: {e}")
-
-# Send the email
-send_email(email_subject, email_body)
+send_email("🗞️ Daily Saudi Gazette Summary", email_body)
