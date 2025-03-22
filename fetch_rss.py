@@ -2,7 +2,7 @@ import feedparser
 import openai
 import os
 from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail
+from sendgrid.helpers.mail import Mail, Email, To, Content
 from dotenv import load_dotenv
 
 # Load environment variables
