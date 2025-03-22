@@ -77,7 +77,9 @@ def send_email(subject, body):
 
     try:
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+        server.ehlo()  # 👈 Add this line
         server.starttls()
+        server.ehlo()  # 👈 Re-identify after starting TLS
         server.login(EMAIL_SENDER, EMAIL_PASSWORD)
         server.sendmail(EMAIL_SENDER, EMAIL_RECEIVER, msg.as_string())
         server.quit()
