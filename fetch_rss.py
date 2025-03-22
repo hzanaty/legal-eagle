@@ -61,7 +61,7 @@ print(email_body)
 # Send the email using SendGrid
 def send_email(subject, body):
     message = Mail(
-        from_email=EMAIL_SENDER,
+        from_email=Email(EMAIL_SENDER, name="Hany Zanaty"),
         to_emails=EMAIL_RECEIVER,
         subject=subject,
         html_content=body
