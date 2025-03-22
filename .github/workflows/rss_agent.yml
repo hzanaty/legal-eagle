@@ -2,32 +2,30 @@ name: Daily RSS Agent
 
 on:
   schedule:
-    - cron: '0 6 * * *' # Runs every day at 6 AM UTC
-  workflow_dispatch:
+    - cron: '0 6 * * *'  # Runs every day at 6 AM UTC
+  workflow_dispatch:     # Allows manual triggering
 
 jobs:
   run-rss-agent:
     runs-on: ubuntu-latest
+
     env:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      SMTP_USER: ${{ secrets.SMTP_USER }}
-      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
-      SMTP_HOST: ${{ secrets.SMTP_HOST }}
-      SMTP_PORT: ${{ secrets.SMTP_PORT }}
-      EMAIL_TO: ${{ secrets.EMAIL_TO }}
+      SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
+      EMAIL_SENDER: ${{ secrets.EMAIL_SENDER }}
+      EMAIL_RECEIVER: ${{ secrets.EMAIL_RECEIVER }}
+
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v3
 
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10'
+          python-version: '3.11'
 
       - name: Install dependencies
-        run: |
-          pip install feedparser openai python-dotenv
+        run: pip install -r requirements.txt
 
       - name: Run RSS Agent
-        run: |
-          python fetch_rss.py
+        run: python fetch_rss.py
