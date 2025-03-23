@@ -9,7 +9,7 @@ from email.mime.multipart import MIMEMultipart
 
 # === Load secrets from GitHub Actions ENV ===
 EMAIL_SENDER = os.getenv("EMAIL_SENDER")
-EMAIL_RECEIVER = os.getenv("EMAIL_TO")
+EMAIL_RECEIVER = os.getenv("EMAIL_RECEIVER")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # === Get Gmail access token using refresh token ===
