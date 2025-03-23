@@ -2,6 +2,7 @@ import smtplib
 import os
 import base64
 import json
+import requests
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from google.auth.transport.requests import Request
@@ -12,14 +13,23 @@ EMAIL_SENDER = os.getenv("EMAIL_SENDER")
 EMAIL_RECEIVER = os.getenv("EMAIL_RECEIVER")
 
 def get_gmail_access_token():
-    with open("token.json") as token_file:
-        token_data = json.load(token_file)
-    creds = Credentials.from_authorized_user_info(token_data)
-    if creds.expired and creds.refresh_token:
-        creds.refresh(Request())
-        with open("token.json", "w") as token_file:
-            token_file.write(creds.to_json())
-    return creds.token
+    token_url = "https://oauth2.googleapis.com/token"
+    client_id = os.getenv("GMAIL_CLIENT_ID")
+    client_secret = os.getenv("GMAIL_CLIENT_SECRET")
+    refresh_token = os.getenv("GMAIL_REFRESH_TOKEN")
+
+    payload = {
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "refresh_token": refresh_token,
+        "grant_type": "refresh_token"
+    }
+
+    response = requests.post(token_url, data=payload)
+    if response.status_code == 200:
+        return response.json()["access_token"]
+    else:
+        raise Exception(f"❌ Failed to refresh access token: {response.text}")
 
 def send_email():
     access_token = get_gmail_access_token()
