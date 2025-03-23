@@ -35,7 +35,7 @@ def get_gmail_access_token():
 # === Function to summarize using OpenAI ===
 def summarize_text(text):
     openai.api_key = OPENAI_API_KEY
-    prompt = f"Summarize the following news article in one simple line in English and another line in Arabaic:\n\n{text}"
+    prompt = f"Summarize the following news article in 2 lines, the first line in English and the second line in Arabaic ():\n\n{text}"
     try:
         response = openai.chat.completions.create(
             model="gpt-4o",
