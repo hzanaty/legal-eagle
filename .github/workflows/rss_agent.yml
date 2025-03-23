@@ -25,7 +25,10 @@ jobs:
 
       - name: Run RSS Agent script
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
+          GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
+          GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
           EMAIL_SENDER: ${{ secrets.EMAIL_SENDER }}
-          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+          EMAIL_RECEIVER: ${{ secrets.EMAIL_RECEIVER }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: python fetch_rss.py
