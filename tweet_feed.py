@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 # ========================
 # Configuration
 # ========================
-BEARER_TOKEN = os.getenv("TWITTER_BEARER_TOKEN")
+BEARER_TOKEN = os.getenv("X_BEARER_TOKEN")
 username = "SaudiGOSI"  # Set the target Twitter username here
 
 # ========================
