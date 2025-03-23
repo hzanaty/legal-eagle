@@ -55,4 +55,4 @@ def send_email():
     except Exception as e:
         print(f"❌ Failed to send email: {e}")
 
-send_email()
+send_email(email_subject, email_body)
