@@ -2,9 +2,8 @@ import feedparser
 import openai
 import os
 
-# Load OpenAI API key from environment
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-client = openai.OpenAI(api_key=OPENAI_API_KEY)
+# Load OpenAI API key
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 RSS_FEED_URL = "https://saudigazette.com.sa/rssFeed/0"
 
