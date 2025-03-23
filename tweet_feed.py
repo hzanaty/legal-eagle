@@ -4,7 +4,7 @@ import requests
 from datetime import datetime, timedelta
 
 # Load your bearer token from GitHub Secrets
-BEARER_TOKEN = os.getenv("TWITTER_BEARER_TOKEN")
+BEARER_TOKEN = os.getenv("X_BEARER_TOKEN")
 
 # Set the target usernames (without the @)
 TARGET_USERS = ["SaudiGOSI"]
