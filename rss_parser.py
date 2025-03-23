@@ -40,3 +40,7 @@ if __name__ == "__main__":
     summaries = fetch_and_summarize_articles()
     for item in summaries:
         print(item)
+def get_rss_summaries():
+    # Your existing code that fetches, parses, summarizes RSS feeds
+    # For example, return HTML content or list of articles
+    return final_html_output
