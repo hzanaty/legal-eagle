@@ -1,73 +1,87 @@
 import feedparser
+import openai
 import os
 import base64
+import json
+import datetime
+import smtplib
 from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from google.oauth2.credentials import Credentials
-from googleapiclient.discovery import build
-from openai import OpenAI
+from google.auth.transport.requests import Request
 
-# Load environment variables
-from dotenv import load_dotenv
-load_dotenv()
+# === Load credentials from environment variables ===
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+EMAIL_SENDER = os.environ.get("EMAIL_SENDER")
+EMAIL_RECEIVER = os.environ.get("EMAIL_RECEIVER")
 
-# RSS Feed URL
-RSS_URL = "https://saudigazette.com.sa/rssFeed/0"
+# === Set your OpenAI API key ===
+openai.api_key = OPENAI_API_KEY
 
-# Gmail and OAuth
-EMAIL_SENDER = os.getenv("EMAIL_SENDER")
-EMAIL_RECEIVER = os.getenv("EMAIL_RECEIVER")
+# === Define the RSS feed URL ===
+RSS_FEED_URL = "https://saudigazette.com.sa/rssFeed/0"
 
-# OpenAI setup
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-client = OpenAI(api_key=OPENAI_API_KEY)
-
-# Function to summarize text with OpenAI
+# === Summarize function using GPT-4o ===
 def summarize_text(text):
-    prompt = f"Summarize the following news article in just one single line:\n{text}"
-    response = client.chat.completions.create(
+    prompt = f"Summarize the following news article in just 1 line:\n\n{text}"
+    response = openai.chat.completions.create(
         model="gpt-4o",
         messages=[{"role": "user", "content": prompt}]
     )
-    return response.choices[0].message.content
+    return response.choices[0].message.content.strip()
 
-# Function to send email using Gmail API
+# === Get Gmail access token from token.json ===
+def get_gmail_access_token():
+    with open("token.json") as token_file:
+        token_data = json.load(token_file)
+    creds = Credentials.from_authorized_user_info(token_data)
+    if creds.expired and creds.refresh_token:
+        creds.refresh(Request())
+        with open("token.json", "w") as token_file:
+            token_file.write(creds.to_json())
+    return creds.token
+
+# === Send email via Gmail SMTP using OAuth2 ===
 def send_email(subject, body):
-    creds = Credentials.from_authorized_user_file('token.json', ['https://www.googleapis.com/auth/gmail.send'])
-    service = build('gmail', 'v1', credentials=creds)
+    access_token = get_gmail_access_token()
 
-    message = MIMEText(body, "plain")
-    message['to'] = EMAIL_RECEIVER
-    message['from'] = EMAIL_SENDER
-    message['subject'] = subject
+    msg = MIMEMultipart()
+    msg["Subject"] = subject
+    msg["From"] = EMAIL_SENDER
+    msg["To"] = EMAIL_RECEIVER
+    msg.attach(MIMEText(body, "html"))
 
-    raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
-    create_message = {'raw': raw_message}
+    auth_string = f"user={EMAIL_SENDER}\1auth=Bearer {access_token}\1\1"
+    auth_string = base64.b64encode(auth_string.encode("utf-8")).decode("utf-8")
 
     try:
-        send_message = service.users().messages().send(userId="me", body=create_message).execute()
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.ehlo()
+        server.starttls()
+        server.ehlo()
+        server.docmd("AUTH", "XOAUTH2 " + auth_string)
+        server.sendmail(EMAIL_SENDER, EMAIL_RECEIVER, msg.as_string())
+        server.quit()
         print("✅ Email sent successfully!")
     except Exception as e:
         print(f"❌ Failed to send email: {e}")
 
-# Parse RSS feed
-feed = feedparser.parse(RSS_URL)
-
-# Build summary content
+# === Parse RSS feed ===
+feed = feedparser.parse(RSS_FEED_URL)
 print("📰 Latest News from Saudi Gazette:\n")
-summary_lines = []
+
+email_body = ""
 for entry in feed.entries:
     title = entry.title
     link = entry.link
-    description = entry.get("description", "No description available.")
-
-    print(f"🔹 {title}\n{link}\n📄 Description: {description}\n")
+    description = entry.description
+    pub_date = entry.published
 
     summary = summarize_text(description)
-    summary_lines.append(f"📰 {title}\n🔗 {link}\n📝 Summary: {summary}\n")
+    print(f"🔹 {title} ({pub_date})")
+    print(f"Summary: {summary}\n")
 
-# Prepare final email content
-email_subject = "🗞️ Daily News Summary: Saudi Gazette"
-email_body = "\n\n".join(summary_lines)
+    email_body += f"<h3>{title}</h3><p><strong>{pub_date}</strong></p><p>{summary}</p><a href='{link}'>Read more</a><br><hr>"
 
-# Send the email
+email_subject = f"🗞️ Daily News Summary – {datetime.datetime.now().strftime('%Y-%m-%d')}"
 send_email(email_subject, email_body)
