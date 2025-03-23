@@ -5,8 +5,6 @@ import json
 import requests
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
 
 # Load secrets from GitHub Actions env
 EMAIL_SENDER = os.getenv("EMAIL_SENDER")
@@ -54,5 +52,9 @@ def send_email():
         print("✅ Email sent successfully!")
     except Exception as e:
         print(f"❌ Failed to send email: {e}")
+
+print("EMAIL_SENDER:", EMAIL_SENDER)
+print("EMAIL_RECEIVER:", EMAIL_RECEIVER)
+print("GMAIL_CLIENT_ID:", os.getenv("GMAIL_CLIENT_ID")[:5] + "...")
 
 send_email()
