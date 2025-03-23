@@ -55,7 +55,11 @@ def fetch_all_tweets():
 
     return "\n".join(all_tweets)
 
-# If you want to test locally
+# If you want to test locally or skip email sending
 if __name__ == "__main__":
-    result = fetch_all_tweets()
-    print(result if result else "No tweets found.")
+    print("🧪 Testing Twitter API access...")
+    print("Username:", username)
+    print("Bearer token is set:", bool(bearer_token))
+    tweets_summary = fetch_all_tweets()
+    print("🧵 Daily Tweets Summary:\n")
+    print(tweets_summary if tweets_summary else "No tweets found.")
