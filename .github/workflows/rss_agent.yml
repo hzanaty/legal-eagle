@@ -21,7 +21,12 @@ jobs:
       - name: 📦 Install dependencies
         run: pip install feedparser openai requests
 
-      - name: 🚀 Run Email Sender
+      - name: 📰 Run RSS Parser
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: python rss_parser.py
+
+      - name: 📧 Run Email Sender
         env:
           EMAIL_SENDER: ${{ secrets.EMAIL_SENDER }}
           EMAIL_RECEIVER: ${{ secrets.EMAIL_RECEIVER }}
