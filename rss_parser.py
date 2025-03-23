@@ -1,16 +1,12 @@
-# === rss_parser.py ===
-# This script handles only RSS parsing and OpenAI summarization
-
 import feedparser
 import openai
 import os
 
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+# Load API key from GitHub secrets
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
-# === Function to summarize using OpenAI ===
 def summarize_text(text):
-    openai.api_key = OPENAI_API_KEY
-    prompt = f"Summarize the following news article in one simple line using same language used in the article:\n\n{text}"
+    prompt = f"Summarize the following news article in one line, using the same language:\n\n{text}"
     try:
         response = openai.chat.completions.create(
             model="gpt-4o",
@@ -18,29 +14,29 @@ def summarize_text(text):
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
-        print(f"❌ OpenAI Error: {e}")
-        return "Summary failed."
+        return f"❌ Failed to summarize: {e}"
 
-# === Parse RSS feed ===
-def fetch_and_summarize_articles():
-    feed_url = "https://saudigazette.com.sa/rssFeed/0"
-    feed = feedparser.parse(feed_url)
-    all_summaries = []
+def get_rss_summaries():
+    rss_url = "https://saudigazette.com.sa/rssFeed/0"
+    feed = feedparser.parse(rss_url)
 
+    summaries = []
     for entry in feed.entries:
         title = entry.title
         link = entry.link
         description = entry.description
+        pub_date = entry.published
+
         summary = summarize_text(description)
-        all_summaries.append(f"<b>{title}</b><br>{summary}<br><a href='{link}'>{link}</a><br><br>")
 
-    return all_summaries
+        article_html = f"""
+        <p><strong>{title}</strong><br>
+        <em>{pub_date}</em><br>
+        {summary}<br>
+        <a href="{link}">Read more</a></p>
+        <hr>
+        """
+        summaries.append(article_html)
 
-if __name__ == "__main__":
-    summaries = fetch_and_summarize_articles()
-    for item in summaries:
-        print(item)
-def get_rss_summaries():
-    # Your existing code that fetches, parses, summarizes RSS feeds
-    # For example, return HTML content or list of articles
-    return final_html_output
+    html_output = f"<h2>📰 Daily News Summary</h2>{''.join(summaries)}"
+    return html_output
