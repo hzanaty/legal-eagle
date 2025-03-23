@@ -1,12 +1,13 @@
+# email_sender.py
 import smtplib
 import os
 import base64
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from rss_parser import get_rss_summaries
 import requests
+from rss_parser import get_rss_summaries
 
-# Load secrets
+# Load from GitHub secrets
 EMAIL_SENDER = os.getenv("EMAIL_SENDER")
 EMAIL_RECEIVER = os.getenv("EMAIL_RECEIVER")
 CLIENT_ID = os.getenv("GMAIL_CLIENT_ID")
@@ -26,15 +27,15 @@ def get_gmail_access_token():
         print("✅ Access token retrieved successfully.")
         return response.json()["access_token"]
     else:
-        raise Exception(f"❌ Failed to refresh access token: {response.text}")
+        raise Exception(f"❌ Failed to refresh token: {response.text}")
 
 def send_email(subject, body):
     access_token = get_gmail_access_token()
 
     msg = MIMEMultipart()
-    msg["Subject"] = subject
     msg["From"] = EMAIL_SENDER
     msg["To"] = EMAIL_RECEIVER
+    msg["Subject"] = subject
     msg.attach(MIMEText(body, "html"))
 
     auth_string = f"user={EMAIL_SENDER}\1auth=Bearer {access_token}\1\1"
@@ -50,6 +51,7 @@ def send_email(subject, body):
     except Exception as e:
         print(f"❌ Failed to send email: {e}")
 
-# === Run the full flow ===
-email_body = get_rss_summaries()
-send_email("🗞️ Saudi Gazette - Daily Digest", email_body)
+# --- Run it
+if __name__ == "__main__":
+    html_body = get_rss_summaries()
+    send_email("📰 Daily Saudi Gazette Summary", html_body)
