@@ -37,7 +37,7 @@ def fetch_recent_tweets(user_id):
         "tweet.fields": "created_at,text",
         "start_time": start_time
     }
-    headers = {"Authorization": f"Bearer {BEARER_TOKEN}"}
+    headers = {"Authorization": f"Bearer {X_BEARER_TOKEN}"}
     response = requests.get(url, headers=headers, params=params)
 
     if response.status_code == 200:
