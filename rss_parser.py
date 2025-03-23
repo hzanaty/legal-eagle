@@ -10,7 +10,7 @@ RSS_FEED_URL = "https://saudigazette.com.sa/rssFeed/0"
 def summarize_text(text):
     prompt = f"Summarize the following news article in one simple line using same language used in the article:\n\n{text}"
     try:
-        response = client.chat.completions.create(
+        response = openai.chat.completions.create(
             model="gpt-4o",
             messages=[{"role": "user", "content": prompt}]
         )
