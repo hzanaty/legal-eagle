@@ -39,12 +39,13 @@ def fetch_and_summarize_rss(feed_url):
         link = entry.get("link", "")
         description = entry.get("description", "No Description")
         pub_date = entry.get("published", "")
-        prompt = f"Summarize the following news article in one simple line using same language used in the article: {description}"
-        
-Title: {title}
-Date: {pub_date}
-Description: {description}"
 
+        prompt = f"""Summarize the following article:
+        Title: {title}
+        Link: {link}
+        Date: {pub_date}
+        Description: {description}"""
+        
         openai.api_key = OPENAI_API_KEY
         response = openai.chat.completions.create(
             model="gpt-4o",
