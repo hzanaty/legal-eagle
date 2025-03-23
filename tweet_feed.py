@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 # ========================
 # Configuration
 # ========================
-BEARER_TOKEN = os.getenv("X_BEARER_TOKEN")
+X_BEARER_TOKEN = os.getenv("X_BEARER_TOKEN")
 username = "SaudiGOSI"  # Set the target Twitter username here
 
 # ========================
@@ -14,7 +14,7 @@ username = "SaudiGOSI"  # Set the target Twitter username here
 def get_user_id(username):
     print(f"🔍 Getting user ID for @{username}...")
     url = f"https://api.twitter.com/2/users/by/username/{username}"
-    headers = {"Authorization": f"Bearer {BEARER_TOKEN}"}
+    headers = {"Authorization": f"Bearer {X_BEARER_TOKEN}"}
     response = requests.get(url, headers=headers)
     if response.status_code == 200:
         user_id = response.json()["data"]["id"]
