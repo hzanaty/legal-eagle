@@ -5,6 +5,10 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from rss_parser import get_rss_summaries
 import requests
+from rss_parser import get_rss_summaries
+
+email_body = get_rss_summaries()
+send_email(subject="Daily News Summary", body=email_body)
 
 # === Load secrets from GitHub Actions ENV or key.env ===
 EMAIL_SENDER = os.getenv("EMAIL_SENDER")
