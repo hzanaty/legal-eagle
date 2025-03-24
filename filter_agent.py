@@ -1,89 +1,61 @@
-# filter_agent.py
-
-import openai
 import os
+from openai import OpenAI
+from dotenv import load_dotenv
 
-# === Load OpenAI Key ===
+# === Load environment variables ===
+load_dotenv("key.env")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-client = openai.OpenAI(api_key=OPENAI_API_KEY)
 
-# === Glossary of Relevant Topics ===
-GLOSSARY = """
-Glossary of Relevant Topics:
-- Labor Law
-- Saudization (Nitaqat)
-- Social Insurance (GOSI)
-- HR regulations and policies
-- Wage protection
-- Iqama, work visa, and expat employment
-- Employment contracts and termination rules
-- Vacation, leave, overtime
-- Payroll changes and contributions
-- Any legal or government updates affecting employees or employers in Saudi Arabia
-"""
+# === Initialize OpenAI client ===
+client = OpenAI(api_key=OPENAI_API_KEY)
 
-# === Prompt Builder with Glossary ===
-def build_prompt(content):
+# === Define your glossary of keywords ===
+GLOSSARY = [
+    "GOSI", "social insurance", "MOL", "HRSD", "visa fees", "article 77",
+    "contract termination", "saudization", "termination", "repatriation",
+    "labor law", "tickets", "iqama", "end of service", "vacation", "expat"
+]
+
+# === Build prompt dynamically ===
+def build_prompt(text):
+    glossary_text = ", ".join(GLOSSARY)
     return f"""
-You are a legal policy analyst for HR in Saudi Arabia.
+You are a legal assistant working in the domain of Human Capital Management (HCM) and localization.
 
-{GLOSSARY}
+The following is a glossary of keywords relevant to legal and policy updates:
+{glossary_text}
 
-The following content may or may not relate to one of the above topics.
-
-Your task is to check if the content is **relevant** to the glossary above.
-
-Answer with "Yes" or "No".
+Analyze the following content and answer with only YES or NO: 
+Is the content relevant to the glossary topics?
 
 Content:
-\"\"\"
-{content}
-\"\"\"
-
-Is this content relevant?
+{text}
 """
 
-# === Relevance Checker ===
-def is_relevant(content):
+# === Check if text is relevant ===
+def is_relevant(text):
+    prompt = build_prompt(text)
     try:
         response = client.chat.completions.create(
             model="gpt-4o",
-            messages=[
-                {"role": "system", "content": "You filter HR and legal content for relevance."},
-                {"role": "user", "content": build_prompt(content)}
-            ]
+            messages=[{"role": "user", "content": prompt}]
         )
-        result = response.choices[0].message.content.strip().lower()
-        return result.startswith("yes")
+        answer = response.choices[0].message.content.strip().upper()
+        return answer == "YES"
     except Exception as e:
-        print(f"❌ Failed to filter content: {e}")
+        print(f"❌ Error checking relevance: {e}")
         return False
 
-# === Main Filtering Function ===
-def filter_relevant_items(items):
-    print("🔎 Filtering relevant content...")
-    relevant_items = []
-
-    for item in items:
-        print(f"🧾 Evaluating: {item[:100]}...")  # Print preview
-        if is_relevant(item):
-            print("✅ Marked as relevant.")
-            relevant_items.append(item)
-        else:
-            print("❌ Irrelevant.")
-    return relevant_items
-
-# === Local Test ===
+# === Example usage for local test ===
 if __name__ == "__main__":
-    sample_inputs = [
-        "The Saudi GOSI introduced new parameters to calculate pension eligibility.",
-        "Football match results from the Saudi Pro League.",
-        "A new regulation requires employers to cover repatriation costs for expats upon contract termination.",
-        "Weather in Riyadh expected to hit 45°C this week."
+    sample_items = [
+        "GOSI announces new policy on expat social insurance.",
+        "Apple releases new iPhone 16 with titanium body.",
+        "HRSD updates guidelines for Saudization compliance.",
+        "Weather forecast for Riyadh shows heavy rain next week."
     ]
 
-    relevant = filter_relevant_items(sample_inputs)
-
-    print("\n🎯 Relevant Content Found:")
-    for r in relevant:
-        print(f"- {r}")
+    print("🔎 Filtering relevant content...\n")
+    for item in sample_items:
+        relevant = is_relevant(item)
+        print(f"✅ Relevant: {item}" if relevant else f"❌ Irrelevant: {item}")
