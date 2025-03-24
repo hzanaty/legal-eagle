@@ -48,17 +48,24 @@ def crazy_tweet_agent():
     selected_user = "HRSD_SA" if today % 2 != 0 else "SaudiGOSI"
     user_id = users[selected_user]
     print(f"🗓️ Today is {'odd' if today % 2 != 0 else 'even'} → Picking @{selected_user}")
-    return fetch_recent_tweets(user_id, selected_user)
 
-# ========================
-# Local test block
-# ========================
-if __name__ == "__main__":
-    print("🧪 Running local tweet test...")
-    tweets = crazy_tweet_agent()
-    if tweets:
-        print("📄 Tweets:\n")
-        for tweet in tweets:
-            print(tweet)
-    else:
-        print("⚠️ No tweets found.")
+    tweets = fetch_recent_tweets(user_id, selected_user)
+    tweet_items = []
+
+    for tweet in tweets:
+        created_at = tweet.get("created_at", "")
+        tweet_text = tweet.get("text", "")
+        tweet_id = tweet.get("id", "")
+        tweet_link = f"https://twitter.com/{selected_user}/status/{tweet_id}"
+
+        item = {
+            "source": "Twitter",
+            "title": f"Tweet from @{selected_user}",
+            "summary": tweet_text,
+            "link": tweet_link,
+            "date": created_at.split("T")[0],  # just date
+            "content": f"{tweet_text}\n{tweet_link}\n{created_at}"
+        }
+        tweet_items.append(item)
+
+    return tweet_items
