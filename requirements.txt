@@ -1,4 +1,7 @@
 feedparser
 openai
+requests
+python-dotenv
 google-auth
-google-api-python-client
+google-auth-oauthlib
+google-auth-httplib2
