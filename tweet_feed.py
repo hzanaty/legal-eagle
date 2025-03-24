@@ -42,7 +42,7 @@ def fetch_recent_tweets(user_id, username):
 # ========================
 # Main Crazy Algorithm
 # ========================
-def crazy_tweet_agent():
+def tricky_tweet_feed():
     print("🌀 Starting CRAZY Tweet Feed Agent...")
     today = datetime.utcnow().day
     selected_user = "HRSD_SA" if today % 2 != 0 else "SaudiGOSI"
@@ -72,7 +72,7 @@ def crazy_tweet_agent():
 
 if __name__ == "__main__":
     print("🧪 Running local tweet test...")
-    tweets = crazy_tweet_agent()
+    tweets = tricky_tweet_feed()
     if tweets:
         for tweet in tweets:
             print(f"🕒 {tweet['date']}")
