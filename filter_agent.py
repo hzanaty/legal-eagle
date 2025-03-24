@@ -1,7 +1,7 @@
 import os
 from openai import OpenAI
 from rss_parser import get_rss_items
-from tweet_feed import crazy_tweet_agent
+from tweet_feed import tricky_tweet_feed
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -79,7 +79,7 @@ def filter_relevant_items(items):
 
 if __name__ == "__main__":
     print("🧠 Running Filter Agent on all feeds...")
-    all_content = get_rss_items() + crazy_tweet_agent()
+    all_content = get_rss_items() + tricky_tweet_feed()
     print(f"📦 Total items before deduplication: {len(all_content)}")
 
     unique_content = remove_semantic_duplicates(all_content)
