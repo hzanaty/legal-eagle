@@ -25,7 +25,7 @@ def get_user_id(username):
         return None
 
 def fetch_recent_tweets(user_id):
-    print("📅 Calculating time range for yesterday's tweets...")
+    print("📅 Calculating time range for previous week tweets...")
     seven_days_ago = datetime.utcnow() - timedelta(days=7)
     start_time = seven_days_ago.replace(hour=0, minute=0, second=0, microsecond=0).isoformat("T") + "Z"
     print(f"⏱️ Start time: {start_time}")
