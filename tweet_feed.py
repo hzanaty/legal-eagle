@@ -1,83 +1,64 @@
+# tweet_feed.py
+
 import os
 import requests
+from datetime import datetime
 import time
-from datetime import datetime, timedelta
 
 # ========================
 # Configuration
 # ========================
-X_BEARER_TOKEN = os.getenv("X_BEARER_TOKEN")
-usernames = ["SaudiGOSI", "HRSD_SA"]  # Add more accounts here
+BEARER_TOKEN = os.getenv("X_BEARER_TOKEN")
+users = {
+    "SaudiGOSI": "877253528",
+    "HRSD_SA": "880244007258562560"
+}
 
 # ========================
 # Helper Functions
 # ========================
-def get_user_id(username):
-    print(f"🔍 Getting user ID for @{username}...")
-    url = f"https://api.twitter.com/2/users/by/username/{username}"
-    headers = {"Authorization": f"Bearer {X_BEARER_TOKEN}"}
-    response = requests.get(url, headers=headers)
-    if response.status_code == 200:
-        user_id = response.json()["data"]["id"]
-        print(f"✅ User ID for @{username} is {user_id}")
-        return user_id
-    else:
-        print(f"❌ Failed to get user ID for {username}: {response.text}")
-        return None
-
-def fetch_recent_tweets(user_id):
-    print("📅 Calculating time range for previous week tweets...")
-    seven_days_ago = datetime.utcnow() - timedelta(days=7)
-    start_time = seven_days_ago.replace(hour=0, minute=0, second=0, microsecond=0).isoformat("T") + "Z"
-    print(f"⏱️ Start time: {start_time}")
-
-    print("📥 Fetching tweets...")
+def fetch_recent_tweets(user_id, username):
+    print(f"📥 Fetching tweets for @{username}...")
     url = f"https://api.twitter.com/2/users/{user_id}/tweets"
     params = {
-        "max_results": 10,
+        "max_results": 5,
         "tweet.fields": "created_at,text",
-        "start_time": start_time
+        # you can add filtering later if needed
     }
-    headers = {"Authorization": f"Bearer {X_BEARER_TOKEN}"}
+    headers = {"Authorization": f"Bearer {BEARER_TOKEN}"}
     response = requests.get(url, headers=headers, params=params)
 
     if response.status_code == 200:
         tweets = response.json().get("data", [])
-        print(f"✅ {len(tweets)} tweet(s) retrieved.")
-        return tweets
+        print(f"✅ Retrieved {len(tweets)} tweet(s) from @{username}")
+        return [
+            f"🕒 {tweet['created_at']}<br>💬 {tweet['text']}<br>🔗 https://x.com/{username}/status/{tweet['id']}<br><br>"
+            for tweet in tweets
+        ]
     else:
-        print(f"❌ Failed to fetch tweets: {response.text}")
+        print(f"❌ Failed to fetch tweets for @{username}: {response.text}")
         return []
 
-def fetch_all_tweets():
-    print("🚀 Starting Tweet Feed Agent...")
-    all_tweets = []
-
-    for username in usernames:
-        print(f"\n🔍 Fetching tweets for @{username}...")
-        user_id = get_user_id(username)
-        if not user_id:
-            continue
-        tweets = fetch_recent_tweets(user_id)
-        for tweet in tweets:
-            tweet["source"] = username  # Add username to tweet
-        all_tweets.extend(tweets)
-
-        time.sleep(5)  # ⏱️ Wait 5 seconds to avoid hitting rate limits
-
-    return all_tweets
+# ========================
+# Main Crazy Algorithm
+# ========================
+def crazy_tweet_agent():
+    print("🌀 Starting CRAZY Tweet Feed Agent...")
+    today = datetime.utcnow().day
+    selected_user = "HRSD_SA" if today % 2 != 0 else "SaudiGOSI"
+    user_id = users[selected_user]
+    print(f"🗓️ Today is {'odd' if today % 2 != 0 else 'even'} → Picking @{selected_user}")
+    return fetch_recent_tweets(user_id, selected_user)
 
 # ========================
-# Local Test Block
+# Local test block
 # ========================
 if __name__ == "__main__":
-    print("🧪 Testing Twitter API access...")
-    tweets = fetch_all_tweets()
+    print("🧪 Running local tweet test...")
+    tweets = crazy_tweet_agent()
     if tweets:
-        print(f"\n📄 Printing {len(tweets)} tweet(s):\n")
+        print("📄 Tweets:\n")
         for tweet in tweets:
-            print(f"📢 @{tweet['source']}")
-            print(f"🕒 {tweet['created_at']}")
-            print(f"💬 {tweet['text']}\n")
+            print(tweet)
     else:
         print("⚠️ No tweets found.")
