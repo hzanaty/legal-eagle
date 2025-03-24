@@ -51,3 +51,6 @@ if __name__ == "__main__":
         print("🧠 Analysis:")
         print(analyze_legal_impact(item))
         print("=" * 80)
+
+def get_lpm_analysis():
+    return investigate_news()
