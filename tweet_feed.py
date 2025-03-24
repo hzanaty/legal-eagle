@@ -69,3 +69,14 @@ def crazy_tweet_agent():
         tweet_items.append(item)
 
     return tweet_items
+
+if __name__ == "__main__":
+    print("🧪 Running local tweet test...")
+    tweets = crazy_tweet_agent()
+    if tweets:
+        for tweet in tweets:
+            print(f"🕒 {tweet['date']}")
+            print(f"💬 {tweet['summary']}")
+            print(f"🔗 {tweet['link']}\n")
+    else:
+        print("⚠️ No tweets found.")
