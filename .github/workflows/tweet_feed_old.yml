@@ -1,4 +1,4 @@
-name: Daily Tweet Feed Test
+name: Tweet Feed Old
 
 on:
   workflow_dispatch:  # manual trigger for now
