@@ -1,5 +1,6 @@
 import os
 import requests
+import time
 from datetime import datetime, timedelta
 
 # ========================
@@ -61,6 +62,8 @@ def fetch_all_tweets():
         for tweet in tweets:
             tweet["source"] = username  # Add username to tweet
         all_tweets.extend(tweets)
+
+        time.sleep(5)  # ⏱️ Wait 5 seconds to avoid hitting rate limits
 
     return all_tweets
 
