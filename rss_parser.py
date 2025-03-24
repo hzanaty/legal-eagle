@@ -21,9 +21,9 @@ def summarize_text(text):
         print(f"❌ Failed to summarize: {e}")
         return "⚠️ Summary unavailable."
 
-def get_rss_summaries():
+def get_rss_content():
     feed = feedparser.parse(RSS_FEED_URL)
-    summaries = []
+    rss_items = []
 
     for entry in feed.entries:
         title = entry.title
@@ -31,6 +31,15 @@ def get_rss_summaries():
         description = entry.get("description", "")
         pub_date = entry.get("published", "")
         summary = summarize_text(description)
-        summaries.append(f"<b>{title}</b><br>{summary}<br><a href='{link}'>Read more</a><br><i>{pub_date}</i><br><br>")
 
-    return "".join(summaries)
+        item = {
+            "source": "RSS",
+            "title": title,
+            "summary": summary,
+            "link": link,
+            "date": pub_date,
+            "content": f"{title}\n{summary}\n{link}\n{pub_date}"
+        }
+        rss_items.append(item)
+
+    return rss_items
