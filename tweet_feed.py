@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 # Configuration
 # ========================
 X_BEARER_TOKEN = os.getenv("X_BEARER_TOKEN")
-username = "SaudiGOSI"  # Set the target Twitter username here
+usernames = ["SaudiGOSI", "HRSD_SA"]  # Add more accounts here
 
 # ========================
 # Helper Functions
@@ -26,8 +26,8 @@ def get_user_id(username):
 
 def fetch_recent_tweets(user_id):
     print("📅 Calculating time range for yesterday's tweets...")
-    yesterday = datetime.utcnow() - timedelta(days=1)
-    start_time = yesterday.replace(hour=0, minute=0, second=0, microsecond=0).isoformat("T") + "Z"
+    seven_days_ago = datetime.utcnow() - timedelta(days=7)
+    start_time = seven_days_ago.replace(hour=0, minute=0, second=0, microsecond=0).isoformat("T") + "Z"
     print(f"⏱️ Start time: {start_time}")
 
     print("📥 Fetching tweets...")
@@ -50,20 +50,30 @@ def fetch_recent_tweets(user_id):
 
 def fetch_all_tweets():
     print("🚀 Starting Tweet Feed Agent...")
-    user_id = get_user_id(username)
-    if not user_id:
-        return []
-    return fetch_recent_tweets(user_id)
+    all_tweets = []
+
+    for username in usernames:
+        print(f"\n🔍 Fetching tweets for @{username}...")
+        user_id = get_user_id(username)
+        if not user_id:
+            continue
+        tweets = fetch_recent_tweets(user_id)
+        for tweet in tweets:
+            tweet["source"] = username  # Add username to tweet
+        all_tweets.extend(tweets)
+
+    return all_tweets
 
 # ========================
 # Local Test Block
 # ========================
 if __name__ == "__main__":
-    print(f"🧪 Testing Twitter API access for: @{username}")
+    print("🧪 Testing Twitter API access...")
     tweets = fetch_all_tweets()
     if tweets:
-        print(f"📄 Printing {len(tweets)} tweet(s):\n")
+        print(f"\n📄 Printing {len(tweets)} tweet(s):\n")
         for tweet in tweets:
+            print(f"📢 @{tweet['source']}")
             print(f"🕒 {tweet['created_at']}")
             print(f"💬 {tweet['text']}\n")
     else:
