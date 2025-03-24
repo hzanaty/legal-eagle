@@ -1,61 +1,92 @@
 import os
 from openai import OpenAI
+from rss_parser import get_rss_items
+from tweet_feed import crazy_tweet_agent
 from dotenv import load_dotenv
 
-# === Load environment variables ===
-load_dotenv("key.env")
+load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-
-# === Initialize OpenAI client ===
 client = OpenAI(api_key=OPENAI_API_KEY)
 
-# === Define your glossary of keywords ===
-GLOSSARY = [
-    "GOSI", "social insurance", "MOL", "HRSD", "visa fees", "article 77",
-    "contract termination", "saudization", "termination", "repatriation",
-    "labor law", "tickets", "iqama", "end of service", "vacation", "expat"
-]
+def get_glossary():
+    return (
+        "Focus on topics related to labor contracts, iqama and visa, leaves, end of service, "
+        "labor courts, social insurance (GOSI), labor disciplinary and violations, remote work, "
+        "part-time, working hours, Saudization or Nitaqat, Wage Protection, labor law, income tax."
+    )
 
-# === Build prompt dynamically ===
-def build_prompt(text):
-    glossary_text = ", ".join(GLOSSARY)
+def build_filter_prompt(glossary, content):
     return f"""
-You are a legal assistant working in the domain of Human Capital Management (HCM) and localization.
+You are a legal policy analyst working in Human Capital Management (HCM). Your job is to assess whether the following news content is relevant to the HR domain based on this glossary of critical topics:
 
-The following is a glossary of keywords relevant to legal and policy updates:
-{glossary_text}
-
-Analyze the following content and answer with only YES or NO: 
-Is the content relevant to the glossary topics?
+Glossary:
+{glossary}
 
 Content:
-{text}
+""" + content + """
+
+Please respond with only "Yes" if the content relates to one or more topics from the glossary, or "No" if it does not.
 """
 
-# === Check if text is relevant ===
 def is_relevant(text):
-    prompt = build_prompt(text)
+    glossary = get_glossary()
+    prompt = build_filter_prompt(glossary, text)
     try:
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=[{"role": "user", "content": prompt}]
         )
-        answer = response.choices[0].message.content.strip().upper()
-        return answer == "YES"
+        reply = response.choices[0].message.content.strip().lower()
+        return "yes" in reply
     except Exception as e:
-        print(f"❌ Error checking relevance: {e}")
+        print(f"❌ Failed to check relevance: {e}")
         return False
 
-# === Example usage for local test ===
-if __name__ == "__main__":
-    sample_items = [
-        "GOSI announces new policy on expat social insurance.",
-        "Apple releases new iPhone 16 with titanium body.",
-        "HRSD updates guidelines for Saudization compliance.",
-        "Weather forecast for Riyadh shows heavy rain next week."
-    ]
+def are_semantically_duplicate(text1, text2):
+    prompt = f"""
+Are the following two news snippets conveying the same or highly similar meaning, even if phrased differently?
 
-    print("🔎 Filtering relevant content...\n")
-    for item in sample_items:
-        relevant = is_relevant(item)
-        print(f"✅ Relevant: {item}" if relevant else f"❌ Irrelevant: {item}")
+Text 1: {text1}
+Text 2: {text2}
+
+Reply with only "Yes" or "No".
+"""
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        reply = response.choices[0].message.content.strip().lower()
+        return "yes" in reply
+    except Exception as e:
+        print(f"❌ Failed to compare for duplication: {e}")
+        return False
+
+def remove_semantic_duplicates(items):
+    unique_items = []
+    for item in items:
+        duplicate = False
+        for existing in unique_items:
+            if are_semantically_duplicate(item, existing):
+                duplicate = True
+                break
+        if not duplicate:
+            unique_items.append(item)
+    return unique_items
+
+def filter_relevant_items(items):
+    return [item for item in items if is_relevant(item)]
+
+if __name__ == "__main__":
+    print("🧠 Running Filter Agent on all feeds...")
+    all_content = get_rss_items() + crazy_tweet_agent()
+    print(f"📦 Total items before deduplication: {len(all_content)}")
+
+    unique_content = remove_semantic_duplicates(all_content)
+    print(f"🧹 Unique items after deduplication: {len(unique_content)}")
+
+    relevant_items = filter_relevant_items(unique_content)
+    print(f"✅ Relevant items after filtering: {len(relevant_items)}\n")
+
+    for item in relevant_items:
+        print("📌", item, "\n")
