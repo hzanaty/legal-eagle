@@ -1,4 +1,4 @@
-name: Daily RSS & Tweet Agent with LPM
+name: LPM Super Agent
 
 on:
   schedule:
