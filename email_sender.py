@@ -5,7 +5,7 @@ import base64
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import requests
-from rss_parser import get_rss_summaries
+from lpm_agent import get_lpm_analysis
 
 # Load from GitHub secrets
 EMAIL_SENDER = os.getenv("EMAIL_SENDER")
@@ -53,5 +53,5 @@ def send_email(subject, body):
 
 # --- Run it
 if __name__ == "__main__":
-    html_body = get_rss_summaries()
-    send_email("📰 Daily Saudi Gazette Summary", html_body)
+    html_body = get_lpm_analysis()
+    send_email("📰 Daily Saudi Feed", html_body)
