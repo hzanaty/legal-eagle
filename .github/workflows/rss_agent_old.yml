@@ -1,4 +1,4 @@
-name: RSS Agent Job
+name: RSS Agent Old
 
 on:
   workflow_dispatch:
