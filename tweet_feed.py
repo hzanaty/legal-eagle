@@ -42,32 +42,46 @@ def fetch_recent_tweets(user_id, username):
 # ========================
 # Main Crazy Algorithm
 # ========================
+# def tricky_tweet_feed():
+#     print("🌀 Starting Tricky Tweet Feed Agent...")
+#     today = datetime.utcnow().day
+#     selected_user = "HRSD_SA" if today % 2 != 0 else "SaudiGOSI"
+#     user_id = users[selected_user]
+#     print(f"🗓️ Today is {'odd' if today % 2 != 0 else 'even'} → Picking @{selected_user}")
+
+#     tweets = fetch_recent_tweets(user_id, selected_user)
+#     tweet_items = []
+
+#     for tweet in tweets:
+#         created_at = tweet.get("created_at", "")
+#         tweet_text = tweet.get("text", "")
+#         tweet_id = tweet.get("id", "")
+#         tweet_link = f"https://twitter.com/{selected_user}/status/{tweet_id}"
+
+#         item = {
+#             "source": "Twitter",
+#             "title": f"Tweet from @{selected_user}",
+#             "summary": tweet_text,
+#             "link": tweet_link,
+#             "date": created_at.split("T")[0],  # just date
+#             "content": f"{tweet_text}\n{tweet_link}\n{created_at}"
+#         }
+#         tweet_items.append(item)
+
+#     return tweet_items
+
 def tricky_tweet_feed():
-    print("🌀 Starting CRAZY Tweet Feed Agent...")
-    today = datetime.utcnow().day
-    selected_user = "HRSD_SA" if today % 2 != 0 else "SaudiGOSI"
-    user_id = users[selected_user]
-    print(f"🗓️ Today is {'odd' if today % 2 != 0 else 'even'} → Picking @{selected_user}")
+    print("🌀 Starting TRICKY Tweet Feed Agent...")
 
-    tweets = fetch_recent_tweets(user_id, selected_user)
-    tweet_items = []
-
-    for tweet in tweets:
-        created_at = tweet.get("created_at", "")
-        tweet_text = tweet.get("text", "")
-        tweet_id = tweet.get("id", "")
-        tweet_link = f"https://twitter.com/{selected_user}/status/{tweet_id}"
-
-        item = {
-            "source": "Twitter",
-            "title": f"Tweet from @{selected_user}",
-            "summary": tweet_text,
-            "link": tweet_link,
-            "date": created_at.split("T")[0],  # just date
-            "content": f"{tweet_text}\n{tweet_link}\n{created_at}"
-        }
-        tweet_items.append(item)
-
+    print("🧪 Using hardcoded tweet for testing purposes...")
+    tweet_items = [{
+        "source": "Twitter",
+        "title": "Tweet from @SaudiGOSI",
+        "summary": "موافقة مجلس الوزراء على نظام التأمينات الاجتماعية الجديد وقصر تطبيقه على الملتحقين الجدد بالعمل",
+        "link": "https://x.com/SaudiGOSI/status/1234567890",
+        "date": "2025-03-22",
+        "content": "موافقة مجلس الوزراء على نظام التأمينات الاجتماعية الجديد وقصر تطبيقه على الملتحقين الجدد بالعمل\nhttps://x.com/SaudiGOSI/status/1234567890\n2025-03-22"
+    }]
     return tweet_items
 
 if __name__ == "__main__":
