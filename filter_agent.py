@@ -77,30 +77,42 @@ def remove_semantic_duplicates(items):
     return unique_items
 
 def filter_relevant_items(items):
-    return [item for item in items if is_relevant(item)]
+    relevant = []
+    for i, item in enumerate(items):
+        print(f"🔍 Checking item {i+1}/{len(items)}...")
+        try:
+            if is_relevant(item["content"]):
+                relevant.append(item["content"])
+        except Exception as e:
+            print(f"❌ Failed to filter item {i+1}: {e}")
+    return relevant
 
 if __name__ == "__main__":
 
-    print("🧠 Running Filter Agent on all feeds...")
+    try:
+        print("🧠 Running Filter Agent on all feeds...")
+        
+        print("🔄 Getting RSS items...")
+        rss_items = get_rss_items()
+        print(f"📥 RSS items fetched: {len(rss_items)}")
+        
+        print("🔄 Getting Tweet feed...")
+        tweet_items = tricky_tweet_feed()
+        print(f"🐦 Tweets fetched: {len(tweet_items)}")
+        
+        all_content = rss_items + tweet_items
+        print(f"📦 Total items before deduplication: {len(all_content)}")
     
-    print("🔄 Getting RSS items...")
-    rss_items = get_rss_items()
-    print(f"📥 RSS items fetched: {len(rss_items)}")
-    
-    print("🔄 Getting Tweet feed...")
-    tweet_items = tricky_tweet_feed()
-    print(f"🐦 Tweets fetched: {len(tweet_items)}")
-    
-    all_content = rss_items + tweet_items
-    print(f"📦 Total items before deduplication: {len(all_content)}")
-
-    start = time.time()
-    unique_content = remove_semantic_duplicates(all_content)
-    print(f"🧹 Deduplication done in {round(time.time() - start, 2)}s")
-    
-    start = time.time()
-    relevant_items = filter_relevant_items(unique_content)
-    print(f"✅ Relevance filtering done in {round(time.time() - start, 2)}s")
-    
-    for item in relevant_items:
-        print("📌", item, "\n")
+        start = time.time()
+        unique_content = remove_semantic_duplicates(all_content)
+        print(f"🧹 Deduplication done in {round(time.time() - start, 2)}s")
+        
+        start = time.time()
+        relevant_items = filter_relevant_items(unique_content)
+        print(f"✅ Relevance filtering done in {round(time.time() - start, 2)}s")
+        
+        for item in relevant_items:
+            print("📌", item, "\n")
+            
+      except Exception as e:
+        print(f"💥 Script failed unexpectedly: {e}")
