@@ -32,7 +32,7 @@ Input = We have these News: {content} from “Saudi Arabia” I need you to foll
    (g) Effective Date
    (h) Full analysis
    - category: One of legal_change, new_law, event, workshop, statistical, other
-   - score: Confidence score from 10% to 100% (estimate)
+   - score: Confidence score from 1 to 10 (as a number)
 4. "Trusted Saudi legal sources" (based on the authority in the news context) are:
 - Ministry of Human Resources and Social Development = "https://www.hrsd.gov.sa/knowledge-centre/decisions-and-regulations/ministerial-decisions" AND "https://www.hrsd.gov.sa/knowledge-centre/decisions-and-regulations/regulation-and-procedures"
 - Social Insurance GOSI = "https://www.gosi.gov.sa/ar/SystemsAndRegulations"
@@ -50,10 +50,16 @@ Use HTML formatting inside the "html_analysis" field only.
                 {"role": "user", "content": prompt},
             ]
         )
-        return response.choices[0].message.content.strip()
+        result_str = response.choices[0].message.content.strip()
+        try:
+            result = json.loads(result_str)
+        except json.JSONDecodeError as e:
+            print("⚠️ JSON parsing failed. Raw output:\n", result_str)
+            return {"category": "other", "html_analysis": f"<p>⚠️ Failed to parse JSON: {e}</p>", "score": 0}
+        return result
     except Exception as e:
-        return f"❌ Failed to analyze: {e}"
-
+        return {"category": "other", "html_analysis": f"<p>❌ Failed to analyze: {e}</p>", "score": 0}
+        
 # ======= Sorting based on priority ========
 def sort_and_concatenate(results):
     priority_order = ["legal_change", "law_event", "statistical", "other"]
