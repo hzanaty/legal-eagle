@@ -33,3 +33,9 @@ def get_rss_items():
 
     print(f"✅ Total parsed RSS items: {len(rss_items)}")
     return rss_items
+
+if __name__ == "__main__":
+    items = get_rss_items()
+    print("🧾 Example output:")
+    for item in items:
+        print(f"- {item['title']} ({item['date']})")
