@@ -23,8 +23,6 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run RSS Parser
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: python rss_parser.py
 
       - name: Run Tweet Feed Agent
