@@ -1,7 +1,13 @@
 import os
+from openai import OpenAI
 from rss_parser import get_rss_items
 from tweet_feed import tricky_tweet_feed
+from dotenv import load_dotenv
 import time
+ 
+load_dotenv()
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 def get_glossary():
     return (
