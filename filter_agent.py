@@ -87,27 +87,31 @@ def get_relevant_news(items):
             print(f"❌ Failed to filter item {i+1}: {e}")
     return relevant
 
+def collect_and_filter_news():
+    print("📡 Collecting items from RSS and Twitter...")
+    rss_items = get_rss_items()
+    tweet_items = tricky_tweet_feed()
+    all_items = rss_items + tweet_items
+    print(f"📦 Total items before deduplication: {len(all_items)}")
+
+    start = time.time()
+    unique_items = remove_semantic_duplicates(all_items)
+    print(f"🧹 Deduplication done in {round(time.time() - start, 2)}s")
+
+    start = time.time()
+    relevant_items = get_relevant_news(unique_items)
+    print(f"✅ Relevant items after filtering: {len(relevant_items)}")
+    print(f"⏱️ Relevance filtering done in {round(time.time() - start, 2)}s")
+
+    return relevant_items
+
 if __name__ == "__main__":
-    import time
     try:
-        print("🧠 Running Filter Agent on all feeds...")
-
-        start = time.time()
-        rss_items = get_rss_items()
-        tweet_items = tricky_tweet_feed()
-        all_content = rss_items + tweet_items
-        print(f"📦 Total items before deduplication: {len(all_content)}")
-
-        unique_content = remove_semantic_duplicates(all_content)
-        print(f"🧹 Deduplication done in {round(time.time() - start, 2)}s")
-
-        start = time.time()
-        relevant_news = get_relevant_news(unique_content)
-        print(f"✅ Relevant items after filtering: {len(relevant_news)}")
-        print(f"⏱️ Relevance filtering done in {round(time.time() - start, 2)}s")
-
-        for item in relevant_news:
+        final_news = collect_and_filter_news()
+        for item in final_news:
             print("📌", item, "\n")
+    except Exception as e:
+        print(f"💥 Script failed unexpectedly: {e}")
 
     except Exception as e:
         print(f"💥 Script failed unexpectedly: {e}")
