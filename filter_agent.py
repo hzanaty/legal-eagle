@@ -107,7 +107,7 @@ def filtered_news():
 
 if __name__ == "__main__":
     try:
-        final_news = collect_and_filter_news()
+        final_news = filtered_news()
         for item in final_news:
             print("📌", item, "\n")
     except Exception as e:
