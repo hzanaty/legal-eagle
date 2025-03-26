@@ -24,9 +24,10 @@ Input = We have these News: {content} from “Saudi Arabia” I need you to foll
 1. Categorize the news as one of: legal_change, new_law, event, workshop, statistical, other
 2. If it's legal_change or new_law:
    a. Is it a new law or a change to existing one?
-   b. Provide details using deep research from "trusted Saudi legal sources" provided below based on the authority in the news context.
-   c. In case it is a chnage then find which articles were impacted by the changes and brief about each article.
-   d. Assess impact on SAP SuccessFactors: Employee Central, Time Tracking, Payroll. The impact you assess should be based on statements written in the law article (not guessing)
+   b. Provide details using deep research from "trusted Saudi legal sources" provided at the end of this prompt, you will find the right source based on the authority in the news context.
+   c. The details that i am expecting are list of all articles with artilce number and summary.
+   d. In case it is a chnage then highlight which articles were impacted by the changes and brief about what changed exactly.
+   e. Assess impact on SAP SuccessFactors: Employee Central, Time Tracking, Payroll. The impact you assess should be based on statements written in the law article (not guessing)
 3. Return a final result in JSON format with these fields:
    - html_analysis: Full analysis as HTML block with following 8 elements:
    (a) Short title of the news
