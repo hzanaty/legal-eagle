@@ -32,7 +32,7 @@ def fetch_recent_tweets(user_id, username):
         tweets = response.json().get("data", [])
         print(f"✅ Retrieved {len(tweets)} tweet(s) from @{username}")
         return [
-            f"🕒 {datetime.strptime(tweet['created_at']}<br>💬 {tweet['text']}<br>🔗 https://x.com/{username}/status/{tweet['id']}<br><br>"
+            f"🕒 {datetime.strptime(tweet['created_at'])}<br>💬 {tweet['text']}<br>🔗 https://x.com/{username}/status/{tweet['id']}<br><br>"
             for tweet in tweets
         ]
     else:
