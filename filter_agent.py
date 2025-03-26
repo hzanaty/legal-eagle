@@ -76,7 +76,7 @@ def remove_semantic_duplicates(items):
             unique_items.append(item)
     return unique_items
 
-def filter_relevant_items(items):
+def get_relevant_news(items):
     relevant = []
     for i, item in enumerate(items):
         print(f"🔍 Checking item {i+1}/{len(items)}...")
@@ -102,11 +102,11 @@ if __name__ == "__main__":
         print(f"🧹 Deduplication done in {round(time.time() - start, 2)}s")
 
         start = time.time()
-        relevant_items = filter_relevant_items(unique_content)
-        print(f"✅ Relevant items after filtering: {len(relevant_items)}")
+        relevant_news = get_relevant_news(unique_content)
+        print(f"✅ Relevant items after filtering: {len(relevant_news)}")
         print(f"⏱️ Relevance filtering done in {round(time.time() - start, 2)}s")
 
-        for item in relevant_items:
+        for item in relevant_news:
             print("📌", item, "\n")
 
     except Exception as e:
