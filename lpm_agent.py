@@ -85,7 +85,7 @@ def sort_and_concatenate(results):
 # ======= Run against filtered news ========
 if __name__ == "__main__":
     print("🔍 Running Legal Policy Manager Agent on filtered content...")
-    filtered_news = get_relevant_news()
+    filtered_news = filtered_news()
     results = []
 
     for item in filtered_news:
