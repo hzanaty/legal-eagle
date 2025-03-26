@@ -1,6 +1,7 @@
 # lpm_agent.py
 import os
 import openai
+import re
 import json
 from filter_agent import filtered_news
 from collections import defaultdict
@@ -8,6 +9,11 @@ from collections import defaultdict
 # Load OpenAI API key from environment variables (GitHub secrets)
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 client = openai.OpenAI(api_key=OPENAI_API_KEY)
+
+def clean_json_string(json_string):
+    # Remove triple backtick code block if it exists
+    cleaned = re.sub(r"^```(?:json)?|```$", "", json_string.strip(), flags=re.MULTILINE)
+    return cleaned.strip()
 
 def analyze_legal_impact(content):
     prompt = f"""
@@ -42,6 +48,7 @@ Input = We have these News: {content} from “Saudi Arabia” I need you to foll
 
 Use HTML formatting inside the "html_analysis" field only.
 """
+
     try:
         response = client.chat.completions.create(
             model="gpt-4o",
@@ -51,12 +58,16 @@ Use HTML formatting inside the "html_analysis" field only.
             ]
         )
         result_str = response.choices[0].message.content.strip()
+        cleaned_json = clean_json_string(result_str)
+
         try:
-            result = json.loads(result_str)
+            result = json.loads(cleaned_json)
         except json.JSONDecodeError as e:
             print("⚠️ JSON parsing failed. Raw output:\n", result_str)
             return {"category": "other", "html_analysis": f"<p>⚠️ Failed to parse JSON: {e}</p>", "score": 0}
+
         return result
+
     except Exception as e:
         return {"category": "other", "html_analysis": f"<p>❌ Failed to analyze: {e}</p>", "score": 0}
         
