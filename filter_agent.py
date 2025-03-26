@@ -87,7 +87,7 @@ def get_relevant_news(items):
             print(f"❌ Failed to filter item {i+1}: {e}")
     return relevant
 
-def collect_and_filter_news():
+def filtered_news():
     print("📡 Collecting items from RSS and Twitter...")
     rss_items = get_rss_items()
     tweet_items = tricky_tweet_feed()
