@@ -2,7 +2,7 @@
 import os
 import openai
 import json
-from filter_agent import get_relevant_news
+from filter_agent import filtered_news
 from collections import defaultdict
 
 # Load OpenAI API key from environment variables (GitHub secrets)
