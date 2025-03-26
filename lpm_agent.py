@@ -22,11 +22,12 @@ Input = We have this news from “Saudi Arabia” {content} I need you to do the
 (d) Reference for “أمر ملكي” and “قرار مجلس الوزراء”
 (e) Publishing Date
 (f) Effective Date
-Search in the following portals (based on the authority in the news context) to get the above information:
-- Ministry of Human Resources and Social Development = https://www.hrsd.gov.sa/knowledge-centre/decisions-and-regulations/ministerial-decisions AND https://www.hrsd.gov.sa/knowledge-centre/decisions-and-regulations/regulation-and-procedures
-- Social Insurance GOSI = https://www.gosi.gov.sa/ar/SystemsAndRegulations
-- Saudi Data & AI Authority (SDAIA) = https://sdaia.gov.sa/en/SDAIA/about/Pages/RegulationsAndPolicies.aspx
-- There are also general sources for all laws in Saudi Arabia = https://laws.boe.gov.sa/BoeLaws/Laws/Search AND https://saudipedia.com/en/ BUT sometimes they are not up-to-date so don’t get any information from there unless it is the latest (very close to the news publishing date)
+Make deep research in the following portals (based on the authority in the news context) to get the above information:
+- Ministry of Human Resources and Social Development = "https://www.hrsd.gov.sa/knowledge-centre/decisions-and-regulations/ministerial-decisions" AND "https://www.hrsd.gov.sa/knowledge-centre/decisions-and-regulations/regulation-and-procedures"
+- Social Insurance GOSI = "https://www.gosi.gov.sa/ar/SystemsAndRegulations"
+- Saudi Data & AI Authority (SDAIA) = "https://sdaia.gov.sa/en/SDAIA/about/Pages/RegulationsAndPolicies.aspx"
+- There are also general sources for all laws in Saudi Arabia BUT sometimes they are not up-to-date so don’t get any information from there unless it is the latest (very close to the news publishing date), these sources are:
+"https://laws.boe.gov.sa/BoeLaws/Laws/Search" AND "https://saudipedia.com/en/ AND https://uqn.gov.sa/DecisionsAndSystems"
 (4) In case it is law/regulation changes then use the above "deep research" technique to find which articles were impacted by the law or regulation changes and brief for each article.
 (5) if it is related to law/regulation then assess the impact on SAP SuccessFactors Employee Central, Time Tracking and Payroll. The impact you assess should be based on statements written in the law article (not guessing)
 """
