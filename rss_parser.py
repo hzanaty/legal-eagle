@@ -7,7 +7,7 @@ from openai import OpenAIError
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=OPENAI_API_KEY)
 
-RSS_FEED_URL = "https://saudigazette.com.sa/rssFeed/0"
+RSS_FEED_URL = "https://saudigazette.com.sa/rssFeed/74"
 
 def summarize_text(text):
     prompt = f"Summarize the following news article in one simple line using same language used in the article:\n\n{text}"
@@ -21,7 +21,7 @@ def summarize_text(text):
         print(f"❌ Failed to summarize: {e}")
         return "⚠️ Summary unavailable."
 
-def get_rss_content():
+def get_rss_items():
     feed = feedparser.parse(RSS_FEED_URL)
     rss_items = []
 
