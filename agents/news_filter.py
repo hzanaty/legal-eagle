@@ -5,17 +5,12 @@ from dotenv import load_dotenv
 from rss_parser import get_rss_items
 from tweet_feed import tricky_tweet_feed
 
+# NEW: import glossary from config
+from configurations.agents_config import glossary
+
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=OPENAI_API_KEY)
-
-def get_glossary():
-    return (
-        "Focus on topics related to labor contracts, iqama and visa, leaves, end of service, "
-        "labor courts, social insurance (GOSI), health insurance, labor disciplinary and violations, remote work, "
-        "part-time, working hours, Saudization or Nitaqat, Wage Protection, labor law, income tax, "
-        "payroll, currency, data protection, data residency, service duration, calendar"
-    )
 
 def build_filter_prompt(glossary, content):
     return f"""
