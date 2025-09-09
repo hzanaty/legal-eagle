@@ -42,7 +42,7 @@ def get_relevant_news(items):
     relevant = []
     for i, item in enumerate(items):
         print(f"🔍 Checking item {i+1}/{len(items)} → {item['title'][:80]}...")
-        if is_relevant(item):
+        if is_relevant(item["content"]):
             relevant.append(item)
     return relevant
 
