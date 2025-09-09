@@ -1,42 +1,51 @@
-import os
-import datetime
+# agents/agents_controller.py
+
 from agents.rss_parser import get_rss_items
-from agents.tweet_feed import fetch_recent_tweets
-from configurations.agents_config import AGENTS_CONFIG
+from agents.tweet_feed import tricky_tweet_feed
+from agents.news_filter import get_relevant_news
+from configurations.agents_config import rss_urls, tweet_accounts
 
+from datetime import datetime
 
-def run_rss_parser():
-    print("📡 Running RSS Parser Agent...")
-    all_rss_items = []
-    for url in AGENTS_CONFIG["rss_urls"]:
-        print(f"🌐 Parsing RSS feed: {url}")
-        rss_items = get_rss_items(url)
-        all_rss_items.extend(rss_items)
-    print(f"📦 Total RSS items collected: {len(all_rss_items)}\n")
-    return all_rss_items
+def collect_rss_news():
+    all_rss_news = []
+    for url in rss_urls:
+        print(f"🌐 Fetching RSS from: {url}")
+        all_rss_news.extend(get_rss_items(url))
+    return all_rss_news
 
+def collect_tweets():
+    # Determine account to fetch based on the day (odd/even)
+    today_day = datetime.utcnow().day
+    sorted_accounts = sorted(tweet_accounts.items())
+    selected_index = today_day % len(sorted_accounts)
+    selected_name, selected_id = sorted_accounts[selected_index]
 
-def run_tweet_feed():
-    print("🐦 Running Tweet Feed Agent...")
-    tweet_accounts = AGENTS_CONFIG["tweet_accounts"]
-    total_accounts = len(tweet_accounts)
+    print(f"🐦 Today is day {today_day} → Selected account: @{selected_name}")
+    return tricky_tweet_feed(user_id=selected_id, username=selected_name)
 
-    # Use day of week (0 = Monday, 6 = Sunday) to select account
-    today = datetime.datetime.utcnow().weekday()
-    selected_index = today % total_accounts
-    selected_account = list(tweet_accounts.items())[selected_index]  # (username, user_id)
+def run_controller():
+    print("\n🚀 Starting Controller Agent\n" + "-"*40)
 
-    username, user_id = selected_account
-    print(f"🗓️ Today is {datetime.date.today()} → Selected account: @{username}")
+    # Step 1: Fetch RSS items
+    rss_news = collect_rss_news()
 
-    tweets = fetch_recent_tweets(user_id, username)
-    return tweets
+    # Step 2: Fetch Tweets
+    tweet_news = collect_tweets()
 
+    # Step 3: Merge and filter news
+    all_news = rss_news + tweet_news
+    print(f"\n📦 Total news items collected: {len(all_news)}")
+    relevant_news = get_relevant_news(all_news)
+    print(f"✅ Relevant news after filtering: {len(relevant_news)}\n")
+
+    # Optional: preview output
+    for item in relevant_news:
+        print(f"📌 {item['title']}")
+        print(f"📝 {item['summary']}")
+        print(f"🔗 {item['link']}\n")
+
+    return relevant_news
 
 if __name__ == "__main__":
-    rss_items = run_rss_parser()
-    tweet_items = run_tweet_feed()
-
-    # Placeholder for combining and passing to next agent
-    all_items = rss_items + tweet_items
-    print(f"🧠 Combined items ready for filtering: {len(all_items)}")
+    run_controller()
