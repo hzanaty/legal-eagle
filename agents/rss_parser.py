@@ -1,41 +1,22 @@
-import feedparser
-
-RSS_FEED_URL = "https://saudigazette.com.sa/rssFeed/74"
-
-def get_rss_items():
-    print("🌐 Fetching RSS feed...")
-    feed = feedparser.parse(RSS_FEED_URL)
-
-    if not feed.entries:
-        print("⚠️ No entries found in the RSS feed.")
-        return []
-
+def parse_rss_feed(url):
+    feed = feedparser.parse(url)
     rss_items = []
-    print(f"📄 Found {len(feed.entries)} items in the RSS feed.")
 
-    for i, entry in enumerate(feed.entries):
+    for entry in feed.entries:
         title = entry.title
         link = entry.link
         description = entry.get("description", "")
         pub_date = entry.get("published", "")
+        summary = description  # or later you can add GPT summarization
 
         item = {
             "source": "RSS",
             "title": title,
-            "summary": description,
+            "summary": summary,
             "link": link,
             "date": pub_date,
-            "content": f"{title}\n{description}\n{link}\n{pub_date}"
+            "content": f"{title}\n{summary}\n{link}\n{pub_date}"
         }
-
-        print(f"📰 Item {i+1}: {title}")
         rss_items.append(item)
 
-    print(f"✅ Total parsed RSS items: {len(rss_items)}")
     return rss_items
-
-if __name__ == "__main__":
-    items = get_rss_items()
-    print("🧾 Example output:")
-    for item in items:
-        print(f"- {item['title']} ({item['date']})")
