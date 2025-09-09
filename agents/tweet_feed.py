@@ -1,96 +1,55 @@
-# tweet_feed.py
+# agents/tweet_feed.py
 
 import os
 import requests
 from datetime import datetime
-import time
+from dotenv import load_dotenv
 
-# ========================
-# Configuration
-# ========================
+load_dotenv()
 BEARER_TOKEN = os.getenv("X_BEARER_TOKEN")
-users = {
-    "SaudiGOSI": "877253528",
-    "HRSD_SA": "880244007258562560"
-}
 
-# ========================
-# Helper Functions
-# ========================
-def fetch_recent_tweets(user_id, username):
+def fetch_recent_tweets(user_id, username, max_results=5):
     print(f"📥 Fetching tweets for @{username}...")
+
     url = f"https://api.twitter.com/2/users/{user_id}/tweets"
     params = {
-        "max_results": 5,
+        "max_results": max_results,
         "tweet.fields": "created_at,text",
-        # you can add filtering later if needed
     }
     headers = {"Authorization": f"Bearer {BEARER_TOKEN}"}
+
     response = requests.get(url, headers=headers, params=params)
 
     if response.status_code == 200:
         tweets = response.json().get("data", [])
         print(f"✅ Retrieved {len(tweets)} tweet(s) from @{username}")
-        return [
-            f"🕒 {datetime.strptime(tweet['created_at'])}<br>💬 {tweet['text']}<br>🔗 https://x.com/{username}/status/{tweet['id']}<br><br>"
-            for tweet in tweets
-        ]
+
+        tweet_items = []
+        for tweet in tweets:
+            created_at = tweet["created_at"]
+            tweet_text = tweet["text"]
+            tweet_id = tweet["id"]
+            tweet_link = f"https://x.com/{username}/status/{tweet_id}"
+
+            item = {
+                "source": "Twitter",
+                "title": f"Tweet from @{username}",
+                "summary": tweet_text,
+                "link": tweet_link,
+                "date": created_at.split("T")[0],
+                "content": f"{tweet_text}\n{tweet_link}\n{created_at}"
+            }
+            tweet_items.append(item)
+
+        return tweet_items
+
     else:
-        print(f"❌ Failed to fetch tweets for @{username}: {response.text}")
+        print(f"❌ Failed to fetch tweets for @{username}: {response.status_code} → {response.text}")
         return []
 
-# ========================
-# Main Crazy Algorithm
-# ========================
-# def tricky_tweet_feed():
-#     print("🌀 Starting Tricky Tweet Feed Agent...")
-#     today = datetime.utcnow().day
-#     selected_user = "HRSD_SA" if today % 2 != 0 else "SaudiGOSI"
-#     user_id = users[selected_user]
-#     print(f"🗓️ Today is {'odd' if today % 2 != 0 else 'even'} → Picking @{selected_user}")
-
-#     tweets = fetch_recent_tweets(user_id, selected_user)
-#     tweet_items = []
-
-#     for tweet in tweets:
-#         created_at = tweet.get("created_at", "")
-#         tweet_text = tweet.get("text", "")
-#         tweet_id = tweet.get("id", "")
-#         tweet_link = f"https://twitter.com/{selected_user}/status/{tweet_id}"
-
-#         item = {
-#             "source": "Twitter",
-#             "title": f"Tweet from @{selected_user}",
-#             "summary": tweet_text,
-#             "link": tweet_link,
-#             "date": created_at.split("T")[0],  # just date
-#             "content": f"{tweet_text}\n{tweet_link}\n{created_at}"
-#         }
-#         tweet_items.append(item)
-
-#     return tweet_items
-
-def tricky_tweet_feed():
-    print("🌀 Starting TRICKY Tweet Feed Agent...")
-
-    print("🧪 Using hardcoded tweet for testing purposes...")
-    tweet_items = [{
-        "source": "Twitter",
-        "title": "Tweet from @SaudiGOSI",
-        "summary": "موافقة مجلس الوزراء على نظام التأمينات الاجتماعية الجديد وقصر تطبيقه على الملتحقين الجدد بالعمل",
-        "link": "https://x.com/SaudiGOSI/status/1234567890",
-        "date": "2025-03-22",
-        "content": "موافقة مجلس الوزراء على نظام التأمينات الاجتماعية الجديد وقصر تطبيقه على الملتحقين الجدد بالعمل\nhttps://x.com/SaudiGOSI/status/1234567890\n2025-03-22"
-    }]
-    return tweet_items
-
+# Optional testing stub
 if __name__ == "__main__":
-    print("🧪 Running local tweet test...")
-    tweets = tricky_tweet_feed()
-    if tweets:
-        for tweet in tweets:
-            print(f"🕒 {tweet['date']}")
-            print(f"💬 {tweet['summary']}")
-            print(f"🔗 {tweet['link']}\n")
-    else:
-        print("⚠️ No tweets found.")
+    print("🧪 Local test mode")
+    tweets = fetch_recent_tweets("877253528", "SaudiGOSI")
+    for tweet in tweets:
+        print("📌", tweet)
