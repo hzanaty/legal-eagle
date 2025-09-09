@@ -12,7 +12,6 @@ RSS_FEED_URLS = [
     "https://www.arabnews.com/taxonomy/term/25/feed",  # Example HR feed
     # Add more here...
 ]
-
 TWITTER_ACCOUNTS = [
     "SaudiGOSI",
     "HRSD_SA"
