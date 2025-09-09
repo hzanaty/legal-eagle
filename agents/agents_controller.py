@@ -1,51 +1,44 @@
-# agents/agents_controller.py
-
+import os
 from agents.rss_parser import get_rss_items
 from agents.tweet_feed import tricky_tweet_feed
 from agents.news_filter import get_relevant_news
-from configurations.agents_config import rss_urls, tweet_accounts
-
+from agents.news_grouper import group_news_items
+from configurations.agents_config import rss_sources, tweet_accounts
 from datetime import datetime
 
-def collect_rss_news():
-    all_rss_news = []
-    for url in rss_urls:
-        print(f"🌐 Fetching RSS from: {url}")
-        all_rss_news.extend(get_rss_items(url))
-    return all_rss_news
-
-def collect_tweets():
-    # Determine account to fetch based on the day (odd/even)
-    today_day = datetime.utcnow().day
-    sorted_accounts = sorted(tweet_accounts.items())
-    selected_index = today_day % len(sorted_accounts)
-    selected_name, selected_id = sorted_accounts[selected_index]
-
-    print(f"🐦 Today is day {today_day} → Selected account: @{selected_name}")
-    return tricky_tweet_feed(user_id=selected_id, username=selected_name)
-
 def run_controller():
-    print("\n🚀 Starting Controller Agent\n" + "-"*40)
+    print("🤖 Starting Legal Eagle Controller")
 
-    # Step 1: Fetch RSS items
-    rss_news = collect_rss_news()
+    # Step 1: Collect from all RSS sources
+    all_rss = []
+    for url in rss_sources:
+        print(f"🔗 Reading RSS: {url}")
+        items = get_rss_items(url)
+        all_rss.extend(items)
 
-    # Step 2: Fetch Tweets
-    tweet_news = collect_tweets()
+    # Step 2: Fetch tweets from selected account based on date
+    today = datetime.utcnow().day
+    sorted_accounts = sorted(tweet_accounts.items())  # [(name, id), ...]
+    selected = sorted_accounts[today % len(sorted_accounts)]
+    account_name, account_id = selected
+    print(f"🐦 Today is day {today} → Reading tweets from @{account_name}")
+    tweet_items = tricky_tweet_feed(account_name, account_id)
 
-    # Step 3: Merge and filter news
-    all_news = rss_news + tweet_news
-    print(f"\n📦 Total news items collected: {len(all_news)}")
-    relevant_news = get_relevant_news(all_news)
-    print(f"✅ Relevant news after filtering: {len(relevant_news)}\n")
+    # Step 3: Filter relevant content
+    all_items = all_rss + tweet_items
+    print(f"📦 Total items collected: {len(all_items)}")
+    relevant_items = get_relevant_news(all_items)
+    print(f"✅ Filtered relevant items: {len(relevant_items)}")
 
-    # Optional: preview output
-    for item in relevant_news:
-        print(f"📌 {item['title']}")
-        print(f"📝 {item['summary']}")
-        print(f"🔗 {item['link']}\n")
+    # Step 4: Group similar news items
+    grouped_items = group_news_items(relevant_items)
+    print(f"🧩 Grouped items: {len(grouped_items)}")
 
-    return relevant_news
+    # Preview grouped result
+    for i, group in enumerate(grouped_items):
+        print(f"\n🧵 Group {i+1}: {group['summary']}")
+        for source in group['sources']:
+            print(f"   • {source['title']} ({source['link']})")
 
 if __name__ == "__main__":
     run_controller()
