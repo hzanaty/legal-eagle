@@ -21,13 +21,37 @@ TWITTER_ACCOUNTS = [
 ]
 
 MONITOR_URLS = [
-    "https://uqn.gov.sa/category?cat=4",   # أم القرى - مجلس الوزراء
-    "https://uqn.gov.sa/category?cat=6",   # أم القرى - قرارات وأنظمة
-    "https://uqn.gov.sa/category?cat=7",   # أم القرى - أوامر ملكية
-    "https://uqn.gov.sa/category?cat=8",   # أم القرى - مراسيم ملكية
-    "https://uqn.gov.sa/category?cat=9",   # أم القرى - قرارات مجلس الوزراء
-    "https://uqn.gov.sa/category?cat=10",   # أم القرى - قرارات وزارية
-    "https://uqn.gov.sa/category?cat=11",   # أم القرى - لوائح وأنظمة
-    "https://uqn.gov.sa/category?cat=12",   # أم القرى - هيئات
+    {
+        "url": "https://uqn.gov.sa/category?cat=4",   # أم القرى - مجلس الوزراء
+        "selector": "h5.entry-title a"
+    },
+    {
+        "url": "https://uqn.gov.sa/category?cat=6",   # أم القرى - قرارات وأنظمة
+        "selector": "h5.entry-title a"
+    },
+    {
+        "url": "https://uqn.gov.sa/category?cat=7",   # أم القرى - أوامر ملكية
+                "selector": "h5.entry-title a"
+    },
+    {
+        "url": "https://uqn.gov.sa/category?cat=8",   # أم القرى - مراسيم ملكية
+        "selector": "h5.entry-title a"
+    },
+    {
+        "url": "https://uqn.gov.sa/category?cat=9",   # أم القرى - قرارات مجلس الوزراء
+        "selector": "h5.entry-title a"
+    },
+    {
+        "url": "https://uqn.gov.sa/category?cat=10",   # أم القرى - قرارات وزارية
+        "selector": "h5.entry-title a"
+    },
+    {
+        "url": "https://uqn.gov.sa/category?cat=11",   # أم القرى - لوائح وأنظمة
+        "selector": "h5.entry-title a"
+    },
+    {
+        "url": "https://uqn.gov.sa/category?cat=12",   # أم القرى - هيئات
+        "selector": "h5.entry-title a"
+    },
     # ... add more as needed
 ]
