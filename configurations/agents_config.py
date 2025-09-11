@@ -22,35 +22,51 @@ TWITTER_ACCOUNTS = [
 
 MONITOR_URLS = [
     {
-        "url": "https://uqn.gov.sa/category?cat=4",   # أم القرى - مجلس الوزراء
+        "name": "أم القرى - مجلس الوزراء",
+        "url": "https://uqn.gov.sa/category?cat=4",
+        "domain": "https://uqn.gov.sa",
         "selector": "h5.entry-title a"
     },
     {
-        "url": "https://uqn.gov.sa/category?cat=6",   # أم القرى - قرارات وأنظمة
+        "name": "أم القرى - قرارات وأنظمة",
+        "url": "https://uqn.gov.sa/category?cat=6",
+        "domain": "https://uqn.gov.sa",
         "selector": "h5.entry-title a"
     },
     {
-        "url": "https://uqn.gov.sa/category?cat=7",   # أم القرى - أوامر ملكية
-                "selector": "h5.entry-title a"
-    },
-    {
-        "url": "https://uqn.gov.sa/category?cat=8",   # أم القرى - مراسيم ملكية
+        "name": "أم القرى - أوامر ملكية",
+        "url": "https://uqn.gov.sa/category?cat=7",
+        "domain": "https://uqn.gov.sa",
         "selector": "h5.entry-title a"
     },
     {
-        "url": "https://uqn.gov.sa/category?cat=9",   # أم القرى - قرارات مجلس الوزراء
+        "name": "أم القرى - مراسيم ملكية",
+        "url": "https://uqn.gov.sa/category?cat=8",
+        "domain": "https://uqn.gov.sa",
         "selector": "h5.entry-title a"
     },
     {
-        "url": "https://uqn.gov.sa/category?cat=10",   # أم القرى - قرارات وزارية
+        "name": "أم القرى - قرارات مجلس الوزراء",
+        "url": "https://uqn.gov.sa/category?cat=9",
+        "domain": "https://uqn.gov.sa",
         "selector": "h5.entry-title a"
     },
     {
-        "url": "https://uqn.gov.sa/category?cat=11",   # أم القرى - لوائح وأنظمة
+        "name": "أم القرى - قرارات وزارية",
+        "url": "https://uqn.gov.sa/category?cat=10",
+        "domain": "https://uqn.gov.sa",
         "selector": "h5.entry-title a"
     },
     {
-        "url": "https://uqn.gov.sa/category?cat=12",   # أم القرى - هيئات
+        "name": "أم القرى - لوائح وأنظمة",
+        "url": "https://uqn.gov.sa/category?cat=11",
+        "domain": "https://uqn.gov.sa",
+        "selector": "h5.entry-title a"
+    },
+    {
+        "name": "أم القرى - هيئات",
+        "url": "https://uqn.gov.sa/category?cat=12",
+        "domain": "https://uqn.gov.sa",
         "selector": "h5.entry-title a"
     },
     # ... add more as needed
