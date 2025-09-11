@@ -1,45 +1,51 @@
-import os
+import datetime
 from agents.rss_parser import get_rss_items
-from agents.tweet_feed import tricky_tweet_feed
+from agents.tweet_feed import fetch_recent_tweets
+from agents.url_monitor import scrape_all_monitor_urls
 from agents.news_filter import get_relevant_news
-from agents.news_grouper import group_news_items
-from configurations.agents_config import rss_sources, tweet_accounts
-from datetime import datetime
-from configurations.agents_config import MONITOR_URLS
+from agents.news_grouper import group_similar_news
+from agents.email_sender import send_summary_email
+from configurations.agents_config import RSS_FEEDS, TWEET_ACCOUNTS, MONITOR_URLS
 
 def run_controller():
-    print("🤖 Starting Legal Eagle Controller")
+    print("🧠 Starting Legal Eagle Controller...\n")
 
-    # Step 1: Collect from all RSS sources
-    all_rss = []
-    for url in rss_sources:
-        print(f"🔗 Reading RSS: {url}")
-        items = get_rss_items(url)
-        all_rss.extend(items)
+    # 1. RSS Agent
+    rss_items = []
+    print("📰 Running RSS Parser Agent...")
+    for url in RSS_FEEDS:
+        rss_items.extend(get_rss_items(url))
+    print(f"✅ Total RSS items collected: {len(rss_items)}\n")
 
-    # Step 2: Fetch tweets from selected account based on date
-    today = datetime.utcnow().day
-    sorted_accounts = sorted(tweet_accounts.items())  # [(name, id), ...]
-    selected = sorted_accounts[today % len(sorted_accounts)]
-    account_name, account_id = selected
-    print(f"🐦 Today is day {today} → Reading tweets from @{account_name}")
-    tweet_items = tricky_tweet_feed(account_name, account_id)
+    # 2. Tweet Feed Agent (daily rotation)
+    today_index = datetime.datetime.utcnow().day % len(TWEET_ACCOUNTS)
+    account_name, account_id = list(TWEET_ACCOUNTS.items())[today_index]
+    tweet_items = fetch_recent_tweets(account_id, account_name)
+    print(f"✅ Total tweets collected from @{account_name}: {len(tweet_items)}\n")
 
-    # Step 3: Filter relevant content
-    all_items = all_rss + tweet_items
-    print(f"📦 Total items collected: {len(all_items)}")
-    relevant_items = get_relevant_news(all_items)
-    print(f"✅ Filtered relevant items: {len(relevant_items)}")
+    # 3. URL Monitor Agent
+    print("🕵️‍♂️ Running URL Monitor Agent...")
+    url_items = scrape_all_monitor_urls()
+    print(f"✅ Total monitored site items collected: {len(url_items)}\n")
 
-    # Step 4: Group similar news items
-    grouped_items = group_news_items(relevant_items)
-    print(f"🧩 Grouped items: {len(grouped_items)}")
+    # 4. Combine all items
+    all_news_items = rss_items + tweet_items + url_items
+    print(f"📦 Total collected items (pre-filter): {len(all_news_items)}\n")
 
-    # Preview grouped result
-    for i, group in enumerate(grouped_items):
-        print(f"\n🧵 Group {i+1}: {group['summary']}")
-        for source in group['sources']:
-            print(f"   • {source['title']} ({source['link']})")
+    # 5. News Filter Agent
+    print("🧹 Filtering for relevance...")
+    filtered_items = get_relevant_news(all_news_items)
+    print(f"✅ Total relevant items after filtering: {len(filtered_items)}\n")
+
+    # 6. News Grouper Agent
+    print("🧠 Grouping similar news items...")
+    grouped_summary = group_similar_news(filtered_items)
+    print(f"✅ Grouped summary ready with {len(grouped_summary)} entries.\n")
+
+    # 7. Email Composer Agent
+    print("📧 Sending summary email...")
+    send_summary_email(grouped_summary)
+    print("✅ Email sent to stakeholders.\n")
 
 if __name__ == "__main__":
     run_controller()
