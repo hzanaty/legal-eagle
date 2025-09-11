@@ -19,3 +19,15 @@ TWITTER_ACCOUNTS = [
     {"name": "SaudiGOSI", "id": "1234567890"},
     {"name": "HRSD_SA",   "id": "9876543210"}
 ]
+
+MONITOR_URLS = [
+    "https://uqn.gov.sa/category?cat=4",   # أم القرى - مجلس الوزراء
+    "https://uqn.gov.sa/category?cat=6",   # أم القرى - قرارات وأنظمة
+    "https://uqn.gov.sa/category?cat=7",   # أم القرى - أوامر ملكية
+    "https://uqn.gov.sa/category?cat=8",   # أم القرى - مراسيم ملكية
+    "https://uqn.gov.sa/category?cat=9",   # أم القرى - قرارات مجلس الوزراء
+    "https://uqn.gov.sa/category?cat=10",   # أم القرى - قرارات وزارية
+    "https://uqn.gov.sa/category?cat=11",   # أم القرى - لوائح وأنظمة
+    "https://uqn.gov.sa/category?cat=12",   # أم القرى - هيئات
+    # ... add more as needed
+]
