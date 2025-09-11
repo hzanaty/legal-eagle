@@ -1,80 +1,47 @@
-import requests
-from bs4 import BeautifulSoup
-from datetime import datetime, timedelta
-import re
+from configurations.agents_config import MONITOR_PAGES
 
-from configurations.agents_config import MONITOR_URLS
-
-def extract_gregorian_date(text):
-    match = re.search(r'(\d{4}-\d{2}-\d{2})$', text)
-    if match:
-        try:
-            return datetime.strptime(match.group(1), "%Y-%m-%d")
-        except ValueError:
-            return None
-    return None
-
-def is_recent_news(text, days=3):
-    pub_date = extract_gregorian_date(text)
-    if pub_date:
-        return pub_date >= datetime.today() - timedelta(days=days)
-    return False
-
-def fetch_news_from_url(url):
-    print(f"🌐 Scraping {url}...")
+def scrape_news_from_url(url, selector):
+    print(f"🌐 Scraping: {url}")
     try:
         response = requests.get(url)
-        soup = BeautifulSoup(response.content, "html.parser")
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, "html.parser")
 
-        # This logic may vary based on the UQN HTML structure
-        news_cards = soup.find_all("div", class_="post-card")
-        news_items = []
+        articles = soup.select(selector)
+        scraped_items = []
 
-        for card in news_cards:
-            link_tag = card.find("a", href=True)
-            if not link_tag:
-                continue
+        for article in articles:
+            title = article.get_text(strip=True)
+            relative_link = article.get("href", "")
+            full_link = f"https://uqn.gov.sa{relative_link}" if relative_link.startswith("/") else relative_link
 
-            news_url = link_tag["href"]
-            full_url = f"https://uqn.gov.sa{news_url}" if news_url.startswith("/") else news_url
+            # Try to get the associated publishing date
+            parent_div = article.find_parent("div")
+            time_tag = parent_div.find("time") if parent_div else None
+            date_text = time_tag.get_text(strip=True) if time_tag else "Unknown"
 
-            details = link_tag.get_text(strip=True)
-            if not is_recent_news(details):
-                continue
+            item = {
+                "source": "Web",
+                "title": title,
+                "summary": title,
+                "link": full_link,
+                "date": date_text,
+                "content": f"{title}\n{full_link}\n{date_text}"
+            }
+            scraped_items.append(item)
 
-            detail_page = requests.get(full_url)
-            detail_soup = BeautifulSoup(detail_page.content, "html.parser")
-            content_div = detail_soup.find("div", class_="post-content")
-            content_text = content_div.get_text(strip=True) if content_div else ""
-
-            news_items.append({
-                "source": "UQN",
-                "title": details.split("\n")[0][:80],
-                "summary": details,
-                "link": full_url,
-                "date": extract_gregorian_date(details).strftime("%Y-%m-%d") if extract_gregorian_date(details) else "",
-                "content": content_text
-            })
-
-        return news_items
+        print(f"✅ Found {len(scraped_items)} items on {url}")
+        return scraped_items
 
     except Exception as e:
-        print(f"❌ Error scraping {url}: {e}")
+        print(f"❌ Failed to scrape {url}: {e}")
         return []
 
-def url_monitor():
-    print("🔍 Starting UQN URL Monitor Agent...")
-    all_news = []
-    for url in MONITOR_URLS:
-        news = fetch_news_from_url(url)
-        all_news.extend(news)
-    print(f"✅ UQN Monitor collected {len(all_news)} item(s)")
-    return all_news
-
-if __name__ == "__main__":
-    items = url_monitor()
-    for item in items:
-        print("📌", item["title"])
-        print("🔗", item["link"])
-        print("🕒", item["date"])
-        print("✍️", item["summary"][:100], "...\n")
+def monitor_web_sources():
+    all_items = []
+    for entry in MONITOR_PAGES:
+        url = entry["url"]
+        selector = entry["selector"]
+        items = scrape_news_from_url(url, selector)
+        all_items.extend(items)
+    return all_items
