@@ -5,6 +5,7 @@ from agents.news_filter import get_relevant_news
 from agents.news_grouper import group_news_items
 from configurations.agents_config import rss_sources, tweet_accounts
 from datetime import datetime
+from configurations.agents_config import MONITOR_URLS
 
 def run_controller():
     print("🤖 Starting Legal Eagle Controller")
