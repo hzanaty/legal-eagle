@@ -13,7 +13,7 @@ def run_controller():
     # 1. RSS Agent
     rss_items = []
     print("📰 Running RSS Parser Agent...")
-    for url in RSS_FEED_URLSS:
+    for url in RSS_FEED_URLS:
         rss_items.extend(get_rss_items(url))
     print(f"✅ Total RSS items collected: {len(rss_items)}\n")
     # Optional preview
