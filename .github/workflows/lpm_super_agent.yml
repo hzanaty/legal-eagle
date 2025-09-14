@@ -1,50 +1,31 @@
-name: LPM Super Agent
+name: 🦅 Legal Eagle – Test RSS Parser Only
 
 on:
-  schedule:
-    - cron: '30 6 * * *'  # Runs every day at 6:30 AM UTC
-  workflow_dispatch:  # Allows manual trigger
+  workflow_dispatch:
 
 jobs:
-  daily-agent:
+  test-legal-eagle:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: 🧾 Checkout repository
         uses: actions/checkout@v3
 
-      - name: Set up Python
+      - name: 🐍 Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10'
+          python-version: "3.10"
 
-      - name: Install dependencies
+      - name: 📦 Install dependencies
         run: |
-          pip install -r requirements.txt
+          python -m pip install --upgrade pip
+          pip install -r configurations/requirements.txt
 
-      - name: Run RSS Parser
-        run: python rss_parser.py
+      - name: 🔐 Set environment variables
+        run: |
+          echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> $GITHUB_ENV
+        shell: bash
 
-      - name: Run Tweet Feed Agent
-        env:
-          X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}
-        run: python tweet_feed.py
-
-      - name: Run Filter Agent
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: python filter_agent.py
-
-      - name: Run LPM Agent
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: python lpm_agent.py
-
-      - name: Send Email
-        env:
-          EMAIL_SENDER: ${{ secrets.EMAIL_SENDER }}
-          EMAIL_RECEIVER: ${{ secrets.EMAIL_RECEIVER }}
-          GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
-          GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
-          GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
-        run: python email_sender.py
+      - name: ▶️ Run Controller (RSS Parser Only)
+        run: |
+          python agents/agents_controller.py
