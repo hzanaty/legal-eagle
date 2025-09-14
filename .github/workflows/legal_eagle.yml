@@ -1,4 +1,4 @@
-name: 🦅 Legal Eagle – Test RSS Parser Only
+name: 🦅 Legal Eagle
 
 on:
   workflow_dispatch:
