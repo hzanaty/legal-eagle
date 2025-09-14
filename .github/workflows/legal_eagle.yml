@@ -26,6 +26,7 @@ jobs:
           echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> $GITHUB_ENV
         shell: bash
 
-      - name: ▶️ Run Controller (RSS Parser Only)
+      - name: ▶️ Run Controller
         run: |
+          export PYTHONPATH="${{ github.workspace }}"
           python agents/agents_controller.py
