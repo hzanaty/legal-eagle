@@ -17,7 +17,7 @@ def run_controller():
         rss_items.extend(get_rss_items(url))
     print(f"✅ Total RSS items collected: {len(rss_items)}\n")
     # Optional preview
-    for item in all_items[:5]:
+    for item in rss_items[:5]:
         print("🔹 Title:", item["title"])
         print("🔗 Link:", item["link"])
         print("🗓️ Date:", item["date"])
