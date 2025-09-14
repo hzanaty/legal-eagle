@@ -15,7 +15,7 @@ RSS_FEED_URLS = [
 
 # configurations/agents_config.py
 
-TWITTER_ACCOUNTS = [
+TWEET_ACCOUNTS = [
     {"name": "SaudiGOSI", "id": "1234567890"},
     {"name": "HRSD_SA",   "id": "9876543210"}
 ]
