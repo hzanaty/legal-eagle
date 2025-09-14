@@ -18,5 +18,5 @@ def parse_rss_feed(url):
             "content": f"{title}\n{summary}\n{link}\n{pub_date}"
         }
         rss_items.append(item)
-
+    print(f"✅ {len(items)} items fetched from {rss_url}")
     return rss_items
