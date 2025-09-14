@@ -1,5 +1,5 @@
 import datetime
-from configurations.agents_config import RSS_FEEDS, TWEET_ACCOUNTS, MONITOR_URLS
+from configurations.agents_config import RSS_FEED_URLS, TWEET_ACCOUNTS, MONITOR_URLS
 from agents.rss_parser import get_rss_items
 #from agents.tweet_feed import fetch_recent_tweets
 #from agents.url_monitor import scrape_all_monitor_urls
@@ -13,7 +13,7 @@ def run_controller():
     # 1. RSS Agent
     rss_items = []
     print("📰 Running RSS Parser Agent...")
-    for url in RSS_FEEDS:
+    for url in RSS_FEED_URLSS:
         rss_items.extend(get_rss_items(url))
     print(f"✅ Total RSS items collected: {len(rss_items)}\n")
     # Optional preview
