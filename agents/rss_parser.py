@@ -1,3 +1,5 @@
+import feedparser
+
 def parse_rss_feed(url):
     feed = feedparser.parse(url)
     rss_items = []
