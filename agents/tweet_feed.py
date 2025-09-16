@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 BEARER_TOKEN = os.getenv("X_BEARER_TOKEN")
+print(f"🔐 Bearer Token used: {BEARER_TOKEN[:10]}...")  # print only first 10 chars for safety
 
 def fetch_recent_tweets(user_id, username, max_results=5):
     print(f"📥 Fetching tweets for @{username}...")
