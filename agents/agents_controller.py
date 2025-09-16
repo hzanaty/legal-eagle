@@ -24,10 +24,8 @@ def run_controller():
 
     # 2. Tweet Feed Agent (daily rotation)
     today_index = datetime.datetime.utcnow().day % len(TWEET_ACCOUNTS)
-    selected_account = TWEET_ACCOUNTS[today_index]
-    account_name = selected_account["name"]
-    account_id = selected_account["id"]
-    tweet_items = fetch_recent_tweets(account_id, account_name)
+    account_name = TWEET_ACCOUNTS[today_index]
+    tweet_items = fetch_recent_tweets(account_name)
     print(f"✅ Total tweets collected from @{account_name}: {len(tweet_items)}\n")
 
     # ===========================
