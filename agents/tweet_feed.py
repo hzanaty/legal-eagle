@@ -5,9 +5,15 @@ import requests
 from datetime import datetime
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv()  # only needed if testing locally
+
 BEARER_TOKEN = os.getenv("X_BEARER_TOKEN")
-print(f"🔐 Bearer Token used: {BEARER_TOKEN[:10]}...")  # print only first 10 chars for safety
+
+if not BEARER_TOKEN:
+    raise ValueError("❌ Missing X_BEARER_TOKEN in environment variables.")
+
+# Optional: print partially masked token for debug
+print(f"🔐 Using Bearer Token: {BEARER_TOKEN[:10]}...")
 
 def fetch_recent_tweets(user_id, username, max_results=5):
     print(f"📥 Fetching tweets for @{username}...")
