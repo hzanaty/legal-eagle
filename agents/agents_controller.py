@@ -1,7 +1,7 @@
 import datetime
 from configurations.agents_config import RSS_FEED_URLS, TWEET_ACCOUNTS, MONITOR_URLS
 from agents.rss_parser import parse_rss_feed
-#from agents.tweet_feed import fetch_recent_tweets
+from agents.tweet_feed import fetch_recent_tweets
 #from agents.url_monitor import scrape_all_monitor_urls
 #from agents.news_filter import get_relevant_news
 #from agents.news_grouper import group_similar_news
@@ -23,15 +23,15 @@ def run_controller():
         print("🗓️ Date:", item["date"])
         print("📄 Content:", item["content"][:100], "...\n")
 
+    # 2. Tweet Feed Agent (daily rotation)
+    today_index = datetime.datetime.utcnow().day % len(TWEET_ACCOUNTS)
+    account_name, account_id = list(TWEET_ACCOUNTS.items())[today_index]
+    tweet_items = fetch_recent_tweets(account_id, account_name)
+    print(f"✅ Total tweets collected from @{account_name}: {len(tweet_items)}\n")
+
     # ===========================
     # 🔒 Other agents are skipped
     # ===========================
-    
-    # 2. Tweet Feed Agent (daily rotation)
-    #today_index = datetime.datetime.utcnow().day % len(TWEET_ACCOUNTS)
-    #account_name, account_id = list(TWEET_ACCOUNTS.items())[today_index]
-    #tweet_items = fetch_recent_tweets(account_id, account_name)
-    #print(f"✅ Total tweets collected from @{account_name}: {len(tweet_items)}\n")
 
     # 3. URL Monitor Agent
     #print("🕵️‍♂️ Running URL Monitor Agent...")
