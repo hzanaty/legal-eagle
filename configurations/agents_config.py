@@ -17,8 +17,8 @@ RSS_FEED_URLS = [
 
 TWEET_ACCOUNTS = [
     {"name": "SaudiGOSI", "id": "2"},
-    {"name": "HRSD_SA",   "id": "3"}
-    {"name": "SAPMENA", "id": "1"},
+    {"name": "HRSD_SA",   "id": "3"},
+    {"name": "SAPMENA", "id": "1"}
 ]
 
 MONITOR_URLS = [
