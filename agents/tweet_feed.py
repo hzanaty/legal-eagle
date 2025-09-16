@@ -46,10 +46,3 @@ def fetch_recent_tweets(user_id, username, max_results=5):
     else:
         print(f"❌ Failed to fetch tweets for @{username}: {response.status_code} → {response.text}")
         return []
-
-# Optional testing stub
-if __name__ == "__main__":
-    print("🧪 Local test mode")
-    tweets = fetch_recent_tweets("877253528", "SaudiGOSI")
-    for tweet in tweets:
-        print("📌", tweet)
