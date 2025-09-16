@@ -52,5 +52,6 @@ def fetch_recent_tweets(username, max_results=10):
         return tweet_items
 
     else:
-        print(f"❌ Failed to fetch tweets for @{username}: {response.status_code} → {response.text}")
-        return []
+        error_message = f"❌ Failed to fetch tweets for @{username}: {response.status_code} → {response.text}"
+        print(error_message)
+        raise RuntimeError(error_message)  # ⛔ This will stop the script with error
