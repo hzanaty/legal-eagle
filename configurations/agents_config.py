@@ -16,8 +16,8 @@ RSS_FEED_URLS = [
 # configurations/agents_config.py
 
 TWEET_ACCOUNTS = [
-    {"name": "SAPMENA", "id": "1"},
     {"name": "SaudiGOSI", "id": "2"},
+    {"name": "SAPMENA", "id": "1"},
     {"name": "HRSD_SA",   "id": "3"}
 ]
 
