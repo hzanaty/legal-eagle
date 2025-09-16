@@ -5,7 +5,7 @@ import requests
 from datetime import datetime
 from dotenv import load_dotenv
 
-load_dotenv()  # only needed if testing locally
+load_dotenv()  # Load .env when running locally
 
 BEARER_TOKEN = os.getenv("X_BEARER_TOKEN")
 
@@ -18,12 +18,13 @@ print(f"🔐 Using Bearer Token: {BEARER_TOKEN[:10]}...")
 def fetch_recent_tweets(username, max_results=5):
     print(f"📥 Fetching tweets for @{username}...")
 
-    url = f"https://api.twitter.com/2/users/{username}/tweets"
-    params = {
-        "max_results": max_results,
-        "tweet.fields": "created_at,text",
-    }
+    url = "https://api.twitter.com/2/tweets/search/recent"
     headers = {"Authorization": f"Bearer {BEARER_TOKEN}"}
+    params = {
+        "query": f"from:{username}",
+        "max_results": max_results,
+        "tweet.fields": "created_at,text"
+    }
 
     response = requests.get(url, headers=headers, params=params)
 
