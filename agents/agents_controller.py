@@ -27,6 +27,9 @@ def run_controller():
     account_name = TWEET_ACCOUNTS[today_index]
     tweet_items = fetch_recent_tweets(account_name)
     print(f"✅ Total tweets collected from @{account_name}: {len(tweet_items)}\n")
+    for tweet in tweet_items[:3]:
+    print("🔹 Title:", tweet["title"])
+    print("📄 Content:", tweet["content"][:100], "...\n")
 
     # ===========================
     # 🔒 Other agents are skipped
