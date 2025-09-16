@@ -24,6 +24,7 @@ jobs:
       - name: 🔐 Set environment variables
         run: |
           echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> $GITHUB_ENV
+          echo "X_BEARER_TOKEN=${{ secrets.X_BEARER_TOKEN }}" >> $GITHUB_ENV
         shell: bash
 
       - name: ▶️ Run Controller
