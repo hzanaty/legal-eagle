@@ -15,10 +15,10 @@ if not BEARER_TOKEN:
 # Optional: print partially masked token for debug
 print(f"🔐 Using Bearer Token: {BEARER_TOKEN[:10]}...")
 
-def fetch_recent_tweets(user_id, username, max_results=5):
+def fetch_recent_tweets(username, max_results=5):
     print(f"📥 Fetching tweets for @{username}...")
 
-    url = f"https://api.twitter.com/2/users/{user_id}/tweets"
+    url = f"https://api.twitter.com/2/users/{username}/tweets"
     params = {
         "max_results": max_results,
         "tweet.fields": "created_at,text",
