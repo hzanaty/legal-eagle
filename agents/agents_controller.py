@@ -35,8 +35,15 @@ def run_controller():
 
     # 3. URL Monitor Agent
     print("🕵️‍♂️ Running URL Monitor Agent...")
-    url_items = scrape_all_monitor_urls()
+    url_items = scrape_all_monitor_urls(MONITOR_URLS)
     print(f"✅ Total monitored site items collected: {len(url_items)}\n")
+
+    # Optional: Preview first 5
+    for item in url_items[:5]:
+        print("🔹 Title:", item["title"])
+        print("🔗 Link:", item["link"])
+        print("🗓️ Date:", item["date"])
+        print("📄 Content:", item["content"][:100], "...\n")
 
     # ===========================
     # 🔒 Other agents are skipped
