@@ -14,7 +14,7 @@ def scrape_all_monitor_urls(MONITOR_URLS):
 
         print(f"🌐 Scraping: {name} → {url}")
         try:
-            response = requests.get(url)
+            response = requests.get(url, timeout=10)
             soup = BeautifulSoup(response.text, "html.parser")
 
             for tag in soup.select(selector):
@@ -22,40 +22,42 @@ def scrape_all_monitor_urls(MONITOR_URLS):
                 relative_link = tag.get("href", "")
                 full_link = urljoin(domain, relative_link)
 
-                # Fetch detail page
-                detail_response = requests.get(full_link)
-                detail_soup = BeautifulSoup(detail_response.text, "html.parser")
+                # ✅ Extract date from sibling <time> tag
+                date_str = ""
+                skip_due_to_old_date = False
 
-                # Extract only the article section
+                # Find the closest <time> tag in the parent container
+                parent_div = tag.find_parent("div")
+                time_tag = parent_div.find("time") if parent_div else None
+
+                if time_tag:
+                    time_text = time_tag.get_text(strip=True)
+                    if "الموافق" in time_text:
+                        parts = time_text.split("الموافق")
+                        if len(parts) > 1:
+                            gregorian_part = parts[1].strip()
+                            try:
+                                parsed_date = datetime.strptime(gregorian_part, "%Y-%m-%d")
+                                date_str = parsed_date.strftime("%Y-%m-%d")
+
+                                if datetime.today() - parsed_date > timedelta(days=2):
+                                    print(f"⏭️ Skipping old news: {title} ({date_str})")
+                                    skip_due_to_old_date = True
+                            except Exception:
+                                pass
+
+                if skip_due_to_old_date or not date_str:
+                    continue  # ❗ Skip this item
+
+                # ✅ Fetch full content from detail page
+                detail_response = requests.get(full_link, timeout=10)
+                detail_soup = BeautifulSoup(detail_response.text, "html.parser")
                 content_div = detail_soup.find("div", class_="m-3 mt-4")
                 if content_div:
                     detail_text = content_div.get_text(separator="\n", strip=True)
                 else:
                     detail_text = f"{title}\n{full_link}"
 
-                # Initialize
-                date_str = ""
-                skip_due_to_old_date = False
-
-                # Extract date from <time class="td-module-date">
-                date_str = ""
-                skip_due_to_old_date = False
-                time_tag = detail_soup.find("time", class_="td-module-date")
-                if time_tag:
-                    try:
-                        full_date_text = time_tag.get_text(strip=True)
-                        if "الموافق" in full_date_text and "-" in full_date_text:
-                            gregorian_part = full_date_text.split("الموافق")[1].strip().split()[0]
-                            parsed_date = datetime.strptime(gregorian_part, "%Y-%m-%d")
-                            date_str = parsed_date.strftime("%Y-%m-%d")
-                            if datetime.today() - parsed_date > timedelta(days=2):
-                                print(f"⏭️ Skipping old news: {title} ({date_str})")
-                                skip_due_to_old_date = True
-                    except Exception:
-                        pass
-                if skip_due_to_old_date:
-                    continue
-                    
                 item = {
                     "source": name,
                     "title": title,
