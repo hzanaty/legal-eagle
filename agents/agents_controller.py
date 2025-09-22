@@ -2,7 +2,7 @@ import datetime
 from configurations.agents_config import RSS_FEED_URLS, TWEET_ACCOUNTS, MONITOR_URLS
 from agents.rss_parser import parse_rss_feed
 from agents.tweet_feed import fetch_recent_tweets
-#from agents.url_monitor import scrape_all_monitor_urls
+from agents.url_monitor import scrape_all_monitor_urls
 #from agents.news_filter import get_relevant_news
 #from agents.news_grouper import group_similar_news
 #from agents.email_sender import send_summary_email
@@ -33,14 +33,14 @@ def run_controller():
         print("🗓️ Date:", tweet["date"])
         print("📄 Content:", tweet["content"][:200], "...\n")  # limit content for readability
 
+    # 3. URL Monitor Agent
+    print("🕵️‍♂️ Running URL Monitor Agent...")
+    url_items = scrape_all_monitor_urls()
+    print(f"✅ Total monitored site items collected: {len(url_items)}\n")
+
     # ===========================
     # 🔒 Other agents are skipped
     # ===========================
-
-    # 3. URL Monitor Agent
-    #print("🕵️‍♂️ Running URL Monitor Agent...")
-    #url_items = scrape_all_monitor_urls()
-    #print(f"✅ Total monitored site items collected: {len(url_items)}\n")
 
     # 4. Combine all items
     #all_news_items = rss_items + tweet_items + url_items
