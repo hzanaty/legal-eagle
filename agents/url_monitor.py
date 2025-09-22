@@ -26,7 +26,13 @@ def scrape_all_monitor_urls(MONITOR_URLS):
                 # Fetch detail page
                 detail_response = requests.get(full_link)
                 detail_soup = BeautifulSoup(detail_response.text, "html.parser")
-                detail_text = detail_soup.get_text(separator="\n", strip=True)
+
+                # Extract only from the legal article section
+                content_div = detail_soup.find("div", class_="m-3 mt-4")
+                if content_div:
+                    detail_text = content_div.get_text(separator="\n", strip=True)
+                else:
+                    detail_text = f"{title}\n{full_link}"
 
                 # Try to extract Gregorian date in format yyyy-mm-dd
                 date_str = ""
@@ -36,16 +42,17 @@ def scrape_all_monitor_urls(MONITOR_URLS):
                         if len(parts) > 1:
                             gregorian_part = parts[1].strip()
                             try:
-                                # Try to parse date like 2025-07-25
                                 parsed_date = datetime.strptime(gregorian_part, "%Y-%m-%d")
                                 date_str = parsed_date.strftime("%Y-%m-%d")
 
                                 # Skip if older than 2 weeks
                                 if datetime.today() - parsed_date > timedelta(weeks=2):
-                                    continue
+                                    print(f"⏭️ Skipping old news: {title} ({date_str})")
+                                    continue  # skip appending this item
+
                             except Exception:
-                                pass  # fallback if parsing fails
-                        break  # stop scanning lines after date found
+                                pass
+                        break  # Stop scanning after finding a date
 
                 item = {
                     "source": name,
