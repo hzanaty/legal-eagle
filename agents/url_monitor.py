@@ -37,26 +37,25 @@ def scrape_all_monitor_urls(MONITOR_URLS):
                 date_str = ""
                 skip_due_to_old_date = False
 
-                # Extract Gregorian date from "الموافق 2025-08-19" style line
-                for line in detail_text.splitlines():
-                    if "الموافق" in line and "-" in line:
-                        try:
-                            gregorian_part = line.split("الموافق")[1].strip()
-                            # Only pick the date part (ignore trailing words)
-                            gregorian_date = gregorian_part.split()[0].strip()
-                            parsed_date = datetime.strptime(gregorian_date, "%Y-%m-%d")
+                # Extract date from <time class="td-module-date">
+                date_str = ""
+                skip_due_to_old_date = False
+                time_tag = detail_soup.find("time", class_="td-module-date")
+                if time_tag:
+                    try:
+                        full_date_text = time_tag.get_text(strip=True)
+                        if "الموافق" in full_date_text and "-" in full_date_text:
+                            gregorian_part = full_date_text.split("الموافق")[1].strip().split()[0]
+                            parsed_date = datetime.strptime(gregorian_part, "%Y-%m-%d")
                             date_str = parsed_date.strftime("%Y-%m-%d")
-
                             if datetime.today() - parsed_date > timedelta(days=2):
                                 print(f"⏭️ Skipping old news: {title} ({date_str})")
                                 skip_due_to_old_date = True
-                            break
-                        except Exception:
-                            pass
-
+                    except Exception:
+                        pass
                 if skip_due_to_old_date:
                     continue
-
+                    
                 item = {
                     "source": name,
                     "title": title,
