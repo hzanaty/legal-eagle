@@ -36,11 +36,3 @@ def scrape_all_monitor_urls():
             print(f"❌ Failed to scrape {name}: {e}")
 
     return all_items
-
-if __name__ == "__main__":
-    items = scrape_all_monitor_urls()
-    for item in items:
-        print("📌", item["title"])
-        print("🔗", item["link"])
-        print("📎", item["content"])
-        print("—" * 40)
