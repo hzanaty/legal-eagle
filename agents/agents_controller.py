@@ -43,7 +43,8 @@ def run_controller():
         print("🔹 Title:", item["title"])
         print("🔗 Link:", item["link"])
         print("🗓️ Date:", item["date"])
-        print("📄 Content:", item["content"][:100], "...\n")
+        print("📄 Content:\n" + item['content'])  # 👈 force full content print
+        print("=" * 60)  # separator
 
     # ===========================
     # 🔒 Other agents are skipped
