@@ -35,7 +35,7 @@ def scrape_all_monitor_urls(MONITOR_URLS):
                         parsed_date = datetime.strptime(gregorian_part, "%Y-%m-%d")
                         date_str = parsed_date.strftime("%Y-%m-%d")
 
-                        # ⏳ Skip if older than 3 days
+                        # ⏳ Skip if older than 2 days
                         if datetime.today() - parsed_date > timedelta(days=2):
                             print(f"⏭️ Skipping old news: {title} ({date_str})")
                             continue
