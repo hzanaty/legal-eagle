@@ -13,8 +13,6 @@ RSS_FEED_URLS = [
     # Add more here...
 ]
 
-# configurations/agents_config.py
-
 TWEET_ACCOUNTS = [
     "SaudiGOSI",
     "HRSD_SA",
