@@ -15,7 +15,7 @@ if not BEARER_TOKEN:
 # Optional: print partially masked token for debug
 print(f"🔐 Using Bearer Token: {BEARER_TOKEN[:10]}...")
 
-def fetch_recent_tweets(username, max_results=10):
+def fetch_recent_tweets(username, max_results=2):
     print(f"📥 Fetching tweets for @{username}...")
 
     url = "https://api.twitter.com/2/tweets/search/recent"
