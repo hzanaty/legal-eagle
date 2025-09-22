@@ -24,8 +24,8 @@ MONITOR_URLS = [
         "name": "أم القرى - مجلس الوزراء",
         "url": "https://uqn.gov.sa/category?cat=4",
         "domain": "https://uqn.gov.sa",
-        "selector": "h5.entry-title a"
-        "content_tag": {"name": "div", "class": "m-3 mt-4"}
+        "selector": "h5.entry-title a",
+        "content": "m-3 mt-4"
     },
     {
         "name": "أم القرى - قرارات وأنظمة",
