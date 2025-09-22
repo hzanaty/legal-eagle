@@ -37,24 +37,25 @@ def scrape_all_monitor_urls(MONITOR_URLS):
                 date_str = ""
                 skip_due_to_old_date = False
 
-                # Try to extract Gregorian date in format yyyy-mm-dd
+                # Extract Gregorian date from "الموافق 2025-08-19" style line
                 for line in detail_text.splitlines():
                     if "الموافق" in line and "-" in line:
-                        parts = line.split("الموافق")
-                        if len(parts) > 1:
-                            gregorian_part = parts[1].strip()
-                            try:
-                                parsed_date = datetime.strptime(gregorian_part, "%Y-%m-%d")
-                                date_str = parsed_date.strftime("%Y-%m-%d")
-                                if datetime.today() - parsed_date > timedelta(days=2):
-                                    print(f"⏭️ Skipping old news: {title} ({date_str})")
-                                    skip_due_to_old_date = True
-                                break  # Stop scanning after date found
-                            except Exception:
-                                pass
+                        try:
+                            gregorian_part = line.split("الموافق")[1].strip()
+                            # Only pick the date part (ignore trailing words)
+                            gregorian_date = gregorian_part.split()[0].strip()
+                            parsed_date = datetime.strptime(gregorian_date, "%Y-%m-%d")
+                            date_str = parsed_date.strftime("%Y-%m-%d")
+
+                            if datetime.today() - parsed_date > timedelta(days=2):
+                                print(f"⏭️ Skipping old news: {title} ({date_str})")
+                                skip_due_to_old_date = True
+                            break
+                        except Exception:
+                            pass
 
                 if skip_due_to_old_date:
-                    continue  # ❗ Skip appending this item entirely
+                    continue
 
                 item = {
                     "source": name,
