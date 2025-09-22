@@ -2,7 +2,6 @@ from urllib.parse import urljoin
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
-from configurations.agents_config import MONITOR_URLS
 
 def scrape_all_monitor_urls(MONITOR_URLS):
     all_items = []
