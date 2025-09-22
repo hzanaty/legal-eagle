@@ -27,15 +27,18 @@ def scrape_all_monitor_urls(MONITOR_URLS):
                 detail_response = requests.get(full_link)
                 detail_soup = BeautifulSoup(detail_response.text, "html.parser")
 
-                # Extract only from the legal article section
+                # Extract only the article section
                 content_div = detail_soup.find("div", class_="m-3 mt-4")
                 if content_div:
                     detail_text = content_div.get_text(separator="\n", strip=True)
                 else:
                     detail_text = f"{title}\n{full_link}"
 
-                # Try to extract Gregorian date in format yyyy-mm-dd
+                # Initialize
                 date_str = ""
+                skip_due_to_old_date = False
+
+                # Try to extract Gregorian date in format yyyy-mm-dd
                 for line in detail_text.splitlines():
                     if "الموافق" in line and "-" in line:
                         parts = line.split("الموافق")
@@ -44,15 +47,15 @@ def scrape_all_monitor_urls(MONITOR_URLS):
                             try:
                                 parsed_date = datetime.strptime(gregorian_part, "%Y-%m-%d")
                                 date_str = parsed_date.strftime("%Y-%m-%d")
-
-                                # Skip if older than 2 weeks
-                                if datetime.today() - parsed_date > timedelta(weeks=2):
+                                if datetime.today() - parsed_date > timedelta(days=2):
                                     print(f"⏭️ Skipping old news: {title} ({date_str})")
-                                    continue  # skip appending this item
-
+                                    skip_due_to_old_date = True
+                                break  # Stop scanning after date found
                             except Exception:
                                 pass
-                        break  # Stop scanning after finding a date
+
+                if skip_due_to_old_date:
+                    continue  # ❗ Skip appending this item entirely
 
                 item = {
                     "source": name,
