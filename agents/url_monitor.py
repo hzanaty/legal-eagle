@@ -3,7 +3,7 @@ import requests
 from bs4 import BeautifulSoup
 from configurations.agents_config import MONITOR_URLS
 
-def scrape_all_monitor_urls():
+def scrape_all_monitor_urls(MONITOR_URLS):
     all_items = []
 
     for source in MONITOR_URLS:
