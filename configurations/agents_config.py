@@ -9,8 +9,6 @@ paytoll, currency, data protection, data residency, service duration, calendar
 
 RSS_FEED_URLS = [
     "https://saudigazette.com.sa/rssFeed/74",
-    "https://www.arabnews.com/taxonomy/term/25/feed",  # Example HR feed
-    # Add more here...
 ]
 
 TWEET_ACCOUNTS = [
@@ -31,50 +29,50 @@ MONITOR_URLS = [
         "name": "أم القرى - قرارات وأنظمة",
         "url": "https://uqn.gov.sa/category?cat=6",
         "domain": "https://uqn.gov.sa",
-        "title_tag": "h5.entry-title a"
-        "content_tag": {"name": "div", "class": "m-3 mt-4"}
+        "title_tag": "h5.entry-title a",
+        "content_tag": "m-3 mt-4"
     },
     {
         "name": "أم القرى - أوامر ملكية",
         "url": "https://uqn.gov.sa/category?cat=7",
         "domain": "https://uqn.gov.sa",
-        "title_tag": "h5.entry-title a"
-        "content_tag": {"name": "div", "class": "m-3 mt-4"}
+        "title_tag": "h5.entry-title a",
+        "content_tag": "m-3 mt-4"
     },
     {
         "name": "أم القرى - مراسيم ملكية",
         "url": "https://uqn.gov.sa/category?cat=8",
         "domain": "https://uqn.gov.sa",
-        "title_tag": "h5.entry-title a"
-        "content_tag": {"name": "div", "class": "m-3 mt-4"}
+        "title_tag": "h5.entry-title a",
+        "content_tag": "m-3 mt-4"
     },
     {
         "name": "أم القرى - قرارات مجلس الوزراء",
         "url": "https://uqn.gov.sa/category?cat=9",
         "domain": "https://uqn.gov.sa",
-        "title_tag": "h5.entry-title a"
-        "content_tag": {"name": "div", "class": "m-3 mt-4"}
+        "title_tag": "h5.entry-title a",
+        "content_tag": "m-3 mt-4"
     },
     {
         "name": "أم القرى - قرارات وزارية",
         "url": "https://uqn.gov.sa/category?cat=10",
         "domain": "https://uqn.gov.sa",
-        "title_tag": "h5.entry-title a"
-        "content_tag": {"name": "div", "class": "m-3 mt-4"}
+        "title_tag": "h5.entry-title a",
+        "content_tag": "m-3 mt-4"
     },
     {
         "name": "أم القرى - لوائح وأنظمة",
         "url": "https://uqn.gov.sa/category?cat=11",
         "domain": "https://uqn.gov.sa",
-        "title_tag": "h5.entry-title a"
-        "content_tag": {"name": "div", "class": "m-3 mt-4"}
+        "title_tag": "h5.entry-title a",
+        "content_tag": "m-3 mt-4"
     },
     {
         "name": "أم القرى - هيئات",
         "url": "https://uqn.gov.sa/category?cat=12",
         "domain": "https://uqn.gov.sa",
-        "title_tag": "h5.entry-title a"
-        "content_tag": {"name": "div", "class": "m-3 mt-4"}
+        "title_tag": "h5.entry-title a",
+        "content_tag": "m-3 mt-4"
     },
     # ... add more as needed
 ]
