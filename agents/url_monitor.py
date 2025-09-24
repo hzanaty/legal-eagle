@@ -1,5 +1,6 @@
 from urllib.parse import urljoin
 import requests
+import re
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 
@@ -10,8 +11,8 @@ def scrape_all_monitor_urls(MONITOR_URLS):
         name = source["name"]
         url = source["url"]
         domain = source["domain"]
-        title_tag = source["title_tag"]       # 👈 Cleaned
-        content_tag = source["content_tag"]   # 👈 Cleaned
+        title_tag = source["title_tag"]
+        content_tag = source["content_tag"]
 
         print(f"🌐 Scraping: {name} → {url}")
         try:
@@ -23,33 +24,28 @@ def scrape_all_monitor_urls(MONITOR_URLS):
                 relative_link = tag.get("href", "")
                 full_link = urljoin(domain, relative_link)
 
-                # Extract date from sibling <time> tag in the same container
+                # Extract date from <time> tag using regex
                 date_str = ""
-                container = tag.find_parent("div")
-                if container:
-                    time_tag = container.find("time")
-                    if time_tag and "الموافق" in time_tag.text:
-                        for part in time_tag.text.split("الموافق"):
-                            part = part.strip()
-                            if "-" in part:
-                                try:
-                                    parsed_date = datetime.strptime(part, "%Y-%m-%d")
-                                    date_str = parsed_date.strftime("%Y-%m-%d")
-                                    # Skip if older than 3 days
-                                    if datetime.today() - parsed_date > timedelta(days=3):
-                                        print(f"⏭️ Skipping old news: {title} ({date_str})")
-                                        break  # Skip this item
-                                except:
-                                    continue
-
-                if not date_str:
-                    continue  # No valid date parsed, skip
+                time_tag = tag.find_next("time", class_="td-module-date")
+                if time_tag:
+                    full_date_text = time_tag.get_text(strip=True)
+                    match = re.search(r"\d{4}-\d{2}-\d{2}", full_date_text)
+                    if match:
+                        try:
+                            gregorian_part = match.group(0)
+                            parsed_date = datetime.strptime(gregorian_part, "%Y-%m-%d")
+                            date_str = parsed_date.strftime("%Y-%m-%d")
+                            if datetime.today() - parsed_date > timedelta(days=7):
+                                print(f"⏭️ Skipping old news: {title} ({date_str})")
+                                continue
+                        except Exception as e:
+                            print(f"⚠️ Failed to parse date from: '{gregorian_part}' → {e}")
 
                 # Fetch detail page
                 detail_response = requests.get(full_link)
                 detail_soup = BeautifulSoup(detail_response.text, "html.parser")
 
-                # Extract only from content_tag class (within <div>)
+                # Extract only from configured content class
                 detail_text = f"{title}\n{full_link}"
                 content_element = detail_soup.find("div", class_=content_tag)
                 if content_element:
