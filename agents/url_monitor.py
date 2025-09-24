@@ -46,26 +46,29 @@ def scrape_all_monitor_urls(MONITOR_URLS):
 
                 # Fetch detail page
                 detail_response = requests.get(full_link)
-                print(f"🔍 Fetching detail page: {full_link} → Status {detail_response.status_code}")
-                detail_soup = BeautifulSoup(detail_response.text, "html.parser")
-
-                # Extract content from configured tag (assumes <div>)
-                detail_text = f"{title}\n{full_link}"
-                content_element = detail_soup.find("div", class_=content_tag)
-                if content_element:
-                    detail_text = content_element.get_text(separator="\n", strip=True)
+                
+                if detail_response.status_code == 200:
+                    print(f"🔍 Parsed: \"{title}\" → {full_link}")
+                    detail_soup = BeautifulSoup(detail_response.text, "html.parser")
+                    
+                    # Extract only from configured content class
+                    detail_text = f"{title}\n{full_link}"
+                    content_element = detail_soup.find("div", class_=content_tag)
+                    if content_element:
+                        detail_text = content_element.get_text(separator="\n", strip=True)
+                
+                    # Append item
+                    item = {
+                        "source": name,
+                        "title": title,
+                        "link": full_link,
+                        "date": date_str,
+                        "content": detail_text
+                    }
+                    all_items.append(item)
+                
                 else:
-                    print(f"⚠️ Content not found in {full_link}")
-
-                # Save item
-                item = {
-                    "source": name,
-                    "title": title,
-                    "link": full_link,
-                    "date": date_str,
-                    "content": detail_text
-                }
-                all_items.append(item)
+                    print(f"⚠️ Failed to fetch: {full_link} → Status {detail_response.status_code}")
 
         except Exception as e:
             print(f"❌ Failed to scrape {name}: {e}")
