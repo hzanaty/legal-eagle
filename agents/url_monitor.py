@@ -24,18 +24,21 @@ def scrape_all_monitor_urls(MONITOR_URLS):
                 relative_link = tag.get("href", "")
                 full_link = urljoin(domain, relative_link)
 
-                # Extract date from <time> tag using regex
+                # Extract date from nearby <time> tag
                 date_str = ""
                 time_tag = tag.find_next("time", class_="td-module-date")
                 if time_tag:
                     full_date_text = time_tag.get_text(strip=True)
                     match = re.search(r"\d{4}-\d{2}-\d{2}", full_date_text)
                     if match:
+                        gregorian_part = match.group(0)
+                        year = int(gregorian_part.split("-")[0])
+                        if year < 2020:
+                            continue  # Skip Hijri dates
                         try:
-                            gregorian_part = match.group(0)
                             parsed_date = datetime.strptime(gregorian_part, "%Y-%m-%d")
                             date_str = parsed_date.strftime("%Y-%m-%d")
-                            if datetime.today() - parsed_date > timedelta(days=7):
+                            if datetime.today() - parsed_date > timedelta(days=10):
                                 print(f"⏭️ Skipping old news: {title} ({date_str})")
                                 continue
                         except Exception as e:
@@ -43,15 +46,18 @@ def scrape_all_monitor_urls(MONITOR_URLS):
 
                 # Fetch detail page
                 detail_response = requests.get(full_link)
+                print(f"🔍 Fetching detail page: {full_link} → Status {detail_response.status_code}")
                 detail_soup = BeautifulSoup(detail_response.text, "html.parser")
 
-                # Extract only from configured content class
+                # Extract content from configured tag (assumes <div>)
                 detail_text = f"{title}\n{full_link}"
                 content_element = detail_soup.find("div", class_=content_tag)
                 if content_element:
                     detail_text = content_element.get_text(separator="\n", strip=True)
+                else:
+                    print(f"⚠️ Content not found in {full_link}")
 
-                # Append item
+                # Save item
                 item = {
                     "source": name,
                     "title": title,
