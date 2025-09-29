@@ -3,21 +3,21 @@
 import os
 from openai import OpenAI
 from dotenv import load_dotenv
-from configurations.agents_config import glossary
+from configurations.agents_config import GLOSSARY
 
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 # 🧠 Build filtering prompt for the model
-def build_filter_prompt(glossary, content):
+def build_filter_prompt(GLOSSARY, content):
     return f"""
 You are a legal policy analyst working in Human Capital Management (HCM). 
 Your task is to assess whether the following news content is relevant to HR, Payroll, GOSI, or labor law topics 
-based on this glossary of critical terms:
+based on this GLOSSARY of critical terms:
 
-Glossary:
-{glossary}
+GLOSSARY:
+{GLOSSARY}
 
 Content:
 {content}
@@ -29,7 +29,7 @@ Respond ONLY in strict JSON format:
 
 # 🔍 Check if a single news item is relevant
 def is_relevant(item):
-    prompt = build_filter_prompt(glossary, item["content"])
+    prompt = build_filter_prompt(GLOSSARY, item["content"])
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",  # ⚡ faster + smarter
