@@ -1,4 +1,5 @@
 # agents/news_grouper.py
+
 import os
 from agents.news_filter import filtered_news
 from openai import OpenAI
@@ -21,7 +22,7 @@ Reply with only "Yes" or "No".
 """
     try:
         response = client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}]
         )
         reply = response.choices[0].message.content.strip().lower()
@@ -49,11 +50,16 @@ def group_news(items):
 
 def summarize_group(group):
     combined_text = "\n\n".join([item["content"] for item in group])
-    prompt = f"Summarize the following related news items in 2-3 concise sentences:\n\n{combined_text}"
+    prompt = f"""
+Summarize the following related news items in 2–3 concise sentences. 
+Focus on the legal/HR significance and avoid redundancy.
+
+{combined_text}
+"""
 
     try:
         response = client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}]
         )
         return response.choices[0].message.content.strip()
@@ -65,7 +71,9 @@ def summarize_group(group):
 def format_group_output(group, summary):
     return {
         "summary": summary,
-        "items": group,
+        "titles": [item["title"] for item in group],  # quick reference
+        "links": [item["link"] for item in group],   # all sources preserved
+        "items": group,                              # keep full details
         "group_size": len(group),
         "date_grouped": datetime.now().strftime("%Y-%m-%d %H:%M")
     }
@@ -81,14 +89,3 @@ def group_and_summarize_news():
         result.append(format_group_output(group, summary))
 
     return result
-
-
-if __name__ == "__main__":
-    grouped_results = group_and_summarize_news()
-    print(f"📦 Total Groups Formed: {len(grouped_results)}")
-
-    for i, group in enumerate(grouped_results, 1):
-        print(f"\n📚 Group {i} ({group['group_size']} items)")
-        print(f"📝 Summary: {group['summary']}")
-        for item in group["items"]:
-            print(f"🔗 {item['title']} — {item['link']}")
