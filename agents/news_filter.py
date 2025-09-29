@@ -39,14 +39,26 @@ def is_relevant(item):
         reply = response.choices[0].message.content.strip().lower()
         return '"true"' in reply
     except Exception as e:
-        print(f"❌ Failed to check relevance for item '{item.get('title', '')}': {e}")
-        return False
+        # Return False but include error details for controller if needed
+        return {
+            "error": True,
+            "title": item.get("title", "Unknown"),
+            "message": str(e)
+        }
 
 # ✅ Entry point: receives a list of items and filters only the relevant ones
 def get_relevant_news(items):
     relevant = []
-    for i, item in enumerate(items):
-        print(f"🔍 Checking item {i+1}/{len(items)} → {item['title'][:80]}...")
-        if is_relevant(item):
+    errors = []
+
+    for item in items:
+        result = is_relevant(item)
+        if isinstance(result, dict) and result.get("error"):  # error case
+            errors.append(result)
+        elif result:  # relevant = True
             relevant.append(item)
-    return relevant
+
+    return {
+        "items": relevant,
+        "errors": errors
+    }
