@@ -2,7 +2,6 @@
 
 import os
 import requests
-from datetime import datetime
 from dotenv import load_dotenv
 
 load_dotenv()  # Load .env when running locally
@@ -12,12 +11,8 @@ BEARER_TOKEN = os.getenv("X_BEARER_TOKEN")
 if not BEARER_TOKEN:
     raise ValueError("❌ Missing X_BEARER_TOKEN in environment variables.")
 
-# Optional: print partially masked token for debug
-print(f"🔐 Using Bearer Token: {BEARER_TOKEN[:10]}...")
 
 def fetch_recent_tweets(username, max_results=10):
-    print(f"📥 Fetching tweets for @{username}...")
-
     url = "https://api.twitter.com/2/tweets/search/recent"
     headers = {"Authorization": f"Bearer {BEARER_TOKEN}"}
     params = {
@@ -30,7 +25,6 @@ def fetch_recent_tweets(username, max_results=10):
 
     if response.status_code == 200:
         tweets = response.json().get("data", [])
-        print(f"✅ Retrieved {len(tweets)} tweet(s) from @{username}")
 
         tweet_items = []
         for tweet in tweets:
@@ -52,6 +46,10 @@ def fetch_recent_tweets(username, max_results=10):
         return tweet_items
 
     else:
-        error_message = f"❌ Failed to fetch tweets for @{username}: {response.status_code} → {response.text}"
-        print(error_message)
-        return []
+        # Return structured error info for controller to handle/log
+        return {
+            "error": True,
+            "status_code": response.status_code,
+            "message": response.text,
+            "username": username
+        }
