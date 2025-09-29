@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 
 def scrape_all_monitor_urls(MONITOR_URLS):
     all_items = []
+    errors = []
 
     for source in MONITOR_URLS:
         name = source["name"]
@@ -14,9 +15,16 @@ def scrape_all_monitor_urls(MONITOR_URLS):
         title_tag = source["title_tag"]
         content_tag = source["content_tag"]
 
-        print(f"🌐 Scraping: {name} → {url}")
         try:
             response = requests.get(url)
+            if response.status_code != 200:
+                errors.append({
+                    "source": name,
+                    "url": url,
+                    "error": f"Failed to fetch listing page, status {response.status_code}"
+                })
+                continue
+
             soup = BeautifulSoup(response.text, "html.parser")
 
             for tag in soup.select(title_tag):
@@ -34,43 +42,54 @@ def scrape_all_monitor_urls(MONITOR_URLS):
                         gregorian_part = match.group(0)
                         year = int(gregorian_part.split("-")[0])
                         if year < 2020:
-                            continue  # Skip Hijri dates
+                            continue  # Skip Hijri-only entries
                         try:
                             parsed_date = datetime.strptime(gregorian_part, "%Y-%m-%d")
                             date_str = parsed_date.strftime("%Y-%m-%d")
                             if datetime.today() - parsed_date > timedelta(days=10):
-                                print(f"⏭️ Skipping old news: {title} ({date_str})")
-                                continue
+                                continue  # Skip old entries
                         except Exception as e:
-                            print(f"⚠️ Failed to parse date from: '{gregorian_part}' → {e}")
+                            errors.append({
+                                "source": name,
+                                "url": full_link,
+                                "error": f"Date parse failed for {gregorian_part}: {e}"
+                            })
 
                 # Fetch detail page
                 detail_response = requests.get(full_link)
-                
-                if detail_response.status_code == 200:
-                    print(f"🔍 Parsed: \"{title}\" → {full_link}")
-                    detail_soup = BeautifulSoup(detail_response.text, "html.parser")
-                    
-                    # Extract only from configured content class
-                    detail_text = f"{title}\n{full_link}"
-                    content_element = detail_soup.find("div", class_=content_tag)
-                    if content_element:
-                        detail_text = content_element.get_text(separator="\n", strip=True)
-                
-                    # Append item
-                    item = {
+                if detail_response.status_code != 200:
+                    errors.append({
                         "source": name,
-                        "title": title,
-                        "link": full_link,
-                        "date": date_str,
-                        "content": detail_text
-                    }
-                    all_items.append(item)
-                
-                else:
-                    print(f"⚠️ Failed to fetch: {full_link} → Status {detail_response.status_code}")
+                        "url": full_link,
+                        "error": f"Failed to fetch detail page, status {detail_response.status_code}"
+                    })
+                    continue
+
+                detail_soup = BeautifulSoup(detail_response.text, "html.parser")
+                detail_text = f"{title}\n{full_link}"
+
+                # Extract only from configured content class
+                content_element = detail_soup.find("div", class_=content_tag)
+                if content_element:
+                    detail_text = content_element.get_text(separator="\n", strip=True)
+
+                item = {
+                    "source": name,
+                    "title": title,
+                    "link": full_link,
+                    "date": date_str,
+                    "content": detail_text
+                }
+                all_items.append(item)
 
         except Exception as e:
-            print(f"❌ Failed to scrape {name}: {e}")
+            errors.append({
+                "source": name,
+                "url": url,
+                "error": str(e)
+            })
 
-    return all_items
+    return {
+        "items": all_items,
+        "errors": errors
+    }
