@@ -1,16 +1,16 @@
 import datetime
 print("✅ Agent controller is starting...")
+
 from configurations.agents_config import RSS_FEED_URLS, TWEET_ACCOUNTS, MONITOR_URLS
 print("✅ Config imported")
+
 from agents.rss_parser import parse_rss_feed
-print("✅ RSS Parser imported")
 from agents.tweet_feed import fetch_recent_tweets
-print("✅ Tweet Feed imported")
 from agents.url_monitor import scrape_all_monitor_urls
-print("✅ URL monitor imported")
-#from agents.news_filter import get_relevant_news
-#from agents.news_grouper import group_similar_news
-#from agents.email_sender import send_summary_email
+from agents.news_filter import get_relevant_news
+from agents.news_grouper import group_and_summarize_news
+# from agents.email_sender import send_summary_email   # 👈 keep disabled
+
 
 def run_controller():
     print("🧠 Starting Legal Eagle Controller...\n")
@@ -19,60 +19,91 @@ def run_controller():
     rss_items = []
     print("📰 Running RSS Parser Agent...")
     for url in RSS_FEED_URLS:
-        rss_items.extend(parse_rss_feed(url))
-    print(f"✅ Total RSS items collected: {len(rss_items)}\n")
-    for item in rss_items[:5]:
-        print("🔹 Title:", item["title"])
-        print("🔗 Link:", item["link"])
-        print("🗓️ Date:", item["date"])
-        print("📄 Content:", item["content"][:100], "...\n")
+        items = parse_rss_feed(url)
+        rss_items.extend(items)
+    print(f"✅ Total RSS items collected: {len(rss_items)}")
+
+    for item in rss_items:
+        print(f"\n🔹 Title: {item['title']}")
+        print(f"🔗 Link: {item['link']}")
+        print(f"🗓️ Date: {item['date']}")
+        print(f"📄 Content: {item['content']}\n")
 
     # 2. Tweet Feed Agent (daily rotation)
     today_index = datetime.datetime.utcnow().day % len(TWEET_ACCOUNTS)
     account_name = TWEET_ACCOUNTS[today_index]
+    print(f"\n🐦 Running Tweet Feed Agent for @{account_name}...")
     tweet_items = fetch_recent_tweets(account_name)
-    print(f"✅ Total tweets collected from @{account_name}: {len(tweet_items)}\n")
+
+    if isinstance(tweet_items, dict) and tweet_items.get("error"):
+        print(f"❌ Tweet fetch failed for @{account_name}: {tweet_items}")
+        tweet_items = []
+    print(f"✅ Total tweets collected from @{account_name}: {len(tweet_items)}")
+
     for tweet in tweet_items:
-        print("🔹 Title:", tweet["title"])
-        print("🔗 Link:", tweet["link"])
-        print("🗓️ Date:", tweet["date"])
-        print("📄 Content:", tweet["content"][:200], "...\n")  # limit content for readability
+        print(f"\n🔹 Title: {tweet['title']}")
+        print(f"🔗 Link: {tweet['link']}")
+        print(f"🗓️ Date: {tweet['date']}")
+        print(f"📄 Content: {tweet['content']}\n")
 
     # 3. URL Monitor Agent
-    print("🕵️‍♂️ Running URL Monitor Agent...")
-    url_items = scrape_all_monitor_urls(MONITOR_URLS)
-    print(f"✅ Total monitored site items collected: {len(url_items)}\n")
+    print("\n🕵️‍♂️ Running URL Monitor Agent...")
+    url_result = scrape_all_monitor_urls(MONITOR_URLS)
+    url_items = url_result.get("items", [])
+    url_errors = url_result.get("errors", [])
 
-    # Optional: Preview first 5
-    for item in url_items[:5]:
-        print("🔹 Title:", item["title"])
-        print("🔗 Link:", item["link"])
-        print("🗓️ Date:", item["date"])
-        print("📄 Content:\n" + item['content'])  # 👈 force full content print
-        print("=" * 60)  # separator
+    print(f"✅ Total monitored site items collected: {len(url_items)}")
+    if url_errors:
+        print(f"⚠️ {len(url_errors)} errors while scraping:")
+        for err in url_errors:
+            print(f"   - {err}")
 
-    # ===========================
-    # 🔒 Other agents are skipped
-    # ===========================
+    for item in url_items:
+        print(f"\n🔹 Title: {item['title']}")
+        print(f"🔗 Link: {item['link']}")
+        print(f"🗓️ Date: {item['date']}")
+        print(f"📄 Content:\n{item['content']}\n")
+        print("=" * 60)
 
     # 4. Combine all items
-    #all_news_items = rss_items + tweet_items + url_items
-    #print(f"📦 Total collected items (pre-filter): {len(all_news_items)}\n")
+    all_news_items = rss_items + tweet_items + url_items
+    print(f"\n📦 Total collected items (pre-filter): {len(all_news_items)}")
 
     # 5. News Filter Agent
-    #print("🧹 Filtering for relevance...")
-    #filtered_items = get_relevant_news(all_news_items)
-    #print(f"✅ Total relevant items after filtering: {len(filtered_items)}\n")
+    print("\n🧹 Filtering for relevance...")
+    filter_result = get_relevant_news(all_news_items)
+    filtered_items = filter_result.get("items", [])
+    filter_errors = filter_result.get("errors", [])
+
+    print(f"✅ Relevant items after filtering: {len(filtered_items)}")
+    if filter_errors:
+        print(f"⚠️ {len(filter_errors)} filtering errors:")
+        for err in filter_errors:
+            print(f"   - {err}")
+
+    for item in filtered_items:
+        print(f"\n🔹 Title: {item['title']}")
+        print(f"🔗 Link: {item['link']}")
+        print(f"🗓️ Date: {item['date']}")
+        print(f"📄 Content: {item['content']}\n")
 
     # 6. News Grouper Agent
-    #print("🧠 Grouping similar news items...")
-    #grouped_summary = group_similar_news(filtered_items)
-    #print(f"✅ Grouped summary ready with {len(grouped_summary)} entries.\n")
+    print("\n🧠 Grouping similar news items...")
+    grouped_summary = group_and_summarize_news(filtered_items)
+    print(f"✅ Grouped summary ready with {len(grouped_summary)} entries.")
 
-    # 7. Email Composer Agent
-    #print("📧 Sending summary email...")
-    #send_summary_email(grouped_summary)
-    #print("✅ Email sent to stakeholders.\n")
+    for i, group in enumerate(grouped_summary, 1):
+        print(f"\n📚 Group {i} ({group['group_size']} items)")
+        print(f"📝 Summary: {group['summary']}")
+        print("🔗 Sources:")
+        for link in group["links"]:
+            print(f"   - {link}")
+
+    # 7. Email Composer Agent (disabled for now)
+    # print("📧 Sending summary email...")
+    # send_summary_email(grouped_summary)
+    # print("✅ Email sent to stakeholders.\n")
+
 
 if __name__ == "__main__":
     run_controller()
