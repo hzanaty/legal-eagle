@@ -14,7 +14,6 @@ RSS_FEED_URLS = [
 TWEET_ACCOUNTS = [
     "SaudiGOSI",
     "HRSD_SA",
-    "SAPMENA"
 ]
 
 MONITOR_URLS = [
