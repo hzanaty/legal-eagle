@@ -1,7 +1,6 @@
 # agents/news_grouper.py
 
 import os
-from agents.news_filter import filtered_news
 from openai import OpenAI
 from dotenv import load_dotenv
 from datetime import datetime
@@ -12,6 +11,9 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 
 
 def are_related(text1, text2):
+    """
+    Uses LLM to check if two texts refer to the same event.
+    """
     prompt = f"""
 Are the following two news items about the same topic or event, even if written differently?
 
@@ -28,17 +30,23 @@ Reply with only "Yes" or "No".
         reply = response.choices[0].message.content.strip().lower()
         return "yes" in reply
     except Exception as e:
-        print(f"⚠️ Failed similarity check: {e}")
-        return False
+        return {"error": True, "message": f"Similarity check failed: {e}"}
 
 
 def group_news(items):
+    """
+    Groups related items together.
+    """
     groups = []
 
     for item in items:
         matched = False
         for group in groups:
-            if are_related(item["content"], group[0]["content"]):
+            result = are_related(item["content"], group[0]["content"])
+            if isinstance(result, dict) and result.get("error"):
+                # if similarity check failed, skip gracefully
+                continue
+            if result:  # if "yes"
                 group.append(item)
                 matched = True
                 break
@@ -49,6 +57,9 @@ def group_news(items):
 
 
 def summarize_group(group):
+    """
+    Summarizes all content in a group into 2–3 concise sentences.
+    """
     combined_text = "\n\n".join([item["content"] for item in group])
     prompt = f"""
 Summarize the following related news items in 2–3 concise sentences. 
@@ -56,7 +67,6 @@ Focus on the legal/HR significance and avoid redundancy.
 
 {combined_text}
 """
-
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
@@ -64,24 +74,28 @@ Focus on the legal/HR significance and avoid redundancy.
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
-        print(f"⚠️ Failed to summarize group: {e}")
-        return "⚠️ Summary not available."
+        return f"⚠️ Summary not available. Error: {e}"
 
 
 def format_group_output(group, summary):
+    """
+    Formats grouped items with metadata and summary.
+    """
     return {
         "summary": summary,
-        "titles": [item["title"] for item in group],  # quick reference
-        "links": [item["link"] for item in group],   # all sources preserved
-        "items": group,                              # keep full details
+        "titles": [item["title"] for item in group],
+        "links": [item["link"] for item in group],
+        "items": group,
         "group_size": len(group),
         "date_grouped": datetime.now().strftime("%Y-%m-%d %H:%M")
     }
 
 
-def group_and_summarize_news():
-    relevant_items = filtered_news()
-    groups = group_news(relevant_items)
+def group_and_summarize_news(items):
+    """
+    Orchestrates grouping + summarization for already filtered items.
+    """
+    groups = group_news(items)
     result = []
 
     for group in groups:
