@@ -11,9 +11,7 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 
 
 def are_related(text1, text2):
-    """
-    Uses LLM to check if two texts refer to the same event.
-    """
+    """Uses LLM to check if two texts refer to the same event."""
     prompt = f"""
 Are the following two news items about the same topic or event, even if written differently?
 
@@ -34,17 +32,13 @@ Reply with only "Yes" or "No".
 
 
 def group_news(items):
-    """
-    Groups related items together.
-    """
+    """Groups related items together (within a single category)."""
     groups = []
-
     for item in items:
         matched = False
         for group in groups:
             result = are_related(item["content"], group[0]["content"])
             if isinstance(result, dict) and result.get("error"):
-                # if similarity check failed, skip gracefully
                 continue
             if result:  # if "yes"
                 group.append(item)
@@ -52,18 +46,15 @@ def group_news(items):
                 break
         if not matched:
             groups.append([item])
-
     return groups
 
 
 def summarize_group(group):
-    """
-    Summarizes all content in a group into 2–3 concise sentences.
-    """
+    """Summarizes all content in a group into 2–3 concise sentences."""
     combined_text = "\n\n".join([item["content"] for item in group])
     prompt = f"""
 Summarize the following related news items in 2–3 concise sentences. 
-Focus on the legal/HR significance and avoid redundancy.
+Focus on the legal/HR/Finance significance and avoid redundancy.
 
 {combined_text}
 """
@@ -77,12 +68,11 @@ Focus on the legal/HR significance and avoid redundancy.
         return f"⚠️ Summary not available. Error: {e}"
 
 
-def format_group_output(group, summary):
-    """
-    Formats grouped items with metadata and summary.
-    """
+def format_group_output(group, summary, category):
+    """Formats grouped items with metadata and summary."""
     return {
         "summary": summary,
+        "category": category,
         "titles": [item["title"] for item in group],
         "links": [item["link"] for item in group],
         "items": group,
@@ -94,12 +84,21 @@ def format_group_output(group, summary):
 def group_and_summarize_news(items):
     """
     Orchestrates grouping + summarization for already filtered items.
+    Groups are formed separately per category (HCM, FIN).
     """
-    groups = group_news(items)
-    result = []
+    results = []
 
-    for group in groups:
-        summary = summarize_group(group)
-        result.append(format_group_output(group, summary))
+    # Split by category
+    categories = {}
+    for item in items:
+        cat = item.get("category", "OTHER")
+        categories.setdefault(cat, []).append(item)
 
-    return result
+    # Group & summarize per category
+    for category, cat_items in categories.items():
+        grouped = group_news(cat_items)
+        for group in grouped:
+            summary = summarize_group(group)
+            results.append(format_group_output(group, summary, category))
+
+    return results
