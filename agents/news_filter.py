@@ -23,6 +23,12 @@ Glossary Categories:
 Content:
 {content}
 
+⚠️ Important instructions:
+- Only classify as HCM or FIN if the content directly concerns those topics.
+- Do NOT classify general political, diplomatic, international relations, cabinet meetings, 
+  government reshuffles, foreign policy, or purely economic/trade deals as HCM or FIN.
+- If the content is unrelated to HCM or FIN, classify it as OTHER.
+
 Respond ONLY in strict JSON format:
 {{ "category": "HCM" }}
 {{ "category": "FIN" }}
