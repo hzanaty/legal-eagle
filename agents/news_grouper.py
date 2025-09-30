@@ -72,7 +72,7 @@ def format_group_output(group, summary, category):
     """Formats grouped items with metadata and summary."""
     return {
         "summary": summary,
-        "category": category,
+        "category": category,   # ✅ preserve HCM/FIN
         "titles": [item["title"] for item in group],
         "links": [item["link"] for item in group],
         "items": group,
@@ -85,18 +85,25 @@ def group_and_summarize_news(items):
     """
     Orchestrates grouping + summarization for already filtered items.
     Groups are formed separately per category (HCM, FIN).
+    HCM groups always appear first, followed by FIN, then others.
     """
     results = []
 
-    # Split by category
+    # Split items by category
     categories = {}
     for item in items:
         cat = item.get("category", "OTHER")
         categories.setdefault(cat, []).append(item)
 
-    # Group & summarize per category
-    for category, cat_items in categories.items():
-        grouped = group_news(cat_items)
+    # Process categories in preferred order
+    ordered_categories = ["HCM", "FIN"] + [
+        c for c in categories.keys() if c not in ["HCM", "FIN"]
+    ]
+
+    for category in ordered_categories:
+        if category not in categories:
+            continue
+        grouped = group_news(categories[category])
         for group in grouped:
             summary = summarize_group(group)
             results.append(format_group_output(group, summary, category))
