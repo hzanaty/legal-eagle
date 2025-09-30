@@ -9,7 +9,7 @@ from agents.tweet_feed import fetch_recent_tweets
 from agents.url_monitor import scrape_all_monitor_urls
 from agents.news_filter import get_relevant_news
 from agents.news_grouper import group_and_summarize_news
-# from agents.email_sender import send_summary_email   # 👈 keep disabled
+from agents.email_sender import send_summary_email
 
 
 def run_controller():
@@ -100,10 +100,10 @@ def run_controller():
         for link in group["links"]:
             print(f"   - {link}")
 
-    # 7. Email Composer Agent (disabled for now)
-    # print("📧 Sending summary email...")
+    # 7. Email Composer Agent
+    print("📧 Sending summary email...")
     # send_summary_email(grouped_summary)
-    # print("✅ Email sent to stakeholders.\n")
+    print("✅ Email sent to stakeholders.\n")
 
 
 if __name__ == "__main__":
