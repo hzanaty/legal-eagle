@@ -93,7 +93,8 @@ def run_controller():
     print(f"✅ Grouped summary ready with {len(grouped_summary)} entries.")
 
     for i, group in enumerate(grouped_summary, 1):
-        print(f"\n📚 Group {i} ({group['group_size']} items)")
+        category = group.get("category", "Uncategorized")
+        print(f"\n📚 Group {i} ({category}, {group['group_size']} items)")
         print(f"📝 Summary: {group['summary']}")
         print("🔗 Sources:")
         for link in group["links"]:
