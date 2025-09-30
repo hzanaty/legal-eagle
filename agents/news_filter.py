@@ -34,7 +34,7 @@ def is_relevant(item):
         response = client.chat.completions.create(
             model="gpt-4o-mini",  # ⚡ faster + smarter
             messages=[{"role": "user", "content": prompt}],
-            response_format={"type": "json"}  # enforce JSON output
+            response_format={"type": "json_object"}
         )
         reply = response.choices[0].message.content.strip().lower()
         return '"true"' in reply
