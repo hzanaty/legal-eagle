@@ -9,56 +9,61 @@ load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=OPENAI_API_KEY)
 
-# 🧠 Build filtering prompt for the model
-def build_filter_prompt(GLOSSARY, content):
-    return f"""
-You are a legal policy analyst working in Human Capital Management (HCM). 
-Your task is to assess whether the following news content is relevant to HR, Payroll, GOSI, or labor law topics 
-based on this GLOSSARY of critical terms:
 
-GLOSSARY:
-{GLOSSARY}
+# 🧠 Build filtering prompt dynamically from glossary categories
+def build_filter_prompt(glossary, content):
+    categories_text = "\n".join([f"- {k}: {v}" for k, v in glossary.items()])
+    return f"""
+You are a legal policy analyst. Classify the following news content into exactly ONE category
+based on the glossary provided.
+
+Glossary Categories:
+{categories_text}
 
 Content:
 {content}
 
 Respond ONLY in strict JSON format:
-{{ "relevant": true }}   ← if related
-{{ "relevant": false }}  ← if not related
+{{ "category": "HCM" }}  ← if related to HCM topics
+{{ "category": "FIN" }}  ← if related to Finance topics
+{{ "category": "OTHER" }} ← if unrelated to HCM or FIN
 """
 
-# 🔍 Check if a single news item is relevant
-def is_relevant(item):
+
+# 🔍 Classify a single news item
+def classify_item(item):
     prompt = build_filter_prompt(GLOSSARY, item["content"])
     try:
         response = client.chat.completions.create(
-            model="gpt-4o-mini",  # ⚡ faster + smarter
+            model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
-            response_format={"type": "json_object"}
+            response_format={"type": "json_object"}  # ✅ structured JSON
         )
-        reply = response.choices[0].message.content.strip().lower()
-        return '"true"' in reply
+        reply = response.choices[0].message.content.strip()
+        return {"title": item.get("title", ""), "category": reply}
     except Exception as e:
-        # Return False but include error details for controller if needed
         return {
             "error": True,
             "title": item.get("title", "Unknown"),
             "message": str(e)
         }
 
-# ✅ Entry point: receives a list of items and filters only the relevant ones
-def get_relevant_news(items):
-    relevant = []
+
+# ✅ Entry point: classify all items
+def classify_news(items):
+    results = []
     errors = []
 
     for item in items:
-        result = is_relevant(item)
-        if isinstance(result, dict) and result.get("error"):  # error case
+        result = classify_item(item)
+        if isinstance(result, dict) and result.get("error"):
             errors.append(result)
-        elif result:  # relevant = True
-            relevant.append(item)
+        else:
+            # attach category directly to item
+            item["category"] = result["category"]
+            results.append(item)
 
     return {
-        "items": relevant,
+        "items": results,
         "errors": errors
     }
