@@ -1,11 +1,24 @@
 # agents_config.py
 
-GLOSSARY = """
-Focus on topics related to labor contracts, iqama and visa, leaves, end of service, 
-labor courts, social insurance (GOSI), health insurance, labor disciplinary and violations, remote work, 
-part-time, working hours, Saudization or Nitaqat, Wage Protection, labor law, income tax, 
-paytoll, currency, data protection, data residency, service duration, calendar
-""".strip()
+GLOSSARY = {
+    "HCM": """
+    Labor contracts, iqama and visa, dependent workers (المرافقين/المرافقات),
+    expatriate labor policies, leaves, end of service, labor courts,
+    social insurance (GOSI), health insurance, labor disciplinary and violations,
+    remote work, part-time, working hours, Saudization (Nitaqat),
+    Wage Protection, labor law, payroll, service duration, calendar,
+    ministerial decrees (قرارات وزارية) from HRSD
+    """.strip(),
+
+    "FIN": """
+    Taxation, VAT, Zakat, ZATCA, tax authority regulations, income tax,
+    currency, financial compliance
+    """.strip(),
+
+    "OTHER": """
+    Any content not related to HCM or FIN
+    """.strip()
+}
 
 RSS_FEED_URLS = [
     "https://saudigazette.com.sa/rssFeed/74",
