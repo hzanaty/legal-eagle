@@ -50,8 +50,3 @@ def send_email(subject, body):
         print("✅ Email sent successfully!")
     except Exception as e:
         print(f"❌ Failed to send email: {e}")
-
-# --- Run it
-if __name__ == "__main__":
-    html_body = get_lpm_analysis()
-    send_email("📰 Daily Saudi Feed", html_body)
