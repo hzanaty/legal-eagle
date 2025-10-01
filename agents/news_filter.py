@@ -41,13 +41,18 @@ def classify_item(item, OPENAI_API_KEY, GLOSSARY):
         )
         reply = response.choices[0].message.content.strip()
 
-        # Expected reply: { "category": "HCM" } or FIN / OTHER
-        if '"HCM"' in reply:
-            return {"category": "HCM"}
-        elif '"FIN"' in reply:
-            return {"category": "FIN"}
-        else:
-            return {"category": "OTHER"}
+        try:
+            data = json.loads(reply)
+            category = data.get("category", "OTHER").upper()
+            if category not in ("HCM", "FIN", "OTHER"):
+                category = "OTHER"
+            return {"category": category}
+        except json.JSONDecodeError:
+            return {
+                "error": True,
+                "title": item.get("title", "Unknown"),
+                "message": f"Invalid JSON reply: {reply}"
+            }
 
     except Exception as e:
         return {
