@@ -18,7 +18,7 @@ def run_controller():
 
     # --- Credentials loaded once here ---
     OPENAI_KEY = creds["openai_api_key"]
-    TWITTER_BEARER = creds["twitter"]["bearer_token"]
+    X_BEARER_TOKEN = creds["twitter"]["bearer_token"]
     GMAIL_CREDS = creds["gmail"]
 
     # 1. RSS Agent
@@ -39,7 +39,7 @@ def run_controller():
     today_index = datetime.datetime.utcnow().day % len(TWEET_ACCOUNTS)
     account_name = TWEET_ACCOUNTS[today_index]
     print(f"\n🐦 Running Tweet Feed Agent for @{account_name}...")
-    tweet_items = fetch_recent_tweets(account_name, TWITTER_BEARER)
+    tweet_items = fetch_recent_tweets(account_name, X_BEARER_TOKEN)
 
     if isinstance(tweet_items, dict) and tweet_items.get("error"):
         print(f"❌ Tweet fetch failed for @{account_name}: {tweet_items}")
