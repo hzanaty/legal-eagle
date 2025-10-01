@@ -1,6 +1,7 @@
 # agents/news_filter.py
 
 import os
+import json
 from openai import OpenAI
 
 # 🧠 Build filtering prompt dynamically from glossary categories
