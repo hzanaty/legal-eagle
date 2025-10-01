@@ -1,2 +1,2 @@
-# rss-agent-job
-Job to run RSS Agent Daily
+# Legal Eagle Job
+Job to run Legal Eagle Agent Daily
