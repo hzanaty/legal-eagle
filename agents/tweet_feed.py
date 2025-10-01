@@ -6,15 +6,15 @@ from dotenv import load_dotenv
 
 load_dotenv()  # Load .env when running locally
 
-BEARER_TOKEN = os.getenv("X_BEARER_TOKEN")
+X_BEARER_TOKEN = os.getenv("X_BEARER_TOKEN")
 
 if not BEARER_TOKEN:
     raise ValueError("❌ Missing X_BEARER_TOKEN in environment variables.")
 
 
-def fetch_recent_tweets(username, max_results=10):
+def fetch_recent_tweets(username, bearer_token, max_results=10):
     url = "https://api.twitter.com/2/tweets/search/recent"
-    headers = {"Authorization": f"Bearer {BEARER_TOKEN}"}
+    headers = {"Authorization": f"Bearer {X_BEARER_TOKEN}"}
     params = {
         "query": f"from:{username}",
         "max_results": max_results,
