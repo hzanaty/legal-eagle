@@ -15,6 +15,11 @@ from agents.email_sender import send_email
 def run_controller():
     print("🧠 Starting Legal Eagle Controller...\n")
 
+    # --- Credentials loaded once here ---
+    OPENAI_KEY = creds["openai_api_key"]
+    TWITTER_BEARER = creds["twitter"]["bearer_token"]
+    GMAIL_CREDS = creds["gmail"]
+
     # 1. RSS Agent
     rss_items = []
     print("📰 Running RSS Parser Agent...")
@@ -33,7 +38,7 @@ def run_controller():
     today_index = datetime.datetime.utcnow().day % len(TWEET_ACCOUNTS)
     account_name = TWEET_ACCOUNTS[today_index]
     print(f"\n🐦 Running Tweet Feed Agent for @{account_name}...")
-    tweet_items = fetch_recent_tweets(account_name)
+    tweet_items = fetch_recent_tweets(account_name, TWITTER_BEARER)
 
     if isinstance(tweet_items, dict) and tweet_items.get("error"):
         print(f"❌ Tweet fetch failed for @{account_name}: {tweet_items}")
@@ -101,16 +106,17 @@ def run_controller():
             print(f"   - {link}")
 
     # 7. Email Composer Agent
-    subject = "Legal Eagle Daily Digest"
+    print("📧 Sending summary email...")
+    subject = "🦅 Legal Eagle Daily Digest"
     body = build_email_body(grouped_summary)
-    
     send_email(
         sender="hanyzanaty@gmail.com", 
-        receivers=EMAIL_RECEIVERS, 
-        subject=subject, 
-        body=body
+        receivers=EMAIL_RECEIVERS,
+        subject=subject,
+        body=body,
+        gmail_creds=GMAIL_CREDS
     )
-
+    print("✅ Email sent to stakeholders.\n")
 
 if __name__ == "__main__":
     run_controller()
