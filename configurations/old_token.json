@@ -1,1 +1,11 @@
-{"token": "ya29.a0AeXRPp53D3sxTd0835bvgrjgdiwiA2q2eML9zz70J5gxFRjeGXidcqjIaqIHy-Y8zUTCuL6Gk3uEOu3BltWS4MYnKNAy81OVuPFlkDBWV9Dj3RvDVxVHbsBWcufCUhjwz9xckxAZh6K5A_jxeiz4x_z1DGvIeWLsSV0nMNBsaCgYKAf4SARMSFQHGX2MitJt_ZagMqgff5nauh14b1g0175", "refresh_token": "1//09i2dimT9u-UlCgYIARAAGAkSNwF-L9Ir0CRiMTL4nzvVwEorpsdFmZHPbOVsUkg8jXCPocT1AfuZHvEl1EpnmEWqkCHzM9l6WIw", "token_uri": "https://oauth2.googleapis.com/token", "client_id": "795702856593-vq4sg0vllspuopkh7109a4j6al1cobd4.apps.googleusercontent.com", "client_secret": "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", "scopes": ["https://mail.google.com/"], "universe_domain": "googleapis.com", "account": "", "expiry": "2025-03-23T19:17:10.653330Z"}
+{
+  "token": "ya29.a0AeXRPp53D3sxTd0835bvgrjgdiwiA2q2eML9zz70J5gxFRjeGXidcqjIaqIHy-Y8zUTCuL6Gk3uEOu3BltWS4MYnKNAy81OVuPFlkDBWV9Dj3RvDVxVHbsBWcufCUhjwz9xckxAZh6K5A_jxeiz4x_z1DGvIeWLsSV0nMNBsaCgYKAf4SARMSFQHGX2MitJt_ZagMqgff5nauh14b1g0175",
+  "refresh_token": "1//09i2dimT9u-UlCgYIARAAGAkSNwF-L9Ir0CRiMTL4nzvVwEorpsdFmZHPbOVsUkg8jXCPocT1AfuZHvEl1EpnmEWqkCHzM9l6WIw",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "client_id": "795702856593-vq4sg0vllspuopkh7109a4j6al1cobd4.apps.googleusercontent.com",
+  "client_secret": "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",
+  "scopes": ["https://mail.google.com/"],
+  "universe_domain": "googleapis.com",
+  "account": "",
+  "expiry": "2025-03-23T19:17:10.653330Z"
+}
