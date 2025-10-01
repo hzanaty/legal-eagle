@@ -88,3 +88,9 @@ MONITOR_URLS = [
     },
     # ... add more as needed
 ]
+
+# Email configuration
+EMAIL_RECEIVERS = [
+    "hany.zanaty@sap.com",
+]
+
