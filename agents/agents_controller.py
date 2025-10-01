@@ -2,7 +2,8 @@ import datetime
 print("✅ Agent controller is starting...")
 
 from configurations.agents_config import RSS_FEED_URLS, TWEET_ACCOUNTS, MONITOR_URLS, EMAIL_RECEIVERS
-print("✅ Config imported")
+from configurations.config_loader import creds
+print("✅ Config and creds imported")
 
 from agents.rss_parser import parse_rss_feed
 from agents.tweet_feed import fetch_recent_tweets
