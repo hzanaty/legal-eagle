@@ -12,12 +12,11 @@ from agents.news_filter import get_relevant_news
 from agents.news_grouper import group_and_summarize_news
 from agents.email_sender import send_email
 
-
 def run_controller():
     print("🧠 Starting Legal Eagle Controller...\n")
 
     # --- Credentials loaded once here ---
-    OPENAI_KEY = creds["openai_api_key"]
+    OPENAI_API_KEY = creds["openai_api_key"]
     X_BEARER_TOKEN = creds["twitter"]["x_bearer_token"]
     GMAIL_CREDS = creds["gmail"]
 
@@ -77,7 +76,7 @@ def run_controller():
 
     # 5. News Filter Agent
     print("\n🧹 Filtering for relevance...")
-    filter_result = get_relevant_news(all_news_items, OPENAI_KEY)
+    filter_result = get_relevant_news(all_news_items, OPENAI_API_KEY)
     filtered_items = filter_result.get("items", [])
     filter_errors = filter_result.get("errors", [])
 
@@ -95,7 +94,7 @@ def run_controller():
 
     # 6. News Grouper Agent
     print("\n🧠 Grouping similar news items...")
-    grouped_summary = group_and_summarize_news(filtered_items, OPENAI_KEY)
+    grouped_summary = group_and_summarize_news(filtered_items, OPENAI_API_KEY)
     print(f"✅ Grouped summary ready with {len(grouped_summary)} entries.")
 
     for i, group in enumerate(grouped_summary, 1):
