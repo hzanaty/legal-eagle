@@ -2,7 +2,6 @@
 
 import os
 import requests
-from dotenv import load_dotenv
 
 def fetch_recent_tweets(username, X_BEARER_TOKEN, max_results=10):
     url = "https://api.twitter.com/2/tweets/search/recent"
