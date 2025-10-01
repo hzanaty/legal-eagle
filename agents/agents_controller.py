@@ -18,7 +18,7 @@ def run_controller():
 
     # --- Credentials loaded once here ---
     OPENAI_KEY = creds["openai_api_key"]
-    X_BEARER_TOKEN = creds["twitter"]["bearer_token"]
+    X_BEARER_TOKEN = creds["twitter"]["x_bearer_token"]
     GMAIL_CREDS = creds["gmail"]
 
     # 1. RSS Agent
