@@ -1,16 +1,8 @@
-# agents/news_grouper.py
-
-import os
 from openai import OpenAI
-from dotenv import load_dotenv
 from datetime import datetime
 
-load_dotenv()
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-client = OpenAI(api_key=OPENAI_API_KEY)
 
-
-def are_related(text1, text2):
+def are_related(text1, text2, client: OpenAI):
     """Uses LLM to check if two texts refer to the same event."""
     prompt = f"""
 Are the following two news items about the same topic or event, even if written differently?
@@ -31,13 +23,13 @@ Reply with only "Yes" or "No".
         return {"error": True, "message": f"Similarity check failed: {e}"}
 
 
-def group_news(items):
+def group_news(items, client: OpenAI):
     """Groups related items together (within a single category)."""
     groups = []
     for item in items:
         matched = False
         for group in groups:
-            result = are_related(item["content"], group[0]["content"])
+            result = are_related(item["content"], group[0]["content"], client)
             if isinstance(result, dict) and result.get("error"):
                 continue
             if result:  # if "yes"
@@ -49,7 +41,7 @@ def group_news(items):
     return groups
 
 
-def summarize_group(group):
+def summarize_group(group, client: OpenAI):
     """Summarizes all content in a group into 2–3 concise sentences."""
     combined_text = "\n\n".join([item["content"] for item in group])
     prompt = f"""
@@ -81,13 +73,14 @@ def format_group_output(group, summary, category):
     }
 
 
-def group_and_summarize_news(items):
+def group_and_summarize_news(items, OPENAI_API_KEY):
     """
     Orchestrates grouping + summarization for already filtered items.
     Groups are formed separately per category (HCM, FIN).
     HCM groups always appear first, followed by FIN, then others.
     """
     results = []
+    client = OpenAI(api_key=OPENAI_API_KEY)
 
     # Split items by category
     categories = {}
@@ -103,9 +96,9 @@ def group_and_summarize_news(items):
     for category in ordered_categories:
         if category not in categories:
             continue
-        grouped = group_news(categories[category])
+        grouped = group_news(categories[category], client)
         for group in grouped:
-            summary = summarize_group(group)
+            summary = summarize_group(group, client)
             results.append(format_group_output(group, summary, category))
 
     return results
