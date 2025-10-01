@@ -108,14 +108,7 @@ def run_controller():
     # 7. Email Composer Agent
     print("📧 Sending summary email...")
     subject = "🦅 Legal Eagle Daily Digest"
-    body = build_email_body(grouped_summary)
-    send_email(
-        sender="hanyzanaty@gmail.com", 
-        receivers=EMAIL_RECEIVERS,
-        subject=subject,
-        body=body,
-        gmail_creds=GMAIL_CREDS
-    )
+    send_email(grouped_summary, EMAIL_RECEIVERS, GMAIL_CREDS)
     print("✅ Email sent to stakeholders.\n")
 
 if __name__ == "__main__":
