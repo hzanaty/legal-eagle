@@ -58,21 +58,21 @@ def send_email(grouped_summary, EMAIL_RECEIVERS, GMAIL_CREDS):
 
     msg = MIMEMultipart()
     msg["From"] = EMAIL_SENDER
-    if isinstance(receivers, list):
+    if isinstance(EMAIL_RECEIVERS, list):
         msg["To"] = ", ".join(EMAIL_RECEIVERS)
     else:
         msg["To"] = EMAIL_RECEIVERS
     msg["Subject"] = subject
     msg.attach(MIMEText(body, "html"))
 
-    auth_string = f"user={SENDER_EMAIL}\1auth=Bearer {access_token}\1\1"
+    auth_string = f"user={EMAIL_SENDER}\1auth=Bearer {access_token}\1\1"
     auth_string = base64.b64encode(auth_string.encode("utf-8")).decode("utf-8")
 
     try:
         server = smtplib.SMTP("smtp.gmail.com", 587)
         server.starttls()
         server.docmd("AUTH", "XOAUTH2 " + auth_string)
-        server.sendmail(SENDER_EMAIL, receivers if isinstance(receivers, list) else [receivers], msg.as_string())
+        server.sendmail(EMAIL_SENDER, EMAIL_RECEIVERS if isinstance(EMAIL_RECEIVERS, list) else [EMAIL_RECEIVERS], msg.as_string())
         server.quit()
         print(f"✅ Email sent successfully to {msg['To']}")
     except Exception as e:
