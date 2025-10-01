@@ -1,7 +1,7 @@
 import datetime
 print("✅ Agent controller is starting...")
 
-from configurations.agents_config import RSS_FEED_URLS, TWEET_ACCOUNTS, MONITOR_URLS
+from configurations.agents_config import RSS_FEED_URLS, TWEET_ACCOUNTS, MONITOR_URLS, EMAIL_RECEIVERS
 print("✅ Config imported")
 
 from agents.rss_parser import parse_rss_feed
@@ -9,7 +9,7 @@ from agents.tweet_feed import fetch_recent_tweets
 from agents.url_monitor import scrape_all_monitor_urls
 from agents.news_filter import get_relevant_news
 from agents.news_grouper import group_and_summarize_news
-from agents.email_sender import send_summary_email
+from agents.email_sender import send_email
 
 
 def run_controller():
@@ -101,9 +101,15 @@ def run_controller():
             print(f"   - {link}")
 
     # 7. Email Composer Agent
-    print("📧 Sending summary email...")
-    # send_summary_email(grouped_summary)
-    print("✅ Email sent to stakeholders.\n")
+    subject = "Legal Eagle Daily Digest"
+    body = build_email_body(grouped_summary)
+    
+    send_email(
+        sender="hanyzanaty@gmail.com", 
+        receivers=EMAIL_RECEIVERS, 
+        subject=subject, 
+        body=body
+    )
 
 
 if __name__ == "__main__":
