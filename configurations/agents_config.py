@@ -20,6 +20,10 @@ GLOSSARY = {
     """.strip()
 }
 
+LANGUAGE_PREFERENCE = {
+    "preferred_language": "ar"   # or "en", "tr", etc.
+}
+
 RSS_FEED_URLS = [
     "https://saudigazette.com.sa/rssFeed/74",
 ]
