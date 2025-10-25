@@ -1,7 +1,7 @@
 import datetime
 print("✅ Agent controller is starting...")
 
-from configurations.agents_config import RSS_FEED_URLS, TWEET_ACCOUNTS, GLOSSARY, MONITOR_URLS, EMAIL_RECEIVERS
+from configurations.agents_config import RSS_FEED_URLS, TWEET_ACCOUNTS, GLOSSARY, MONITOR_URLS, EMAIL_RECEIVERS, LANGUAGE_PREFERENCE
 from configurations.config_loader import creds
 print("✅ Config and creds imported")
 
@@ -76,6 +76,7 @@ def run_controller():
 
     # 5. News Filter Agent
     print("\n🧹 Filtering for relevance...")
+    PREF_LANG = LANGUAGE_PREFERENCE["preferred_language"]
     filter_result = get_relevant_news(all_news_items, OPENAI_API_KEY, GLOSSARY)
     filtered_items = filter_result.get("items", [])
     filter_errors = filter_result.get("errors", [])
