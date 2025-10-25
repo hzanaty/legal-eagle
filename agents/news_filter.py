@@ -5,7 +5,7 @@ import json
 from openai import OpenAI
 
 # 🧠 Build filtering prompt dynamically from glossary categories
-def build_filter_prompt(content, GLOSSARY):
+def build_filter_prompt(content, GLOSSARY, LANGUAGE_PREFERENCE):
     categories_text = "\n".join([f"- {k}: {v}" for k, v in GLOSSARY.items()])
     return f"""
 You are a legal policy analyst. Classify the following news content into exactly ONE category
@@ -22,6 +22,7 @@ Content:
 - Do NOT classify general political, diplomatic, international relations, cabinet meetings, 
   government reshuffles, foreign policy, or purely economic/trade deals as HCM or FIN.
 - If the content is unrelated to HCM or FIN, classify it as OTHER.
+- Preferred output language: {LANGUAGE_PREFERENCE}
 
 Respond ONLY in strict JSON format:
 {{ "category": "HCM" }}
@@ -31,8 +32,8 @@ Respond ONLY in strict JSON format:
 
 
 # 🔍 Classify a single news item
-def classify_item(item, OPENAI_API_KEY, GLOSSARY):
-    prompt = build_filter_prompt(item["content"], GLOSSARY)
+def classify_item(item, OPENAI_API_KEY, GLOSSARY, LANGUAGE_PREFERENCE):
+    prompt = build_filter_prompt(item["content"], GLOSSARY, LANGUAGE_PREFERENCE)
     client = OpenAI(api_key=OPENAI_API_KEY)
     try:
         response = client.chat.completions.create(
@@ -64,12 +65,12 @@ def classify_item(item, OPENAI_API_KEY, GLOSSARY):
 
 
 # ✅ Entry point: classify and filter items
-def get_relevant_news(all_news_items, OPENAI_API_KEY, GLOSSARY):
+def get_relevant_news(all_news_items, OPENAI_API_KEY, GLOSSARY, LANGUAGE_PREFERENCE):
     relevant = []
     errors = []
 
     for item in all_news_items:
-        result = classify_item(item, OPENAI_API_KEY, GLOSSARY)
+        result = classify_item(item, OPENAI_API_KEY, GLOSSARY, LANGUAGE_PREFERENCE)
 
         if isinstance(result, dict) and result.get("error"):
             errors.append(result)
