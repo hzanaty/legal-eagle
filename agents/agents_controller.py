@@ -106,6 +106,8 @@ def run_controller():
             print(f"   - {link}")
 
     # 7. Email Composer Agent
+    print("✅ Grouped summary count:", len(grouped_summary))
+    print("Sample group keys:", grouped_summary[0].keys())
     print("📧 Sending summary email...")
     subject = "🦅 Legal Eagle Daily Digest"
     send_email(grouped_summary, EMAIL_RECEIVERS, GMAIL_CREDS)
