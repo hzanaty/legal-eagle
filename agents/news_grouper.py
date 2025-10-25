@@ -50,21 +50,41 @@ Focus on the legal/HR/Finance significance and avoid redundancy.
 Write the summary in {LANGUAGE_PREFERENCE}.
 Do NOT translate if the text is already in {LANGUAGE_PREFERENCE}, and do not distort the meaning.
 
+Return your answer strictly as JSON with this format:
+{{
+  "title": "...",
+  "summary": "..."
+}}
+
+News items:
+
 {combined_text}
 """
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}]
+            messages=[{"role": "user", "content": prompt}],
+            response_format={"type": "json_object"}  # ✅ structured output
         )
-        return response.choices[0].message.content.strip()
+        reply = response.choices[0].message.content.strip()
+        data = {}
+        try:
+            data = json.loads(reply)
+        except Exception:
+            # fallback: if not JSON, treat entire text as summary
+            data["title"] = "Untitled Group"
+            data["summary"] = reply
+        return data
     except Exception as e:
-        return f"⚠️ Summary not available. Error: {e}"
+        return {
+            "title": "⚠️ Summary Error",
+            "summary": f"Summary not available. Error: {e}"
+        }
 
-
-def format_group_output(group, summary, category):
+def format_group_output(group, summary, category, title):
     """Formats grouped items with metadata and summary."""
     return {
+        "title": title,
         "summary": summary,
         "category": category,   # ✅ preserve HCM/FIN
         "titles": [item["title"] for item in group],
@@ -100,7 +120,9 @@ def group_and_summarize_news(items, OPENAI_API_KEY, LANGUAGE_PREFERENCE):
             continue
         grouped = group_news(categories[category], client)
         for group in grouped:
-            summary = summarize_group(group, client, LANGUAGE_PREFERENCE)
-            results.append(format_group_output(group, summary, category))
+            data = summarize_group(group, client, LANGUAGE_PREFERENCE)
+            title = data.get("title", "Untitled Group")
+            summary = data.get("summary", "")
+            results.append(format_group_output(group, summary, category, title))
 
     return results
