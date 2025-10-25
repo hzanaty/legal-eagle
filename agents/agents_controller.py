@@ -94,7 +94,7 @@ def run_controller():
 
     # 6. News Grouper Agent
     print("\n🧠 Grouping similar news items...")
-    grouped_summary = group_and_summarize_news(filtered_items, OPENAI_API_KEY)
+    grouped_summary = group_and_summarize_news(filtered_items, OPENAI_API_KEY, LANGUAGE_PREFERENCE)
     print(f"✅ Grouped summary ready with {len(grouped_summary)} entries.")
 
     for i, group in enumerate(grouped_summary, 1):
