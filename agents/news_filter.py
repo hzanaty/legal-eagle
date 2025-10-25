@@ -34,6 +34,7 @@ Respond ONLY in strict JSON format:
 # 🔍 Classify a single news item
 def classify_item(item, OPENAI_API_KEY, GLOSSARY, LANGUAGE_PREFERENCE):
     prompt = build_filter_prompt(item["content"], GLOSSARY, LANGUAGE_PREFERENCE)
+    prompt += "\n\nDo not translate, summarize, or modify the text in any way — only classify it."
     client = OpenAI(api_key=OPENAI_API_KEY)
     try:
         response = client.chat.completions.create(
