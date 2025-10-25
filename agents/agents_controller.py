@@ -76,8 +76,7 @@ def run_controller():
 
     # 5. News Filter Agent
     print("\n🧹 Filtering for relevance...")
-    PREF_LANG = LANGUAGE_PREFERENCE["preferred_language"]
-    filter_result = get_relevant_news(all_news_items, OPENAI_API_KEY, GLOSSARY)
+    filter_result = get_relevant_news(all_news_items, OPENAI_API_KEY, GLOSSARY, LANGUAGE_PREFERENCE)
     filtered_items = filter_result.get("items", [])
     filter_errors = filter_result.get("errors", [])
 
