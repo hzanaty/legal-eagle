@@ -1,4 +1,4 @@
-name: 🧪 Test Snapshot Monitor
+name: 🧪 Quick Test
 
 on:
   workflow_dispatch:
