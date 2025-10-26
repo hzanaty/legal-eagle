@@ -94,5 +94,6 @@ MONITOR_URLS = [
 # Email configuration
 EMAIL_RECEIVERS = [
     "hany.zanaty@sap.com",
+    "alanoud.alsaud@sap.com",
 ]
 
