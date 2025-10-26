@@ -25,3 +25,14 @@ jobs:
         run: |
           export PYTHONPATH="${{ github.workspace }}"
           python agents/snapshot_monitor.py
+
+
+      - name: 💾 Commit snapshots (keep last 2 per site)
+        run: |
+          git config user.name "Legal Eagle"
+          git config user.email "actions@github.com"
+          git pull --rebase
+          git add snapshots/
+          git commit -m "🧩 Update daily snapshots (auto-rotated)" || echo "No changes to commit"
+          git push
+
