@@ -27,11 +27,6 @@ jobs:
           pip install -r configurations/requirements.txt
 
       - name: ▶️ Run Controller
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}
-          EMAIL_SENDER: ${{ secrets.EMAIL_SENDER }}
-          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
         run: |
           export PYTHONPATH="${{ github.workspace }}"
           python agents/agents_controller.py
