@@ -110,7 +110,8 @@ def run_controller():
     print("Sample group keys:", grouped_summary[0].keys())
     print("📧 Sending summary email...")
     subject = "🦅 Legal Eagle Daily Digest"
-    send_email(grouped_summary, EMAIL_RECEIVERS, GMAIL_CREDS)
+    send_email(grouped_summary, EMAIL_RECEIVERS, GMAIL_CREDS, LANGUAGE_PREFERENCE)
+
     print("✅ Email sent to stakeholders.\n")
 
 if __name__ == "__main__":
