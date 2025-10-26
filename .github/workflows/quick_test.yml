@@ -2,6 +2,9 @@ name: 🧪 Quick Test
 
 on:
   workflow_dispatch:
+   
+permissions:
+  contents: write
 
 jobs:
   test-snapshot:
