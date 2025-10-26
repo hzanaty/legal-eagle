@@ -96,6 +96,7 @@ SNAPSHOT_SITES = [
         "name": "GOSI News Center",
         "url": "https://www.gosi.gov.sa/ar/MediaCenter/News"
     },
+]
 
 # Email configuration
 EMAIL_RECEIVERS = [
