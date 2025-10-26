@@ -1,5 +1,6 @@
 import os
 import requests
+from configurations.agents_config import SNAPSHOT_SITES
 from datetime import datetime
 
 # Folder where snapshots are saved
@@ -46,3 +47,8 @@ def save_snapshot(url: str):
 
     print(f"✅ Snapshot saved for {url} → {path}")
     return path
+
+if __name__ == "__main__":
+    for site in SNAPSHOT_SITES:
+        save_snapshot(site["url"])
+
