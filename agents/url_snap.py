@@ -68,8 +68,3 @@ def save_snapshot(url: str):
     print(f"✅ JSON snapshot saved → {json_path}")
     return json_path
 
-
-if __name__ == "__main__":
-    from configurations.agents_config import SNAPSHOT_SITES
-    for site in SNAPSHOT_SITES:
-        save_snapshot(site["url"])
