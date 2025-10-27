@@ -1,13 +1,15 @@
 name: 🧪 Test Snapshot Monitor
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:    # manual trigger
+  schedule:
+    - cron: "0 4 * * *"   # 🕓 runs daily at 04:00 UTC (08:00 Gulf time)
 
 permissions:
-  contents: write
+  contents: write        # ✅ needed for git push
 
 jobs:
-  test-snapshot:
+  snapshot:
     runs-on: ubuntu-latest
 
     steps:
@@ -38,7 +40,18 @@ jobs:
         run: |
           git config user.name "Legal Eagle Bot"
           git config user.email "actions@github.com"
-          git pull --rebase
+          git fetch origin main
+          git checkout main
+          git pull
+          
+          # Stage only snapshots folder
           git add snapshots/
-          git commit -m "🧩 Update daily snapshots (auto-rotated)" || echo "No changes to commit"
-          git push
+
+          # Only commit if there are changes
+          if ! git diff --cached --quiet; then
+            git commit -m "🧩 Update daily snapshots (auto-rotated)"
+            git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git main
+            echo "✅ Snapshot changes committed and pushed."
+          else
+            echo "ℹ️ No new snapshot changes to commit."
+          fi
