@@ -30,6 +30,10 @@ jobs:
           python -m pip install requests-html
           python -c "from requests_html import HTMLSession; s=HTMLSession(); s.get('https://example.com').html.render(); s.close()"
 
+      - name: 🧩 Install Playwright browsers
+        run: |
+          python -m playwright install chromium
+
       - name: ▶️ Run Snapshot Monitor
         run: |
           export PYTHONPATH="${{ github.workspace }}"
