@@ -68,3 +68,29 @@ def save_snapshot(url: str):
     print(f"✅ JSON snapshot saved → {json_path}")
     return json_path
 
+def run_snap_and_return_items(SNAP_URLS):
+    """
+    Runs the snapshot process and returns today's extracted items as a list of dicts.
+    """
+    today = datetime.now().strftime("%Y-%m-%d")
+    results = []
+
+    for site in SNAP_URLS:
+        site_url = site["url"]
+        site_name = site["name"]
+
+        print(f"🌐 Rendering {site_name} ({site_url})...")
+        site_items = save_snapshot(site_url)  # existing extraction function
+        if site_items:
+            results.extend(site_items)
+
+    # Locate today's JSON file (pattern-based)
+    snapshot_files = [f for f in os.listdir("snapshots") if f.endswith(f"{today}.json")]
+    for file in snapshot_files:
+        with open(os.path.join("snapshots", file), "r", encoding="utf-8") as f:
+            data = json.load(f)
+            results.extend(data)
+
+    print(f"✅ Snap completed: {len(results)} items extracted.")
+    return results
+
