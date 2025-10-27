@@ -1,13 +1,13 @@
 import datetime
 print("✅ Agent controller is starting...")
 
-from configurations.agents_config import RSS_FEED_URLS, TWEET_ACCOUNTS, GLOSSARY, MONITOR_URLS, EMAIL_RECEIVERS, LANGUAGE_PREFERENCE
+from configurations.agents_config import RSS_FEED_URLS, TWEET_ACCOUNTS, GLOSSARY, CRAWL_URLS, EMAIL_RECEIVERS, LANGUAGE_PREFERENCE
 from configurations.config_loader import creds
 print("✅ Config and creds imported")
 
 from agents.rss_parser import parse_rss_feed
 from agents.tweet_feed import fetch_recent_tweets
-from agents.url_monitor import scrape_all_monitor_urls
+from agents.url_crawl import scrape_all_CRAWL_URLS
 from agents.news_filter import get_relevant_news
 from agents.news_grouper import group_and_summarize_news
 from agents.email_sender import send_email
@@ -53,7 +53,7 @@ def run_controller():
 
     # 3. URL Monitor Agent
     print("\n🕵️‍♂️ Running URL Monitor Agent...")
-    url_result = scrape_all_monitor_urls(MONITOR_URLS)
+    url_result = scrape_all_CRAWL_URLS(CRAWL_URLS)
     url_items = url_result.get("items", [])
     url_errors = url_result.get("errors", [])
 
