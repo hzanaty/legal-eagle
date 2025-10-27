@@ -1,8 +1,8 @@
-name: 🧪 Quick Test
+name: 🧪 Test Snapshot Monitor
 
 on:
   workflow_dispatch:
-   
+
 permissions:
   contents: write
 
@@ -24,18 +24,22 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r configurations/requirements.txt
 
+      # 🧩 NEW — prepare Chromium for requests-html
+      - name: 🧩 Prepare Chromium for requests-html
+        run: |
+          python -m pip install requests-html
+          python -c "from requests_html import HTMLSession; s=HTMLSession(); s.get('https://example.com').html.render(); s.close()"
+
       - name: ▶️ Run Snapshot Monitor
         run: |
           export PYTHONPATH="${{ github.workspace }}"
           python agents/snapshot_monitor.py
 
-
       - name: 💾 Commit snapshots (keep last 2 per site)
         run: |
-          git config user.name "Legal Eagle"
+          git config user.name "Legal Eagle Bot"
           git config user.email "actions@github.com"
           git pull --rebase
           git add snapshots/
           git commit -m "🧩 Update daily snapshots (auto-rotated)" || echo "No changes to commit"
           git push
-
