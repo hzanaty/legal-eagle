@@ -31,7 +31,7 @@ TWEET_ACCOUNTS = [
     "HRSD_SA",
 ]
 
-MONITOR_URLS = [
+CRAWL_URLS = [
     {
         "name": "أم القرى - مجلس الوزراء",
         "url": "https://uqn.gov.sa/category?cat=4",
@@ -91,7 +91,7 @@ MONITOR_URLS = [
     # ... add more as needed
 ]
 
-SNAPSHOT_SITES = [
+SNAP_URLS = [
     {
         "name": "GOSI News Center",
         "url": "https://www.gosi.gov.sa/ar/MediaCenter/News"
