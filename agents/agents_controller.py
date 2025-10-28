@@ -8,6 +8,7 @@ print("✅ Config and creds imported")
 from agents.rss_parser import parse_rss_feed
 from agents.tweet_feed import fetch_recent_tweets
 from agents.url_crawl import scrape_all_CRAWL_URLS
+from agents.url_snap import run_snap_and_return_items
 from agents.news_filter import get_relevant_news
 from agents.news_grouper import group_and_summarize_news
 from agents.email_sender import send_email
@@ -70,11 +71,14 @@ def run_controller():
         print(f"📄 Content:\n{item['content']}\n")
         print("=" * 60)
 
-    # 4. Combine all items
-    all_news_items = rss_items + tweet_items + url_items
+    # 4. Snapshot websites (dynamic JS pages)
+    snap_items = run_snap_and_return_items(SNAP_URLS)
+    
+    # 5. Combine all items
+    all_news_items = rss_items + tweet_items + url_items + snap_items
     print(f"\n📦 Total collected items (pre-filter): {len(all_news_items)}")
 
-    # 5. News Filter Agent
+    # 6. News Filter Agent
     print("\n🧹 Filtering for relevance...")
     filter_result = get_relevant_news(all_news_items, OPENAI_API_KEY, GLOSSARY, LANGUAGE_PREFERENCE)
     filtered_items = filter_result.get("items", [])
@@ -92,7 +96,7 @@ def run_controller():
         print(f"🗓️ Date: {item['date']}")
         print(f"📄 Content: {item['content']}\n")
 
-    # 6. News Grouper Agent
+    # 7. News Grouper Agent
     print("\n🧠 Grouping similar news items...")
     grouped_summary = group_and_summarize_news(filtered_items, OPENAI_API_KEY, LANGUAGE_PREFERENCE)
     print(f"✅ Grouped summary ready with {len(grouped_summary)} entries.")
@@ -105,7 +109,7 @@ def run_controller():
         for link in group["links"]:
             print(f"   - {link}")
 
-    # 7. Email Composer Agent
+    # 8. Email Composer Agent
     print("✅ Grouped summary count:", len(grouped_summary))
     print("Sample group keys:", grouped_summary[0].keys())
     print("📧 Sending summary email...")
