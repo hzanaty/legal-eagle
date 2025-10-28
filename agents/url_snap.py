@@ -70,7 +70,7 @@ def save_snapshot(url: str):
 
 def run_snap_and_return_items(SNAP_URLS):
     """
-    Runs the snapshot process and returns today's extracted items as a list of dicts.
+    Runs the snapshot extraction and returns today's JSON news items in normalized form.
     """
     today = datetime.now().strftime("%Y-%m-%d")
     results = []
@@ -80,17 +80,30 @@ def run_snap_and_return_items(SNAP_URLS):
         site_name = site["name"]
 
         print(f"🌐 Rendering {site_name} ({site_url})...")
-        site_items = save_snapshot(site_url)  # existing extraction function
+        site_items = save_snapshot(site_url)  # assumes your existing save_snapshot() returns list of dicts
         if site_items:
             results.extend(site_items)
 
-    # Locate today's JSON file (pattern-based)
-    snapshot_files = [f for f in os.listdir("snapshots") if f.endswith(f"{today}.json")]
+    # Also load today's saved JSON snapshots, if any
+    snapshot_files = [
+        f for f in os.listdir("snapshots")
+        if f.endswith(f"{today}.json")
+    ]
+
     for file in snapshot_files:
         with open(os.path.join("snapshots", file), "r", encoding="utf-8") as f:
             data = json.load(f)
-            results.extend(data)
+            for item in data:
+                normalized = {
+                    "title": item.get("title", "Untitled"),
+                    "content": item.get("snippet", ""),  # rename field
+                    "link": item.get("link", ""),
+                    "date": item.get("date", today),
+                    "source": "Snap"
+                }
+                results.append(normalized)
 
     print(f"✅ Snap completed: {len(results)} items extracted.")
     return results
+
 
