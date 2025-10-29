@@ -1,10 +1,12 @@
-# snap_url_agent.py  (Playwright version)
 import re
 import json
 import asyncio
-from urllib.parse import urljoin, urlparse
+import sys
+import yaml
+from urllib.parse import urlparse
 from datetime import datetime
 from playwright.async_api import async_playwright
+
 
 async def smart_snap_sites(SNAP_URLS):
     all_items = []
@@ -18,19 +20,31 @@ async def smart_snap_sites(SNAP_URLS):
             print(f"🌐 Capturing: {site['name']} → {site['url']}")
             domain = f"{urlparse(site['url']).scheme}://{urlparse(site['url']).netloc}"
 
-            # 🔹 Auto-infer link pattern
-            sample_path = urlparse(site["sample_link"]).path
-            link_pattern = re.sub(r'\d+', r'\\d+', sample_path)
-            print(f"🔗 Inferred link pattern: {link_pattern}")
-
             try:
-                await page.goto(site["url"], timeout=30000)
+                await page.goto(site["url"], timeout=40000)
             except Exception as e:
                 print(f"⚠️ Failed to load {site['url']} → {e}")
                 continue
 
-            # extract all <a href> links
-            anchors = await page.eval_on_selector_all("a[href]", "els => els.map(a => a.href)")
+            # 🕓 Wait for dynamically rendered links (e.g. Angular "اقرأ المزيد")
+            try:
+                await page.wait_for_selector("a.readMore", timeout=15000)
+                anchors = await page.eval_on_selector_all("a.readMore", "els => els.map(a => a.href)")
+            except Exception:
+                # fallback: collect all hrefs
+                anchors = await page.eval_on_selector_all("a[href]", "els => els.map(a => a.href)")
+
+            # 🧠 Auto-learn link pattern from first valid link
+            example_links = [a for a in anchors if "/NewsDetails/" in a or "/Details/" in a]
+            if not example_links:
+                print(f"⚠️ No news links found on {site['url']}")
+                continue
+
+            first_example = example_links[0]
+            sample_path = urlparse(first_example).path
+            link_pattern = re.sub(r'\d+', r'\\d+', sample_path)
+            print(f"🔗 Auto-learned link pattern: {link_pattern}")
+
             found_links = [url for url in anchors if re.search(link_pattern, url)]
             found_links = list(set(found_links))
             print(f"📎 Found {len(found_links)} news links")
@@ -42,19 +56,16 @@ async def smart_snap_sites(SNAP_URLS):
                     print(f"⚠️ Failed to open detail {link} → {e}")
                     continue
 
-                # 🏷️ Extract title (first h1/h2)
+                # 🏷️ Extract title
                 title = await page.locator("h1, h2").first.text_content()
-                if title:
-                    title = title.strip()
-                else:
-                    title = "No title"
+                title = title.strip() if title else "No title"
 
-                # 📄 Extract visible text from largest Arabic block
+                # 📄 Extract main Arabic text block
                 html = await page.content()
                 arabic_blocks = re.findall(r'>([^<>]{50,}[\u0600-\u06FF][^<>]{20,})<', html)
                 content = max(arabic_blocks, key=len) if arabic_blocks else "No Arabic content found."
 
-                # 🗓️ Try to find a Gregorian date
+                # 🗓️ Detect date (YYYY-MM-DD) if present
                 date_match = re.search(r'(\d{4}-\d{2}-\d{2})', html)
                 date = date_match.group(1) if date_match else datetime.now().strftime("%Y-%m-%d")
 
@@ -67,6 +78,7 @@ async def smart_snap_sites(SNAP_URLS):
                     "snap_time": datetime.now().isoformat(),
                     "status": "OK"
                 }
+
                 print(f"📰 Parsed: {title[:60]}...")
                 all_items.append(item)
 
@@ -74,14 +86,24 @@ async def smart_snap_sites(SNAP_URLS):
     return all_items
 
 
+# 🔹 MAIN ENTRY POINT
 if __name__ == "__main__":
-    SNAP_URLS = [
-        {
-            "name": "GOSI News",
-            "url": "https://www.gosi.gov.sa/ar/MediaCenter/News",
-            "sample_link": "https://www.gosi.gov.sa/ar/MediaCenter/News/NewsDetails/1/0028102025"
-        }
-    ]
+    """
+    This main block lets you:
+    - run locally:        python agents/url_snap.py
+    - or with YAML file:  python agents/url_snap.py snap_sources.yml
+    It will produce:      snap_output_<YYYY-MM-DD>.json
+    """
+
+    # 🧩 Load YAML config (if provided) or fallback to internal default
+    cfg_path = sys.argv[1] if len(sys.argv) > 1 else "snap_sources.yml"
+    try:
+        with open(cfg_path, "r", encoding="utf-8") as f:
+            SNAP_URLS = yaml.safe_load(f)["sources"]
+    except Exception:
+        SNAP_URLS = [
+            {"name": "GOSI News", "url": "https://www.gosi.gov.sa/ar/MediaCenter/News"}
+        ]
 
     async def main():
         data = await smart_snap_sites(SNAP_URLS)
