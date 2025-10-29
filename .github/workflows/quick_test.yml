@@ -1,7 +1,7 @@
 name: Run URL Snap Agent (Test)
 
 on:
-  workflow_dispatch:  # run manually from GitHub Actions
+  workflow_dispatch:
 
 jobs:
   test-url-snap:
@@ -23,6 +23,7 @@ jobs:
           python -m playwright install --with-deps chromium
 
       - name: 🚀 Execute Snap Agent
+        working-directory: agents      # ✅ this is where url_snap.py lives
         run: |
           python url_snap.py
 
@@ -30,4 +31,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: snap-output
-          path: snap_output_*.json
+          path: agents/snap_output_*.json
