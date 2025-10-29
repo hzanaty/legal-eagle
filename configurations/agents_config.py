@@ -93,8 +93,9 @@ CRAWL_URLS = [
 
 SNAP_URLS = [
     {
-        "name": "GOSI News Center",
-        "url": "https://www.gosi.gov.sa/ar/MediaCenter/News"
+        "name": "GOSI News",
+        "url": "https://www.gosi.gov.sa/ar/MediaCenter/News",
+        "link_pattern": "https://www.gosi.gov.sa/ar/MediaCenter/News/Details/{id}"
     },
 ]
 
