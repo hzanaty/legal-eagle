@@ -1,109 +1,97 @@
-import os
+# snap_url_agent.py
+import re
 import json
+import requests
+from bs4 import BeautifulSoup
+from urllib.parse import urljoin, urlparse
 from datetime import datetime
-from zoneinfo import ZoneInfo
-from playwright.sync_api import sync_playwright
 
-SNAPSHOT_DIR = "snapshots"
-os.makedirs(SNAPSHOT_DIR, exist_ok=True)
-
-
-def _get_domain_from_url(url: str) -> str:
-    return url.split("//")[-1].split("/")[0].replace(".", "_")
-
-
-def save_snapshot(url: str):
-    """Render GOSI or similar page, extract visible news, and save JSON snapshot."""
-    domain = _get_domain_from_url(url)
-    now_ksa = datetime.now(ZoneInfo("Asia/Riyadh"))
-    today = now_ksa.strftime("%Y-%m-%d")
-    json_path = os.path.join(SNAPSHOT_DIR, f"{domain}_{today}.json")
-
-    print(f"🌐 Rendering {url} using Playwright Chromium (KSA time: {now_ksa:%Y-%m-%d %H:%M})...")
-    news_data = []
-
-    try:
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            page = browser.new_page()
-            page.goto(url, wait_until="networkidle", timeout=120000)
-            page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-
-            # 📰 Extract visible news data
-            items = page.query_selector_all(".newsItemDetails")
-            print(f"📰 Found {len(items)} news entries:")
-            for i, item in enumerate(items, 1):
-                title = item.query_selector(".newsItemTitle").inner_text() if item.query_selector(".newsItemTitle") else ""
-                date = item.query_selector(".newsItemDate").inner_text() if item.query_selector(".newsItemDate") else ""
-                snippet = item.query_selector(".newsItemText").inner_text() if item.query_selector(".newsItemText") else ""
-                link_el = item.query_selector("a")
-                link = link_el.get_attribute("href") if link_el else url
-
-                news_data.append({
-                    "title": title.strip(),
-                    "date": date.strip(),
-                    "snippet": snippet.strip(),
-                    "link": link
-                })
-                print(f"   {i}. {title.strip()} ({date.strip()})")
-
-            browser.close()
-
-    except Exception as e:
-        print(f"⚠️ Rendering failed for {url}: {e}")
-        return None
-
-    # ✅ Save structured JSON snapshot
-    with open(json_path, "w", encoding="utf-8") as f:
-        json.dump(news_data, f, ensure_ascii=False, indent=2)
-
-    # 🔁 Keep only last 2 snapshots per domain
-    files = sorted(
-        [f for f in os.listdir(SNAPSHOT_DIR) if f.startswith(domain)],
-        reverse=True
-    )
-    for old in files[2:]:
-        os.remove(os.path.join(SNAPSHOT_DIR, old))
-
-    print(f"✅ JSON snapshot saved → {json_path}")
-    return json_path
-
-def run_snap_and_return_items(SNAP_URLS):
-    """
-    Runs the snapshot extraction and returns today's JSON news items in normalized form.
-    """
-    today = datetime.now().strftime("%Y-%m-%d")
-    results = []
+def smart_snap_sites(SNAP_URLS):
+    all_items = []
 
     for site in SNAP_URLS:
-        site_url = site["url"]
-        site_name = site["name"]
+        print(f"🌐 Capturing: {site['name']} → {site['url']}")
+        domain = f"{urlparse(site['url']).scheme}://{urlparse(site['url']).netloc}"
 
-        print(f"🌐 Rendering {site_name} ({site_url})...")
-        site_items = save_snapshot(site_url)  # assumes your existing save_snapshot() returns list of dicts
-        if site_items:
-            results.extend(site_items)
+        # 🔹 Auto-infer link pattern from sample link
+        sample_path = urlparse(site["sample_link"]).path
+        link_pattern = re.sub(r'\d+', r'\\d+', sample_path)
+        print(f"🔗 Inferred link pattern: {link_pattern}")
 
-    # Also load today's saved JSON snapshots, if any
-    snapshot_files = [
-        f for f in os.listdir("snapshots")
-        if f.endswith(f"{today}.json")
+        try:
+            res = requests.get(site["url"], timeout=15)
+            res.raise_for_status()
+        except Exception as e:
+            print(f"⚠️ Failed to fetch {site['url']} → {e}")
+            continue
+
+        soup = BeautifulSoup(res.text, "html.parser")
+        found_links = set()
+
+        for a in soup.find_all("a", href=True):
+            href = a["href"]
+            if re.search(link_pattern, href):
+                full_link = urljoin(domain, href)
+                found_links.add(full_link)
+
+        print(f"📎 Found {len(found_links)} news links")
+
+        # 🔹 Fetch each detail page
+        for link in found_links:
+            try:
+                detail = requests.get(link, timeout=15)
+                detail.raise_for_status()
+            except Exception as e:
+                print(f"⚠️ Failed detail fetch {link} → {e}")
+                continue
+
+            s2 = BeautifulSoup(detail.text, "html.parser")
+
+            # 🏷️ Title: prefer h1, then h2, then meta title
+            title_tag = s2.find(["h1", "h2"])
+            title = title_tag.get_text(strip=True) if title_tag else s2.title.get_text(strip=True) if s2.title else "No title"
+
+            # 📄 Content: choose the largest Arabic text block
+            arabic_blocks = []
+            for div in s2.find_all(["div", "article", "section"]):
+                text = div.get_text(" ", strip=True)
+                if re.search(r'[\u0600-\u06FF]', text):
+                    arabic_blocks.append(text)
+            content = max(arabic_blocks, key=len) if arabic_blocks else "No Arabic content found."
+
+            # 🗓️ Try to detect date inside page (Gregorian)
+            date_match = re.search(r'(\d{4}-\d{2}-\d{2})', detail.text)
+            date = date_match.group(1) if date_match else datetime.now().strftime("%Y-%m-%d")
+
+            item = {
+                "source": site["name"],
+                "title": title,
+                "date": date,
+                "content": content,
+                "link": link,
+                "snap_time": datetime.now().isoformat(),
+                "status": "OK"
+            }
+            all_items.append(item)
+
+    return all_items
+
+
+if __name__ == "__main__":
+    # 🧩 Minimal config: only 3 keys per site
+    SNAP_URLS = [
+        {
+            "name": "GOSI News",
+            "url": "https://www.gosi.gov.sa/ar/MediaCenter/News",
+            "sample_link": "https://www.gosi.gov.sa/ar/MediaCenter/News/NewsDetails/1/0028102025"
+        }
     ]
 
-    for file in snapshot_files:
-        with open(os.path.join("snapshots", file), "r", encoding="utf-8") as f:
-            data = json.load(f)
-            for item in data:
-                normalized = {
-                    "title": item.get("title", "Untitled"),
-                    "content": item.get("snippet", ""),  # rename field
-                    "link": item.get("link", ""),
-                    "date": item.get("date", today),
-                    "source": "Snap"
-                }
-                results.append(normalized)
+    data = smart_snap_sites(SNAP_URLS)
 
-    print(f"✅ Snap completed: {len(results)} items extracted.")
-    return results
+    # 💾 Save JSON snapshot
+    out_file = f"snap_output_{datetime.now().strftime('%Y-%m-%d')}.json"
+    with open(out_file, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
 
-
+    print(f"\n✅ Saved {len(data)} items to {out_file}")
