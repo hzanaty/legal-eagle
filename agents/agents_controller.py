@@ -9,6 +9,7 @@ from agents.rss_parser import parse_rss_feed
 from agents.tweet_feed import fetch_recent_tweets
 from agents.url_crawl import scrape_all_urls
 from agents.url_snap import run_snap_and_return_items
+from agents.compare_news_agent import run_compare_news_agent
 from agents.news_filter import get_relevant_news
 from agents.news_grouper import group_and_summarize_news
 from agents.email_sender import send_email
@@ -80,9 +81,14 @@ def run_controller():
     all_news_items = rss_items + tweet_items + url_items + snap_items
     print(f"\n📦 Total collected items (pre-filter): {len(all_news_items)}")
 
+    # 5.1. Compare News
+    compare_result = run_compare_news_agent(all_news_items)
+    new_items = compare_result["new_items"]
+    print(f"✅ {len(new_items)} new items after semantic comparison.")
+
     # 6. News Filter Agent
     print("\n🧹 Filtering for relevance...")
-    filter_result = get_relevant_news(all_news_items, OPENAI_API_KEY, GLOSSARY, LANGUAGE_PREFERENCE)
+    filter_result = get_relevant_news(new_items, OPENAI_API_KEY, GLOSSARY, LANGUAGE_PREFERENCE)
     filtered_items = filter_result.get("items", [])
     filter_errors = filter_result.get("errors", [])
 
