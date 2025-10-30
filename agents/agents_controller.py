@@ -1,5 +1,5 @@
-import datetime
 from datetime import datetime, timedelta
+dubai_time = datetime.utcnow() + timedelta(hours=4)
 
 print("✅ Agent controller is starting...")
 
@@ -127,30 +127,6 @@ def run_controller():
     send_email(grouped_summary, EMAIL_RECEIVERS, GMAIL_CREDS, LANGUAGE_PREFERENCE)
 
     print("✅ Email sent to stakeholders.\n")
-
-# 9. Save Email Digest Body for Delta Comparison
-from datetime import datetime
-from pathlib import Path
-
-print("💾 Saving today's email digest for delta comparison...")
-dubai_time = datetime.utcnow() + datetime.timedelta(hours=4)
-today_str = dubai_time.strftime("%Y-%m-%d")
-
-# Folder to store past digests
-digest_dir = Path("digests")
-digest_dir.mkdir(exist_ok=True)
-
-# Build simple text body to compare later
-digest_file = digest_dir / f"digest_{today_str}.txt"
-
-with open(digest_file, "w", encoding="utf-8") as f:
-    f.write("🦅 Legal Eagle Daily Digest\n\n")
-    for group in grouped_summary:
-        category = group.get("category", "Uncategorized")
-        summary = group.get("summary", "")
-        f.write(f"📚 {category}\n{summary}\n\n")
-
-print(f"✅ Digest saved → {digest_file}")
 
 if __name__ == "__main__":
     run_controller()
