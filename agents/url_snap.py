@@ -88,4 +88,11 @@ def run_snap_and_return_items(SNAP_URLS):
     items = asyncio.run(_async_snap(SNAP_URLS))
 
     # Always save to snapshots folder
-    Path("snap
+    Path("snapshots").mkdir(exist_ok=True)
+    out_file = Path("snapshots") / f"snap_output_{datetime.now().strftime('%Y-%m-%d')}.json"
+
+    with open(out_file, "w", encoding="utf-8") as f:
+        json.dump(items, f, ensure_ascii=False, indent=2)
+
+    print(f"✅ Snap Agent saved {len(items)} items to {out_file}")
+    return items
