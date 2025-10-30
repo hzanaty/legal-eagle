@@ -20,81 +20,74 @@ async def smart_snap_sites(SNAP_URLS):
             print(f"🌐 Capturing: {site['name']} → {site['url']}")
             domain = f"{urlparse(site['url']).scheme}://{urlparse(site['url']).netloc}"
 
-            # 🧭 Go to main news listing page
             try:
                 await page.goto(site["url"], timeout=40000)
+                await page.wait_for_selector("a.readMore", timeout=30000)
             except Exception as e:
                 print(f"⚠️ Failed to load {site['url']} → {e}")
                 continue
 
-            # 🕓 Wait for Angular to render "اقرأ المزيد" buttons
-            try:
-                await page.wait_for_selector("a.readMore", timeout=20000)
-            except Exception:
-                print("⚠️ No readMore selector found at all.")
-                continue
-
-            # Scroll & give Angular time
+            # Scroll to ensure all cards render
             for _ in range(5):
                 await page.mouse.wheel(0, 1000)
                 await page.wait_for_timeout(1500)
 
-            print("⏳ Waiting for Angular to populate NewsDetails paths...")
-            anchors = []
-            for i in range(12):  # up to ~24 seconds total
-                html = await page.content()
-                anchors = re.findall(r'/NewsDetails/\d+/\d+', html)
-                if anchors:
-                    break
-                await page.wait_for_timeout(2000)
+            # Get number of news items
+            read_more_buttons = await page.query_selector_all("a.readMore")
+            print(f"📑 Found {len(read_more_buttons)} visible news cards")
 
-            if not anchors:
-                print(f"⚠️ No news links found on {site['url']}")
-                continue
-
-            anchors = list(set(anchors))
-            anchors = [f"https://www.gosi.gov.sa/ar/MediaCenter/News{a}" for a in anchors]
-
-            # 🧠 Auto-learn link pattern
-            first_example = anchors[0]
-            sample_path = urlparse(first_example).path
-            link_pattern = re.sub(r'\d+', r'\\d+', sample_path)
-            print(f"🔗 Auto-learned link pattern: {link_pattern}")
-            print(f"📎 Found {len(anchors)} news links")
-
-            # 🔍 Visit each detail page
-            for link in anchors:
+            for idx in range(len(read_more_buttons)):
                 try:
-                    await page.goto(link, timeout=30000)
+                    # Re-acquire buttons after each navigation
+                    await page.wait_for_selector("a.readMore", timeout=20000)
+                    buttons = await page.query_selector_all("a.readMore")
+
+                    if idx >= len(buttons):
+                        print(f"⚠️ Index {idx} out of range, breaking loop.")
+                        break
+
+                    print(f"🖱️ Clicking news item {idx + 1}/{len(buttons)}")
+                    await buttons[idx].click()
+                    await page.wait_for_timeout(2000)
+
+                    # Wait until article title appears
+                    await page.wait_for_selector("h1", timeout=20000)
+                    html = await page.content()
+
+                    # Extract data
+                    title = await page.locator("h1").first.text_content()
+                    title = title.strip() if title else "No title"
+
+                    date_match = re.search(r'(\d{4}-\d{2}-\d{2})', html)
+                    date = date_match.group(1) if date_match else datetime.now().strftime("%Y-%m-%d")
+
+                    arabic_blocks = re.findall(r'>([^<>]{50,}[\u0600-\u06FF][^<>]{20,})<', html)
+                    content = max(arabic_blocks, key=len) if arabic_blocks else "No Arabic content found."
+
+                    link = page.url  # now we have the actual URL
+
+                    item = {
+                        "source": site["name"],
+                        "title": title,
+                        "date": date,
+                        "content": content,
+                        "link": link,
+                        "snap_time": datetime.now().isoformat(),
+                        "status": "OK"
+                    }
+                    print(f"📰 Parsed: {title[:60]}...")
+                    all_items.append(item)
+
+                    # Go back to main listing
+                    await page.go_back()
+                    await page.wait_for_selector("a.readMore", timeout=30000)
+                    await page.wait_for_timeout(1500)
+
                 except Exception as e:
-                    print(f"⚠️ Failed to open detail {link} → {e}")
+                    print(f"⚠️ Failed to parse news item {idx + 1}: {e}")
+                    await page.go_back()
+                    await page.wait_for_selector("a.readMore", timeout=30000)
                     continue
-
-                # 🏷️ Title
-                title = await page.locator("h1, h2").first.text_content()
-                title = title.strip() if title else "No title"
-
-                # 📄 Main Arabic text block
-                html = await page.content()
-                arabic_blocks = re.findall(r'>([^<>]{50,}[\u0600-\u06FF][^<>]{20,})<', html)
-                content = max(arabic_blocks, key=len) if arabic_blocks else "No Arabic content found."
-
-                # 🗓️ Date
-                date_match = re.search(r'(\d{4}-\d{2}-\d{2})', html)
-                date = date_match.group(1) if date_match else datetime.now().strftime("%Y-%m-%d")
-
-                item = {
-                    "source": site["name"],
-                    "title": title,
-                    "date": date,
-                    "content": content,
-                    "link": link,
-                    "snap_time": datetime.now().isoformat(),
-                    "status": "OK"
-                }
-
-                print(f"📰 Parsed: {title[:60]}...")
-                all_items.append(item)
 
         await browser.close()
     return all_items
