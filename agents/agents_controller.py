@@ -72,7 +72,9 @@ def run_controller():
         print("=" * 60)
 
     # 4. Snapshot websites (dynamic JS pages)
+    print("\n📸 Running URL Snap Agent...")
     snap_items = run_snap_and_return_items(SNAP_URLS)
+    print(f"✅ Snap Agent collected {len(snap_items)} items")
     
     # 5. Combine all items
     all_news_items = rss_items + tweet_items + url_items + snap_items
