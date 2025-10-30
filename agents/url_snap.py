@@ -18,7 +18,6 @@ async def smart_snap_sites(SNAP_URLS):
 
         for site in SNAP_URLS:
             print(f"🌐 Capturing: {site['name']} → {site['url']}")
-            domain = f"{urlparse(site['url']).scheme}://{urlparse(site['url']).netloc}"
 
             try:
                 await page.goto(site["url"], timeout=40000)
@@ -30,63 +29,50 @@ async def smart_snap_sites(SNAP_URLS):
             # Scroll to ensure all cards render
             for _ in range(5):
                 await page.mouse.wheel(0, 1000)
-                await page.wait_for_timeout(1500)
+                await page.wait_for_timeout(1000)
 
-            # Get number of news items
-            read_more_buttons = await page.query_selector_all("a.readMore")
-            print(f"📑 Found {len(read_more_buttons)} visible news cards")
+            cards = await page.query_selector_all("div.newsItemDetails")
+            print(f"📑 Found {len(cards)} visible news cards")
 
-            for idx in range(len(read_more_buttons)):
+            for idx in range(len(cards)):
                 try:
-                    # Re-acquire buttons after each navigation
+                    # re-select each iteration (DOM changes)
                     await page.wait_for_selector("a.readMore", timeout=20000)
                     buttons = await page.query_selector_all("a.readMore")
-
                     if idx >= len(buttons):
-                        print(f"⚠️ Index {idx} out of range, breaking loop.")
                         break
 
-                    print(f"🖱️ Clicking news item {idx + 1}/{len(buttons)}")
+                    print(f"🖱️ Expanding news item {idx + 1}/{len(buttons)}")
                     await buttons[idx].click()
                     await page.wait_for_timeout(2000)
 
-                    # Wait until article title appears
-                    await page.wait_for_selector("h1", timeout=20000)
-                    html = await page.content()
+                    # Wait until expanded article text is visible
+                    await page.wait_for_selector("div.newsItemDetails h1", timeout=15000)
 
-                    # Extract data
-                    title = await page.locator("h1").first.text_content()
-                    title = title.strip() if title else "No title"
-
-                    date_match = re.search(r'(\d{4}-\d{2}-\d{2})', html)
-                    date = date_match.group(1) if date_match else datetime.now().strftime("%Y-%m-%d")
-
-                    arabic_blocks = re.findall(r'>([^<>]{50,}[\u0600-\u06FF][^<>]{20,})<', html)
-                    content = max(arabic_blocks, key=len) if arabic_blocks else "No Arabic content found."
-
-                    link = page.url  # now we have the actual URL
+                    # Extract title, date, and paragraph directly from the expanded card
+                    title = await page.locator("div.newsItemDetails h1").nth(idx).text_content()
+                    date = await page.locator("div.newsItemDetails span.newsItemDate").nth(idx).text_content()
+                    paragraph = await page.locator("div.newsItemDetails p").nth(idx).text_content()
 
                     item = {
                         "source": site["name"],
-                        "title": title,
-                        "date": date,
-                        "content": content,
-                        "link": link,
+                        "title": title.strip(),
+                        "date": date.strip(),
+                        "content": paragraph.strip(),
+                        "link": site.get("url", "https://www.gosi.gov.sa/ar/MediaCenter/News"),  # dynamic fallback
                         "snap_time": datetime.now().isoformat(),
                         "status": "OK"
                     }
+
                     print(f"📰 Parsed: {title[:60]}...")
                     all_items.append(item)
 
-                    # Go back to main listing
-                    await page.go_back()
-                    await page.wait_for_selector("a.readMore", timeout=30000)
-                    await page.wait_for_timeout(1500)
+                    # Close overlay or restore listing
+                    await page.keyboard.press("Escape")
+                    await page.wait_for_timeout(1000)
 
                 except Exception as e:
-                    print(f"⚠️ Failed to parse news item {idx + 1}: {e}")
-                    await page.go_back()
-                    await page.wait_for_selector("a.readMore", timeout=30000)
+                    print(f"⚠️ Failed to extract item {idx + 1}: {e}")
                     continue
 
         await browser.close()
