@@ -6,12 +6,10 @@ from datetime import datetime, timezone, timedelta
 from openai import OpenAI
 from configurations.config_loader import creds
 
-
 def _hash_item(item):
     """Create a stable hash based on title + date + source."""
     base = (item.get("source", "") + item.get("title", "") + item.get("date", "")).strip()
     return hashlib.sha256(base.encode("utf-8")).hexdigest()
-
 
 def _get_latest_news_file(folder="outputs"):
     """Return yesterday's snapshot path if exists."""
@@ -19,7 +17,6 @@ def _get_latest_news_file(folder="outputs"):
     if len(digests) == 0:
         return None
     return digests[-1]
-
 
 def _get_embedding(client, text):
     """Generate vector embedding for a text snippet."""
@@ -30,12 +27,10 @@ def _get_embedding(client, text):
         print(f"⚠️ Embedding failed: {e}")
         return np.zeros(1536, dtype=np.float32)
 
-
 def _cosine_similarity(a, b):
     if np.linalg.norm(a) == 0 or np.linalg.norm(b) == 0:
         return 0.0
     return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
-
 
 def run_compare_news_agent(all_news_items):
     """
