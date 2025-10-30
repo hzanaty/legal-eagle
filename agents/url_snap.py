@@ -3,12 +3,11 @@ import json
 import asyncio
 import sys
 import yaml
-from urllib.parse import urlparse
 from datetime import datetime
 from playwright.async_api import async_playwright
 
 
-async def smart_snap_sites(SNAP_URLS):
+async def smart_snap_sites(SNAP_URLS, max_items=None):
     all_items = []
 
     async with async_playwright() as p:
@@ -18,62 +17,65 @@ async def smart_snap_sites(SNAP_URLS):
 
         for site in SNAP_URLS:
             print(f"🌐 Capturing: {site['name']} → {site['url']}")
-
             try:
+                # Load page and wait ONLY once for any read-more buttons to exist
                 await page.goto(site["url"], timeout=40000)
                 await page.wait_for_selector("a.readMore", timeout=30000)
             except Exception as e:
                 print(f"⚠️ Failed to load {site['url']} → {e}")
                 continue
 
-            # Scroll to ensure all cards render
-            for _ in range(5):
-                await page.mouse.wheel(0, 1000)
-                await page.wait_for_timeout(1000)
+            # Gentle auto-scroll to let Angular render all card texts (no extra waits later)
+            for _ in range(4):
+                await page.mouse.wheel(0, 1200)
+                await page.wait_for_timeout(800)
 
-            cards = await page.query_selector_all("div.newsItemDetails")
-            print(f"📑 Found {len(cards)} visible news cards")
+            # Extract card data directly from listing (no clicking, no further waits)
+            # We read arrays for titles, dates, and paragraphs from the same index.
+            try:
+                titles = await page.eval_on_selector_all(
+                    "div.newsItemDetails h1",
+                    "els => els.map(e => (e.textContent||'').trim())"
+                )
+                dates = await page.eval_on_selector_all(
+                    "div.newsItemDetails span.newsItemDate",
+                    "els => els.map(e => (e.textContent||'').trim())"
+                )
+                paras = await page.eval_on_selector_all(
+                    "div.newsItemDetails p",
+                    "els => els.map(e => (e.textContent||'').trim())"
+                )
+            except Exception as e:
+                print(f"⚠️ Could not read listing cards → {e}")
+                continue
 
-            for idx in range(len(cards)):
-                try:
-                    # re-select each iteration (DOM changes)
-                    await page.wait_for_selector("a.readMore", timeout=20000)
-                    buttons = await page.query_selector_all("a.readMore")
-                    if idx >= len(buttons):
-                        break
+            count = min(len(titles), len(dates), len(paras))
+            if max_items is not None:
+                count = min(count, max_items)
 
-                    print(f"🖱️ Expanding news item {idx + 1}/{len(buttons)}")
-                    await buttons[idx].click()
-                    await page.wait_for_timeout(2000)
+            print(f"📑 Found {count} cards with extractable text")
 
-                    # Wait until expanded article text is visible
-                    await page.wait_for_selector("div.newsItemDetails h1", timeout=15000)
+            for i in range(count):
+                title = titles[i] if i < len(titles) else ""
+                date_text = dates[i] if i < len(dates) else ""
+                para = paras[i] if i < len(paras) else ""
 
-                    # Extract title, date, and paragraph directly from the expanded card
-                    title = await page.locator("div.newsItemDetails h1").nth(idx).text_content()
-                    date = await page.locator("div.newsItemDetails span.newsItemDate").nth(idx).text_content()
-                    paragraph = await page.locator("div.newsItemDetails p").nth(idx).text_content()
+                # Normalize date to YYYY-MM-DD if present in text
+                m = re.search(r"\d{4}-\d{2}-\d{2}", date_text)
+                date_norm = m.group(0) if m else datetime.now().strftime("%Y-%m-%d")
 
-                    item = {
-                        "source": site["name"],
-                        "title": title.strip(),
-                        "date": date.strip(),
-                        "content": paragraph.strip(),
-                        "link": site.get("url", "https://www.gosi.gov.sa/ar/MediaCenter/News"),  # dynamic fallback
-                        "snap_time": datetime.now().isoformat(),
-                        "status": "OK"
-                    }
-
-                    print(f"📰 Parsed: {title[:60]}...")
-                    all_items.append(item)
-
-                    # Close overlay or restore listing
-                    await page.keyboard.press("Escape")
-                    await page.wait_for_timeout(1000)
-
-                except Exception as e:
-                    print(f"⚠️ Failed to extract item {idx + 1}: {e}")
-                    continue
+                item = {
+                    "source": site["name"],
+                    "title": title,
+                    "date": date_norm,
+                    "content": para,
+                    # Option 2 fallback: use the configured main URL as link (not hardcoded; config-driven)
+                    "link": site.get("url", "https://www.gosi.gov.sa/ar/MediaCenter/News"),
+                    "snap_time": datetime.now().isoformat(),
+                    "status": "OK"
+                }
+                print(f"📰 Parsed: {title[:60]}...")
+                all_items.append(item)
 
         await browser.close()
     return all_items
@@ -84,9 +86,15 @@ if __name__ == "__main__":
     """
     Run locally or from GitHub Actions.
 
-    Examples:
       python agents/url_snap.py
       python agents/url_snap.py snap_sources.yml
+
+    Behavior:
+    - Loads the listing page once.
+    - Uses a short initial wait for 'a.readMore' just to confirm cards rendered.
+    - Scrolls a bit.
+    - Extracts titles/dates/summaries directly from visible cards.
+    - No further waits, no clicking, no per-article URLs.
     """
     cfg_path = sys.argv[1] if len(sys.argv) > 1 else "snap_sources.yml"
     try:
