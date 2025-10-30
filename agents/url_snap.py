@@ -20,27 +20,45 @@ async def smart_snap_sites(SNAP_URLS):
             print(f"🌐 Capturing: {site['name']} → {site['url']}")
             domain = f"{urlparse(site['url']).scheme}://{urlparse(site['url']).netloc}"
 
+            # 🧭 Go to main news listing page
             try:
                 await page.goto(site["url"], timeout=40000)
             except Exception as e:
                 print(f"⚠️ Failed to load {site['url']} → {e}")
                 continue
 
-            # 🕓 Wait for dynamically rendered links (e.g. Angular "اقرأ المزيد")
+            # 🕓 Wait for Angular feed to render completely
             try:
-                await page.wait_for_selector("a.readMore", timeout=15000)
-                anchors = await page.eval_on_selector_all("a.readMore", "els => els.map(a => a.href)")
-            except Exception:
-                # fallback: collect all hrefs
-                anchors = await page.eval_on_selector_all("a[href]", "els => els.map(a => a.href)")
+                await page.wait_for_selector("a.readMore", timeout=20000)
 
-            # 🧠 Auto-learn link pattern from first valid link
-            example_links = [a for a in anchors if "/NewsDetails/" in a or "/Details/" in a]
-            if not example_links:
+                # Scroll gradually to trigger lazy loading of news cards
+                for _ in range(4):
+                    await page.mouse.wheel(0, 1000)
+                    await page.wait_for_timeout(2000)
+
+                # Give Angular extra time to populate hrefs
+                await page.wait_for_timeout(4000)
+
+                # Collect all populated "اقرأ المزيد" links
+                anchors = await page.evaluate("""
+                    Array.from(document.querySelectorAll('a.readMore'))
+                         .map(a => a.href)
+                         .filter(h => h && h.includes('/NewsDetails/'))
+                """)
+            except Exception as e:
+                print(f"⚠️ No 'readMore' anchors found → {e}")
+                anchors = await page.evaluate("""
+                    Array.from(document.querySelectorAll('a[href]'))
+                         .map(a => a.href)
+                         .filter(h => h.includes('/NewsDetails/'))
+                """)
+
+            if not anchors:
                 print(f"⚠️ No news links found on {site['url']}")
                 continue
 
-            first_example = example_links[0]
+            # 🧠 Auto-learn link pattern
+            first_example = anchors[0]
             sample_path = urlparse(first_example).path
             link_pattern = re.sub(r'\d+', r'\\d+', sample_path)
             print(f"🔗 Auto-learned link pattern: {link_pattern}")
@@ -49,6 +67,7 @@ async def smart_snap_sites(SNAP_URLS):
             found_links = list(set(found_links))
             print(f"📎 Found {len(found_links)} news links")
 
+            # 🔍 Visit each detail page
             for link in found_links:
                 try:
                     await page.goto(link, timeout=30000)
@@ -60,12 +79,12 @@ async def smart_snap_sites(SNAP_URLS):
                 title = await page.locator("h1, h2").first.text_content()
                 title = title.strip() if title else "No title"
 
-                # 📄 Extract main Arabic text block
+                # 📄 Extract the main Arabic text block
                 html = await page.content()
                 arabic_blocks = re.findall(r'>([^<>]{50,}[\u0600-\u06FF][^<>]{20,})<', html)
                 content = max(arabic_blocks, key=len) if arabic_blocks else "No Arabic content found."
 
-                # 🗓️ Detect date (YYYY-MM-DD) if present
+                # 🗓️ Detect date (YYYY-MM-DD)
                 date_match = re.search(r'(\d{4}-\d{2}-\d{2})', html)
                 date = date_match.group(1) if date_match else datetime.now().strftime("%Y-%m-%d")
 
@@ -89,10 +108,11 @@ async def smart_snap_sites(SNAP_URLS):
 # 🔹 MAIN ENTRY POINT
 if __name__ == "__main__":
     """
-    This main block lets you:
-    - run locally:        python agents/url_snap.py
-    - or with YAML file:  python agents/url_snap.py snap_sources.yml
-    It will produce:      snap_output_<YYYY-MM-DD>.json
+    Run locally or from GitHub Actions.
+
+    Examples:
+      python agents/url_snap.py
+      python agents/url_snap.py snap_sources.yml
     """
 
     # 🧩 Load YAML config (if provided) or fallback to internal default
