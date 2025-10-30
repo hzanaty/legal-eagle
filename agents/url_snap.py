@@ -27,61 +27,59 @@ async def smart_snap_sites(SNAP_URLS):
                 print(f"⚠️ Failed to load {site['url']} → {e}")
                 continue
 
-            # 🕓 Wait for Angular feed to render completely
+            # 🕓 Wait for Angular to render "اقرأ المزيد" buttons
             try:
                 await page.wait_for_selector("a.readMore", timeout=20000)
+            except Exception:
+                print("⚠️ No readMore selector found at all.")
+                continue
 
-                # Scroll gradually to trigger lazy loading of news cards
-                for _ in range(4):
-                    await page.mouse.wheel(0, 1000)
-                    await page.wait_for_timeout(2000)
+            # Scroll & give Angular time
+            for _ in range(5):
+                await page.mouse.wheel(0, 1000)
+                await page.wait_for_timeout(1500)
 
-                # Give Angular router time to populate the DOM
-                await page.wait_for_timeout(4000)
-
-                # 🧠 Extract news detail paths manually (Angular has no href attributes)
+            print("⏳ Waiting for Angular to populate NewsDetails paths...")
+            anchors = []
+            for i in range(12):  # up to ~24 seconds total
                 html = await page.content()
                 anchors = re.findall(r'/NewsDetails/\d+/\d+', html)
-                anchors = list(set(anchors))
-
-                # Construct absolute URLs
-                anchors = [f"https://www.gosi.gov.sa/ar/MediaCenter/News{a}" for a in anchors]
-            except Exception as e:
-                print(f"⚠️ Could not extract anchors → {e}")
-                anchors = []
+                if anchors:
+                    break
+                await page.wait_for_timeout(2000)
 
             if not anchors:
                 print(f"⚠️ No news links found on {site['url']}")
                 continue
+
+            anchors = list(set(anchors))
+            anchors = [f"https://www.gosi.gov.sa/ar/MediaCenter/News{a}" for a in anchors]
 
             # 🧠 Auto-learn link pattern
             first_example = anchors[0]
             sample_path = urlparse(first_example).path
             link_pattern = re.sub(r'\d+', r'\\d+', sample_path)
             print(f"🔗 Auto-learned link pattern: {link_pattern}")
-
-            found_links = [url for url in anchors if re.search(link_pattern, url)]
-            found_links = list(set(found_links))
-            print(f"📎 Found {len(found_links)} news links")
+            print(f"📎 Found {len(anchors)} news links")
 
             # 🔍 Visit each detail page
-            for link in found_links:
+            for link in anchors:
                 try:
                     await page.goto(link, timeout=30000)
                 except Exception as e:
                     print(f"⚠️ Failed to open detail {link} → {e}")
                     continue
 
-                # 🏷️ Extract title
+                # 🏷️ Title
                 title = await page.locator("h1, h2").first.text_content()
                 title = title.strip() if title else "No title"
 
-                # 📄 Extract the main Arabic text block
+                # 📄 Main Arabic text block
                 html = await page.content()
                 arabic_blocks = re.findall(r'>([^<>]{50,}[\u0600-\u06FF][^<>]{20,})<', html)
                 content = max(arabic_blocks, key=len) if arabic_blocks else "No Arabic content found."
 
-                # 🗓️ Detect date (YYYY-MM-DD)
+                # 🗓️ Date
                 date_match = re.search(r'(\d{4}-\d{2}-\d{2})', html)
                 date = date_match.group(1) if date_match else datetime.now().strftime("%Y-%m-%d")
 
@@ -111,8 +109,6 @@ if __name__ == "__main__":
       python agents/url_snap.py
       python agents/url_snap.py snap_sources.yml
     """
-
-    # 🧩 Load YAML config (if provided) or fallback to internal default
     cfg_path = sys.argv[1] if len(sys.argv) > 1 else "snap_sources.yml"
     try:
         with open(cfg_path, "r", encoding="utf-8") as f:
