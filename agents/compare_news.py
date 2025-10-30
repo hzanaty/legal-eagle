@@ -1,96 +1,86 @@
 import json
-import numpy as np
-import hashlib
 from pathlib import Path
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 from openai import OpenAI
-from configurations.config_loader import creds
+import numpy as np
 
-def _hash_item(item):
-    """Create a stable hash based on title + date + source."""
-    base = (item.get("source", "") + item.get("title", "") + item.get("date", "")).strip()
-    return hashlib.sha256(base.encode("utf-8")).hexdigest()
+# Initialize OpenAI client
+client = OpenAI()
 
-def _get_latest_news_file(folder="outputs"):
-    """Return yesterday's snapshot path if exists."""
-    digests = sorted(Path(folder).glob("all_news_*.json"))
-    if len(digests) == 0:
-        return None
-    return digests[-1]
+def cosine_similarity(vec_a, vec_b):
+    """Compute cosine similarity between two vectors."""
+    return np.dot(vec_a, vec_b) / (np.linalg.norm(vec_a) * np.linalg.norm(vec_b))
 
-def _get_embedding(client, text):
-    """Generate vector embedding for a text snippet."""
-    try:
-        resp = client.embeddings.create(model="text-embedding-3-small", input=text[:5000])
-        return np.array(resp.data[0].embedding, dtype=np.float32)
-    except Exception as e:
-        print(f"⚠️ Embedding failed: {e}")
-        return np.zeros(1536, dtype=np.float32)
-
-def _cosine_similarity(a, b):
-    if np.linalg.norm(a) == 0 or np.linalg.norm(b) == 0:
-        return 0.0
-    return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
-
-def run_compare_news(all_news_items):
+def run_compare_news_agent(current_items):
     """
-    Compare today's collected news with yesterday's saved file.
-    Return only new unique (semantically different) items.
+    Compares today's collected items with the latest snapshot.
+    Returns only new or significantly changed items.
     """
-    print("\n🧾 Running Compare News Agent with OpenAI embeddings...")
-    Path("outputs").mkdir(exist_ok=True)
 
-    client = OpenAI(api_key=creds["openai_api_key"])
+    print("🧠 Running Compare News Agent...")
 
-    # Dubai time (UTC+4)
-    dubai_time = datetime.now(timezone.utc) + timedelta(hours=4)
-    today_file = Path("outputs") / f"all_news_{dubai_time.strftime('%Y-%m-%d')}.json"
+    outputs_dir = Path("outputs")
+    outputs_dir.mkdir(exist_ok=True)
 
-    # Load yesterday snapshot
-    yesterday_file = _get_latest_news_file("outputs")
-    if not yesterday_file:
-        print("⚠️ No previous snapshot found — treating all as new.")
-        yesterday_items = []
-        yesterday_hashes = set()
+    today_str = (datetime.utcnow() + timedelta(hours=4)).strftime("%Y-%m-%d")
+    latest_path = outputs_dir / "latest_all_news.json"
+    dated_path = outputs_dir / f"all_news_{today_str}.json"
+
+    # Load previous snapshot if it exists
+    previous_items = []
+    if latest_path.exists():
+        try:
+            with open(latest_path, "r", encoding="utf-8") as f:
+                previous_items = json.load(f)
+            print(f"📂 Loaded {len(previous_items)} items from latest_all_news.json")
+        except Exception as e:
+            print(f"⚠️ Failed to load previous snapshot: {e}")
     else:
-        with open(yesterday_file, "r", encoding="utf-8") as f:
-            yesterday_items = json.load(f)
-        yesterday_hashes = {_hash_item(it) for it in yesterday_items}
-        print(f"📁 Loaded {len(yesterday_items)} items from {yesterday_file.name}")
+        print("⚠️ No previous snapshot found — treating all items as new.")
 
-    # Precompute yesterday embeddings (for performance)
-    yesterday_embeds = []
-    for it in yesterday_items:
-        title = it.get("title", "")
-        emb = _get_embedding(client, title)
-        yesterday_embeds.append((title, emb))
+    # If no previous snapshot, return all as new
+    if not previous_items:
+        with open(latest_path, "w", encoding="utf-8") as f:
+            json.dump(current_items, f, ensure_ascii=False, indent=2)
+        with open(dated_path, "w", encoding="utf-8") as f:
+            json.dump(current_items, f, ensure_ascii=False, indent=2)
+        print(f"✅ Saved initial baseline → {latest_path}")
+        return {"new_items": current_items}
+
+    # Generate embeddings for current and previous items
+    def get_text_signature(item):
+        return f"{item.get('title', '')} {item.get('content', '')}"
+
+    print("🔍 Generating embeddings for semantic comparison...")
+    prev_texts = [get_text_signature(i) for i in previous_items]
+    curr_texts = [get_text_signature(i) for i in current_items]
+
+    prev_embeddings = client.embeddings.create(input=prev_texts, model="text-embedding-3-small").data
+    curr_embeddings = client.embeddings.create(input=curr_texts, model="text-embedding-3-small").data
 
     new_items = []
-    for item in all_news_items:
-        item_hash = _hash_item(item)
-        title = item.get("title", "")
+    threshold = 0.90  # similarity threshold
 
-        # Quick hash duplicate check
-        if item_hash in yesterday_hashes:
-            continue
-
-        # Semantic duplicate check
-        item_emb = _get_embedding(client, title)
-        duplicate_found = False
-        for old_title, old_emb in yesterday_embeds:
-            sim = _cosine_similarity(item_emb, old_emb)
-            if sim >= 0.92:
-                duplicate_found = True
+    for i, curr in enumerate(curr_embeddings):
+        curr_vec = np.array(curr.embedding)
+        is_new = True
+        for prev in prev_embeddings:
+            prev_vec = np.array(prev.embedding)
+            if cosine_similarity(curr_vec, prev_vec) > threshold:
+                is_new = False
                 break
+        if is_new:
+            new_items.append(current_items[i])
 
-        if not duplicate_found:
-            new_items.append(item)
+    print(f"✅ {len(new_items)} new items found (threshold {threshold}).")
 
-    print(f"🆕 {len(new_items)} semantically new items found out of {len(all_news_items)} total.")
+    # Save both daily and latest versions
+    with open(dated_path, "w", encoding="utf-8") as f:
+        json.dump(current_items, f, ensure_ascii=False, indent=2)
 
-    # Save today's snapshot
-    with open(today_file, "w", encoding="utf-8") as f:
-        json.dump(all_news_items, f, ensure_ascii=False, indent=2)
-    print(f"💾 Saved today's combined news → {today_file.name}")
+    with open(latest_path, "w", encoding="utf-8") as f:
+        json.dump(current_items, f, ensure_ascii=False, indent=2)
 
-    return {"new_items": new_items, "today_file": str(today_file)}
+    print(f"💾 Updated latest snapshot → {latest_path}")
+
+    return {"new_items": new_items}
