@@ -1,0 +1,101 @@
+import json
+import numpy as np
+import hashlib
+from pathlib import Path
+from datetime import datetime, timezone, timedelta
+from openai import OpenAI
+from configurations.config_loader import creds
+
+
+def _hash_item(item):
+    """Create a stable hash based on title + date + source."""
+    base = (item.get("source", "") + item.get("title", "") + item.get("date", "")).strip()
+    return hashlib.sha256(base.encode("utf-8")).hexdigest()
+
+
+def _get_latest_news_file(folder="outputs"):
+    """Return yesterday's snapshot path if exists."""
+    digests = sorted(Path(folder).glob("all_news_*.json"))
+    if len(digests) == 0:
+        return None
+    return digests[-1]
+
+
+def _get_embedding(client, text):
+    """Generate vector embedding for a text snippet."""
+    try:
+        resp = client.embeddings.create(model="text-embedding-3-small", input=text[:5000])
+        return np.array(resp.data[0].embedding, dtype=np.float32)
+    except Exception as e:
+        print(f"⚠️ Embedding failed: {e}")
+        return np.zeros(1536, dtype=np.float32)
+
+
+def _cosine_similarity(a, b):
+    if np.linalg.norm(a) == 0 or np.linalg.norm(b) == 0:
+        return 0.0
+    return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
+
+
+def run_compare_news_agent(all_news_items):
+    """
+    Compare today's collected news with yesterday's saved file.
+    Return only new unique (semantically different) items.
+    """
+    print("\n🧾 Running Compare News Agent with OpenAI embeddings...")
+    Path("outputs").mkdir(exist_ok=True)
+
+    client = OpenAI(api_key=creds["openai_api_key"])
+
+    # Dubai time (UTC+4)
+    dubai_time = datetime.now(timezone.utc) + timedelta(hours=4)
+    today_file = Path("outputs") / f"all_news_{dubai_time.strftime('%Y-%m-%d')}.json"
+
+    # Load yesterday snapshot
+    yesterday_file = _get_latest_news_file("outputs")
+    if not yesterday_file:
+        print("⚠️ No previous snapshot found — treating all as new.")
+        yesterday_items = []
+        yesterday_hashes = set()
+    else:
+        with open(yesterday_file, "r", encoding="utf-8") as f:
+            yesterday_items = json.load(f)
+        yesterday_hashes = {_hash_item(it) for it in yesterday_items}
+        print(f"📁 Loaded {len(yesterday_items)} items from {yesterday_file.name}")
+
+    # Precompute yesterday embeddings (for performance)
+    yesterday_embeds = []
+    for it in yesterday_items:
+        title = it.get("title", "")
+        emb = _get_embedding(client, title)
+        yesterday_embeds.append((title, emb))
+
+    new_items = []
+    for item in all_news_items:
+        item_hash = _hash_item(item)
+        title = item.get("title", "")
+
+        # Quick hash duplicate check
+        if item_hash in yesterday_hashes:
+            continue
+
+        # Semantic duplicate check
+        item_emb = _get_embedding(client, title)
+        duplicate_found = False
+        for old_title, old_emb in yesterday_embeds:
+            sim = _cosine_similarity(item_emb, old_emb)
+            if sim >= 0.92:
+                duplicate_found = True
+                break
+
+        if not duplicate_found:
+            new_items.append(item)
+
+    print(f"🆕 {len(new_items)} semantically new items found out of {len(all_news_items)} total.")
+
+    # Save today's snapshot
+    with open(today_file, "w", encoding="utf-8") as f:
+        json.dump(all_news_items, f, ensure_ascii=False, indent=2)
+    print(f"💾 Saved today's combined news → {today_file.name}")
+
+    return {"new_items": new_items, "today_file": str(today_file)}
