@@ -1,14 +1,13 @@
 import re
 import json
 import asyncio
-import sys
-import yaml
 from datetime import datetime
 from pathlib import Path
 from playwright.async_api import async_playwright
 
 
 async def smart_snap_sites(SNAP_URLS, max_items=None):
+    """Capture visible news summaries from configured sites and save JSON snapshot."""
     all_items = []
 
     async with async_playwright() as p:
@@ -25,7 +24,6 @@ async def smart_snap_sites(SNAP_URLS, max_items=None):
                 print(f"⚠️ Failed to load {site['url']} → {e}")
                 continue
 
-            # Gentle scroll to render cards
             for _ in range(4):
                 await page.mouse.wheel(0, 1200)
                 await page.wait_for_timeout(800)
@@ -57,25 +55,3 @@ async def smart_snap_sites(SNAP_URLS, max_items=None):
                 title = titles[i] if i < len(titles) else ""
                 date_text = dates[i] if i < len(dates) else ""
                 para = paras[i] if i < len(paras) else ""
-
-                m = re.search(r"\d{4}-\d{2}-\d{2}", date_text)
-                date_norm = m.group(0) if m else datetime.now().strftime("%Y-%m-%d")
-
-                item = {
-                    "source": site["name"],
-                    "title": title,
-                    "date": date_norm,
-                    "content": para,
-                    "link": site.get("url", "https://www.gosi.gov.sa/ar/MediaCenter/News"),
-                    "snap_time": datetime.now().isoformat(),
-                    "status": "OK"
-                }
-                print(f"📰 Parsed: {title[:60]}...")
-                all_items.append(item)
-
-        await browser.close()
-    return all_items
-
-
-# 🔹 MAIN ENTRY POINT
-i
