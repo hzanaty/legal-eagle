@@ -26,6 +26,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r configurations/requirements.txt
 
+      # 🧩 Add this step right after installing dependencies
+      - name: 🧩 Install Playwright Browsers
+        run: playwright install chromium
+
       - name: ▶️ Run Controller
         run: |
           export PYTHONPATH="${{ github.workspace }}"
