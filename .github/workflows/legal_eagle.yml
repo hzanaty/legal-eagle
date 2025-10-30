@@ -34,3 +34,11 @@ jobs:
         run: |
           export PYTHONPATH="${{ github.workspace }}"
           python agents/agents_controller.py
+      
+      - name: 📤 Upload News Snapshot (outputs)
+        uses: actions/upload-artifact@v4
+        with:
+          name: 🦅_LegalEagle_AllNews_${{ github.run_number }}
+          path: outputs/*.json
+          if-no-files-found: ignore
+
