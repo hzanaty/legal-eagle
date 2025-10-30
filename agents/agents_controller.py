@@ -9,7 +9,7 @@ from agents.rss_parser import parse_rss_feed
 from agents.tweet_feed import fetch_recent_tweets
 from agents.url_crawl import scrape_all_urls
 from agents.url_snap import run_snap_and_return_items
-from agents.compare_news_agent import run_compare_news_agent
+from agents.compare_news import run_compare_news
 from agents.news_filter import get_relevant_news
 from agents.news_grouper import group_and_summarize_news
 from agents.email_sender import send_email
