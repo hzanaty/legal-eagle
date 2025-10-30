@@ -4,7 +4,7 @@ import re
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 
-def scrape_all_crawl_urls(CRAWL_URLS):
+def scrape_all_urls(CRAWL_URLS):
     all_items = []
     errors = []
 
