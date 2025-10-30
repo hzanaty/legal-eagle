@@ -39,7 +39,7 @@ def run_controller():
         print(f"📄 Content: {item['content']}\n")
 
     # 2. Tweet Feed Agent (daily rotation)
-    today_index = datetime.datetime.utcnow().day % len(TWEET_ACCOUNTS)
+    today_index = datetime.utcnow().day % len(TWEET_ACCOUNTS)
     account_name = TWEET_ACCOUNTS[today_index]
     print(f"\n🐦 Running Tweet Feed Agent for @{account_name}...")
     tweet_items = fetch_recent_tweets(account_name, X_BEARER_TOKEN)
