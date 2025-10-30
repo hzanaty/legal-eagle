@@ -52,9 +52,9 @@ def run_controller():
         print(f"🗓️ Date: {tweet['date']}")
         print(f"📄 Content: {tweet['content']}\n")
 
-    # 3. URL Monitor Agent
+    # 3. URL Crawl Agent
     print("\n🕵️‍♂️ Running URL Monitor Agent...")
-    url_result = scrape_all_CRAWL_URLS(CRAWL_URLS)
+    url_result = scrape_all_crawl_urls(CRAWL_URLS)
     url_items = url_result.get("items", [])
     url_errors = url_result.get("errors", [])
 
