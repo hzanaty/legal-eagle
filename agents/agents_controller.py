@@ -82,7 +82,7 @@ def run_controller():
     print(f"\n📦 Total collected items (pre-filter): {len(all_news_items)}")
 
     # 5.1. Compare News
-    compare_result = run_compare_news_agent(all_news_items)
+    compare_result = run_compare_news(all_news_items)
     new_items = compare_result["new_items"]
     print(f"✅ {len(new_items)} new items after semantic comparison.")
 
