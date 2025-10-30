@@ -32,7 +32,7 @@ def _cosine_similarity(a, b):
         return 0.0
     return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
 
-def run_compare_news_agent(all_news_items):
+def run_compare_news(all_news_items):
     """
     Compare today's collected news with yesterday's saved file.
     Return only new unique (semantically different) items.
