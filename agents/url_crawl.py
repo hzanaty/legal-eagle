@@ -4,11 +4,11 @@ import re
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 
-def scrape_all_monitor_urls(MONITOR_URLS):
+def scrape_all_crawl_urls(CRAWL_URLS):
     all_items = []
     errors = []
 
-    for source in MONITOR_URLS:
+    for source in CRAWL_URLS:
         name = source["name"]
         url = source["url"]
         domain = source["domain"]
