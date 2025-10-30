@@ -5,7 +5,7 @@ on:
   schedule:
     - cron: "0 7 * * *"
 
-  # ▶️ Allow manual trigger from GitHub Actions tab
+  # ▶️ Manual trigger from GitHub Actions tab
   workflow_dispatch:
 
 jobs:
@@ -13,28 +13,33 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1️⃣ Checkout repo
       - name: 🧾 Checkout repository
         uses: actions/checkout@v4
 
+      # 2️⃣ Set up Python
       - name: 🐍 Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
+      # 3️⃣ Install dependencies
       - name: 📦 Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r configurations/requirements.txt
 
-      # 🧩 Add this step right after installing dependencies
+      # 4️⃣ Install Playwright browser (needed for dynamic crawler)
       - name: 🧩 Install Playwright Browsers
         run: playwright install chromium
 
-      - name: ▶️ Run Controller
+      # 5️⃣ Run the main controller
+      - name: ▶️ Run Legal Eagle Controller
         run: |
           export PYTHONPATH="${{ github.workspace }}"
           python agents/agents_controller.py
-      
+
+      # 6️⃣ Upload today's news outputs for manual inspection
       - name: 📤 Upload News Snapshot (outputs)
         uses: actions/upload-artifact@v4
         with:
@@ -42,3 +47,13 @@ jobs:
           path: outputs/*.json
           if-no-files-found: ignore
 
+      # 7️⃣ (Optional) Commit latest snapshot directly into the repo
+      - name: 💾 Commit latest snapshot to repo
+        if: success()
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git pull --rebase
+          git add outputs/latest_all_news.json
+          git commit -m "🦅 Update latest news snapshot"
+          git push
