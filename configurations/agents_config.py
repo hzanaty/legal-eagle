@@ -97,6 +97,7 @@ SNAP_URLS = [
         "url": "https://www.gosi.gov.sa/ar/MediaCenter/News",
         "sample_link": "https://www.gosi.gov.sa/ar/MediaCenter/News/NewsDetails/1/0028102025"
     },
+]
 
 # Email configuration
 EMAIL_RECEIVERS = [
