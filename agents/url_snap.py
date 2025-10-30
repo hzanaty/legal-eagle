@@ -1,7 +1,7 @@
 import re
 import json
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from playwright.async_api import async_playwright
 
@@ -10,21 +10,22 @@ async def _async_snap(SNAP_URLS, max_items=None):
     """Internal async routine that captures visible news summaries."""
     all_items = []
 
+    print("\n📸 [SNAP] Launching headless browser...")
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         context = await browser.new_context(locale="ar-SA")
         page = await context.new_page()
 
         for site in SNAP_URLS:
-            print(f"🌐 Capturing: {site['name']} → {site['url']}")
+            print(f"\n🌐 [SNAP] Capturing: {site['name']} → {site['url']}")
             try:
                 await page.goto(site["url"], timeout=40000)
                 await page.wait_for_selector("a.readMore", timeout=30000)
             except Exception as e:
-                print(f"⚠️ Failed to load {site['url']} → {e}")
+                print(f"⚠️ [SNAP] Failed to load {site['url']} → {e}")
                 continue
 
-            # Scroll gently to ensure all cards render
+            # Gentle scroll to trigger Angular lazy loading
             for _ in range(4):
                 await page.mouse.wheel(0, 1200)
                 await page.wait_for_timeout(800)
@@ -43,19 +44,21 @@ async def _async_snap(SNAP_URLS, max_items=None):
                     "els => els.map(e => (e.textContent||'').trim())"
                 )
             except Exception as e:
-                print(f"⚠️ Could not read listing cards → {e}")
+                print(f"⚠️ [SNAP] Could not extract listing cards → {e}")
                 continue
 
             count = min(len(titles), len(dates), len(paras))
             if max_items is not None:
                 count = min(count, max_items)
 
-            print(f"📑 Found {count} cards with extractable text")
+            print(f"📑 [SNAP] Found {count} visible news cards")
 
             for i in range(count):
                 title = titles[i] if i < len(titles) else ""
                 date_text = dates[i] if i < len(dates) else ""
                 para = paras[i] if i < len(paras) else ""
+
+                # Normalize date
                 m = re.search(r"\d{4}-\d{2}-\d{2}", date_text)
                 date_norm = m.group(0) if m else datetime.now().strftime("%Y-%m-%d")
 
@@ -64,35 +67,45 @@ async def _async_snap(SNAP_URLS, max_items=None):
                     "title": title,
                     "date": date_norm,
                     "content": para,
-                    # Config-driven fallback link
-                    "link": site.get("url"),
-                    "snap_time": datetime.now().isoformat(),
-                    "status": "OK"
+                    "link": site.get("url"),  # config-driven fallback link
+                    "snap_time": datetime.now(timezone.utc).isoformat(),  # internal UTC marker
+                    "status": "OK",
                 }
-                print(f"📰 Parsed: {title[:60]}...")
+                print(f"📰 [SNAP] Parsed: {title[:60]}...")
                 all_items.append(item)
 
         await browser.close()
+        print("✅ [SNAP] Browser closed cleanly.")
     return all_items
 
 
 def run_snap_and_return_items(SNAP_URLS):
     """
     Public entry point used by agents_controller.py
-    Runs the async Playwright scraper internally and saves snapshot in /snapshots/.
+    Runs Playwright internally and saves snapshot in /snapshots/ (Dubai time UTC+4).
     Returns the collected list of items.
     """
     print("\n📸 Running URL Snap Agent...")
 
-    # Execute async part
-    items = asyncio.run(_async_snap(SNAP_URLS))
+    try:
+        items = asyncio.run(_async_snap(SNAP_URLS))
+    except Exception as e:
+        print(f"❌ [SNAP] Fatal error while running Playwright: {e}")
+        items = []
 
-    # Always save to snapshots folder
+    # Dubai time (UTC +4)
+    dubai_time = datetime.now(timezone.utc) + timedelta(hours=4)
+
     Path("snapshots").mkdir(exist_ok=True)
-    out_file = Path("snapshots") / f"snap_output_{datetime.now().strftime('%Y-%m-%d')}.json"
+    out_file = Path("snapshots") / f"snap_output_{dubai_time.strftime('%Y-%m-%d')}.json"
 
-    with open(out_file, "w", encoding="utf-8") as f:
-        json.dump(items, f, ensure_ascii=False, indent=2)
+    try:
+        with open(out_file, "w", encoding="utf-8") as f:
+            json.dump(items, f, ensure_ascii=False, indent=2)
+        print(f"💾 [SNAP] Saved {len(items)} items to {out_file}")
+        print(f"🕓 [SNAP] Dubai timestamp: {dubai_time.isoformat()}")
+    except Exception as e:
+        print(f"❌ [SNAP] Failed to save JSON file: {e}")
 
-    print(f"✅ Snap Agent saved {len(items)} items to {out_file}")
+    print("✅ [SNAP] Agent finished.\n")
     return items
