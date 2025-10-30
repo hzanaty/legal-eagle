@@ -126,4 +126,7 @@ if __name__ == "__main__":
         data = await smart_snap_sites(SNAP_URLS)
         out_file = f"snap_output_{datetime.now().strftime('%Y-%m-%d')}.json"
         with open(out_file, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False,_
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        print(f"\n✅ Saved {len(data)} items to {out_file}")
+
+    asyncio.run(main())
