@@ -36,22 +36,19 @@ async def smart_snap_sites(SNAP_URLS):
                     await page.mouse.wheel(0, 1000)
                     await page.wait_for_timeout(2000)
 
-                # Give Angular extra time to populate hrefs
+                # Give Angular router time to populate the DOM
                 await page.wait_for_timeout(4000)
 
-                # Collect all populated "اقرأ المزيد" links
-                anchors = await page.evaluate("""
-                    Array.from(document.querySelectorAll('a.readMore'))
-                         .map(a => a.href)
-                         .filter(h => h && h.includes('/NewsDetails/'))
-                """)
+                # 🧠 Extract news detail paths manually (Angular has no href attributes)
+                html = await page.content()
+                anchors = re.findall(r'/NewsDetails/\d+/\d+', html)
+                anchors = list(set(anchors))
+
+                # Construct absolute URLs
+                anchors = [f"https://www.gosi.gov.sa/ar/MediaCenter/News{a}" for a in anchors]
             except Exception as e:
-                print(f"⚠️ No 'readMore' anchors found → {e}")
-                anchors = await page.evaluate("""
-                    Array.from(document.querySelectorAll('a[href]'))
-                         .map(a => a.href)
-                         .filter(h => h.includes('/NewsDetails/'))
-                """)
+                print(f"⚠️ Could not extract anchors → {e}")
+                anchors = []
 
             if not anchors:
                 print(f"⚠️ No news links found on {site['url']}")
@@ -129,7 +126,4 @@ if __name__ == "__main__":
         data = await smart_snap_sites(SNAP_URLS)
         out_file = f"snap_output_{datetime.now().strftime('%Y-%m-%d')}.json"
         with open(out_file, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-        print(f"\n✅ Saved {len(data)} items to {out_file}")
-
-    asyncio.run(main())
+            json.dump(data, f, ensure_ascii=False,_
