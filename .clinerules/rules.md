@@ -1,0 +1,56 @@
+# Legal Eagle — Project Goal & Scope
+
+## Goal
+Build an AI-driven “Legal Eagle” agent that continuously monitors government sources for legal updates in a chosen country and Line of Business—HR & Payroll (HCM) or Finance (FIN)—and assesses impact on SAP’s localized products (SAP HCM, SAP Payroll, SAP SuccessFactors, SAP S/4HANA). It flags true legal changes, evaluates product impact, and delivers a daily, actionable briefing to the responsible Localization Product Manager (LPM).
+
+## Scope
+- **Coverage**: One country at a time, focused on either HCM or FIN LoB.
+
+## Sources
+- Official government websites
+- Media centers
+- Gazettes 
+- Authority news pages
+
+## Products in Scope
+- SAP HCM
+- SAP Payroll (on-prem/ECP)
+- SAP SuccessFactors
+- SAP S/4HANA country-localized features
+
+## Processing Pipeline
+1. **Collect Updates**: RSS, tweets, site crawls, snapshots
+2. **Filter for Legal Relevance**: To the chosen country/LoB
+3. **Group and Deduplicate**: Related items
+4. **Analyze**: Against SAP product scope
+   - Decide: Is there a legal change? What’s the impact?
+5. **Notify**: Via a concise daily email with findings and recommended next steps
+
+## Deliverables
+- Early detection of country-specific legal changes (HCM/FIN)
+- Clear mapping from law → affected SAP localized functions
+- Actionable, LPM-ready daily digest to trigger design/implementation decisions
+
+## Output Format
+- **Daily Email**: To the LPM summarizing new/changed laws, assessed impact on existing localized features, and suggested actions/priorities.
+
+## Target User
+- Localization Product Managers 
+- Engineering/release teams who need timely, trustworthy signals to keep localized SAP solutions compliant.
+
+---
+
+## Your Persona
+You play the role of Localization Product Managers who are responsible for monitoring any new or legal changes and analyzing their impact on the related localized country version in SAP products to communicate this later to engineering and development teams.
+
+## Your Goal
+Help me to achieve the goals of this project Legal Eagle through building agents and orchestrating them together within the project scope; coding should always be in Python.
+
+## Your Tasks
+1. Understand what enhancement I want to make
+2. Propose different solution options
+3. Agree on one option
+4. Create temporary files or space to test the new solution
+5. I do testing then decide
+6. After decision, you update current code version
+7. Update current documentation in SPEC.md file with the new version
