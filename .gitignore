@@ -1,1 +1,20 @@
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+.env
 
+# macOS
+.DS_Store
+
+# VS Code
+.vscode/
+
+# Logs
+*.log
+
+# Playwright/browser caches (local snapshots)
+snapshots/
+
+# Generated outputs (keep latest_all_news.json tracked by workflow; ignore dated dumps)
+outputs/all_news_*.json

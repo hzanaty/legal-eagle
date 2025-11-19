@@ -1,11 +1,12 @@
 import json
 from pathlib import Path
 from datetime import datetime, timedelta
+from configurations.config_loader import creds
 from openai import OpenAI
 import numpy as np
 
-# Initialize OpenAI client
-client = OpenAI()
+# Initialize OpenAI client with API key
+client = OpenAI(api_key=creds["openai_api_key"])
 
 def cosine_similarity(vec_a, vec_b):
     """Compute cosine similarity between two vectors."""
