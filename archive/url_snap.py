@@ -3,6 +3,7 @@ import json
 import asyncio
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Optional
 from playwright.async_api import async_playwright
 
 
@@ -79,10 +80,11 @@ async def _async_snap(SNAP_URLS, max_items=None):
     return all_items
 
 
-def run_snap_and_return_items(SNAP_URLS):
+def run_snap_and_return_items(SNAP_URLS, output_subdir: Optional[str] = None):
     """
     Public entry point used by agents_controller.py
     Runs Playwright internally and saves snapshot in /snapshots/ (Dubai time UTC+4).
+    If output_subdir is provided, snapshots are saved under /snapshots/{output_subdir}/.
     Returns the collected list of items.
     """
     print("\n📸 Running URL Snap Agent...")
@@ -96,8 +98,11 @@ def run_snap_and_return_items(SNAP_URLS):
     # Dubai time (UTC +4)
     dubai_time = datetime.now(timezone.utc) + timedelta(hours=4)
 
-    Path("snapshots").mkdir(exist_ok=True)
-    out_file = Path("snapshots") / f"snap_output_{dubai_time.strftime('%Y-%m-%d')}.json"
+    base = Path("snapshots")
+    if output_subdir:
+        base = base / output_subdir
+    base.mkdir(parents=True, exist_ok=True)
+    out_file = base / f"snap_output_{dubai_time.strftime('%Y-%m-%d')}.json"
 
     try:
         with open(out_file, "w", encoding="utf-8") as f:
