@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+Legal Eagle Admin Server (user LaunchAgent)
+Runs the Flask admin web interface on http://127.0.0.1:8080
+
+Installation:
+  cp scripts/launchd/com.legaleagle.admin.plist ~/Library/LaunchAgents/
+  launchctl load -w ~/Library/LaunchAgents/com.legaleagle.admin.plist
+
+Unload:
+  launchctl unload ~/Library/LaunchAgents/com.legaleagle.admin.plist
+
+Check status:
+  launchctl list | grep legaleagle
+
+View logs:
+  tail -f /Users/i077750/Documents/GitHub/legal-eagle/outputs/admin-stdout.log
+  tail -f /Users/i077750/Documents/GitHub/legal-eagle/outputs/admin-stderr.log
+-->
+<plist version="1.0">
+  <dict>
+    <key>Label</key>
+    <string>com.legaleagle.admin</string>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/i077750/Documents/GitHub/legal-eagle</string>
+
+    <key>ProgramArguments</key>
+    <array>
+      <string>/Library/Frameworks/Python.framework/Versions/3.13/bin/python3</string>
+      <string>/Users/i077750/Documents/GitHub/legal-eagle/admin/app.py</string>
+    </array>
+
+    <!-- Keep the server running always -->
+    <key>KeepAlive</key>
+    <true/>
+
+    <!-- Start when user logs in -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- Environment variables -->
+    <key>EnvironmentVariables</key>
+    <dict>
+      <key>PYTHONPATH</key>
+      <string>/Users/i077750/Documents/GitHub/legal-eagle</string>
+      <key>PYTHONUNBUFFERED</key>
+      <string>1</string>
+    </dict>
+
+    <!-- Logs -->
+    <key>StandardOutPath</key>
+    <string>/Users/i077750/Documents/GitHub/legal-eagle/outputs/admin-stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/i077750/Documents/GitHub/legal-eagle/outputs/admin-stderr.log</string>
+
+    <!-- Restart if it crashes (throttle to prevent rapid restarts) -->
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+  </dict>
+</plist>

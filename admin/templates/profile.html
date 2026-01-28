@@ -1,0 +1,506 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+  /* Profile-specific Fiori styles */
+  .sapTable-compact {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--sapFontSmallSize);
+  }
+  
+  .sapTable-compact th {
+    padding: var(--sapSpacingXS) var(--sapSpacingS);
+    text-align: left;
+    font-weight: 600;
+    background: var(--sapNeutralBackground);
+    border-bottom: 1px solid var(--sapGroup_ContentBorderColor);
+    font-size: var(--sapFontSmallSize);
+  }
+  
+  .sapTable-compact td {
+    padding: var(--sapSpacingXS) var(--sapSpacingS);
+    border-bottom: 1px solid var(--sapGroup_ContentBorderColor);
+    vertical-align: middle;
+    font-size: var(--sapFontSmallSize);
+  }
+  
+  .sapTable-compact tbody tr:hover {
+    background: var(--sapList_Hover_Background);
+  }
+  
+  .sapTable-compact input[type="checkbox"] {
+    cursor: pointer;
+  }
+  
+  .sapTable-toolbar {
+    padding: var(--sapSpacingS) var(--sapSpacingM);
+    background: #fafafa;
+    border-bottom: 1px solid var(--sapGroup_ContentBorderColor);
+    display: flex;
+    gap: var(--sapSpacingS);
+    align-items: center;
+  }
+  
+  .sapForm-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: var(--sapSpacingS);
+    align-items: end;
+  }
+  
+  .sapForm-group {
+    margin-bottom: var(--sapSpacingM);
+  }
+  
+  .sapForm-label {
+    display: block;
+    margin-bottom: var(--sapSpacingXS);
+    font-weight: 400;
+    color: var(--sapTextColor);
+    font-size: var(--sapFontSize);
+  }
+  
+  .sapForm-input,
+  .sapForm-select,
+  .sapForm-textarea {
+    width: 100%;
+    padding: var(--sapSpacingS);
+    border: 1px solid var(--sapTileBorderColor);
+    border-radius: 0.25rem;
+    font-family: var(--sapFontFamily);
+    font-size: var(--sapFontSize);
+    color: var(--sapTextColor);
+    background: var(--sapBaseColor);
+    transition: border-color 0.2s;
+  }
+  
+  .sapForm-input:focus,
+  .sapForm-select:focus,
+  .sapForm-textarea:focus {
+    outline: none;
+    border-color: var(--sapBrandColor);
+    box-shadow: 0 0 0 1px var(--sapBrandColor);
+  }
+  
+  .sapForm-help {
+    display: block;
+    margin-top: var(--sapSpacingXS);
+    font-size: var(--sapFontSmallSize);
+    color: var(--sapNeutralColor);
+  }
+  
+  .sapTermItem {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--sapSpacingS);
+    border: 1px solid var(--sapTileBorderColor);
+    border-radius: 0.25rem;
+    margin-bottom: var(--sapSpacingXS);
+    background: var(--sapBaseColor);
+  }
+  
+  .sapTermItem:hover {
+    background: var(--sapList_Hover_Background);
+  }
+</style>
+
+<!-- Schedule Section -->
+<div class="sapCard">
+  <div class="sapCard-header">
+    <span>🗓️ Schedule</span>
+    <span style="color: var(--sapNeutralColor); font-weight: 400; font-size: var(--sapFontSmallSize);">
+      Timezone: Asia/Dubai
+    </span>
+  </div>
+  <div class="sapCard-content">
+    <form method="post" action="{{ url_for('update_profile_schedule_day', profile_id=profile.id) }}">
+      <div class="sapForm-row">
+        <div class="sapForm-group" style="margin-bottom: 0;">
+          <label class="sapForm-label">Scheduled Day</label>
+          <select class="sapForm-select" name="schedule_day">
+            <option value="" {% if not profile.schedule_day %}selected{% endif %}>Unset</option>
+            <option value="Sunday" {% if profile.schedule_day == 'Sunday' %}selected{% endif %}>Sunday</option>
+            <option value="Monday" {% if profile.schedule_day == 'Monday' %}selected{% endif %}>Monday</option>
+            <option value="Tuesday" {% if profile.schedule_day == 'Tuesday' %}selected{% endif %}>Tuesday</option>
+            <option value="Wednesday" {% if profile.schedule_day == 'Wednesday' %}selected{% endif %}>Wednesday</option>
+            <option value="Thursday" {% if profile.schedule_day == 'Thursday' %}selected{% endif %}>Thursday</option>
+            <option value="Friday" {% if profile.schedule_day == 'Friday' %}selected{% endif %}>Friday</option>
+            <option value="Saturday" {% if profile.schedule_day == 'Saturday' %}selected{% endif %}>Saturday</option>
+          </select>
+          <span class="sapForm-help">Profiles with Unset are skipped by the controller</span>
+        </div>
+        <button type="submit" class="sapBtn sapBtn-emphasized">Save Schedule</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- RSS Feeds -->
+<div class="sapCard">
+  <div class="sapCard-header">
+    <span>📡 RSS Feeds</span>
+    <span style="color: var(--sapNeutralColor); font-weight: 400; font-size: var(--sapFontSmallSize);">
+      {{ rss|length if rss else 0 }} feed{% if (rss|length if rss else 0) != 1 %}s{% endif %}
+    </span>
+  </div>
+  
+  {% if rss and rss|length > 0 %}
+  <div class="sapTable-toolbar">
+    <button type="submit" form="bulk_rss_form" class="sapBtn sapBtn-reject sapBtn-sm">Delete Selected</button>
+  </div>
+  
+  <div class="sapCard-content" style="padding: 0;">
+    <div style="overflow-x: auto;">
+      <table class="sapTable-compact">
+        <thead>
+          <tr>
+            <th style="width: 40px;"><input type="checkbox" onclick="toggleAllCheckboxes(this, 'bulk_rss_form')"></th>
+            <th>URL</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in rss %}
+          <tr>
+            <td style="text-align: center;"><input type="checkbox" name="urls" value="{{ u }}" form="bulk_rss_form"></td>
+            <td style="font-family: monospace; font-size: var(--sapFontSmallSize);">{{ u }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+  
+  <div class="sapCard-content">
+    {% if not rss or rss|length == 0 %}
+    <div style="text-align: center; color: var(--sapNeutralColor); padding: var(--sapSpacingL) 0;">
+      <div style="font-size: 2rem; margin-bottom: var(--sapSpacingS);">📡</div>
+      <p style="margin: 0;">No RSS feeds yet</p>
+    </div>
+    {% endif %}
+    
+    <form method="post" action="{{ url_for('add_rss', profile_id=profile.id) }}">
+      <div class="sapForm-row">
+        <input class="sapForm-input" name="url" placeholder="https://example.gov/news/feed" required>
+        <button type="submit" class="sapBtn sapBtn-accept">Add RSS</button>
+      </div>
+    </form>
+    
+    <form id="bulk_rss_form" method="post" action="{{ url_for('bulk_delete_rss', profile_id=profile.id) }}" style="display:none;"></form>
+  </div>
+</div>
+
+<!-- URL Sources -->
+<div class="sapCard">
+  <div class="sapCard-header">
+    <span>🌐 URL Sources</span>
+    <span style="color: var(--sapNeutralColor); font-weight: 400; font-size: var(--sapFontSmallSize);">
+      Auto / Force Static / Force Dynamic
+    </span>
+  </div>
+  
+  {% if urls and urls|length > 0 %}
+  <div class="sapTable-toolbar">
+    <button type="submit" form="bulk_urls_form" class="sapBtn sapBtn-reject sapBtn-sm">Delete Selected</button>
+  </div>
+  
+  <div class="sapCard-content" style="padding: 0;">
+    <div style="overflow-x: auto;">
+      <table class="sapTable-compact">
+        <thead>
+          <tr>
+            <th style="width: 40px;"><input type="checkbox" onclick="toggleAllCheckboxes(this, 'bulk_urls_form')"></th>
+            <th>URL</th>
+            <th style="width: 120px;">Mode</th>
+            <th style="width: 120px;">Crawl Version</th>
+            <th style="width: 140px;">Sample Link</th>
+            <th style="width: 140px;">Read More Label</th>
+            <th style="width: 120px;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in urls %}
+          <tr>
+            <td style="text-align: center;"><input type="checkbox" name="urls" value="{{ s.url }}" form="bulk_urls_form"></td>
+            <form method="post" action="{{ url_for('update_url_source_route', profile_id=profile.id) }}">
+              <td style="font-family: monospace; font-size: var(--sapFontSmallSize);">
+                {{ s.url }}
+                <input type="hidden" name="url" value="{{ s.url }}">
+              </td>
+              <td>
+                <select class="sapForm-select" name="mode" style="padding: 0.25rem 0.5rem; font-size: var(--sapFontSmallSize);">
+                  <option value="auto" {% if s.mode == 'auto' %}selected{% endif %}>auto</option>
+                  <option value="force_static" {% if s.mode == 'force_static' %}selected{% endif %}>force_static</option>
+                  <option value="force_dynamic" {% if s.mode == 'force_dynamic' %}selected{% endif %}>force_dynamic</option>
+                </select>
+              </td>
+              <td>
+                <select class="sapForm-select" name="crawl_version" style="padding: 0.25rem 0.5rem; font-size: var(--sapFontSmallSize);">
+                  <option value="v1" {% if (s.crawl_version or 'v1') == 'v1' %}selected{% endif %}>v1 (trusted)</option>
+                  <option value="v2" {% if s.crawl_version == 'v2' %}selected{% endif %}>v2 (new)</option>
+                </select>
+              </td>
+              <td>
+                <input class="sapForm-input" name="sample_link" value="{{ s.sample_link or '' }}" placeholder="https://..." style="padding: 0.25rem 0.5rem; font-size: var(--sapFontSmallSize);">
+              </td>
+              <td>
+                <input class="sapForm-input" name="read_more_label" value="{{ s.read_more_label or '' }}" placeholder="e.g., اقرأ المزيد" style="padding: 0.25rem 0.5rem; font-size: var(--sapFontSmallSize);">
+              </td>
+              <td>
+                <div style="display: flex; gap: var(--sapSpacingXS);">
+                  <button type="submit" class="sapBtn sapBtn-emphasized sapBtn-sm">Save</button>
+            </form>
+                  <form method="post" action="{{ url_for('delete_url_source_route', profile_id=profile.id) }}">
+                    <input type="hidden" name="url" value="{{ s.url }}">
+                    <button type="submit" class="sapBtn sapBtn-reject sapBtn-sm">Delete</button>
+                  </form>
+                </div>
+              </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+  
+  <div class="sapCard-content">
+    {% if not urls or urls|length == 0 %}
+    <div style="text-align: center; color: var(--sapNeutralColor); padding: var(--sapSpacingL) 0;">
+      <div style="font-size: 2rem; margin-bottom: var(--sapSpacingS);">🌐</div>
+      <p style="margin: 0;">No URL sources yet</p>
+    </div>
+    {% endif %}
+    
+    <form method="post" action="{{ url_for('add_url_source_route', profile_id=profile.id) }}">
+      <div class="sapForm-group">
+        <label class="sapForm-label">URL</label>
+        <input class="sapForm-input" name="url" placeholder="https://example.gov/news" required>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--sapSpacingM);">
+        <div class="sapForm-group">
+          <label class="sapForm-label">Mode</label>
+          <select class="sapForm-select" name="mode">
+            <option value="auto" selected>auto</option>
+            <option value="force_static">force_static</option>
+            <option value="force_dynamic">force_dynamic</option>
+          </select>
+        </div>
+        <div class="sapForm-group">
+          <label class="sapForm-label">Crawl Version</label>
+          <select class="sapForm-select" name="crawl_version">
+            <option value="v1" selected>v1 (trusted)</option>
+            <option value="v2">v2 (new)</option>
+          </select>
+        </div>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--sapSpacingM);">
+        <div class="sapForm-group">
+          <label class="sapForm-label">Sample Link (optional)</label>
+          <input class="sapForm-input" name="sample_link" placeholder="https://example.gov/news/12345">
+        </div>
+        <div class="sapForm-group">
+          <label class="sapForm-label">Read More Label (optional)</label>
+          <input class="sapForm-input" name="read_more_label" placeholder="e.g., اقرأ المزيد">
+        </div>
+      </div>
+      <button type="submit" class="sapBtn sapBtn-accept" style="width: 100%;">Add URL Source</button>
+    </form>
+    
+    <form id="bulk_urls_form" method="post" action="{{ url_for('bulk_delete_url_sources', profile_id=profile.id) }}" style="display:none;"></form>
+  </div>
+</div>
+
+<!-- Twitter Accounts -->
+<div class="sapCard">
+  <div class="sapCard-header">
+    <span>🐦 Twitter Accounts</span>
+    <span style="color: var(--sapNeutralColor); font-weight: 400; font-size: var(--sapFontSmallSize);">
+      {{ tweets|length if tweets else 0 }} account{% if (tweets|length if tweets else 0) != 1 %}s{% endif %}
+    </span>
+  </div>
+  
+  {% if tweets and tweets|length > 0 %}
+  <div class="sapTable-toolbar">
+    <button type="submit" form="bulk_tweets_form" class="sapBtn sapBtn-reject sapBtn-sm">Delete Selected</button>
+  </div>
+  
+  <div class="sapCard-content" style="padding: 0;">
+    <div style="overflow-x: auto;">
+      <table class="sapTable-compact">
+        <thead>
+          <tr>
+            <th style="width: 40px;"><input type="checkbox" onclick="toggleAllCheckboxes(this, 'bulk_tweets_form')"></th>
+            <th>Handle</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for h in tweets %}
+          <tr>
+            <td style="text-align: center;"><input type="checkbox" name="handles" value="{{ h }}" form="bulk_tweets_form"></td>
+            <td style="font-family: monospace; font-size: var(--sapFontSmallSize);">@{{ h }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+  
+  <div class="sapCard-content">
+    {% if not tweets or tweets|length == 0 %}
+    <div style="text-align: center; color: var(--sapNeutralColor); padding: var(--sapSpacingL) 0;">
+      <div style="font-size: 2rem; margin-bottom: var(--sapSpacingS);">🐦</div>
+      <p style="margin: 0;">No Twitter accounts yet</p>
+    </div>
+    {% endif %}
+    
+    <form method="post" action="{{ url_for('add_tweet_account_route', profile_id=profile.id) }}">
+      <div class="sapForm-row">
+        <input class="sapForm-input" name="handle" placeholder="e.g., GOSI_SA" required>
+        <button type="submit" class="sapBtn sapBtn-accept">Add Account</button>
+      </div>
+    </form>
+    
+    <form id="bulk_tweets_form" method="post" action="{{ url_for('bulk_delete_tweet_accounts', profile_id=profile.id) }}" style="display:none;"></form>
+    
+    <hr style="margin: var(--sapSpacingL) 0; border: 0; border-top: 1px solid var(--sapGroup_ContentBorderColor);">
+    
+    <div class="sapForm-group">
+      <label class="sapForm-label" style="font-weight: 600;">Reset Quota Date</label>
+      <span class="sapForm-help">Tweets are disabled until this date; tweeting resumes on the date itself</span>
+      <div style="margin-top: var(--sapSpacingS); padding: var(--sapSpacingS); background: var(--sapNeutralBackground); border-radius: 0.25rem; font-size: var(--sapFontSmallSize);">
+        Current: <strong>{{ reset_quota_date or 'unset' }}</strong>
+      </div>
+    </div>
+    
+    <form method="post" action="{{ url_for('save_tweet_reset_quota_date', profile_id=profile.id) }}">
+      <div style="display: grid; grid-template-columns: 1fr auto auto; gap: var(--sapSpacingS); align-items: end;">
+        <input type="date" class="sapForm-input" name="reset_quota_date" value="{{ reset_quota_date or '' }}">
+        <button type="submit" class="sapBtn sapBtn-emphasized">Save</button>
+        <button type="submit" name="clear" value="1" class="sapBtn sapBtn-reject">Clear</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Email Receivers -->
+<div class="sapCard">
+  <div class="sapCard-header">
+    <span>📧 Email Receivers</span>
+    <span style="color: var(--sapNeutralColor); font-weight: 400; font-size: var(--sapFontSmallSize);">
+      {{ receivers|length if receivers else 0 }} receiver{% if (receivers|length if receivers else 0) != 1 %}s{% endif %}
+    </span>
+  </div>
+  
+  <div class="sapCard-content">
+    <form method="post" action="{{ url_for('add_email_receiver_route', profile_id=profile.id) }}">
+      <div class="sapForm-row">
+        <input class="sapForm-input" name="email" placeholder="user@example.com" type="email" required>
+        <button type="submit" class="sapBtn sapBtn-accept">Add Email</button>
+      </div>
+    </form>
+    
+    {% if receivers and receivers|length > 0 %}
+    <div style="margin-top: var(--sapSpacingM);">
+      <div class="sapTable-toolbar">
+        <button type="submit" form="bulk_emails_form" class="sapBtn sapBtn-reject sapBtn-sm">Delete Selected</button>
+      </div>
+      
+      <div style="overflow-x: auto;">
+        <table class="sapTable-compact">
+          <thead>
+            <tr>
+              <th style="width: 40px;"><input type="checkbox" onclick="toggleAllCheckboxes(this, 'bulk_emails_form')"></th>
+              <th>Email</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for e in receivers %}
+            <tr>
+              <td style="text-align: center;"><input type="checkbox" name="emails" value="{{ e }}" form="bulk_emails_form"></td>
+              <td style="font-family: monospace; font-size: var(--sapFontSmallSize);">{{ e }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      
+      <form id="bulk_emails_form" method="post" action="{{ url_for('bulk_delete_email_receivers', profile_id=profile.id) }}" style="display:none;"></form>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Glossary -->
+<div class="sapCard">
+  <div class="sapCard-header">
+    <span>📖 Glossary</span>
+    <span style="color: var(--sapNeutralColor); font-weight: 400; font-size: var(--sapFontSmallSize);">
+      {{ glossary.terms|length if glossary and glossary.terms else 0 }} term{% if (glossary.terms|length if glossary and glossary.terms else 0) != 1 %}s{% endif %}
+    </span>
+  </div>
+  
+  {% if glossary and glossary.terms and glossary.terms|length > 0 %}
+  <div class="sapTable-toolbar">
+    <button type="submit" form="bulk_terms_form" class="sapBtn sapBtn-reject sapBtn-sm">Delete Selected</button>
+  </div>
+  
+  <div class="sapCard-content">
+    {% for t in glossary.terms %}
+    <div class="sapTermItem">
+      <div style="display: flex; align-items: center; gap: var(--sapSpacingS);">
+        <input type="checkbox" name="term_ids" value="{{ t.id }}" form="bulk_terms_form">
+        <span>{{ t.term }}</span>
+      </div>
+    </div>
+    {% endfor %}
+    
+    <form id="bulk_terms_form" method="post" action="{{ url_for('bulk_delete_glossary_terms_route', profile_id=profile.id) }}" style="display:none;"></form>
+  </div>
+  {% else %}
+  <div class="sapCard-content">
+    <div style="text-align: center; color: var(--sapNeutralColor); padding: var(--sapSpacingL) 0;">
+      <div style="font-size: 2rem; margin-bottom: var(--sapSpacingS);">📖</div>
+      <p style="margin: 0;">No glossary terms yet</p>
+    </div>
+  </div>
+  {% endif %}
+  
+  <div class="sapCard-content">
+    <hr style="margin: var(--sapSpacingL) 0; border: 0; border-top: 1px solid var(--sapGroup_ContentBorderColor);">
+    
+    <h3 style="font-size: var(--sapFontLargeSize); margin-bottom: var(--sapSpacingM);">Add Term</h3>
+    <form method="post" action="{{ url_for('add_glossary_term_simple_route', profile_id=profile.id) }}">
+      <div class="sapForm-row">
+        <input class="sapForm-input" name="term" placeholder="e.g., Saudization (Nitaqat)" required>
+        <button type="submit" class="sapBtn sapBtn-accept">Add</button>
+      </div>
+    </form>
+    
+    <div style="margin-top: var(--sapSpacingL);">
+      <h3 style="font-size: var(--sapFontLargeSize); margin-bottom: var(--sapSpacingM);">Bulk Add</h3>
+      <form method="post" action="{{ url_for('add_glossary_term_bulk_route', profile_id=profile.id) }}">
+        <div class="sapForm-group">
+          <label class="sapForm-label">One term per line</label>
+          <textarea class="sapForm-textarea" name="bulk_terms" rows="5" placeholder="Labor contracts&#10;iqama and visa&#10;dependent workers (المرافقين/المرافقات)&#10;expatriate labor policies&#10;Wage Protection" style="font-family: monospace; font-size: var(--sapFontSmallSize);"></textarea>
+        </div>
+        <button type="submit" class="sapBtn sapBtn-emphasized" style="width: 100%;">Add All Terms</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+function toggleAllCheckboxes(masterCheckbox, formId) {
+  const form = document.getElementById(formId);
+  if (!form) return;
+  
+  const checkboxes = form.querySelectorAll('input[type="checkbox"]');
+  checkboxes.forEach(function(cb) {
+    cb.checked = masterCheckbox.checked;
+  });
+}
+</script>
+{% endblock %}

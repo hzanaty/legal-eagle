@@ -1,0 +1,15 @@
+[Unit]
+Description=Legal Eagle scheduled runner timer (daily at 07:00)
+
+# For user-level timer, place in ~/.config/systemd/user/legal-eagle.timer
+# For system-level timer, place in /etc/systemd/system/legal-eagle.timer
+
+[Timer]
+# Run daily at 07:00 local time
+OnCalendar=*-*-* 07:00:00
+# Link to the service unit
+Unit=legal-eagle.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target

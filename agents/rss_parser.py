@@ -11,12 +11,15 @@ def parse_rss_feed(url):
         pub_date = entry.get("published", "")
         summary = description  # or later you can add GPT summarization
 
+        guid = entry.get("id") or entry.get("guid") or None
         item = {
             "source": "RSS",
+            "source_type": "RSS",
             "title": title,
             "summary": summary,
             "link": link,
             "date": pub_date,
+            "guid": guid,
             "content": f"{title}\n{summary}\n{link}\n{pub_date}"
         }
         rss_items.append(item)

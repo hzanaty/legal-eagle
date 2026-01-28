@@ -30,8 +30,10 @@ def normalize_group_for_email(group: dict) -> tuple[str, str]:
 def build_email_body(grouped_summary: list[dict], lang: str) -> str:
     """
     Builds an HTML email body for grouped news items.
-    Shows each category (HCM / FIN) once, supports RTL languages,
-    and hides item counts and 'Summary:' labels.
+    Per category (HCM/FIN/Other), shows two sections when present:
+      - New
+      - Updates (with delta bullets)
+    Supports RTL languages and avoids redundant labels.
     """
     today = datetime.now().strftime("%Y-%m-%d")
 
@@ -54,12 +56,15 @@ def build_email_body(grouped_summary: list[dict], lang: str) -> str:
         return "\n".join(html)
 
     last_category = None
+    printed_new = False
+    printed_updates = False
 
     for group in grouped_summary:
         title, summary = normalize_group_for_email(group)
         category = group.get("category", "Uncategorized")
+        is_update = bool(group.get("is_update_section"))
 
-        # Print category header only once
+        # Category header only once per category
         if category != last_category:
             if category == "HCM":
                 html.append("<h3>📚 تحديثات الموارد البشرية (HCM)</h3>" if lang == "ar" else "<h3>📚 HCM Updates</h3>")
@@ -68,17 +73,42 @@ def build_email_body(grouped_summary: list[dict], lang: str) -> str:
             else:
                 html.append("<h3>🗞️ مواضيع أخرى</h3>" if lang == "ar" else "<h3>🗞️ Other Topics</h3>")
             last_category = category
+            printed_new = False
+            printed_updates = False
 
-        # Grouped news item
+        # Subsection headers within category
+        if not is_update and not printed_new:
+            html.append("<h4>🆕 جديدة</h4>" if lang == "ar" else "<h4>🆕 New</h4>")
+            printed_new = True
+        if is_update and not printed_updates:
+            html.append("<h4>♻️ تحديثات</h4>" if lang == "ar" else "<h4>♻️ Updates</h4>")
+            printed_updates = True
+
+        # Render group
         html.append(f"<p><b>📚 {title}</b></p>")
-        html.append(f"<p>{summary}</p>")
+
+        if is_update:
+            # Prefer delta bullets if available; otherwise show summary as plain text
+            delta_lines = group.get("delta") or []
+            if delta_lines:
+                html.append("<ul>")
+                for d in delta_lines:
+                    html.append(f"<li>{d}</li>")
+                html.append("</ul>")
+            else:
+                html.append(f"<p>{summary}</p>")
+        else:
+            html.append(f"<p>{summary}</p>")
 
         # Links
-        html.append("<ul>")
-        for link, item_title in zip(group.get('links', []), group.get('titles', [])):
-            safe_title = item_title or "Source"
-            html.append(f"<li><a href='{link}'>{safe_title}</a></li>")
-        html.append("</ul>")
+        links = group.get('links', []) or []
+        titles = group.get('titles', []) or []
+        if links:
+            html.append("<ul>")
+            for link, item_title in zip(links, titles):
+                safe_title = item_title or "Source"
+                html.append(f"<li><a href='{link}'>{safe_title}</a></li>")
+            html.append("</ul>")
 
     html.append(
         "<hr><div style='color:#666;font-size:12px;margin-top:16px;'>"
@@ -88,9 +118,11 @@ def build_email_body(grouped_summary: list[dict], lang: str) -> str:
     return "\n".join(html)
 
 
-def send_email(grouped_summary: list[dict], EMAIL_RECEIVERS, GMAIL_CREDS: dict, lang: str) -> None:
+def send_email(grouped_summary: list[dict], EMAIL_RECEIVERS, GMAIL_CREDS: dict, lang: str) -> bool:
     """
     Sends the Legal Eagle digest email using Gmail App Password authentication.
+    Returns:
+      True on success, False on failure (after retries).
     """
     EMAIL_SENDER = GMAIL_CREDS["email_sender"]
     APP_PASSWORD = GMAIL_CREDS["app_password"]
@@ -109,12 +141,29 @@ def send_email(grouped_summary: list[dict], EMAIL_RECEIVERS, GMAIL_CREDS: dict, 
     msg["Subject"] = subject
     msg.attach(MIMEText(body, "html"))
 
-    try:
-        server = smtplib.SMTP("smtp.gmail.com", 587, timeout=30)
-        server.starttls()
-        server.login(EMAIL_SENDER, APP_PASSWORD)
-        server.sendmail(EMAIL_SENDER, rcpt_list, msg.as_string())
-        server.quit()
-        print(f"✅ Email sent successfully to {msg['To']}")
-    except Exception as e:
-        print(f"❌ Failed to send email: {e}")
+    # Retry up to 2 times to mitigate transient network issues/timeouts
+    for attempt in range(1, 3):
+        # First try STARTTLS on port 587
+        try:
+            with smtplib.SMTP("smtp.gmail.com", 587, timeout=120) as server:
+                server.ehlo()
+                server.starttls()
+                server.ehlo()
+                server.login(EMAIL_SENDER, APP_PASSWORD)
+                server.sendmail(EMAIL_SENDER, rcpt_list, msg.as_string())
+            print(f"✅ Email sent successfully via STARTTLS to {msg['To']}")
+            return True
+        except Exception as e1:
+            print(f"❌ STARTTLS send failed (attempt {attempt}/2): {e1}")
+            # Fallback to SSL on port 465
+            try:
+                with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=120) as server:
+                    server.login(EMAIL_SENDER, APP_PASSWORD)
+                    server.sendmail(EMAIL_SENDER, rcpt_list, msg.as_string())
+                print(f"✅ Email sent successfully via SSL to {msg['To']}")
+                return True
+            except Exception as e2:
+                print(f"❌ SSL send failed (attempt {attempt}/2): {e2}")
+                if attempt >= 2:
+                    return False
+    return False

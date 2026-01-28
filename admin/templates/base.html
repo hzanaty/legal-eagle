@@ -1,0 +1,621 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Legal Eagle - SAP Compliance Management</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  
+  <!-- SAP Fiori Icon Font -->
+  <link rel="stylesheet" href="https://sdk.openui5.org/resources/sap/ui/core/themes/sap_horizon/fonts/SAP-icons.woff2">
+  
+  <style>
+    /* ============================================
+       SAP FIORI DESIGN SYSTEM - CSS FRAMEWORK
+       ============================================ */
+    
+    /* CSS Variables - SAP Fiori Color Palette */
+    :root {
+      /* Brand Colors */
+      --sapBrandColor: #0a6ed1;
+      --sapHighlightColor: #0854a0;
+      --sapShellColor: #354a5f;
+      
+      /* Background Colors */
+      --sapBackgroundColor: #f7f7f7;
+      --sapTileBackground: #ffffff;
+      --sapBaseColor: #ffffff;
+      
+      /* Semantic Colors */
+      --sapPositiveColor: #107e3e;
+      --sapPositiveBackground: #e5f3ea;
+      --sapNegativeColor: #b00;
+      --sapNegativeBackground: #ffeaf1;
+      --sapCriticalColor: #e9730c;
+      --sapCriticalBackground: #fef7f1;
+      --sapNeutralColor: #6a6d70;
+      --sapNeutralBackground: #f5f5f5;
+      
+      /* Text Colors */
+      --sapTextColor: #32363a;
+      --sapLinkColor: #0a6ed1;
+      --sapLinkHoverColor: #0854a0;
+      
+      /* Border & Shadow */
+      --sapTileBorderColor: #d9d9d9;
+      --sapGroup_ContentBorderColor: #d9d9d9;
+      --sapTileShadow: 0 0 0 1px rgba(0,0,0,.1), 0 1px 3px 0 rgba(0,0,0,.08);
+      --sapContent_Shadow0: 0 0 0 1px rgba(0,0,0,.1);
+      --sapContent_Shadow1: 0 1px 3px 0 rgba(0,0,0,.15);
+      
+      /* Hover States */
+      --sapList_Hover_Background: #e5f0fa;
+      --sapButton_Hover_Background: #ebf5fe;
+      
+      /* Spacing System (16px base unit) */
+      --sapSpacingXS: 0.25rem;   /* 4px */
+      --sapSpacingS: 0.5rem;     /* 8px */
+      --sapSpacingM: 1rem;       /* 16px */
+      --sapSpacingL: 1.5rem;     /* 24px */
+      --sapSpacingXL: 2rem;      /* 32px */
+      
+      /* Typography */
+      --sapFontFamily: "72", "72full", Arial, Helvetica, sans-serif;
+      --sapFontSize: 0.875rem;   /* 14px - Fiori standard */
+      --sapFontSmallSize: 0.75rem;  /* 12px */
+      --sapFontLargeSize: 1rem;     /* 16px */
+      --sapFontHeader1Size: 2rem;   /* 32px */
+      --sapFontHeader2Size: 1.5rem; /* 24px */
+      --sapFontHeader3Size: 1.25rem; /* 20px */
+    }
+    
+    /* Reset & Base Styles */
+    * {
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: var(--sapFontFamily);
+      font-size: var(--sapFontSize);
+      color: var(--sapTextColor);
+      background-color: var(--sapBackgroundColor);
+      margin: 0;
+      padding: 0;
+      line-height: 1.4;
+      padding-top: 76px; /* Shell bar height */
+    }
+    
+    /* ============================================
+       SAP FIORI SHELL BAR
+       ============================================ */
+    .sapShellBar {
+      background: var(--sapShellColor);
+      color: #ffffff;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 1000;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+    }
+    
+    .sapShellBar-top {
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 var(--sapSpacingM);
+    }
+    
+    .sapShellBar-left {
+      display: flex;
+      align-items: center;
+      gap: var(--sapSpacingM);
+    }
+    
+    .sapShellBar-menuBtn {
+      background: none;
+      border: none;
+      color: #ffffff;
+      font-size: 1.25rem;
+      cursor: pointer;
+      padding: 0.5rem;
+      border-radius: 0.25rem;
+      transition: background-color 0.2s;
+    }
+    
+    .sapShellBar-menuBtn:hover {
+      background-color: rgba(255,255,255,0.1);
+    }
+    
+    .sapShellBar-logo {
+      font-size: 1.125rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      color: #ffffff;
+    }
+    
+    .sapShellBar-center {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      max-width: 600px;
+      margin: 0 var(--sapSpacingL);
+    }
+    
+    .sapShellBar-search {
+      width: 100%;
+      max-width: 400px;
+    }
+    
+    .sapShellBar-search input {
+      width: 100%;
+      padding: 0.375rem var(--sapSpacingM);
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 0.25rem;
+      background: rgba(255,255,255,0.15);
+      color: #ffffff;
+      font-size: var(--sapFontSize);
+    }
+    
+    .sapShellBar-search input::placeholder {
+      color: rgba(255,255,255,0.7);
+    }
+    
+    .sapShellBar-search input:focus {
+      outline: none;
+      background: rgba(255,255,255,0.25);
+      border-color: rgba(255,255,255,0.5);
+    }
+    
+    .sapShellBar-right {
+      display: flex;
+      align-items: center;
+      gap: var(--sapSpacingS);
+    }
+    
+    .sapShellBar-icon {
+      background: none;
+      border: none;
+      color: #ffffff;
+      font-size: 1.125rem;
+      cursor: pointer;
+      padding: 0.5rem;
+      border-radius: 0.25rem;
+      transition: background-color 0.2s;
+      position: relative;
+    }
+    
+    .sapShellBar-icon:hover {
+      background-color: rgba(255,255,255,0.1);
+    }
+    
+    .sapShellBar-subtitle {
+      height: 32px;
+      display: flex;
+      align-items: center;
+      padding: 0 var(--sapSpacingM);
+      font-size: var(--sapFontSize);
+      background: rgba(0,0,0,0.1);
+      border-top: 1px solid rgba(255,255,255,0.1);
+    }
+    
+    /* ============================================
+       FIORI LAYOUT & CONTAINERS
+       ============================================ */
+    .sapContainer {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: var(--sapSpacingL);
+    }
+    
+    .sapPage {
+      background: var(--sapBackgroundColor);
+      min-height: calc(100vh - 76px);
+    }
+    
+    .sapCard {
+      background: var(--sapTileBackground);
+      border: 1px solid var(--sapTileBorderColor);
+      border-radius: 0.25rem;
+      box-shadow: var(--sapTileShadow);
+      margin-bottom: var(--sapSpacingM);
+    }
+    
+    .sapCard-header {
+      padding: var(--sapSpacingM);
+      border-bottom: 1px solid var(--sapGroup_ContentBorderColor);
+      font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .sapCard-content {
+      padding: var(--sapSpacingM);
+    }
+    
+    /* ============================================
+       FIORI BUTTONS
+       ============================================ */
+    .sapBtn {
+      font-family: var(--sapFontFamily);
+      font-size: var(--sapFontSize);
+      padding: 0.375rem var(--sapSpacingM);
+      border-radius: 0.25rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: 1px solid transparent;
+      font-weight: 400;
+      display: inline-flex;
+      align-items: center;
+      gap: var(--sapSpacingS);
+      text-decoration: none;
+      line-height: 1.4;
+    }
+    
+    /* Emphasized Button (Primary) */
+    .sapBtn-emphasized {
+      background: var(--sapBrandColor);
+      color: #ffffff;
+      border-color: var(--sapBrandColor);
+    }
+    
+    .sapBtn-emphasized:hover {
+      background: var(--sapHighlightColor);
+      border-color: var(--sapHighlightColor);
+    }
+    
+    /* Default Button (Secondary) */
+    .sapBtn-default {
+      background: var(--sapBaseColor);
+      color: var(--sapTextColor);
+      border-color: var(--sapTileBorderColor);
+    }
+    
+    .sapBtn-default:hover {
+      background: var(--sapButton_Hover_Background);
+      border-color: var(--sapBrandColor);
+      color: var(--sapBrandColor);
+    }
+    
+    /* Transparent Button (Tertiary) */
+    .sapBtn-transparent {
+      background: transparent;
+      color: var(--sapLinkColor);
+      border-color: transparent;
+    }
+    
+    .sapBtn-transparent:hover {
+      background: var(--sapButton_Hover_Background);
+      color: var(--sapLinkHoverColor);
+    }
+    
+    /* Semantic Buttons */
+    .sapBtn-accept {
+      background: var(--sapPositiveColor);
+      color: #ffffff;
+      border-color: var(--sapPositiveColor);
+    }
+    
+    .sapBtn-accept:hover {
+      background: #0d6733;
+    }
+    
+    .sapBtn-reject {
+      background: var(--sapNegativeColor);
+      color: #ffffff;
+      border-color: var(--sapNegativeColor);
+    }
+    
+    .sapBtn-reject:hover {
+      background: #a00;
+    }
+    
+    .sapBtn-attention {
+      background: var(--sapCriticalColor);
+      color: #ffffff;
+      border-color: var(--sapCriticalColor);
+    }
+    
+    /* Button Sizes */
+    .sapBtn-sm {
+      font-size: var(--sapFontSmallSize);
+      padding: 0.25rem var(--sapSpacingS);
+    }
+    
+    .sapBtn-lg {
+      font-size: var(--sapFontLargeSize);
+      padding: 0.5rem var(--sapSpacingL);
+    }
+    
+    /* ============================================
+       FIORI BADGES
+       ============================================ */
+    .sapBadge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.25rem var(--sapSpacingS);
+      border-radius: 0.25rem;
+      font-size: var(--sapFontSmallSize);
+      font-weight: 600;
+      line-height: 1;
+    }
+    
+    .sapBadge-positive {
+      background: var(--sapPositiveBackground);
+      color: var(--sapPositiveColor);
+    }
+    
+    .sapBadge-negative {
+      background: var(--sapNegativeBackground);
+      color: var(--sapNegativeColor);
+    }
+    
+    .sapBadge-critical {
+      background: var(--sapCriticalBackground);
+      color: var(--sapCriticalColor);
+    }
+    
+    .sapBadge-neutral {
+      background: var(--sapNeutralBackground);
+      color: var(--sapNeutralColor);
+    }
+    
+    /* ============================================
+       FIORI ALERTS/MESSAGES
+       ============================================ */
+    .sapMessageStrip {
+      padding: var(--sapSpacingM);
+      border-radius: 0.25rem;
+      margin-bottom: var(--sapSpacingM);
+      border-left: 4px solid;
+      display: flex;
+      align-items: flex-start;
+      gap: var(--sapSpacingS);
+    }
+    
+    .sapMessageStrip-success {
+      background: var(--sapPositiveBackground);
+      border-color: var(--sapPositiveColor);
+      color: var(--sapTextColor);
+    }
+    
+    .sapMessageStrip-error {
+      background: var(--sapNegativeBackground);
+      border-color: var(--sapNegativeColor);
+      color: var(--sapTextColor);
+    }
+    
+    .sapMessageStrip-warning {
+      background: var(--sapCriticalBackground);
+      border-color: var(--sapCriticalColor);
+      color: var(--sapTextColor);
+    }
+    
+    .sapMessageStrip-info {
+      background: #e5f0fa;
+      border-color: var(--sapBrandColor);
+      color: var(--sapTextColor);
+    }
+    
+    .sapMessageStrip-close {
+      margin-left: auto;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 1.25rem;
+      color: var(--sapTextColor);
+      opacity: 0.6;
+      padding: 0;
+      line-height: 1;
+    }
+    
+    .sapMessageStrip-close:hover {
+      opacity: 1;
+    }
+    
+    /* ============================================
+       PROFILE NAVIGATION (Object Page Pattern)
+       ============================================ */
+    .sapObjectPage-header {
+      background: var(--sapTileBackground);
+      border-bottom: 1px solid var(--sapGroup_ContentBorderColor);
+      padding: var(--sapSpacingL) var(--sapSpacingM);
+      margin-bottom: var(--sapSpacingM);
+      box-shadow: var(--sapContent_Shadow0);
+    }
+    
+    .sapObjectPage-title {
+      font-size: var(--sapFontHeader2Size);
+      font-weight: 400;
+      color: var(--sapTextColor);
+      margin: 0 0 var(--sapSpacingS) 0;
+      display: flex;
+      align-items: center;
+      gap: var(--sapSpacingS);
+    }
+    
+    .sapObjectPage-nav {
+      display: flex;
+      gap: var(--sapSpacingS);
+      margin-top: var(--sapSpacingM);
+    }
+    
+    .sapObjectPage-navLink {
+      padding: 0.375rem 0.75rem;
+      border-radius: 0.25rem;
+      background: var(--sapBaseColor);
+      border: 1px solid var(--sapTileBorderColor);
+      color: var(--sapTextColor);
+      text-decoration: none;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: var(--sapSpacingS);
+      font-size: 0.75rem;
+    }
+    
+    .sapObjectPage-navLink:hover {
+      background: var(--sapButton_Hover_Background);
+    }
+    
+    /* Configure tab - Blue (primary) */
+    .sapObjectPage-navLink-configure:hover {
+      border-color: var(--sapBrandColor);
+      color: var(--sapBrandColor);
+    }
+    
+    .sapObjectPage-navLink-configure.active {
+      background: var(--sapBrandColor);
+      border-color: var(--sapBrandColor);
+      color: #ffffff;
+      font-weight: 600;
+    }
+    
+    /* Run tab - Green (success) */
+    .sapObjectPage-navLink-run:hover {
+      border-color: var(--sapPositiveColor);
+      color: var(--sapPositiveColor);
+    }
+    
+    .sapObjectPage-navLink-run.active {
+      background: var(--sapPositiveColor);
+      border-color: var(--sapPositiveColor);
+      color: #ffffff;
+      font-weight: 600;
+    }
+    
+    /* Review tab - Orange (warning) */
+    .sapObjectPage-navLink-review:hover {
+      border-color: var(--sapCriticalColor);
+      color: var(--sapCriticalColor);
+    }
+    
+    .sapObjectPage-navLink-review.active {
+      background: var(--sapCriticalColor);
+      border-color: var(--sapCriticalColor);
+      color: #ffffff;
+      font-weight: 600;
+    }
+    
+    /* ============================================
+       RESPONSIVE BEHAVIOR
+       ============================================ */
+    @media (max-width: 768px) {
+      .sapShellBar-center {
+        display: none;
+      }
+      
+      .sapContainer {
+        padding: var(--sapSpacingM);
+      }
+      
+      .sapObjectPage-nav {
+        flex-direction: column;
+      }
+    }
+    
+    /* Utility for inline forms */
+    .form-inline { display: inline; }
+  </style>
+</head>
+<body>
+<!-- SAP Fiori Shell Bar -->
+<header class="sapShellBar">
+  <div class="sapShellBar-top">
+    <div class="sapShellBar-left">
+      <button class="sapShellBar-menuBtn" onclick="window.location.href='{{ url_for('admin_dashboard') }}'">☰</button>
+      <span class="sapShellBar-logo">SAP</span>
+    </div>
+    <div class="sapShellBar-center">
+      <div class="sapShellBar-search">
+        <input type="text" placeholder="Search profiles..." id="shellSearchInput">
+      </div>
+    </div>
+    <div class="sapShellBar-right">
+      <button class="sapShellBar-icon" title="Notifications">🔔</button>
+      <button class="sapShellBar-icon" title="User">👤</button>
+      <button class="sapShellBar-icon" title="Settings">⚙️</button>
+    </div>
+  </div>
+  <div class="sapShellBar-subtitle">
+    Legal Eagle - Compliance Management
+  </div>
+</header>
+
+<!-- Object Page Header (Profile Navigation) -->
+{% if profile %}
+<div class="sapObjectPage-header">
+  <div class="sapContainer" style="padding: 0;">
+    <h1 class="sapObjectPage-title">
+      <span>{{ profile.country_code }}/{{ profile.lob }}</span>
+      {% if profile.name %}
+        <span style="font-weight: 400; color: var(--sapNeutralColor);"> - {{ profile.name }}</span>
+      {% endif %}
+      {% if profile.active == 1 %}
+        <span class="sapBadge sapBadge-positive">● Active</span>
+      {% else %}
+        <span class="sapBadge sapBadge-neutral">○ Inactive</span>
+      {% endif %}
+    </h1>
+    <nav class="sapObjectPage-nav">
+      <a class="sapObjectPage-navLink sapObjectPage-navLink-configure" href="{{ url_for('admin_profile_detail', profile_id=profile.id) }}">
+        Configure
+      </a>
+      <a class="sapObjectPage-navLink sapObjectPage-navLink-run" href="{{ url_for('admin_profile_runs', profile_id=profile.id) }}">
+        Run
+      </a>
+      <a class="sapObjectPage-navLink sapObjectPage-navLink-review" href="{{ url_for('admin_review_news', profile_id=profile.id) }}">
+        Review
+      </a>
+    </nav>
+  </div>
+</div>
+{% endif %}
+
+<!-- Main Content Area -->
+<main class="sapPage">
+  <div class="sapContainer">
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="sapMessageStrip sapMessageStrip-{{ 'error' if category == 'error' else 'success' if category == 'success' else 'warning' if category == 'warning' else 'info' }}">
+            <span>{{ message }}</span>
+            <button class="sapMessageStrip-close" onclick="this.parentElement.remove()">×</button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+  </div>
+</main>
+
+<script>
+  // Active page detection for object page navigation
+  document.addEventListener('DOMContentLoaded', function() {
+    const currentPath = window.location.pathname;
+    const navLinks = document.querySelectorAll('.sapObjectPage-navLink');
+    
+    navLinks.forEach(function(link) {
+      const linkPath = link.getAttribute('href');
+      if (linkPath && currentPath === linkPath) {
+        link.classList.add('active');
+      }
+    });
+    
+    // Simple search functionality
+    const searchInput = document.getElementById('shellSearchInput');
+    if (searchInput) {
+      searchInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+          // Could implement search functionality here
+          console.log('Search:', this.value);
+        }
+      });
+    }
+  });
+</script>
+</body>
+</html>

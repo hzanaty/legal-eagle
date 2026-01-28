@@ -1,0 +1,315 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+  /* Create Profile Page Styles */
+  .sapBreadcrumb {
+    margin-bottom: var(--sapSpacingM);
+    font-size: var(--sapFontSmallSize);
+    color: var(--sapNeutralColor);
+  }
+  
+  .sapBreadcrumb a {
+    color: var(--sapLinkColor);
+    text-decoration: none;
+  }
+  
+  .sapBreadcrumb a:hover {
+    color: var(--sapLinkHoverColor);
+    text-decoration: underline;
+  }
+  
+  .sapBreadcrumb-separator {
+    margin: 0 var(--sapSpacingXS);
+    color: var(--sapNeutralColor);
+  }
+  
+  .sapPageHeader {
+    margin-bottom: var(--sapSpacingL);
+  }
+  
+  .sapPageHeader-title {
+    font-size: var(--sapFontHeader2Size);
+    font-weight: 400;
+    color: var(--sapTextColor);
+    margin: 0 0 var(--sapSpacingXS) 0;
+  }
+  
+  .sapPageHeader-subtitle {
+    font-size: var(--sapFontSize);
+    color: var(--sapNeutralColor);
+    margin: 0;
+  }
+  
+  .sapForm-container {
+    max-width: 600px;
+    margin: 0 auto;
+  }
+  
+  .sapForm-group {
+    margin-bottom: var(--sapSpacingM);
+  }
+  
+  .sapForm-label {
+    display: block;
+    margin-bottom: var(--sapSpacingXS);
+    font-weight: 400;
+    color: var(--sapTextColor);
+    font-size: var(--sapFontSize);
+  }
+  
+  .sapForm-label-required::after {
+    content: " *";
+    color: var(--sapNegativeColor);
+  }
+  
+  .sapForm-input {
+    width: 100%;
+    padding: var(--sapSpacingS);
+    border: 1px solid var(--sapTileBorderColor);
+    border-radius: 0.25rem;
+    font-family: var(--sapFontFamily);
+    font-size: var(--sapFontSize);
+    color: var(--sapTextColor);
+    background: var(--sapBaseColor);
+    transition: border-color 0.2s;
+  }
+  
+  .sapForm-input:focus {
+    outline: none;
+    border-color: var(--sapBrandColor);
+    box-shadow: 0 0 0 1px var(--sapBrandColor);
+  }
+  
+  .sapForm-input:invalid:not(:placeholder-shown) {
+    border-color: var(--sapNegativeColor);
+  }
+  
+  .sapForm-help {
+    display: block;
+    margin-top: var(--sapSpacingXS);
+    font-size: var(--sapFontSmallSize);
+    color: var(--sapNeutralColor);
+  }
+  
+  .sapForm-radio {
+    display: flex;
+    gap: var(--sapSpacingM);
+    margin-top: var(--sapSpacingXS);
+  }
+  
+  .sapForm-radio label {
+    display: flex;
+    align-items: center;
+    gap: var(--sapSpacingXS);
+    cursor: pointer;
+    padding: var(--sapSpacingS);
+    border: 1px solid var(--sapTileBorderColor);
+    border-radius: 0.25rem;
+    transition: all 0.2s;
+  }
+  
+  .sapForm-radio label:hover {
+    background: var(--sapButton_Hover_Background);
+    border-color: var(--sapBrandColor);
+  }
+  
+  .sapForm-radio input[type="radio"]:checked + span {
+    font-weight: 600;
+    color: var(--sapBrandColor);
+  }
+  
+  .sapForm-radio label:has(input[type="radio"]:checked) {
+    background: var(--sapButton_Hover_Background);
+    border-color: var(--sapBrandColor);
+  }
+  
+  .sapForm-actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sapSpacingS);
+    margin-top: var(--sapSpacingL);
+  }
+  
+  @media (max-width: 768px) {
+    .sapForm-container {
+      max-width: 100%;
+    }
+  }
+</style>
+
+<!-- Breadcrumb Navigation -->
+<nav class="sapBreadcrumb">
+  <a href="{{ url_for('admin_dashboard') }}">Dashboard</a>
+  <span class="sapBreadcrumb-separator">›</span>
+  <span>Create Profile</span>
+</nav>
+
+<!-- Page Header -->
+<header class="sapPageHeader">
+  <h1 class="sapPageHeader-title">Create Profile</h1>
+  <p class="sapPageHeader-subtitle">Set up a new monitoring profile for a country and line of business</p>
+</header>
+
+<!-- Create Profile Form -->
+<div class="sapForm-container">
+  <div class="sapCard">
+    <div class="sapCard-header">
+      <span>Profile Configuration</span>
+    </div>
+    <div class="sapCard-content">
+      <form method="post" action="{{ url_for('create_profile_route') }}" id="createProfileForm">
+        <!-- Country Code -->
+        <div class="sapForm-group">
+          <label for="country_code" class="sapForm-label sapForm-label-required">Country (ISO alpha-2)</label>
+          <input 
+            list="iso_codes" 
+            class="sapForm-input" 
+            id="country_code" 
+            name="country_code" 
+            required 
+            maxlength="2" 
+            pattern="[A-Za-z]{2}" 
+            placeholder="e.g., SA, AE, IN"
+            autocomplete="off">
+          <datalist id="iso_codes">
+            <option value="AE">United Arab Emirates</option>
+            <option value="BH">Bahrain</option>
+            <option value="EG">Egypt</option>
+            <option value="IN">India</option>
+            <option value="ID">Indonesia</option>
+            <option value="JO">Jordan</option>
+            <option value="KW">Kuwait</option>
+            <option value="LB">Lebanon</option>
+            <option value="MA">Morocco</option>
+            <option value="MY">Malaysia</option>
+            <option value="OM">Oman</option>
+            <option value="PK">Pakistan</option>
+            <option value="QA">Qatar</option>
+            <option value="SA">Saudi Arabia</option>
+            <option value="SG">Singapore</option>
+            <option value="TH">Thailand</option>
+            <option value="TR">Turkey</option>
+            <option value="US">United States</option>
+            <option value="GB">United Kingdom</option>
+            <option value="DE">Germany</option>
+            <option value="FR">France</option>
+            <option value="ES">Spain</option>
+            <option value="IT">Italy</option>
+            <option value="BR">Brazil</option>
+            <option value="CN">China</option>
+            <option value="JP">Japan</option>
+            <option value="KR">South Korea</option>
+            <option value="ZA">South Africa</option>
+          </datalist>
+          <span class="sapForm-help">Two-letter ISO country code (e.g., SA for Saudi Arabia)</span>
+        </div>
+
+        <!-- Line of Business -->
+        <div class="sapForm-group">
+          <label class="sapForm-label sapForm-label-required">Line of Business</label>
+          <div class="sapForm-radio">
+            <label>
+              <input type="radio" id="lob_hcm" name="lob" value="HCM" checked>
+              <span>HCM (Payroll & HR)</span>
+            </label>
+            <label>
+              <input type="radio" id="lob_fin" name="lob" value="FIN">
+              <span>FIN (Finance)</span>
+            </label>
+          </div>
+          <span class="sapForm-help">Choose the business area to monitor</span>
+        </div>
+
+        <!-- Display Name -->
+        <div class="sapForm-group">
+          <label for="name" class="sapForm-label">Display Name</label>
+          <input 
+            class="sapForm-input" 
+            id="name" 
+            name="name" 
+            placeholder="e.g., Saudi Arabia HCM"
+            autocomplete="off">
+          <span class="sapForm-help">Optional friendly name for easy identification</span>
+        </div>
+
+        <!-- Language -->
+        <div class="sapForm-group">
+          <label for="language" class="sapForm-label">Language</label>
+          <input 
+            class="sapForm-input" 
+            id="language" 
+            name="language" 
+            value="en" 
+            maxlength="5"
+            placeholder="e.g., en, ar, de"
+            autocomplete="off">
+          <span class="sapForm-help">Language code for email digest (default: en)</span>
+        </div>
+
+        <!-- Form Actions -->
+        <div class="sapForm-actions">
+          <button type="submit" class="sapBtn sapBtn-default" style="width: 100%;">
+            Create Profile
+          </button>
+          <a href="{{ url_for('admin_dashboard') }}" class="sapBtn sapBtn-default" style="width: 100%; text-align: center;">
+            Cancel
+          </a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Help Card -->
+  <div class="sapCard" style="margin-top: var(--sapSpacingM);">
+    <div class="sapCard-header">
+      <span>💡 Quick Start Guide</span>
+    </div>
+    <div class="sapCard-content">
+      <p style="margin: 0 0 var(--sapSpacingM) 0; color: var(--sapNeutralColor); font-size: var(--sapFontSize);">
+        After creating your profile, you'll need to:
+      </p>
+      <ol style="margin: 0; padding-left: var(--sapSpacingL); font-size: var(--sapFontSize); line-height: 1.6;">
+        <li><strong>Configure Sources:</strong> Add RSS feeds, Twitter accounts, and website URLs to monitor</li>
+        <li><strong>Add Glossary Terms:</strong> Define keywords and terms to filter relevant legal updates</li>
+        <li><strong>Set Email Recipients:</strong> Configure who receives the daily digest</li>
+        <li><strong>Run the Profile:</strong> Execute the monitoring pipeline to collect and analyze news</li>
+        <li><strong>Review Results:</strong> Check filtered news items and refine your configuration</li>
+      </ol>
+    </div>
+  </div>
+</div>
+
+<script>
+// Form validation and UX enhancements
+document.addEventListener('DOMContentLoaded', function() {
+  const form = document.getElementById('createProfileForm');
+  const countryInput = document.getElementById('country_code');
+  
+  // Auto-uppercase country code
+  if (countryInput) {
+    countryInput.addEventListener('input', function(e) {
+      this.value = this.value.toUpperCase();
+    });
+  }
+  
+  // Form submission validation
+  form.addEventListener('submit', function(e) {
+    const country = countryInput.value.trim();
+    
+    if (country.length !== 2) {
+      e.preventDefault();
+      alert('Country code must be exactly 2 letters (e.g., SA, AE, IN)');
+      countryInput.focus();
+      return false;
+    }
+    
+    // Show loading state on submit button
+    const submitBtn = form.querySelector('button[type="submit"]');
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '⏳ Creating Profile...';
+    }
+  });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,433 @@
+{% extends "base.html" %}
+{% block content %}
+
+<!-- Status Cards (at top, full width) -->
+<div style="margin-bottom: var(--sapSpacingM);">
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--sapSpacingM);">
+    
+    <!-- Twitter Rate Limit Status Card -->
+    {% if twitter_status %}
+    <div class="sapStatCard {% if twitter_status.can_fetch %}sapStatCard-positive{% else %}sapStatCard-warning{% endif %}">
+      <div class="sapStatCard-label">🐦 Twitter Status</div>
+      <div class="sapStatCard-value" style="font-size: 2rem;">
+        {% if twitter_status.can_fetch %}
+          ✓ Ready Now
+        {% else %}
+          ⏰ Wait {{ twitter_status.minutes_to_wait }} min
+        {% endif %}
+      </div>
+      <div style="font-size: var(--sapFontSmallSize); color: var(--sapNeutralColor); margin-top: var(--sapSpacingS);">
+        <div style="margin-bottom: 4px;"><strong>Next:</strong> @{{ twitter_status.next_account }} (#{{ twitter_status.next_account_num }}/{{ twitter_status.total_accounts }})</div>
+        <div><strong>Last:</strong> {{ twitter_status.time_ago }}</div>
+        {% if not twitter_status.can_fetch and twitter_status.next_available_time %}
+        <div style="margin-top: 4px;"><strong>Available:</strong> {{ twitter_status.next_available_time|format_ts('Asia/Dubai', '%I:%M %p') }}</div>
+        {% endif %}
+      </div>
+    </div>
+    {% else %}
+    <div class="sapStatCard sapStatCard-neutral">
+      <div class="sapStatCard-label">🐦 Twitter Status</div>
+      <div class="sapStatCard-value" style="font-size: 2rem;">—</div>
+      <div style="font-size: var(--sapFontSmallSize); color: var(--sapNeutralColor); margin-top: var(--sapSpacingS);">
+        No accounts configured
+      </div>
+    </div>
+    {% endif %}
+    
+    <!-- Resource Collection Status Card -->
+    <div class="sapStatCard {% if resource_status.will_skip_resources %}sapStatCard-neutral{% else %}sapStatCard-positive{% endif %}">
+      <div class="sapStatCard-label">📰 Resources</div>
+      <div class="sapStatCard-value" style="font-size: 2rem;">
+        {% if resource_status.will_skip_resources %}
+          ⏭️ Skip RSS/URLs
+        {% else %}
+          ✓ Full Collection
+        {% endif %}
+      </div>
+      <div style="font-size: var(--sapFontSmallSize); color: var(--sapNeutralColor); margin-top: var(--sapSpacingS);">
+        {% if resource_status.will_skip_resources %}
+        <div style="margin-bottom: 4px;">Twitter only this run</div>
+        {% else %}
+        <div style="margin-bottom: 4px;">RSS + URLs + Twitter</div>
+        {% endif %}
+        <div><strong>Last Full Run:</strong> {{ resource_status.time_ago }}</div>
+      </div>
+    </div>
+    
+  </div>
+</div>
+
+<style>
+  /* Status Card Styles (matching review page) */
+  .sapStatCard {
+    background: var(--sapTileBackground);
+    border: 1px solid var(--sapTileBorderColor);
+    border-radius: 0.25rem;
+    padding: var(--sapSpacingL);
+    text-align: center;
+    box-shadow: var(--sapTileShadow);
+  }
+  
+  .sapStatCard-value {
+    font-size: 2rem;
+    font-weight: 300;
+    line-height: 1.2;
+    margin: var(--sapSpacingS) 0;
+  }
+  
+  .sapStatCard-label {
+    font-size: var(--sapFontSize);
+    color: var(--sapNeutralColor);
+    font-weight: 600;
+  }
+  
+  .sapStatCard-neutral { border-left: 4px solid var(--sapNeutralColor); }
+  .sapStatCard-warning { border-left: 4px solid var(--sapCriticalColor); }
+  .sapStatCard-positive { border-left: 4px solid var(--sapPositiveColor); }
+  
+  /* Run Page Specific Fiori Styles */
+  .sapTable-compact {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--sapFontSmallSize);
+  }
+  
+  .sapTable-compact th {
+    padding: var(--sapSpacingXS) var(--sapSpacingS);
+    text-align: left;
+    font-weight: 600;
+    background: var(--sapNeutralBackground);
+    border-bottom: 1px solid var(--sapGroup_ContentBorderColor);
+  }
+  
+  .sapTable-compact td {
+    padding: var(--sapSpacingXS) var(--sapSpacingS);
+    border-bottom: 1px solid var(--sapGroup_ContentBorderColor);
+    vertical-align: middle;
+  }
+  
+  .sapTable-compact tbody tr:hover {
+    background: var(--sapList_Hover_Background);
+    cursor: pointer;
+  }
+  
+  .sapTable-compact a {
+    color: var(--sapLinkColor);
+    text-decoration: none;
+  }
+  
+  .sapTable-compact a:hover {
+    color: var(--sapLinkHoverColor);
+    text-decoration: underline;
+  }
+  
+  /* Terminal/Log Viewer */
+  .sapLogViewer {
+    background: #0b0f19;
+    color: #d3d7de;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+    font-size: 12px;
+    height: 500px;
+    overflow: auto;
+    padding: var(--sapSpacingM);
+    border-radius: 0.25rem;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.3);
+  }
+  
+  .sapLogViewer pre {
+    margin: 0;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+  
+  /* Split Layout */
+  .sapSplitPanel {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: var(--sapSpacingM);
+  }
+  
+  @media (max-width: 992px) {
+    .sapSplitPanel {
+      grid-template-columns: 1fr;
+    }
+  }
+  
+  /* Modal Overlay */
+  .sapDialog-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 2000;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .sapDialog-overlay.show {
+    display: flex;
+  }
+  
+  .sapDialog {
+    background: var(--sapBaseColor);
+    border-radius: 0.25rem;
+    box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+    max-width: 500px;
+    width: 90%;
+  }
+  
+  .sapDialog-header {
+    padding: var(--sapSpacingM);
+    border-bottom: 1px solid var(--sapGroup_ContentBorderColor);
+    font-weight: 600;
+    font-size: var(--sapFontLargeSize);
+  }
+  
+  .sapDialog-content {
+    padding: var(--sapSpacingL);
+    font-size: var(--sapFontSize);
+    line-height: 1.5;
+  }
+  
+  .sapDialog-footer {
+    padding: var(--sapSpacingM);
+    border-top: 1px solid var(--sapGroup_ContentBorderColor);
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--sapSpacingS);
+  }
+  
+  .sapMonospace {
+    font-family: monospace;
+    font-size: var(--sapFontSmallSize);
+    color: var(--sapNeutralColor);
+  }
+</style>
+
+<div class="sapSplitPanel">
+  <!-- Left Panel: Controls & History -->
+  <div>
+    <!-- Run Controls -->
+    <div class="sapCard" style="margin-bottom: var(--sapSpacingM);">
+      <div class="sapCard-header">
+        <span>▶️ Run Workflow</span>
+      </div>
+      <div class="sapCard-content">
+        {% set disable_clear = run_active or (news_count == 0) %}
+        
+        <button 
+          type="button" 
+          class="sapBtn sapBtn-reject sapBtn-sm" 
+          style="width: 100%; margin-bottom: var(--sapSpacingS);"
+          onclick="showClearDialog()"
+          {% if disable_clear %}disabled{% endif %}>
+          Clear Historical News
+        </button>
+
+        <form method="post" action="{{ url_for('admin_start_run', profile_id=profile.id) }}">
+          <button type="submit" class="sapBtn sapBtn-accept" style="width: 100%;">
+            Start Run
+          </button>
+        </form>
+        
+        {% if selected_run and selected_run.status == 'Running' %}
+        <form method="post" action="{{ url_for('cancel_run', run_id=selected_run.id) }}" style="margin-top: var(--sapSpacingS);">
+          <button type="submit" class="sapBtn sapBtn-attention" style="width: 100%;">
+            Cancel Run
+          </button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Run History -->
+    <div class="sapCard">
+      <div class="sapCard-header">
+        <span>📊 History</span>
+        <span style="color: var(--sapNeutralColor); font-weight: 400; font-size: var(--sapFontSmallSize);">
+          Last 7 days
+        </span>
+      </div>
+      <div class="sapCard-content" style="padding: 0;">
+        {% if runs and runs|length > 0 %}
+        <div style="overflow-x: auto;">
+          <table class="sapTable-compact">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Status</th>
+                <th>Started</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in runs %}
+              <tr onclick="window.location.href='{{ url_for('admin_profile_runs', profile_id=profile.id, run_id=r.id) }}'">
+                <td>
+                  <a href="{{ url_for('admin_profile_runs', profile_id=profile.id, run_id=r.id) }}">#{{ r.id }}</a>
+                </td>
+                <td>
+                  {% set s = r.status %}
+                  <span class="sapBadge 
+                    {% if s == 'Success' %}sapBadge-positive
+                    {% elif s == 'Failed' %}sapBadge-negative
+                    {% elif s == 'Canceled' %}sapBadge-critical
+                    {% elif s == 'Running' %}sapBadge-neutral{% else %}sapBadge-neutral{% endif %}">
+                    {% if s == 'Success' %}✓
+                    {% elif s == 'Failed' %}✗
+                    {% elif s == 'Canceled' %}⏸
+                    {% elif s == 'Running' %}⟳{% else %}—{% endif %}
+                    {{ s }}
+                  </span>
+                  {% if r.origin %}
+                    <span class="sapBadge sapBadge-neutral" style="margin-left: var(--sapSpacingXS);">
+                      {% if r.origin == 'scheduled' %}🗓️{% else %}👤{% endif %}
+                    </span>
+                  {% endif %}
+                </td>
+                <td class="sapMonospace">{{ (r.started_at or '')|format_date('Asia/Dubai') }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div style="padding: var(--sapSpacingL); text-align: center; color: var(--sapNeutralColor);">
+          <p style="margin: 0;">No runs yet</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Panel: Log Viewer -->
+  <div>
+    <div class="sapCard">
+      <div class="sapCard-header">
+        <div style="display: flex; align-items: center; gap: var(--sapSpacingS);">
+          <span>📝 Run Logs</span>
+          {% if selected_run %}
+          <span style="color: var(--sapNeutralColor); font-weight: 400;">#{{ selected_run.id }}</span>
+          {% endif %}
+        </div>
+        <div style="display: flex; align-items: center; gap: var(--sapSpacingS);">
+          {% if selected_run %}
+            {% set s = selected_run.status %}
+            <span id="run-status" class="sapBadge 
+              {% if s == 'Success' %}sapBadge-positive
+              {% elif s == 'Failed' %}sapBadge-negative
+              {% elif s == 'Canceled' %}sapBadge-critical
+              {% elif s == 'Running' %}sapBadge-neutral{% else %}sapBadge-neutral{% endif %}">
+              {% if s == 'Success' %}✓
+              {% elif s == 'Failed' %}✗
+              {% elif s == 'Canceled' %}⏸
+              {% elif s == 'Running' %}⟳{% else %}—{% endif %}
+              {{ s }}
+            </span>
+            {% if selected_run.origin %}
+              <span class="sapBadge sapBadge-neutral">
+                {% if selected_run.origin == 'scheduled' %}🗓️ Scheduled{% else %}👤 Manual{% endif %}
+              </span>
+            {% endif %}
+          {% else %}
+            <span id="run-status" class="sapBadge sapBadge-neutral">Idle</span>
+          {% endif %}
+        </div>
+      </div>
+      <div class="sapCard-content" style="padding: 0;">
+        <div class="sapLogViewer">
+          <pre id="log"></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Clear News Confirmation Dialog -->
+<div id="clearNewsModal" class="sapDialog-overlay">
+  <div class="sapDialog">
+    <div class="sapDialog-header">
+      ⚠️ Confirm Clear
+    </div>
+    <div class="sapDialog-content">
+      Are you sure you want to delete all news items for this profile? This action cannot be undone.
+    </div>
+    <div class="sapDialog-footer">
+      <button type="button" class="sapBtn sapBtn-default" onclick="hideClearDialog()">Cancel</button>
+      <form method="post" action="{{ url_for('clear_profile_news', profile_id=profile.id) }}" style="display: inline;">
+        <button type="submit" class="sapBtn sapBtn-reject">Delete All</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+function showClearDialog() {
+  document.getElementById('clearNewsModal').classList.add('show');
+}
+
+function hideClearDialog() {
+  document.getElementById('clearNewsModal').classList.remove('show');
+}
+
+// Close dialog on overlay click
+document.getElementById('clearNewsModal').addEventListener('click', function(e) {
+  if (e.target === this) {
+    hideClearDialog();
+  }
+});
+
+(function() {
+  const logEl = document.getElementById('log');
+  const statusEl = document.getElementById('run-status');
+  
+  {% if selected_run %}
+  // Log streaming
+  const es = new EventSource("{{ url_for('stream_run_logs', run_id=selected_run.id) }}");
+  
+  function append(line) {
+    if (!line) return;
+    logEl.textContent += line + "\n";
+    logEl.parentElement.scrollTop = logEl.parentElement.scrollHeight;
+  }
+  
+  es.onmessage = function(e) {
+    append(e.data);
+  };
+  
+  es.addEventListener('done', function(e) {
+    const status = e.data || 'Success';
+    let badgeClass = 'sapBadge ';
+    let icon = '';
+    
+    if (status === 'Success') {
+      badgeClass += 'sapBadge-positive';
+      icon = '✓ ';
+    } else if (status === 'Failed') {
+      badgeClass += 'sapBadge-negative';
+      icon = '✗ ';
+    } else if (status === 'Canceled') {
+      badgeClass += 'sapBadge-critical';
+      icon = '⏸ ';
+    } else {
+      badgeClass += 'sapBadge-neutral';
+      icon = '— ';
+    }
+    
+    statusEl.textContent = icon + status;
+    statusEl.className = badgeClass;
+    es.close();
+  });
+  
+  es.onerror = function() {
+    // Keep SSE alive; browser will auto-reconnect
+  };
+  {% else %}
+  // Empty state
+  logEl.textContent = '💡 Click "Start Run" to execute the profile workflow, or select a run from history to view its logs.\n\nLogs will appear here in real-time during execution.';
+  {% endif %}
+})();
+</script>
+{% endblock %}

@@ -1,5 +1,6 @@
 feedparser
-openai
+openai>=1.30.0
+httpx
 requests
 python-dotenv
 google-auth
@@ -8,3 +9,4 @@ google-auth-httplib2
 beautifulsoup4
 playwright
 numpy
+Flask

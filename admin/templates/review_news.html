@@ -1,0 +1,406 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+  /* Review News Fiori Styles */
+  .sapStatCard {
+    background: var(--sapTileBackground);
+    border: 1px solid var(--sapTileBorderColor);
+    border-radius: 0.25rem;
+    padding: var(--sapSpacingL);
+    text-align: center;
+    box-shadow: var(--sapTileShadow);
+  }
+  
+  .sapStatCard-value {
+    font-size: 3rem;
+    font-weight: 300;
+    line-height: 1;
+    margin: var(--sapSpacingS) 0;
+  }
+  
+  .sapStatCard-label {
+    font-size: var(--sapFontSize);
+    color: var(--sapNeutralColor);
+    font-weight: 600;
+  }
+  
+  .sapStatCard-neutral { border-left: 4px solid var(--sapNeutralColor); }
+  .sapStatCard-warning { border-left: 4px solid var(--sapCriticalColor); }
+  .sapStatCard-positive { border-left: 4px solid var(--sapPositiveColor); }
+  
+  .sapSegmentedButton {
+    display: inline-flex;
+    border: 1px solid var(--sapTileBorderColor);
+    border-radius: 0.25rem;
+    overflow: hidden;
+    margin-bottom: var(--sapSpacingM);
+  }
+  
+  .sapSegmentedButton-item {
+    padding: var(--sapSpacingS) var(--sapSpacingL);
+    background: var(--sapBaseColor);
+    border: none;
+    border-right: 1px solid var(--sapTileBorderColor);
+    color: var(--sapTextColor);
+    text-decoration: none;
+    transition: all 0.2s;
+    font-size: var(--sapFontSize);
+    cursor: pointer;
+  }
+  
+  .sapSegmentedButton-item:last-child {
+    border-right: none;
+  }
+  
+  .sapSegmentedButton-item:hover {
+    background: var(--sapButton_Hover_Background);
+  }
+  
+  .sapSegmentedButton-item.active {
+    background: var(--sapBrandColor);
+    color: #ffffff;
+    font-weight: 600;
+  }
+  
+  .sapTable-review {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--sapFontSmallSize);
+  }
+  
+  .sapTable-review th {
+    padding: var(--sapSpacingS);
+    text-align: left;
+    font-weight: 600;
+    background: var(--sapNeutralBackground);
+    border-bottom: 2px solid var(--sapGroup_ContentBorderColor);
+    font-size: var(--sapFontSmallSize);
+  }
+  
+  .sapTable-review td {
+    padding: var(--sapSpacingS);
+    border-bottom: 1px solid var(--sapGroup_ContentBorderColor);
+    vertical-align: top;
+  }
+  
+  .sapTable-review tbody tr:hover {
+    background: var(--sapList_Hover_Background);
+  }
+  
+  .sapGrid-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--sapSpacingM);
+    margin-bottom: var(--sapSpacingM);
+  }
+  
+  .sapPagination {
+    display: flex;
+    justify-content: center;
+    gap: var(--sapSpacingXS);
+    margin-top: var(--sapSpacingM);
+  }
+  
+  .sapPagination-item {
+    padding: var(--sapSpacingS) var(--sapSpacingM);
+    border: 1px solid var(--sapTileBorderColor);
+    background: var(--sapBaseColor);
+    color: var(--sapTextColor);
+    text-decoration: none;
+    border-radius: 0.25rem;
+    font-size: var(--sapFontSmallSize);
+    transition: all 0.2s;
+  }
+  
+  .sapPagination-item:hover:not(.disabled):not(.active) {
+    background: var(--sapButton_Hover_Background);
+    border-color: var(--sapBrandColor);
+    color: var(--sapBrandColor);
+  }
+  
+  .sapPagination-item.active {
+    background: var(--sapBrandColor);
+    border-color: var(--sapBrandColor);
+    color: #ffffff;
+    font-weight: 600;
+  }
+  
+  .sapPagination-item.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+</style>
+
+<!-- Stats Cards -->
+<div class="sapGrid-stats">
+  <div class="sapStatCard sapStatCard-neutral">
+    <div class="sapStatCard-label">Total</div>
+    <div class="sapStatCard-value">{{ total_count }}</div>
+  </div>
+  <div class="sapStatCard sapStatCard-warning">
+    <div class="sapStatCard-label">Pending Review</div>
+    <div class="sapStatCard-value">{{ pending_count }}</div>
+  </div>
+  <div class="sapStatCard sapStatCard-positive">
+    <div class="sapStatCard-label">Reviewed</div>
+    <div class="sapStatCard-value">{{ reviewed_count }}</div>
+  </div>
+</div>
+
+<!-- Filter Tabs -->
+<div class="sapSegmentedButton">
+  <a class="sapSegmentedButton-item {% if not filter_reviewed %}active{% endif %}" 
+     href="{{ url_for('admin_review_news', profile_id=profile.id) }}">
+    All
+  </a>
+  <a class="sapSegmentedButton-item {% if filter_reviewed == 'no' %}active{% endif %}" 
+     href="{{ url_for('admin_review_news', profile_id=profile.id, reviewed='no') }}">
+    Pending
+  </a>
+  <a class="sapSegmentedButton-item {% if filter_reviewed == 'yes' %}active{% endif %}" 
+     href="{{ url_for('admin_review_news', profile_id=profile.id, reviewed='yes') }}">
+    Reviewed
+  </a>
+</div>
+
+<!-- Bulk Actions Card -->
+<div class="sapCard">
+  <div class="sapCard-header">
+    <span>⚙️ Bulk Actions</span>
+    <div style="display: flex; gap: var(--sapSpacingS);">
+      <form method="POST" action="{{ url_for('clear_filtered_news_route', profile_id=profile.id) }}" onsubmit="return confirm('Clear all filtered news items?');">
+        <input type="hidden" name="clear_type" value="all">
+        <button type="submit" class="sapBtn sapBtn-reject sapBtn-sm">Clear All</button>
+      </form>
+      <form method="POST" action="{{ url_for('clear_filtered_news_route', profile_id=profile.id) }}" onsubmit="return confirm('Clear only reviewed items?');">
+        <input type="hidden" name="clear_type" value="reviewed">
+        <button type="submit" class="sapBtn sapBtn-attention sapBtn-sm">Clear Reviewed</button>
+      </form>
+    </div>
+  </div>
+  <div class="sapCard-content">
+    <form method="POST" action="{{ url_for('bulk_score_filtered_news', profile_id=profile.id) }}" id="bulkScoreForm">
+      <div style="display: flex; gap: var(--sapSpacingS); align-items: center; flex-wrap: wrap;">
+        <label style="font-weight: 600;">Bulk Score Selected:</label>
+        <select name="bulk_score" class="sapForm-select" style="width: 180px; padding: 0.25rem 0.5rem; font-size: var(--sapFontSmallSize);">
+          <option value="1">1 - Not Relevant</option>
+          <option value="2">2 - Low</option>
+          <option value="3">3 - Medium</option>
+          <option value="4">4 - High</option>
+          <option value="5">5 - Very Relevant</option>
+        </select>
+        <button type="submit" class="sapBtn sapBtn-emphasized sapBtn-sm">Apply Score</button>
+        <button type="button" class="sapBtn sapBtn-default sapBtn-sm" onclick="toggleSelectAll()">Select All</button>
+        <button type="submit" form="bulkDeleteForm" class="sapBtn sapBtn-reject sapBtn-sm" onclick="return confirm('Delete selected items?');">Delete Selected</button>
+      </div>
+    </form>
+    <form method="POST" action="{{ url_for('bulk_delete_filtered_news', profile_id=profile.id) }}" id="bulkDeleteForm" style="display:none;"></form>
+  </div>
+</div>
+
+<!-- Items Table -->
+{% if items %}
+<div class="sapCard">
+  <div class="sapCard-header">
+    <span>📰 Filtered News Items</span>
+    <span style="color: var(--sapNeutralColor); font-weight: 400; font-size: var(--sapFontSmallSize);">
+      Page {{ page }} of {{ total_pages }}
+    </span>
+  </div>
+  <div class="sapCard-content" style="padding: 0;">
+    <div style="overflow-x: auto;">
+      <table class="sapTable-review">
+        <thead>
+          <tr>
+            <th style="width: 40px;">
+              <input type="checkbox" id="selectAllCheckbox" onclick="toggleSelectAll()">
+            </th>
+            <th style="width: 80px;">Source</th>
+            <th>Title / Content</th>
+            <th style="width: 100px;">Filter Reason</th>
+            <th style="width: 60px;">Score</th>
+            <th style="width: 140px;">Dates</th>
+            <th style="width: 150px;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in items %}
+          <tr>
+            <td style="text-align: center;">
+              <input type="checkbox" name="item_ids" value="{{ item.id }}" form="bulkScoreForm" class="item-checkbox bulk-checkbox">
+            </td>
+            <td>
+              <span class="sapBadge sapBadge-neutral">{{ item.source_type or 'unknown' }}</span>
+            </td>
+            <td>
+              <div style="font-weight: 600; margin-bottom: var(--sapSpacingXS);">
+                {{ item.title or '(No title)' }}
+              </div>
+              <div style="color: var(--sapNeutralColor); font-size: var(--sapFontSmallSize); margin-bottom: var(--sapSpacingXS);">
+                {{ (item.content or '')[:150] }}{% if item.content and item.content|length > 150 %}...{% endif %}
+              </div>
+              {% if item.url %}
+              <a href="{{ item.url }}" target="_blank" style="font-size: var(--sapFontSmallSize); color: var(--sapLinkColor);">
+                🔗 {{ item.url[:50] }}{% if item.url|length > 50 %}...{% endif %}
+              </a>
+              {% endif %}
+            </td>
+            <td>
+              {% if item.filter_reason == 'domain_country' %}
+              <span class="sapBadge sapBadge-neutral" title="Domain not whitelisted and no country mention">Domain</span>
+              {% elif item.filter_reason == 'glossary' %}
+              <span class="sapBadge sapBadge-critical" title="No glossary term match">Glossary</span>
+              {% elif item.filter_reason == 'llm_classification' %}
+              <span class="sapBadge sapBadge-negative" title="LLM classified as not relevant">LLM</span>
+              {% else %}
+              <span class="sapBadge sapBadge-neutral">{{ item.filter_reason or 'unknown' }}</span>
+              {% endif %}
+            </td>
+            <td style="text-align: center;">
+              {% if item.relevance_score %}
+              <span class="sapBadge {% if item.relevance_score >= 4 %}sapBadge-positive{% elif item.relevance_score >= 3 %}sapBadge-critical{% else %}sapBadge-neutral{% endif %}">
+                {{ item.relevance_score }}/5
+              </span>
+              {% else %}
+              <span style="color: var(--sapNeutralColor);">—</span>
+              {% endif %}
+            </td>
+            <td style="font-size: var(--sapFontSmallSize);">
+              <div style="margin-bottom: var(--sapSpacingXS);">
+                <span style="color: var(--sapNeutralColor);">Pub:</span> 
+                {% if item.published_at %}
+                <strong>{{ item.published_at|format_date }}</strong>
+                {% else %}
+                <span style="color: var(--sapNeutralColor);">—</span>
+                {% endif %}
+              </div>
+              <div>
+                <span style="color: var(--sapNeutralColor);">Pull:</span> 
+                <strong>{{ item.created_at|format_date }}</strong>
+              </div>
+            </td>
+            <td>
+              <form method="POST" action="{{ url_for('score_filtered_news', profile_id=profile.id) }}" style="display: flex; gap: var(--sapSpacingXS); align-items: center;">
+                <input type="hidden" name="item_id" value="{{ item.id }}">
+                <select name="score" class="sapForm-select" style="width: 60px; padding: 0.25rem; font-size: var(--sapFontSmallSize);">
+                  <option value="1" {% if item.relevance_score == 1 %}selected{% endif %}>1</option>
+                  <option value="2" {% if item.relevance_score == 2 %}selected{% endif %}>2</option>
+                  <option value="3" {% if item.relevance_score == 3 %}selected{% endif %}>3</option>
+                  <option value="4" {% if item.relevance_score == 4 %}selected{% endif %}>4</option>
+                  <option value="5" {% if item.relevance_score == 5 %}selected{% endif %}>5</option>
+                </select>
+                <button type="submit" class="sapBtn sapBtn-emphasized sapBtn-sm" style="padding: 0.25rem 0.5rem;">Save</button>
+              </form>
+              <form method="POST" action="{{ url_for('delete_filtered_news_item', profile_id=profile.id) }}" onsubmit="return confirm('Delete this item?');" style="margin-top: var(--sapSpacingXS);">
+                <input type="hidden" name="item_id" value="{{ item.id }}">
+                <button type="submit" class="sapBtn sapBtn-reject sapBtn-sm" style="padding: 0.25rem 0.5rem; width: 100%;" title="Delete">Delete</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Pagination -->
+{% if total_pages > 1 %}
+<div class="sapPagination">
+  <a class="sapPagination-item {% if page == 1 %}disabled{% endif %}" 
+     href="{{ url_for('admin_review_news', profile_id=profile.id, reviewed=filter_reviewed, page=page-1) if page > 1 else '#' }}">
+    ‹ Previous
+  </a>
+  
+  {% for p in range(1, total_pages + 1) %}
+    {% if p == page %}
+      <span class="sapPagination-item active">{{ p }}</span>
+    {% elif p == 1 or p == total_pages or (p >= page - 2 and p <= page + 2) %}
+      <a class="sapPagination-item" href="{{ url_for('admin_review_news', profile_id=profile.id, reviewed=filter_reviewed, page=p) }}">{{ p }}</a>
+    {% elif p == page - 3 or p == page + 3 %}
+      <span class="sapPagination-item disabled">...</span>
+    {% endif %}
+  {% endfor %}
+  
+  <a class="sapPagination-item {% if page == total_pages %}disabled{% endif %}" 
+     href="{{ url_for('admin_review_news', profile_id=profile.id, reviewed=filter_reviewed, page=page+1) if page < total_pages else '#' }}">
+    Next ›
+  </a>
+</div>
+{% endif %}
+
+{% else %}
+<div class="sapCard">
+  <div class="sapCard-content" style="text-align: center; padding: var(--sapSpacingXL);">
+    <div style="font-size: 3rem; margin-bottom: var(--sapSpacingM); color: var(--sapNeutralColor);">📰</div>
+    <h3 style="font-size: var(--sapFontHeader3Size); margin-bottom: var(--sapSpacingS);">No filtered news items found</h3>
+    <p style="color: var(--sapNeutralColor); margin: 0;">Run a profile to collect news. Filtered items will appear here for review.</p>
+  </div>
+</div>
+{% endif %}
+
+<!-- Help Card -->
+<div class="sapCard">
+  <div class="sapCard-header">
+    <span>💡 How to Use This Page</span>
+  </div>
+  <div class="sapCard-content">
+    <h3 style="font-size: var(--sapFontLargeSize); margin-bottom: var(--sapSpacingS);">Relevance Scoring Guide</h3>
+    <ul style="margin: 0; padding-left: var(--sapSpacingL); line-height: 1.8;">
+      <li><strong>1 - Not Relevant:</strong> Completely unrelated to the profile's LoB (HCM/FIN). Can be safely ignored.</li>
+      <li><strong>2 - Low:</strong> Tangentially related but not actionable. General news that happens to mention a keyword.</li>
+      <li><strong>3 - Medium:</strong> Somewhat relevant. Could be useful context but not a direct legal change.</li>
+      <li><strong>4 - High:</strong> Relevant to the LoB. Consider adding keywords to the glossary.</li>
+      <li><strong>5 - Very Relevant:</strong> This should have been included! Add missing terms to the glossary immediately.</li>
+    </ul>
+    
+    <h3 style="font-size: var(--sapFontLargeSize); margin: var(--sapSpacingM) 0 var(--sapSpacingS) 0;">Filter Reasons</h3>
+    <ul style="margin: 0; padding-left: var(--sapSpacingL); line-height: 1.8;">
+      <li><strong>Domain/Country:</strong> The news source domain wasn't whitelisted and no country mention was found.</li>
+      <li><strong>Glossary:</strong> No glossary terms matched in the content. Consider adding relevant terms.</li>
+      <li><strong>LLM:</strong> The AI classified this as not relevant to the LoB. Review the content to verify.</li>
+    </ul>
+    
+    <div class="sapMessageStrip sapMessageStrip-info" style="margin-top: var(--sapSpacingM);">
+      <span>
+        <strong>💡 Tip:</strong> High scores (4-5) on glossary-filtered items indicate missing terms. 
+        <a href="{{ url_for('admin_profile_detail', profile_id=profile.id) }}" style="color: var(--sapLinkColor); font-weight: 600;">Add them to the glossary</a> to improve future filtering.
+      </span>
+    </div>
+  </div>
+</div>
+
+<script>
+function toggleSelectAll() {
+  const checkboxes = document.querySelectorAll('.item-checkbox');
+  const selectAll = document.getElementById('selectAllCheckbox');
+  const allChecked = Array.from(checkboxes).every(function(cb) { return cb.checked; });
+  
+  checkboxes.forEach(function(cb) {
+    cb.checked = !allChecked;
+  });
+  selectAll.checked = !allChecked;
+  syncBulkDeleteForm();
+}
+
+function syncBulkDeleteForm() {
+  const bulkDeleteForm = document.getElementById('bulkDeleteForm');
+  bulkDeleteForm.innerHTML = '';
+  const checkboxes = document.querySelectorAll('.bulk-checkbox:checked');
+  checkboxes.forEach(function(cb) {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'item_ids';
+    input.value = cb.value;
+    bulkDeleteForm.appendChild(input);
+  });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  const checkboxes = document.querySelectorAll('.bulk-checkbox');
+  checkboxes.forEach(function(cb) {
+    cb.addEventListener('change', syncBulkDeleteForm);
+  });
+});
+</script>
+{% endblock %}

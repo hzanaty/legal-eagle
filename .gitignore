@@ -15,6 +15,18 @@ __pycache__/
 
 # Playwright/browser caches (local snapshots)
 snapshots/
+# Test run artifacts (ignore local test outputs written by scripts)
+scripts/test_runs/
 
 # Generated outputs (keep latest_all_news.json tracked by workflow; ignore dated dumps)
 outputs/all_news_*.json
+# SQLite DB files (do not commit local config databases)
+configurations/*.db
+
+# Environment files (ignore all .env variants anywhere)
+.env.*
+**/.env
+**/.env.*
+# Sensitive credentials file (use environment variables instead)
+configurations/credentials.json
+archive/
