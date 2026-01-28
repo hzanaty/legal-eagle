@@ -1,6 +1,6 @@
-# Legal Eagle 2.1 — Technical Specification
+# Legal Eagle 2.0 — Technical Specification
 
-**Version:** 2.1 (SAP Fiori Design)  
+**Version:** 2.0 (SAP Fiori Design)  
 **Last Updated:** 2026-01-28
 
 This document provides the technical specification for Legal Eagle, an AI-powered regulatory compliance monitoring system for SAP Localization.

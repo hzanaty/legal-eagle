@@ -52,6 +52,89 @@ A daily email digest containing:
 
 ---
 
+## 🗺️ Roadmap
+
+### v2.0 — Current Release ✅
+**Focus**: Solid foundation with multi-source monitoring
+
+**Delivered Features**:
+- Multi-profile support (Country + LoB combinations)
+- Triple-source collection: RSS feeds, Twitter/X, Government websites
+- AI-powered relevance filtering (GPT-4o-mini)
+- Semantic deduplication & update detection
+- SAP Fiori Admin UI with live log streaming
+- Daily email digests with grouped summaries
+- Human-in-the-loop feedback for continuous improvement
+
+**Recent Improvements** (v2.0.1 — Jan 2026):
+- Twitter Free tier optimization (15-min rate limiting, round-robin rotation)
+- Resource skip optimization (2-hour rule for RSS/URLs)
+- Enhanced status visibility with clean stat cards
+
+---
+
+### v3.0 — Enhanced Intelligence 🔮
+**Target**: Q2 2026  
+**Focus**: Advanced AI analysis and contextual understanding
+
+**Planned Features**:
+- **Deep Impact Analysis**: AI assessment of legal changes on specific SAP modules
+- **Risk Scoring**: Automatic priority/severity classification
+- **Multi-language Translation**: Native language monitoring → English analysis
+- **Trend Detection**: Pattern recognition across multiple countries
+- **Predictive Alerts**: Early warning for similar changes in other regions
+- **Enhanced Grouping**: Topic clustering with regulatory themes
+- **Sentiment Analysis**: Urgency detection from official language
+
+**Technical Improvements**:
+- Upgrade to GPT-4 Turbo for complex reasoning
+- Vector database for historical context (Pinecone, Weaviate, or similar)
+- Custom fine-tuned models for SAP localization domain knowledge
+- Agentic workflows with multi-step reasoning chains
+
+---
+
+### v4.0 — LOKA Integration 🔗
+**Target**: Q4 2026  
+**Focus**: End-to-end compliance workflow automation
+
+**Planned Features**:
+- **LOKA MCP Integration**: Bidirectional sync with SAP's localization knowledge base
+- **Regulation Matching**: Auto-link detected legal changes to existing LOKA regulations
+- **Impact Propagation**: Push Legal Eagle findings to LOKA requirements/features
+- **LPM Workflow**: Seamless handoff from monitoring → requirement → implementation
+- **Requirement Templates**: AI-generated initial requirement drafts from legal changes
+- **Backlog Integration**: Direct creation of JIRA Requirements from detected changes
+- **Compliance Dashboard**: Unified view of legal changes → requirements → features → releases
+
+**LOKA MCP Tools to be Used**:
+- `loka_search_regulations`: Check if change already tracked
+- `loka_get_regulation`: Fetch existing regulation details
+- `loka_prepare_blog_context`: Generate compliance communications
+- `loka_search_requirements`: Find related development work
+- `loka_find_stakeholders`: Identify responsible LPMs/teams
+
+**Expected Benefits**:
+- **Zero Manual Entry**: Legal changes auto-create LOKA regulations
+- **Full Traceability**: Legal source → regulation → requirement → feature
+- **Faster Response**: Reduce detection-to-delivery time by 60%
+- **Better Coverage**: No legal changes slip through the cracks
+
+---
+
+### Beyond v4.0 — Future Vision 🚀
+
+**Potential Enhancements**:
+- Multi-tenant SaaS deployment for all SAP localization teams globally
+- REST API for third-party integrations (Confluence, ServiceNow, etc.)
+- Mobile app for LPM push notifications
+- AI chatbot for natural language queries ("What changed in Brazil payroll?")
+- Regulatory change calendar with visual deadline tracking
+- Automated compliance reporting for audit purposes
+- Real-time alerts for critical/urgent changes (not just daily digests)
+
+---
+
 ## ⚙️ How It Works
 
 ```
