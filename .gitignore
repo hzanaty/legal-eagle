@@ -30,3 +30,6 @@ configurations/*.db
 # Sensitive credentials file (use environment variables instead)
 configurations/credentials.json
 archive/
+
+# MCP server (local development only, not part of this project)
+mcp/
