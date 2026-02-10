@@ -54,3 +54,59 @@ Help me to achieve the goals of this project Legal Eagle through building agents
 5. I do testing then decide
 6. After decision, you update current code version
 7. Update current documentation in SPEC.md file with the new version
+
+---
+
+## Technical Reference
+
+For detailed technical information, consult **`SPEC.md`** in the project root:
+- Architecture diagrams and data flow
+- Database schema (SQLite tables, columns, indexes)
+- API reference for all agents and configuration modules
+- File structure conventions
+- Technology stack and dependencies
+
+When implementing changes:
+- Follow existing code patterns in the respective directories
+- Update `SPEC.md` to reflect significant architectural or API changes
+- Keep file organization consistent with Section 11 (File Structure) in SPEC.md
+
+---
+
+## Development Guidelines
+
+### Coding Conventions
+- **Language**: Python 3.11+ (all production code)
+- **Style**: Follow existing patterns in each module
+- **Imports**: Use relative imports within packages (e.g., `from .config_loader import ...`)
+- **Type hints**: Use when it improves clarity (not required everywhere)
+- **Error handling**: Use try/except with specific exceptions; log errors appropriately
+
+### File Organization
+- **Agents**: Processing pipeline components → `agents/`
+- **Configuration**: Database, environment loading → `configurations/`
+- **Admin UI**: Flask application → `admin/`
+- **Scripts**: CLI utilities, schedulers, testing → `scripts/`
+- **Outputs**: Generated artifacts → `outputs/{country}_{lob}/`
+- **Documentation**: User/technical docs → Root directory
+
+### Testing Guidelines
+- **Test scripts**: Place in `scripts/` directory (prefix with `test_`)
+- **Test outputs**: Write to `scripts/test_runs/` (gitignored)
+- **Test data**: Use small, realistic samples (e.g., 10 items)
+- **Isolation**: Test individual components before integration
+- **Naming**: Use descriptive names (e.g., `test_filter_strict.py`, not `test1.py`)
+
+### Adding New Features
+1. **Explore first**: Read relevant files in `agents/` and `configurations/`
+2. **Plan**: Propose solution with pros/cons before coding
+3. **Test in isolation**: Create test script in `scripts/test_runs/`
+4. **Integrate**: Update main controller (`agents/agents_controller.py`)
+5. **Document**: Update `SPEC.md` with new functionality
+6. **Verify**: Run full pipeline to ensure no regressions
+
+### Environment Variables
+- All secrets in environment variables (never in code or database)
+- Use `LEGAL_EAGLE_` prefix for project-specific vars
+- Document new env vars in `SPEC.md` Section 8.1
+- Provide sensible defaults where possible
