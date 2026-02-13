@@ -1,61 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
 
-<!-- Status Cards (at top, full width) -->
-<div style="margin-bottom: var(--sapSpacingM);">
-  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--sapSpacingM);">
-    
-    <!-- Twitter Rate Limit Status Card -->
-    {% if twitter_status %}
-    <div class="sapStatCard {% if twitter_status.can_fetch %}sapStatCard-positive{% else %}sapStatCard-warning{% endif %}">
-      <div class="sapStatCard-label">🐦 Twitter Status</div>
-      <div class="sapStatCard-value" style="font-size: 2rem;">
-        {% if twitter_status.can_fetch %}
-          ✓ Ready Now
-        {% else %}
-          ⏰ Wait {{ twitter_status.minutes_to_wait }} min
-        {% endif %}
-      </div>
-      <div style="font-size: var(--sapFontSmallSize); color: var(--sapNeutralColor); margin-top: var(--sapSpacingS);">
-        <div style="margin-bottom: 4px;"><strong>Next:</strong> @{{ twitter_status.next_account }} (#{{ twitter_status.next_account_num }}/{{ twitter_status.total_accounts }})</div>
-        <div><strong>Last:</strong> {{ twitter_status.time_ago }}</div>
-        {% if not twitter_status.can_fetch and twitter_status.next_available_time %}
-        <div style="margin-top: 4px;"><strong>Available:</strong> {{ twitter_status.next_available_time|format_ts('Asia/Dubai', '%I:%M %p') }}</div>
-        {% endif %}
-      </div>
-    </div>
-    {% else %}
-    <div class="sapStatCard sapStatCard-neutral">
-      <div class="sapStatCard-label">🐦 Twitter Status</div>
-      <div class="sapStatCard-value" style="font-size: 2rem;">—</div>
-      <div style="font-size: var(--sapFontSmallSize); color: var(--sapNeutralColor); margin-top: var(--sapSpacingS);">
-        No accounts configured
-      </div>
-    </div>
-    {% endif %}
-    
-    <!-- Resource Collection Status Card -->
-    <div class="sapStatCard {% if resource_status.will_skip_resources %}sapStatCard-neutral{% else %}sapStatCard-positive{% endif %}">
-      <div class="sapStatCard-label">📰 Resources</div>
-      <div class="sapStatCard-value" style="font-size: 2rem;">
-        {% if resource_status.will_skip_resources %}
-          ⏭️ Skip RSS/URLs
-        {% else %}
-          ✓ Full Collection
-        {% endif %}
-      </div>
-      <div style="font-size: var(--sapFontSmallSize); color: var(--sapNeutralColor); margin-top: var(--sapSpacingS);">
-        {% if resource_status.will_skip_resources %}
-        <div style="margin-bottom: 4px;">Twitter only this run</div>
-        {% else %}
-        <div style="margin-bottom: 4px;">RSS + URLs + Twitter</div>
-        {% endif %}
-        <div><strong>Last Full Run:</strong> {{ resource_status.time_ago }}</div>
-      </div>
-    </div>
-    
-  </div>
-</div>
 
 <style>
   /* Status Card Styles (matching review page) */
@@ -210,6 +155,31 @@
 <div class="sapSplitPanel">
   <!-- Left Panel: Controls & History -->
   <div>
+    <!-- Twitter Status Card (Compact) -->
+    {% if twitter_status %}
+    <div class="sapCard" style="margin-bottom: var(--sapSpacingM);">
+      <div class="sapCard-header" style="text-align: center;">
+        <span style="font-size: 1.25rem;">🐦 Twitter</span>
+      </div>
+      <div class="sapCard-content" style="text-align: center; padding: var(--sapSpacingM);">
+        <div style="font-size: 1.5rem; font-weight: 300; margin-bottom: var(--sapSpacingS); color: {% if twitter_status.can_fetch %}var(--sapPositiveColor){% else %}var(--sapCriticalColor){% endif %};">
+          {% if twitter_status.can_fetch %}
+            ✓ Ready
+          {% else %}
+            ⏰ Wait {{ twitter_status.minutes_to_wait }} min
+          {% endif %}
+        </div>
+        <div style="font-size: var(--sapFontSmallSize); color: var(--sapNeutralColor);">
+          {% if twitter_status.can_fetch %}
+            Last: {{ twitter_status.time_ago }}
+          {% else %}
+            Next: {{ twitter_status.next_available_time|format_ts('Asia/Dubai', '%I:%M %p') }}
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+    
     <!-- Run Controls -->
     <div class="sapCard" style="margin-bottom: var(--sapSpacingM);">
       <div class="sapCard-header">

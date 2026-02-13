@@ -152,6 +152,9 @@
           Review
         </button>
         <div style="flex: 1;"></div>
+        <button id="btn-show-inactive" class="sapBtn sapBtn-transparent sapBtn-sm" onclick="toggleInactiveProfiles()">
+          Show Inactive
+        </button>
         <button id="btn-toggle" class="sapBtn sapBtn-transparent sapBtn-sm" disabled onclick="performAction('toggle')">
           <span id="toggle-text">Deactivate</span>
         </button>
@@ -169,12 +172,13 @@
                 <th>LoB</th>
                 <th>Name</th>
                 <th>Language</th>
+                <th>Last Run</th>
                 <th>Status</th>
               </tr>
             </thead>
             <tbody>
               {% for p in profiles %}
-              <tr tabindex="0" data-profile-id="{{ p.id }}" data-profile-active="{{ p.active }}" onclick="selectRow(this, event)" onkeydown="handleRowKeydown(event, this)">
+              <tr tabindex="0" data-profile-id="{{ p.id }}" data-profile-active="{{ p.active }}" class="{% if p.active != 1 %}inactive-profile{% endif %}" onclick="selectRow(this, event)" onkeydown="handleRowKeydown(event, this)" style="{% if p.active != 1 %}display: none;{% endif %}">
                 <td class="sapTable-selection">
                   <input type="radio" name="selected_profile" value="{{ p.id }}" onclick="event.stopPropagation(); selectRow(this.parentElement.parentElement, event)">
                 </td>
@@ -183,6 +187,7 @@
                 <td><span class="sapBadge sapBadge-neutral">{{ p.lob }}</span></td>
                 <td>{{ p.name or "—" }}</td>
                 <td style="color: var(--sapNeutralColor);">{{ p.language or "en" }}</td>
+                <td style="color: var(--sapNeutralColor); font-size: var(--sapFontSmallSize);">{{ p.last_run_display }}</td>
                 <td>
                   {% if p.active == 1 %}
                     <span class="sapBadge sapBadge-positive">● Active</span>
@@ -278,6 +283,45 @@ function performAction(action) {
       document.body.appendChild(form);
       form.submit();
       break;
+  }
+}
+
+let showInactiveState = false;
+
+function toggleInactiveProfiles() {
+  const btn = document.getElementById('btn-show-inactive');
+  const inactiveRows = document.querySelectorAll('.inactive-profile');
+  
+  // Toggle state
+  showInactiveState = !showInactiveState;
+  
+  // Update button appearance
+  if (showInactiveState) {
+    btn.classList.remove('sapBtn-transparent');
+    btn.classList.add('sapBtn-emphasized');
+    btn.textContent = 'Hide Inactive';
+  } else {
+    btn.classList.remove('sapBtn-emphasized');
+    btn.classList.add('sapBtn-transparent');
+    btn.textContent = 'Show Inactive';
+  }
+  
+  // Show/hide inactive rows
+  inactiveRows.forEach(function(row) {
+    row.style.display = showInactiveState ? '' : 'none';
+  });
+  
+  // If currently selected profile becomes hidden, deselect it
+  if (!showInactiveState && selectedProfileActive === '0') {
+    selectedProfileId = null;
+    selectedProfileActive = null;
+    const allRows = document.querySelectorAll('#profilesTable tbody tr');
+    allRows.forEach(function(r) {
+      r.classList.remove('selected');
+      const radio = r.querySelector('input[type="radio"]');
+      if (radio) radio.checked = false;
+    });
+    updateToolbarButtons();
   }
 }
 

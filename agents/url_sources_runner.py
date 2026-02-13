@@ -1625,9 +1625,173 @@ def static_collect(base_url: str, listing_html: str) -> Tuple[List[Dict], List[D
 # Unified Runner
 # -------------------------------
 
+def recursive_crawl(
+    entry_url: str,
+    detail_pattern: Optional[str],
+    max_depth: int = 3,
+    allowed_domains: Optional[List[str]] = None,
+    path_filter: Optional[str] = None,
+    max_results: int = 20
+) -> Tuple[List[Dict], List[Dict]]:
+    """
+    Recursive BFS crawler for multi-level news hierarchies.
+    
+    Args:
+        entry_url: Starting URL (Level 1)
+        detail_pattern: Pattern to identify final detail pages (e.g., "IAFRIAFRC12F")
+        max_depth: Maximum levels to drill down (default: 3)
+        allowed_domains: List of allowed domains for cross-subdomain crawling
+        path_filter: Only follow links containing this path segment
+        max_results: Stop after finding N articles
+    
+    Returns:
+        (items, errors) tuple
+    """
+    from collections import deque
+    from urllib.parse import urlparse, urljoin
+    
+    print(f"[Recursive Crawl] Starting at: {entry_url}")
+    print(f"[Recursive Crawl] Max depth: {max_depth}, Detail pattern: {detail_pattern or 'any'}")
+    print(f"[Recursive Crawl] Path filter: {path_filter or 'none'}, Max results: {max_results}")
+    
+    items: List[Dict] = []
+    errors: List[Dict] = []
+    visited: set = set()
+    
+    # Queue: (url, depth)
+    queue: deque = deque([(entry_url, 1)])
+    
+    # Auto-detect allowed domains if not provided
+    if not allowed_domains:
+        allowed_domains = []
+        try:
+            base_domain = urlparse(entry_url).netloc
+            if base_domain:
+                allowed_domains.append(base_domain)
+        except Exception:
+            pass
+        
+        # Add sample_link domain if detail_pattern provided
+        # (This will be handled by caller passing allowed_domains)
+    
+    print(f"[Recursive Crawl] Allowed domains: {allowed_domains or ['same as entry']}")
+    
+    def is_allowed_domain(url: str) -> bool:
+        if not allowed_domains:
+            return True
+        try:
+            domain = urlparse(url).netloc
+            return any(allowed in domain or domain in allowed for allowed in allowed_domains)
+        except Exception:
+            return False
+    
+    def is_detail_page(url: str) -> bool:
+        """Check if URL matches detail pattern (final article page)"""
+        if not detail_pattern:
+            return False
+        return detail_pattern in url
+    
+    def matches_path_filter(url: str) -> bool:
+        """Check if URL contains path filter"""
+        if not path_filter:
+            return True
+        return path_filter in url
+    
+    while queue and len(items) < max_results:
+        current_url, depth = queue.popleft()
+        
+        # Skip if already visited
+        if current_url in visited:
+            continue
+        visited.add(current_url)
+        
+        print(f"[Recursive Crawl] L{depth}: {current_url}")
+        
+        # Check if this is a detail page
+        if is_detail_page(current_url):
+            print(f"  → Detail page detected (pattern match)")
+            # Fetch and extract article
+            status, html = http_get(current_url, timeout=25)
+            if status != 200:
+                errors.append({"url": current_url, "error": f"detail fetch status {status}", "depth": depth})
+                continue
+            
+            try:
+                article = extract_article(entry_url, current_url, html)
+                items.append(article)
+                print(f"  ✓ Extracted article: {article.get('title', '')[:50]}")
+            except Exception as e:
+                errors.append({"url": current_url, "error": f"detail parse failed: {e}", "depth": depth})
+            
+            continue  # Don't drill deeper from detail pages
+        
+        # If we haven't reached max depth, fetch page and find links
+        if depth < max_depth:
+            status, html = http_get(current_url, timeout=25)
+            if status != 200:
+                errors.append({"url": current_url, "error": f"listing fetch status {status}", "depth": depth})
+                continue
+            
+            # Extract links from page
+            try:
+                soup = BeautifulSoup(html, "html.parser")
+                links = []
+                
+                for a in soup.find_all("a", href=True):
+                    href = a.get("href")
+                    if not href:
+                        continue
+                    
+                    abs_url = urljoin(current_url, href)
+                    
+                    # Apply filters
+                    if not is_allowed_domain(abs_url):
+                        continue
+                    if not matches_path_filter(abs_url):
+                        continue
+                    if not _is_probable_html_url(abs_url):
+                        continue
+                    
+                    links.append(abs_url)
+                
+                # Deduplicate
+                links = list(dict.fromkeys(links))
+                
+                # Prioritize detail pattern matches
+                if detail_pattern:
+                    detail_links = [u for u in links if detail_pattern in u]
+                    other_links = [u for u in links if detail_pattern not in u]
+                    links = detail_links + other_links
+                
+                print(f"  → Found {len(links)} candidate links")
+                
+                # Add to queue
+                for link in links:
+                    if link not in visited:
+                        queue.append((link, depth + 1))
+                
+            except Exception as e:
+                errors.append({"url": current_url, "error": f"link extraction failed: {e}", "depth": depth})
+        
+        # If at max depth and not a detail page, try extracting as article anyway
+        elif depth == max_depth:
+            print(f"  → Max depth reached, attempting article extraction")
+            status, html = http_get(current_url, timeout=25)
+            if status == 200:
+                try:
+                    article = extract_article(entry_url, current_url, html)
+                    items.append(article)
+                    print(f"  ✓ Extracted article: {article.get('title', '')[:50]}")
+                except Exception as e:
+                    errors.append({"url": current_url, "error": f"max-depth parse failed: {e}", "depth": depth})
+    
+    print(f"[Recursive Crawl] Complete: {len(items)} items, {len(errors)} errors, {len(visited)} pages visited")
+    return items, errors
+
+
 def run_unified_sources(url_sources: List[Dict[str, str]], profile_slug: Optional[str] = None) -> Dict[str, List[Dict]]:
     """
-    url_sources: [{"url": str, "mode": "auto|force_static|force_dynamic", "sample_link": Optional[str]}]
+    url_sources: [{"url": str, "mode": "auto|force_static|force_dynamic|recursive", "sample_link": Optional[str], ...}]
     Returns: {"items": [...], "errors": [...]}
     """
     print(f"[Sources] {len(url_sources)} sources to process")
@@ -1996,6 +2160,45 @@ def run_unified_sources(url_sources: List[Dict[str, str]], profile_slug: Optiona
                 its, errs = _dynamic_path(u, detail_pattern, read_label)
                 try:
                     print(f"[source] dynamic path items={len(its)} errors={len(errs)}")
+                except Exception:
+                    pass
+                items.extend(its); errors.extend(errs)
+            elif mode == "recursive":
+                # Recursive crawling for multi-level hierarchies
+                max_depth = src.get("max_depth", 3)
+                allowed_domains_raw = src.get("allowed_domains") or ""
+                path_filter = src.get("path_filter")
+                max_results = src.get("max_results", 20)
+                
+                # Parse allowed_domains (newline-separated or JSON array)
+                allowed_domains = []
+                if allowed_domains_raw:
+                    try:
+                        import json
+                        allowed_domains = json.loads(allowed_domains_raw)
+                    except Exception:
+                        # Fallback: newline-separated
+                        allowed_domains = [d.strip() for d in allowed_domains_raw.split("\n") if d.strip()]
+                
+                # Auto-add sample_link domain if not in allowed_domains
+                if sample and allowed_domains:
+                    try:
+                        sample_domain = urlparse(sample).netloc
+                        if sample_domain and sample_domain not in allowed_domains:
+                            allowed_domains.append(sample_domain)
+                    except Exception:
+                        pass
+                
+                its, errs = recursive_crawl(
+                    entry_url=u,
+                    detail_pattern=detail_pattern,
+                    max_depth=max_depth,
+                    allowed_domains=allowed_domains if allowed_domains else None,
+                    path_filter=path_filter,
+                    max_results=max_results
+                )
+                try:
+                    print(f"[source] recursive path items={len(its)} errors={len(errs)}")
                 except Exception:
                     pass
                 items.extend(its); errors.extend(errs)

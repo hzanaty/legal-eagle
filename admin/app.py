@@ -137,21 +137,63 @@ def admin_dashboard():
         conn.close()
     except Exception as e:
         print(f"⚠️ Retention cleanup skipped: {e}")
-    # Show all profiles (active and inactive)
+    # Show all profiles (active and inactive) with last run time
+    # Sorted by last run (never/oldest first, newest last)
     conn = get_connection()
-    rows = conn.execute("SELECT * FROM profiles ORDER BY country_code, lob, COALESCE(name, '')").fetchall()
-    conn.close()
-    profiles = [
-        {
-            "id": int(r["id"]),
+    rows = conn.execute("SELECT * FROM profiles").fetchall()
+    
+    profiles = []
+    for r in rows:
+        profile_id = int(r["id"])
+        
+        # Get last run time for this profile
+        last_run_row = conn.execute(
+            "SELECT started_at FROM runs WHERE profile_id = ? AND started_at IS NOT NULL ORDER BY started_at DESC LIMIT 1",
+            (profile_id,)
+        ).fetchone()
+        
+        last_run_time = None
+        last_run_display = "—"
+        last_run_sort_key = ""  # Empty string sorts before any date
+        
+        if last_run_row and last_run_row["started_at"]:
+            try:
+                last_dt = datetime.fromisoformat(last_run_row["started_at"])
+                now = datetime.utcnow()
+                elapsed_mins = int((now - last_dt).total_seconds() / 60)
+                
+                if elapsed_mins < 1:
+                    last_run_display = "just now"
+                elif elapsed_mins < 60:
+                    last_run_display = f"{elapsed_mins} min ago"
+                elif elapsed_mins < 1440:
+                    hours = elapsed_mins // 60
+                    last_run_display = f"{hours} hour{'s' if hours != 1 else ''} ago"
+                else:
+                    days = elapsed_mins // 1440
+                    last_run_display = f"{days} day{'s' if days != 1 else ''} ago"
+                
+                last_run_time = last_run_row["started_at"]
+                last_run_sort_key = last_run_time  # ISO format sorts correctly
+            except Exception:
+                pass
+        
+        profiles.append({
+            "id": profile_id,
             "country_code": r["country_code"],
             "lob": r["lob"],
             "name": r["name"],
             "language": r["language"],
             "active": int(r["active"] or 0),
-        }
-        for r in rows
-    ]
+            "last_run_time": last_run_time,
+            "last_run_display": last_run_display,
+            "last_run_sort_key": last_run_sort_key,
+        })
+    
+    # Sort by last run (never/oldest first), then by country/lob as secondary sort
+    profiles.sort(key=lambda p: (p["last_run_sort_key"], p["country_code"], p["lob"]))
+    
+    conn.close()
     return render_template("dashboard.html", profiles=profiles)
 
 
@@ -235,7 +277,7 @@ def admin_profile_runs(profile_id: int):
     run_active_row = conn.execute("SELECT 1 FROM runs WHERE profile_id = ? AND status = 'Running' LIMIT 1", (profile_id,)).fetchone()
     run_active = bool(run_active_row)
 
-    # Twitter status calculation
+    # Twitter status calculation (Search API - all accounts fetched together)
     from agents.tweet_feed import check_twitter_rate_limit
     from configurations.db import get_setting as db_get_setting
     
@@ -274,16 +316,8 @@ def admin_profile_runs(profile_id: int):
             except Exception:
                 pass
         
-        # Get last and next account info
-        last_idx_str = db_get_setting(conn, profile_id, 'twitter_last_account_index', '0')
-        try:
-            last_idx = int(last_idx_str)
-        except ValueError:
-            last_idx = 0
-        
-        next_idx = (last_idx + 1) % len(twitter_accounts)
-        last_account = twitter_accounts[last_idx] if last_idx < len(twitter_accounts) else twitter_accounts[0]
-        next_account = twitter_accounts[next_idx]
+        # Format account list for display
+        account_list = ", ".join([f"@{a.lstrip('@')}" for a in twitter_accounts])
         
         twitter_status = {
             'can_fetch': can_fetch,
@@ -291,11 +325,8 @@ def admin_profile_runs(profile_id: int):
             'time_ago': time_ago_str,
             'last_fetch_time': last_fetch_time,
             'next_available_time': next_available_time,
-            'last_account': last_account,
-            'last_account_num': last_idx + 1,
-            'next_account': next_account,
-            'next_account_num': next_idx + 1,
             'total_accounts': len(twitter_accounts),
+            'account_list': account_list,
         }
     
     # Resource status calculation
@@ -522,6 +553,7 @@ def admin_profile_detail(profile_id: int):
 
     glossary = load_glossary(profile_id)
     reset_quota_date = get_setting_value(profile_id, 'tweets_reset_quota_date')
+    monitor_enabled = get_setting_value(profile_id, 'monitor_updates_enabled', 'false') == 'true'
 
     return render_template(
         "profile.html",
@@ -533,6 +565,7 @@ def admin_profile_detail(profile_id: int):
         receivers=receivers,
         glossary=glossary,
         reset_quota_date=reset_quota_date,
+        monitor_enabled=monitor_enabled,
     )
 
 
@@ -561,6 +594,26 @@ def update_profile_schedule_day(profile_id: int):
     add_audit_log(conn, entity="profiles", action="update_schedule_day", details=f"schedule_day={value}", profile_id=profile_id)
     conn.close()
     flash("Schedule day updated.", "success")
+    return redirect(url_for("admin_profile_detail", profile_id=profile_id))
+
+
+@app.route("/admin/profiles/<int:profile_id>/monitor-toggle", methods=["POST"])
+def toggle_monitor_updates(profile_id: int):
+    """
+    Toggle monitor_updates_enabled setting for a profile.
+    Enables/disables Law-to-Specification email monitoring.
+    """
+    enabled = request.form.get("enabled") == "true"
+    value = "true" if enabled else "false"
+    
+    conn = get_connection()
+    create_schema_if_needed(conn)
+    set_setting_value(profile_id, "monitor_updates_enabled", value)
+    add_audit_log(conn, entity="settings", action="toggle_monitor_updates", details=f"enabled={value}", profile_id=profile_id)
+    conn.close()
+    
+    status = "enabled" if enabled else "disabled"
+    flash(f"Monitor notifications {status}.", "success")
     return redirect(url_for("admin_profile_detail", profile_id=profile_id))
 
 # RSS management
@@ -622,17 +675,27 @@ def add_url_source_route(profile_id: int):
     crawl_version = (request.form.get("crawl_version", "v1") or "v1").strip()
     if crawl_version not in ("v1", "v2"):
         crawl_version = "v1"
+    
+    # Recursive mode parameters
+    max_depth = int(request.form.get("max_depth", "2") or "2")
+    allowed_domains = request.form.get("allowed_domains", "").strip() or None
+    path_filter = request.form.get("path_filter", "").strip() or None
+    max_results = int(request.form.get("max_results", "20") or "20")
+    date_scope = request.form.get("date_scope", "all").strip() or "all"
+    
     if not url:
         flash("URL is required.", "error")
         return redirect(url_for("admin_profile_detail", profile_id=profile_id))
-    if mode not in ("auto", "force_static", "force_dynamic"):
+    if mode not in ("auto", "force_static", "force_dynamic", "recursive"):
         flash("Invalid mode.", "error")
         return redirect(url_for("admin_profile_detail", profile_id=profile_id))
 
     conn = get_connection()
     create_schema_if_needed(conn)
-    upsert_url_source(conn, profile_id, url=url, mode=mode, sample_link=sample_link, read_more_label=read_more_label, crawl_version=crawl_version)
-    add_audit_log(conn, entity="url_sources", action="add", details=f"url={url} mode={mode} sample_link={sample_link} read_more_label={read_more_label} crawl_version={crawl_version}", profile_id=profile_id)
+    upsert_url_source(conn, profile_id, url=url, mode=mode, sample_link=sample_link, read_more_label=read_more_label, 
+                     crawl_version=crawl_version, max_depth=max_depth, allowed_domains=allowed_domains, 
+                     path_filter=path_filter, max_results=max_results, date_scope=date_scope)
+    add_audit_log(conn, entity="url_sources", action="add", details=f"url={url} mode={mode}", profile_id=profile_id)
     conn.close()
     flash("URL source added.", "success")
     return redirect(url_for("admin_profile_detail", profile_id=profile_id))
@@ -647,18 +710,28 @@ def update_url_source_route(profile_id: int):
     crawl_version = (request.form.get("crawl_version", "").strip() or None)
     if crawl_version and crawl_version not in ("v1", "v2"):
         crawl_version = "v1"
+    
+    # Recursive mode parameters
+    max_depth = int(request.form.get("max_depth", "2") or "2")
+    allowed_domains = request.form.get("allowed_domains", "").strip() or None
+    path_filter = request.form.get("path_filter", "").strip() or None
+    max_results = int(request.form.get("max_results", "20") or "20")
+    date_scope = request.form.get("date_scope", "all").strip() or "all"
+    
     if not url:
         flash("URL is required.", "error")
         return redirect(url_for("admin_profile_detail", profile_id=profile_id))
-    if mode and mode not in ("auto", "force_static", "force_dynamic"):
+    if mode and mode not in ("auto", "force_static", "force_dynamic", "recursive"):
         flash("Invalid mode.", "error")
         return redirect(url_for("admin_profile_detail", profile_id=profile_id))
 
     conn = get_connection()
     create_schema_if_needed(conn)
-    # Use upsert to update mode/sample_link/read_more_label/crawl_version
-    upsert_url_source(conn, profile_id, url=url, mode=mode or "auto", sample_link=sample_link, read_more_label=read_more_label, crawl_version=(crawl_version or "v1"))
-    add_audit_log(conn, entity="url_sources", action="update", details=f"url={url} mode={mode} sample_link={sample_link} read_more_label={read_more_label} crawl_version={crawl_version or 'v1'}", profile_id=profile_id)
+    # Use upsert to update all fields
+    upsert_url_source(conn, profile_id, url=url, mode=mode or "auto", sample_link=sample_link, read_more_label=read_more_label, 
+                     crawl_version=(crawl_version or "v1"), max_depth=max_depth, allowed_domains=allowed_domains, 
+                     path_filter=path_filter, max_results=max_results, date_scope=date_scope)
+    add_audit_log(conn, entity="url_sources", action="update", details=f"url={url} mode={mode}", profile_id=profile_id)
     conn.close()
     flash("URL source updated.", "success")
     return redirect(url_for("admin_profile_detail", profile_id=profile_id))

@@ -27,13 +27,18 @@ def normalize_group_for_email(group: dict) -> tuple[str, str]:
     return str(title), str(summary)
 
 
-def build_email_body(grouped_summary: list[dict], lang: str) -> str:
+def build_email_body(grouped_summary: list[dict], lang: str, monitor_updates: dict = None) -> str:
     """
     Builds an HTML email body for grouped news items.
     Per category (HCM/FIN/Other), shows two sections when present:
       - New
       - Updates (with delta bullets)
     Supports RTL languages and avoids redundant labels.
+    
+    Args:
+        grouped_summary: List of grouped news items
+        lang: Language code
+        monitor_updates: Optional dict with monitor update data from Law-to-Specification emails
     """
     today = datetime.now().strftime("%Y-%m-%d")
 
@@ -52,9 +57,8 @@ def build_email_body(grouped_summary: list[dict], lang: str) -> str:
             if lang == "ar"
             else "<p>No relevant updates found today.</p>"
         )
-        html.append("</div>")
-        return "\n".join(html)
-
+        # Don't return early - we still need to add monitor updates section below
+    
     last_category = None
     printed_new = False
     printed_updates = False
@@ -110,6 +114,35 @@ def build_email_body(grouped_summary: list[dict], lang: str) -> str:
                 html.append(f"<li><a href='{link}'>{safe_title}</a></li>")
             html.append("</ul>")
 
+    # Monitor Updates Section (Law-to-Specification email integration)
+    if monitor_updates is not None:
+        html.append("<hr style='margin:32px 0;'>")
+        html.append("<h3>🔍 تنبيهات تغييرات المواقع (Law-to-Spec)</h3>" if lang == "ar" else "<h3>🔍 Website Change Alerts (Law-to-Spec)</h3>")
+        
+        if monitor_updates.get('changes'):
+            # Show report date if available
+            if monitor_updates.get('report_date'):
+                html.append(f"<p><b>📅 تقرير:</b> {monitor_updates['report_date']}</p>" if lang == "ar" else f"<p><b>📅 Report:</b> {monitor_updates['report_date']}</p>")
+            
+            # Show monitored URLs
+            if monitor_updates.get('monitored_urls'):
+                urls = monitor_updates['monitored_urls']
+                for url in urls:
+                    # Extract domain for display
+                    from urllib.parse import urlparse
+                    domain = urlparse(url).netloc
+                    html.append(f"<p><b>🔗 المصدر:</b> {domain}</p>" if lang == "ar" else f"<p><b>🔗 Source:</b> {domain}</p>")
+            
+            # Show changes
+            html.append("<p><b>تغييرات مكتشفة:</b></p>" if lang == "ar" else "<p><b>Changes detected:</b></p>")
+            html.append("<ul>")
+            for change in monitor_updates['changes']:
+                html.append(f"<li>{change}</li>")
+            html.append("</ul>")
+        else:
+            # No updates found
+            html.append("<p>لم يتم الكشف عن تغييرات في المواقع منذ آخر تقرير.</p>" if lang == "ar" else "<p>No website changes detected since last report.</p>")
+    
     html.append(
         "<hr><div style='color:#666;font-size:12px;margin-top:16px;'>"
         "Legal Eagle — Automated Compliance Insights by LPMx"
@@ -118,9 +151,17 @@ def build_email_body(grouped_summary: list[dict], lang: str) -> str:
     return "\n".join(html)
 
 
-def send_email(grouped_summary: list[dict], EMAIL_RECEIVERS, GMAIL_CREDS: dict, lang: str) -> bool:
+def send_email(grouped_summary: list[dict], EMAIL_RECEIVERS, GMAIL_CREDS: dict, lang: str, monitor_updates: dict = None) -> bool:
     """
     Sends the Legal Eagle digest email using Gmail App Password authentication.
+    
+    Args:
+        grouped_summary: List of grouped news items
+        EMAIL_RECEIVERS: List of email addresses or single email
+        GMAIL_CREDS: Gmail credentials dict
+        lang: Language code
+        monitor_updates: Optional monitor updates data from Law-to-Specification
+    
     Returns:
       True on success, False on failure (after retries).
     """
@@ -128,7 +169,7 @@ def send_email(grouped_summary: list[dict], EMAIL_RECEIVERS, GMAIL_CREDS: dict, 
     APP_PASSWORD = GMAIL_CREDS["app_password"]
 
     subject = f"🦅 Legal Eagle Daily Digest — {datetime.now().strftime('%Y-%m-%d')}"
-    body = build_email_body(grouped_summary, lang)
+    body = build_email_body(grouped_summary, lang, monitor_updates)
 
     msg = MIMEMultipart()
     msg["From"] = EMAIL_SENDER

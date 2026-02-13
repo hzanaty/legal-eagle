@@ -66,8 +66,16 @@ A daily email digest containing:
 - Daily email digests with grouped summaries
 - Human-in-the-loop feedback for continuous improvement
 
-**Recent Improvements** (v2.0.1 — Jan 2026):
-- Twitter Free tier optimization (15-min rate limiting, round-robin rotation)
+**Recent Improvements**:
+
+**v2.1.0 — Feb 2026**:
+- Twitter Search API Integration (multi-account fetching in single call)
+- Profile-level Lookback Window (configurable `news_lookback_days`, default 7 days)
+- Date Filtering Utility (unified date filtering across all sources)
+- Deprecated round-robin account selection (no longer needed with Search API)
+
+**v2.0.1 — Jan 2026**:
+- Twitter Free tier optimization (15-min rate limiting)
 - Resource skip optimization (2-hour rule for RSS/URLs)
 - Enhanced status visibility with clean stat cards
 

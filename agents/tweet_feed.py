@@ -3,7 +3,7 @@
 import time
 import requests
 from datetime import datetime, timedelta
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List, Dict, Any
 
 from configurations.config_loader import get_setting_value, set_setting_value
 try:
@@ -53,27 +53,6 @@ def _log_rate_limit_headers(resp: requests.Response) -> None:
         pass
 
 
-def _get_user_id(username: str, token: str) -> tuple[bool, str | dict]:
-    url = f"https://api.twitter.com/2/users/by/username/{username}"
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "User-Agent": "LegalEagleBot/1.0",
-    }
-    r = requests.get(url, headers=headers, timeout=30)
-    if r.status_code == 200:
-        data = r.json()
-        uid = data.get("data", {}).get("id")
-        if uid:
-            return True, uid
-        return False, {"error": True, "status_code": 200, "message": "No user id in response", "username": username}
-    elif r.status_code == 429:
-        print("User lookup hit 429.")
-        _log_rate_limit_headers(r)
-        return False, {"error": True, "status_code": 429, "message": "Rate limited on user lookup", "username": username}
-    else:
-        return False, {"error": True, "status_code": r.status_code, "message": r.text, "username": username}
-
-
 def check_twitter_rate_limit(profile_id: int, conn=None) -> Tuple[bool, int]:
     """
     Check if Twitter API can be called based on 15-minute rate limit.
@@ -108,8 +87,162 @@ def check_twitter_rate_limit(profile_id: int, conn=None) -> Tuple[bool, int]:
         return True, 0
 
 
+def search_tweets_multi_account(
+    accounts: List[str],
+    bearer_token: str,
+    profile_id: int,
+    conn=None,
+    days: int = 7,
+    max_results: int = 100
+) -> List[Dict[str, Any]]:
+    """
+    Fetch tweets from multiple accounts using Twitter Search API (one call).
+    
+    Args:
+        accounts: List of Twitter handles (with or without @)
+        bearer_token: Twitter API Bearer Token
+        profile_id: Profile ID for settings storage
+        conn: Optional database connection
+        days: Lookback window in days (max 7 for free tier)
+        max_results: Max tweets to return (max 100 per request)
+    
+    Returns:
+        List of tweet items formatted for pipeline, or empty list on error
+    """
+    if not accounts:
+        print("⚠️ No Twitter accounts provided")
+        return []
+    
+    # Enforce free tier limits
+    if days > 7:
+        print(f"⚠️ Twitter Search API limited to 7 days on free tier. Using 7 instead of {days}")
+        days = 7
+    
+    if max_results > 100:
+        max_results = 100
+    
+    def _set(key: str, value: str) -> None:
+        try:
+            if conn and db_set_setting:
+                db_set_setting(conn, profile_id, key, value)
+            else:
+                set_setting_value(profile_id, key, value)
+        except Exception:
+            pass
+    
+    # Build search query
+    handles = [h.lstrip("@") for h in accounts]
+    query = " OR ".join([f"from:{h}" for h in handles])
+    if len(handles) > 1:
+        query = f"({query})"
+    
+    # Calculate start_time for lookback window
+    start_time = (datetime.utcnow() - timedelta(days=days)).isoformat() + "Z"
+    
+    # Make API call
+    url = "https://api.twitter.com/2/tweets/search/recent"
+    headers = {
+        "Authorization": f"Bearer {bearer_token}",
+        "User-Agent": "LegalEagleBot/1.0"
+    }
+    params = {
+        "query": query,
+        "start_time": start_time,
+        "max_results": max_results,
+        "tweet.fields": "created_at,author_id,text"
+    }
+    
+    print(f"🐦 Searching tweets from {len(accounts)} accounts (last {days} days)...")
+    
+    try:
+        response = requests.get(url, headers=headers, params=params, timeout=30)
+        
+        # Update last fetch time
+        _set('twitter_last_fetch_time', datetime.utcnow().isoformat())
+        
+        if response.status_code == 200:
+            data = response.json()
+            tweets = data.get("data", [])
+            print(f"✅ Found {len(tweets)} tweets from Search API")
+            
+            # Convert to pipeline format
+            # Note: We need to map author_id back to username for proper formatting
+            # For now, we'll use a generic format. In future, could cache author_id->username mapping
+            items = []
+            for tweet in tweets:
+                text = tweet.get("text", "")
+                created_at = tweet.get("created_at", "")
+                tid = tweet.get("id", "")
+                author_id = tweet.get("author_id", "")
+                
+                # Try to find the username from the query accounts (best effort)
+                # In practice, all tweets will be from our monitored accounts
+                username = f"user_{author_id}"  # Fallback
+                
+                link = f"https://x.com/i/web/status/{tid}" if tid else ""
+                
+                items.append({
+                    "source": "Twitter",
+                    "source_type": "Tweet",
+                    "tweet_id": tid,
+                    "title": f"Tweet from Twitter",
+                    "summary": text,
+                    "link": link,
+                    "date": (created_at.split("T")[0] if created_at else ""),
+                    "content": f"{text}\n{link}\n{created_at}",
+                    "author_id": author_id,
+                })
+            
+            return items
+            
+        elif response.status_code == 429:
+            print("⚠️ Rate limit hit on Search API")
+            _log_rate_limit_headers(response)
+            return []
+        else:
+            print(f"❌ Twitter Search API error: {response.status_code}")
+            try:
+                error_data = response.json()
+                print(f"   Error: {error_data}")
+            except Exception:
+                print(f"   Response: {response.text}")
+            return []
+            
+    except Exception as e:
+        print(f"❌ Exception calling Twitter Search API: {e}")
+        return []
+
+
+# ========================================
+# LEGACY FUNCTIONS (Timeline API)
+# Kept for backward compatibility
+# ========================================
+
+def _get_user_id(username: str, token: str) -> tuple[bool, str | dict]:
+    url = f"https://api.twitter.com/2/users/by/username/{username}"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "User-Agent": "LegalEagleBot/1.0",
+    }
+    r = requests.get(url, headers=headers, timeout=30)
+    if r.status_code == 200:
+        data = r.json()
+        uid = data.get("data", {}).get("id")
+        if uid:
+            return True, uid
+        return False, {"error": True, "status_code": 200, "message": "No user id in response", "username": username}
+    elif r.status_code == 429:
+        print("User lookup hit 429.")
+        _log_rate_limit_headers(r)
+        return False, {"error": True, "status_code": 429, "message": "Rate limited on user lookup", "username": username}
+    else:
+        return False, {"error": True, "status_code": r.status_code, "message": r.text, "username": username}
+
+
 def select_next_twitter_account(profile_id: int, accounts: list[str], conn=None) -> Tuple[str, int]:
     """
+    DEPRECATED: Use search_tweets_multi_account() instead.
+    
     Select next account using round-robin rotation.
     Updates state in database.
     
@@ -154,10 +287,10 @@ def select_next_twitter_account(profile_id: int, accounts: list[str], conn=None)
     return selected, next_idx
 
 
-# Single-attempt fetch with immediate respect for server rate-limit headers.
-# Tries search first, then a single fallback to the user timeline. No retries/backoff loops.
 def fetch_recent_tweets(username, X_BEARER_TOKEN, profile_id, conn=None, max_results=5):
     """
+    DEPRECATED: Use search_tweets_multi_account() instead.
+    
     Fetch tweets for a known account using timeline endpoint only.
     - Caches user_id and last_seen_id in SQLite settings per profile.
     - Uses since_id to pull only new tweets.

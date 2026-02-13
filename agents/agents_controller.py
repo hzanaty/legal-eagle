@@ -30,12 +30,14 @@ print("✅ Config and creds imported")
 from configurations.db import get_connection, create_schema_if_needed, insert_filtered_news
 
 from agents.rss_parser import parse_rss_feed
-from agents.tweet_feed import fetch_recent_tweets, check_twitter_rate_limit, select_next_twitter_account
+from agents.tweet_feed import search_tweets_multi_account, check_twitter_rate_limit
 from agents.url_sources_runner import run_unified_sources
 from agents.compare_news import run_compare_news_agent
 from agents.news_filter import get_relevant_news
 from agents.news_grouper import group_and_summarize_news
 from agents.email_sender import send_email
+from agents.date_filter import filter_items_by_date
+from agents.email_inbox_parser import fetch_monitor_updates, format_monitor_updates_for_email
 from urllib.parse import urlparse
 
 
@@ -284,6 +286,10 @@ def run_profile_once(profile_id: int) -> bool:
         X_BEARER_TOKEN = creds["twitter"]["x_bearer_token"]
         GMAIL_CREDS = creds["gmail"]
 
+        # Load lookback window (default: 7 days)
+        lookback_days = int(get_setting_value(profile_id, 'news_lookback_days', '7'))
+        print(f"📅 News lookback window: {lookback_days} days")
+
         # Check if should skip RSS/URL resources (2-hour rule)
         conn = get_connection()
         create_schema_if_needed(conn)
@@ -298,8 +304,10 @@ def run_profile_once(profile_id: int) -> bool:
             for url in RSS_FEED_URLS:
                 rss_items.extend(parse_rss_feed(url))
             print(f"✅ Total RSS items collected: {len(rss_items)}")
+            # Apply date filter
+            rss_items = filter_items_by_date(rss_items, days=lookback_days)
 
-        # 2) Tweets (with 15-minute rate limit and round-robin)
+        # 2) Tweets (with 15-minute rate limit, Search API for all accounts)
         disable_tweets = os.environ.get("DISABLE_TWEETS")
         # Reset quota date enforcement
         reset_str = get_setting_value(profile_id, 'tweets_reset_quota_date')
@@ -339,17 +347,18 @@ def run_profile_once(profile_id: int) -> bool:
                         pass
                 print("🐦 Skipping Tweet Agent this run")
             else:
-                # Select next account (round-robin)
-                print("\n🐦 Running Tweet Feed Agent...")
-                selected_account, account_idx = select_next_twitter_account(profile_id, TWEET_ACCOUNTS, conn)
-                print(f"   ↳ Selected: @{selected_account} (#{account_idx + 1}/{len(TWEET_ACCOUNTS)})")
+                # Use Search API to fetch from ALL accounts in one call
+                print("\n🐦 Running Tweet Feed Agent (Search API)...")
+                print(f"   ↳ Fetching from {len(TWEET_ACCOUNTS)} accounts: {', '.join('@' + a.lstrip('@') for a in TWEET_ACCOUNTS)}")
                 
-                items = fetch_recent_tweets(selected_account, X_BEARER_TOKEN, profile_id, conn)
-                if isinstance(items, dict) and items.get("error"):
-                    print(f"   ❌ Tweet fetch failed for @{selected_account}: {items}")
-                else:
-                    tweet_items.extend(items)
-                    print(f"✅ Total tweets collected: {len(tweet_items)}")
+                tweet_items = search_tweets_multi_account(
+                    TWEET_ACCOUNTS, 
+                    X_BEARER_TOKEN, 
+                    profile_id, 
+                    conn, 
+                    days=lookback_days
+                )
+                print(f"✅ Total tweets collected from all accounts: {len(tweet_items)}")
 
         # 3) URL sources (skip if < 2 hours)
         url_items = []
@@ -365,6 +374,9 @@ def run_profile_once(profile_id: int) -> bool:
                 print(f"⚠️ {len(url_errors)} errors while scraping:")
                 for err in url_errors:
                     print(f"   - {err}")
+            
+            # Apply date filter
+            url_items = filter_items_by_date(url_items, days=lookback_days)
             
             # Update last full run time (only after full RSS+URL collection)
             from configurations.db import set_setting as db_set_setting
@@ -416,10 +428,45 @@ def run_profile_once(profile_id: int) -> bool:
         grouped_summary = group_and_summarize_news(final_items, OPENAI_API_KEY, LANGUAGE_PREFERENCE)
         print(f"✅ Grouped summary ready with {len(grouped_summary)} entries.")
 
+        # Monitor Updates (Law-to-Specification email integration)
+        monitor_updates_data = None
+        monitor_enabled = get_setting_value(profile_id, 'monitor_updates_enabled', 'false')
+        
+        if monitor_enabled == 'true' and EMAIL_RECEIVERS:
+            print("\n🔍 Fetching Monitor Updates from email inbox...")
+            try:
+                # Pass all email receivers (any of them can forward monitor emails)
+                print(f"   ↳ Checking emails from: {', '.join(EMAIL_RECEIVERS)}")
+                
+                conn_monitor = get_connection()
+                create_schema_if_needed(conn_monitor)
+                
+                monitor_updates = fetch_monitor_updates(
+                    profile_id,
+                    EMAIL_RECEIVERS,  # Pass all receivers, not just first
+                    GMAIL_CREDS['email_sender'],
+                    GMAIL_CREDS['app_password'],
+                    conn_monitor
+                )
+                
+                conn_monitor.close()
+                
+                if monitor_updates:
+                    monitor_updates_data = format_monitor_updates_for_email(monitor_updates)
+                    print(f"✅ Found {len(monitor_updates)} monitor update email(s)")
+                    print(f"   ↳ Total changes: {monitor_updates_data['count'] if monitor_updates_data else 0}")
+                else:
+                    print("ℹ️ No new monitor updates found")
+            except Exception as e:
+                print(f"⚠️ Error fetching monitor updates: {e}")
+                monitor_updates_data = None
+        elif monitor_enabled == 'true' and not EMAIL_RECEIVERS:
+            print("\n⚠️ Monitor updates enabled but no email receivers configured")
+
         # Email
-        print("� Sending summary email...")
+        print("\n📧 Sending summary email...")
         subject = f"🦅 Legal Eagle Daily Digest — {country}/{lob}"
-        ok = send_email(grouped_summary, EMAIL_RECEIVERS, GMAIL_CREDS, LANGUAGE_PREFERENCE)
+        ok = send_email(grouped_summary, EMAIL_RECEIVERS, GMAIL_CREDS, LANGUAGE_PREFERENCE, monitor_updates=monitor_updates_data)
         if ok:
             print(f"✅ Email sent to stakeholders for {country}/{lob}.\n")
             return True

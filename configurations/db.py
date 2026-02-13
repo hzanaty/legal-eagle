@@ -694,10 +694,11 @@ def list_url_sources(conn: sqlite3.Connection, profile_id: int) -> List[Dict[str
     """
     Return a list of URL sources with mode and sample_link for the given profile.
     Shape:
-      [{"url": str, "mode": "auto|force_static|force_dynamic", "sample_link": Optional[str], "read_more_label": Optional[str], "created_at": str}]
+      [{"url": str, "mode": "auto|force_static|force_dynamic|recursive", "sample_link": Optional[str], "read_more_label": Optional[str], 
+        "crawl_version": str, "max_depth": int, "allowed_domains": str, "path_filter": str, "max_results": int, "date_scope": str, "created_at": str}]
     """
     rows = conn.execute(
-        "SELECT url, mode, sample_link, read_more_label, crawl_version, created_at FROM url_sources WHERE profile_id = ? ORDER BY url",
+        "SELECT url, mode, sample_link, read_more_label, crawl_version, max_depth, allowed_domains, path_filter, max_results, date_scope, created_at FROM url_sources WHERE profile_id = ? ORDER BY url",
         (profile_id,)
     ).fetchall()
     return [
@@ -707,29 +708,54 @@ def list_url_sources(conn: sqlite3.Connection, profile_id: int) -> List[Dict[str
             "sample_link": r["sample_link"],
             "read_more_label": r["read_more_label"],
             "crawl_version": r["crawl_version"],
+            "max_depth": r["max_depth"],
+            "allowed_domains": r["allowed_domains"],
+            "path_filter": r["path_filter"],
+            "max_results": r["max_results"],
+            "date_scope": r["date_scope"],
             "created_at": r["created_at"],
         }
         for r in rows
     ]
 
 
-def upsert_url_source(conn: sqlite3.Connection, profile_id: int, url: str, mode: str = "auto", sample_link: Optional[str] = None, read_more_label: Optional[str] = None, crawl_version: str = "v1") -> None:
+def upsert_url_source(
+    conn: sqlite3.Connection, 
+    profile_id: int, 
+    url: str, 
+    mode: str = "auto", 
+    sample_link: Optional[str] = None, 
+    read_more_label: Optional[str] = None, 
+    crawl_version: str = "v1",
+    max_depth: int = 2,
+    allowed_domains: Optional[str] = None,
+    path_filter: Optional[str] = None,
+    max_results: int = 20,
+    date_scope: str = "all"
+) -> None:
     """
-    Insert a new url_source or update existing mode/sample_link/read_more_label/crawl_version.
+    Insert a new url_source or update existing with all parameters including recursive options.
     """
     now_iso = datetime.utcnow().isoformat()
     with conn:
         conn.execute(
             """
-            INSERT INTO url_sources(profile_id, url, mode, sample_link, read_more_label, crawl_version, created_at)
-            VALUES(?,?,?,?,?,?,?)
+            INSERT INTO url_sources(profile_id, url, mode, sample_link, read_more_label, crawl_version, 
+                                   max_depth, allowed_domains, path_filter, max_results, date_scope, created_at)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
             ON CONFLICT(profile_id, url) DO UPDATE SET
               mode=excluded.mode,
               sample_link=excluded.sample_link,
               read_more_label=excluded.read_more_label,
-              crawl_version=excluded.crawl_version
+              crawl_version=excluded.crawl_version,
+              max_depth=excluded.max_depth,
+              allowed_domains=excluded.allowed_domains,
+              path_filter=excluded.path_filter,
+              max_results=excluded.max_results,
+              date_scope=excluded.date_scope
             """,
-            (profile_id, url, mode, sample_link, read_more_label, crawl_version, now_iso)
+            (profile_id, url, mode, sample_link, read_more_label, crawl_version, 
+             max_depth, allowed_domains, path_filter, max_results, date_scope, now_iso)
         )
 
 
@@ -1033,5 +1059,115 @@ def get_reviewed_news_baseline(conn: sqlite3.Connection, profile_id: int, min_sc
             "source_id": None,
             "domain": None,
             "hash_signature": None,
+        })
+    return result
+
+
+# -----------------------
+# Monitor updates helpers (Law-to-Specification email integration)
+# -----------------------
+
+def insert_monitor_update_processed(
+    conn: sqlite3.Connection,
+    profile_id: int,
+    email_message_id: str,
+    report_date: Optional[str],
+    monitored_url: Optional[str],
+    changes: List[str]
+) -> int:
+    """
+    Mark a Law-to-Specification email as processed.
+    
+    Args:
+        conn: Database connection
+        profile_id: Profile ID
+        email_message_id: Gmail message ID (unique)
+        report_date: Report date from email (ISO format)
+        monitored_url: URL being monitored
+        changes: List of change summaries
+    
+    Returns:
+        Inserted row ID
+    """
+    import json
+    now_iso = datetime.utcnow().isoformat()
+    changes_json = json.dumps(changes)
+    
+    with conn:
+        try:
+            conn.execute(
+                """
+                INSERT INTO monitor_updates_processed(
+                    profile_id, email_message_id, report_date, monitored_url, changes_json, processed_at
+                )
+                VALUES(?,?,?,?,?,?)
+                """,
+                (profile_id, email_message_id, report_date, monitored_url, changes_json, now_iso)
+            )
+            row = conn.execute("SELECT last_insert_rowid() AS id").fetchone()
+            return int(row["id"]) if row else -1
+        except sqlite3.IntegrityError:
+            # Email already processed (duplicate email_message_id)
+            return -1
+
+
+def is_monitor_email_processed(conn: sqlite3.Connection, email_message_id: str) -> bool:
+    """
+    Check if an email has already been processed.
+    
+    Args:
+        conn: Database connection
+        email_message_id: Gmail message ID
+    
+    Returns:
+        True if email was already processed, False otherwise
+    """
+    row = conn.execute(
+        "SELECT id FROM monitor_updates_processed WHERE email_message_id = ?",
+        (email_message_id,)
+    ).fetchone()
+    return row is not None
+
+
+def list_monitor_updates_for_profile(
+    conn: sqlite3.Connection,
+    profile_id: int,
+    days: int = 7
+) -> List[Dict[str, Any]]:
+    """
+    List recent monitor updates for a profile.
+    
+    Args:
+        conn: Database connection
+        profile_id: Profile ID
+        days: How many days back to look (default: 7)
+    
+    Returns:
+        List of monitor update records
+    """
+    import json
+    window_iso = (datetime.utcnow() - timedelta(days=days)).isoformat()
+    
+    rows = conn.execute(
+        """
+        SELECT id, profile_id, email_message_id, report_date, monitored_url, changes_json, processed_at
+        FROM monitor_updates_processed
+        WHERE profile_id = ? AND processed_at >= ?
+        ORDER BY processed_at DESC
+        """,
+        (profile_id, window_iso)
+    ).fetchall()
+    
+    result: List[Dict[str, Any]] = []
+    for r in rows:
+        changes = json.loads(r["changes_json"]) if r["changes_json"] else []
+        result.append({
+            "id": r["id"],
+            "profile_id": r["profile_id"],
+            "email_message_id": r["email_message_id"],
+            "report_date": r["report_date"],
+            "monitored_url": r["monitored_url"],
+            "changes": changes,
+            "processed_at": r["processed_at"],
         })
     return result

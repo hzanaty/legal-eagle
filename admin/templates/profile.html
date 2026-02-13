@@ -212,10 +212,12 @@
           <tr>
             <th style="width: 40px;"><input type="checkbox" onclick="toggleAllCheckboxes(this, 'bulk_urls_form')"></th>
             <th>URL</th>
-            <th style="width: 120px;">Mode</th>
-            <th style="width: 120px;">Crawl Version</th>
-            <th style="width: 140px;">Sample Link</th>
-            <th style="width: 140px;">Read More Label</th>
+            <th style="width: 100px;">Mode</th>
+            <th style="width: 100px;">Crawl Ver.</th>
+            <th style="width: 120px;">Sample Link</th>
+            <th style="width: 100px;">Read More</th>
+            <th style="width: 80px;">Depth</th>
+            <th style="width: 100px;">Domains</th>
             <th style="width: 120px;">Actions</th>
           </tr>
         </thead>
@@ -315,7 +317,7 @@
 <!-- Twitter Accounts -->
 <div class="sapCard">
   <div class="sapCard-header">
-    <span>🐦 Twitter Accounts</span>
+    <span>� Twitter Accounts</span>
     <span style="color: var(--sapNeutralColor); font-weight: 400; font-size: var(--sapFontSmallSize);">
       {{ tweets|length if tweets else 0 }} account{% if (tweets|length if tweets else 0) != 1 %}s{% endif %}
     </span>
@@ -351,7 +353,7 @@
   <div class="sapCard-content">
     {% if not tweets or tweets|length == 0 %}
     <div style="text-align: center; color: var(--sapNeutralColor); padding: var(--sapSpacingL) 0;">
-      <div style="font-size: 2rem; margin-bottom: var(--sapSpacingS);">🐦</div>
+      <div style="font-size: 2rem; margin-bottom: var(--sapSpacingS);">�</div>
       <p style="margin: 0;">No Twitter accounts yet</p>
     </div>
     {% endif %}
@@ -433,6 +435,40 @@
   </div>
 </div>
 
+<!-- Monitor Notifications -->
+<div class="sapCard">
+  <div class="sapCard-header">
+    <span>📧 Monitor Notifications</span>
+    <span style="color: var(--sapNeutralColor); font-weight: 400; font-size: var(--sapFontSmallSize);">
+      Law-to-Specification Integration
+    </span>
+  </div>
+  <div class="sapCard-content">
+    <div style="padding: var(--sapSpacingM); background: var(--sapNeutralBackground); border-radius: 0.25rem; margin-bottom: var(--sapSpacingM);">
+      <label style="display: flex; align-items: center; gap: var(--sapSpacingS); cursor: pointer;">
+        <input type="checkbox" id="monitorToggle" {% if monitor_enabled %}checked{% endif %} 
+               onchange="toggleMonitorUpdates({{ profile.id }}, this.checked)">
+        <span style="font-weight: 600;">Enable Law-to-Specification email notifications</span>
+      </label>
+    </div>
+    
+    <div class="sapForm-help" style="margin-top: var(--sapSpacingS);">
+      <p style="margin: 0 0 var(--sapSpacingS) 0;">
+        <strong>How it works:</strong>
+      </p>
+      <ol style="margin: 0; padding-left: var(--sapSpacingL); line-height: 1.6;">
+        <li>Law-to-Specification sends "Monitor updates" emails to the first email receiver above</li>
+        <li>That person forwards the email to Legal Eagle's Gmail inbox</li>
+        <li>Legal Eagle scans the inbox and includes changes in the daily digest</li>
+        <li>Changes appear in a separate "Website Change Alerts" section</li>
+      </ol>
+      <p style="margin: var(--sapSpacingS) 0 0 0; color: var(--sapCriticalColor);">
+        <strong>Note:</strong> Requires at least one email receiver configured above.
+      </p>
+    </div>
+  </div>
+</div>
+
 <!-- Glossary -->
 <div class="sapCard">
   <div class="sapCard-header">
@@ -501,6 +537,21 @@ function toggleAllCheckboxes(masterCheckbox, formId) {
   checkboxes.forEach(function(cb) {
     cb.checked = masterCheckbox.checked;
   });
+}
+
+function toggleMonitorUpdates(profileId, enabled) {
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = `/admin/profiles/${profileId}/monitor-toggle`;
+  
+  const input = document.createElement('input');
+  input.type = 'hidden';
+  input.name = 'enabled';
+  input.value = enabled ? 'true' : 'false';
+  
+  form.appendChild(input);
+  document.body.appendChild(form);
+  form.submit();
 }
 </script>
 {% endblock %}

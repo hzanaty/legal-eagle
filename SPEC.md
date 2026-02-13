@@ -1,7 +1,7 @@
-# Legal Eagle 2.0 — Technical Specification
+# Legal Eagle 2.2 — Technical Specification
 
-**Version:** 2.0 (SAP Fiori Design)  
-**Last Updated:** 2026-01-28
+**Version:** 2.2 (Monitor Updates Integration + Law-to-Spec Email Parsing)  
+**Last Updated:** 2026-02-13
 
 This document provides the technical specification for Legal Eagle, an AI-powered regulatory compliance monitoring system for SAP Localization.
 
@@ -50,19 +50,20 @@ Legal Eagle monitors government sources for legal updates in chosen countries an
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                           LEGAL EAGLE 2.0 ARCHITECTURE                       │
+│                           LEGAL EAGLE 2.2 ARCHITECTURE                       │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
 │  │                         DATA SOURCES                                  │   │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────────┐   │   │
-│  │  │ RSS Feeds   │  │ Twitter/X   │  │ Websites (Static/Dynamic)   │   │   │
-│  │  │ rss_parser  │  │ tweet_feed  │  │ url_sources_runner          │   │   │
-│  │  └──────┬──────┘  └──────┬──────┘  └──────────────┬──────────────┘   │   │
-│  └─────────┼────────────────┼────────────────────────┼──────────────────┘   │
-│            │                │                        │                       │
-│            └────────────────┼────────────────────────┘                       │
-│                             ▼                                                │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌───────────────┐  ┌──────────┐   │   │
+│  │  │ RSS Feeds   │  │ Twitter/X   │  │   Websites    │  │  Email   │   │   │
+│  │  │ rss_parser  │  │ tweet_feed  │  │ url_sources_  │  │  Inbox   │   │   │
+│  │  │             │  │             │  │    runner     │  │(Law2Spec)│   │   │
+│  │  └──────┬──────┘  └──────┬──────┘  └───────┬───────┘  └────┬─────┘   │   │
+│  └─────────┼────────────────┼────────────────┼──────────────────┼─────────┘  │
+│            │                │                │                  │            │
+│            └────────────────┼────────────────┘                  │            │
+│                             ▼                                   │            │
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
 │  │                      PROCESSING PIPELINE                              │   │
 │  │                                                                       │   │
@@ -71,13 +72,21 @@ Legal Eagle monitors government sources for legal updates in chosen countries an
 │  │  │ (AI Relevance)  │    │ (Dedup/Updates) │    │ (AI Grouping)   │   │   │
 │  │  └─────────────────┘    └─────────────────┘    └────────┬────────┘   │   │
 │  │                                                          │            │   │
-│  └──────────────────────────────────────────────────────────┼────────────┘   │
-│                                                              ▼               │
+│  │  ┌──────────────────────────────────────────────────────┘            │   │
+│  │  │                                                                    │   │
+│  │  │  ┌──────────────────────┐                                         │   │
+│  │  └─▶│ email_inbox_parser   │ (Monitor Updates from Law-to-Spec)      │   │
+│  │     │ (Gmail IMAP)         │                                         │   │
+│  │     └──────────┬───────────┘                                         │   │
+│  │                │                                                     │   │
+│  └────────────────┼─────────────────────────────────────────────────────┘   │
+│                   ▼                                                          │
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
 │  │                         OUTPUT                                        │   │
 │  │  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐   │   │
 │  │  │  email_sender   │    │  JSON Snapshots │    │  SQLite DB      │   │   │
 │  │  │ (Daily Digest)  │    │ (outputs/)      │    │ (Baseline)      │   │   │
+│  │  │ + Monitor Alerts│    │                 │    │                 │   │   │
 │  │  └─────────────────┘    └─────────────────┘    └─────────────────┘   │   │
 │  └──────────────────────────────────────────────────────────────────────┘   │
 │                                                                              │
@@ -85,6 +94,7 @@ Legal Eagle monitors government sources for legal updates in chosen countries an
 │  │                         ADMIN UI (Flask)                              │   │
 │  │  • Profile Management    • Source Configuration    • Run Execution   │   │
 │  │  • Glossary Management   • Filtered News Review    • Live Logs       │   │
+│  │  • Monitor Notifications Toggle                                      │   │
 │  └──────────────────────────────────────────────────────────────────────┘   │
 │                                                                              │
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
@@ -94,9 +104,10 @@ Legal Eagle monitors government sources for legal updates in chosen countries an
 │  │  │ (config.db)     │    │ Variables       │                          │   │
 │  │  │ - Profiles      │    │ - API Keys      │                          │   │
 │  │  │ - Sources       │    │ - Credentials   │                          │   │
-│  │  │ - Glossary      │    │                 │                          │   │
+│  │  │ - Glossary      │    │ - Gmail IMAP    │                          │   │
 │  │  │ - News Baseline │    │                 │                          │   │
 │  │  │ - Runs/Logs     │    │                 │                          │   │
+│  │  │ - Monitor Hist. │    │                 │                          │   │
 │  │  └─────────────────┘    └─────────────────┘                          │   │
 │  └──────────────────────────────────────────────────────────────────────┘   │
 │                                                                              │
@@ -135,7 +146,8 @@ Legal Eagle monitors government sources for legal updates in chosen countries an
 |---------|----------------|---------|
 | OpenAI | `gpt-4o-mini` | Semantic filtering and grouping |
 | OpenAI | `text-embedding-3-small` | Semantic similarity for deduplication |
-| Twitter/X API | `GET /2/users/{id}/tweets` | Timeline monitoring |
+| Twitter/X API | `GET /2/tweets/search/recent` | Multi-account tweet search (v2.1+) |
+| Twitter/X API | `GET /2/users/{id}/tweets` | Single-account timeline (legacy) |
 | Gmail SMTP | `smtp.gmail.com:587` | Email delivery |
 
 ---
@@ -172,6 +184,14 @@ Per-profile key-value settings.
 | `value` | TEXT | Setting value |
 
 **Unique constraint**: `(profile_id, key)`
+
+**Common Settings** (v2.1+):
+| Key | Default | Description |
+|-----|---------|-------------|
+| `news_lookback_days` | `7` | Lookback window for news collection (max 7 for Twitter Free tier) |
+| `twitter_last_fetch_time` | - | Last Twitter API call timestamp (ISO) |
+| `tweets_reset_quota_date` | - | Date to resume Twitter collection (ISO date) |
+| `twitter_last_account_index` | `0` | **Deprecated in v2.1**: Round-robin index (no longer used with Search API) |
 
 ### 4.2 Source Tables
 
@@ -325,7 +345,26 @@ Log lines for each run (for live streaming).
 | `line` | TEXT | Log message |
 | `seq` | INTEGER | Sequence number |
 
-### 4.6 Audit Table
+### 4.6 Monitor Updates Table
+
+#### `monitor_updates_processed`
+Tracks processed Law-to-Specification "Monitor updates" emails to prevent duplicates.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | INTEGER PK | Auto-increment ID |
+| `profile_id` | INTEGER FK | References `profiles(id)` |
+| `email_message_id` | TEXT | Email Message-ID header |
+| `report_date` | TEXT | Report date from email (ISO format) |
+| `monitored_url` | TEXT | URL being monitored |
+| `changes_json` | TEXT | JSON array of change summaries |
+| `processed_at` | TEXT | Processing timestamp (ISO) |
+
+**Indexes**: `(profile_id, email_message_id)` (unique), `(profile_id, processed_at)`
+
+**Purpose**: Prevents re-processing forwarded emails when profile runs multiple times.
+
+### 4.7 Audit Table
 
 #### `audit_log`
 Tracks admin actions for accountability.
@@ -367,7 +406,7 @@ def parse_rss_feed(url: str) -> List[Dict]
 
 **Purpose**: Collect tweets from monitored Twitter/X accounts.
 
-**Input**: Account handle, bearer token, profile_id
+**Input**: List of account handles, bearer token, profile_id, lookback days
 
 **Output**: List of tweet items with:
 - `source`: `"Twitter"`
@@ -377,20 +416,78 @@ def parse_rss_feed(url: str) -> List[Dict]
 - `date`: Tweet timestamp
 - `content`: Full tweet text
 - `tweet_id`: Tweet ID (for deduplication)
+- `author_id`: Tweet author ID
 
-**Key Features**:
-- Uses timeline endpoint `GET /2/users/{id}/tweets`
-- Caches `user_id` and `last_seen_id` per handle in SQLite settings
-- Uses `since_id` for incremental fetching
-- Hard cap: `max_results=3` per request
-- No retries on 429 (rate limit)
+**Key Features (v2.1+)**:
+- **Multi-Account Search API**: Fetches from ALL accounts in single API call (more efficient)
+- Uses `GET /2/tweets/search/recent` endpoint
+- Enforces 15-minute rate limit (Free tier)
+- Configurable lookback window (max 7 days on Free tier)
+- Returns up to 100 tweets per request
 
-**Key Function**:
+**Legacy Features (deprecated)**:
+- Timeline endpoint `GET /2/users/{id}/tweets` (single account)
+- Round-robin account rotation (no longer needed)
+- `since_id` incremental fetching
+
+**Key Functions**:
 ```python
+# v2.1+ (recommended)
+def search_tweets_multi_account(
+    accounts: List[str],
+    bearer_token: str,
+    profile_id: int,
+    conn=None,
+    days: int = 7,
+    max_results: int = 100
+) -> List[Dict]
+
+# Legacy (deprecated)
 def fetch_recent_tweets(account_name: str, bearer_token: str, profile_id: int) -> List[Dict]
 ```
 
-### 5.3 URL Sources Runner (`agents/url_sources_runner.py`)
+**Rate Limiting**:
+- `check_twitter_rate_limit(profile_id, conn)` enforces 15-minute rule
+- Stores `twitter_last_fetch_time` in settings
+- Returns `(can_run: bool, minutes_to_wait: int)`
+
+### 5.3 Date Filter (`agents/date_filter.py`)
+
+**Purpose**: Filter news items by publication date across all source types (v2.1+).
+
+**Input**: 
+- List of news items (RSS, tweets, URL sources)
+- Lookback window in days (default: 7)
+
+**Output**: Filtered list containing only items within the date range
+
+**Key Features**:
+- **Unified date filtering**: Works across RSS, Twitter, and URL sources
+- **Flexible date field detection**: Tries multiple field names (`date`, `published`, `published_at`, `pubDate`, `created_at`)
+- **Multiple format support**: ISO 8601 and simple YYYY-MM-DD formats
+- **Fail-safe behavior**: Items without parseable dates are KEPT (don't lose data)
+- **Configurable lookback**: Per-profile setting `news_lookback_days` (stored in `settings` table)
+
+**Configuration**:
+- Profile-level setting: `news_lookback_days` (default: 7)
+- Twitter Search API limited to max 7 days on Free tier
+- Applied BEFORE filtering for efficiency
+
+**Key Functions**:
+```python
+def filter_items_by_date(items: List[Dict[str, Any]], days: int = 7) -> List[Dict[str, Any]]
+def parse_item_date(item: Dict[str, Any]) -> Optional[datetime]
+```
+
+**Usage Example**:
+```python
+from agents.date_filter import filter_items_by_date
+
+# Apply 7-day lookback window
+filtered_items = filter_items_by_date(all_news_items, days=7)
+```
+
+### 5.4 URL Sources Runner (`agents/url_sources_runner.py`)
 
 **Purpose**: Scrape news from government websites (static and dynamic).
 
@@ -570,6 +667,7 @@ def group_and_summarize_news(items: List[Dict], api_key: str, language: str) -> 
 - Email receivers list
 - Gmail credentials
 - Language preference
+- Monitor updates (optional)
 
 **Output**: Boolean success status
 
@@ -577,7 +675,8 @@ def group_and_summarize_news(items: List[Dict], api_key: str, language: str) -> 
 - Gmail SMTP with App Password
 - STARTTLS with SSL fallback
 - Retry on transient errors
-- HTML formatted email
+- HTML formatted email with RTL support
+- Monitor updates section integration
 
 **Key Function**:
 ```python
@@ -585,9 +684,80 @@ def send_email(
     grouped_summary: List[Dict],
     receivers: List[str],
     gmail_creds: Dict,
-    language: str
+    language: str,
+    monitor_updates: Dict = None
 ) -> bool
 ```
+
+**Email Structure**:
+1. Header with date
+2. News sections by category (HCM/FIN/Other)
+   - New items
+   - Updates (with delta bullets)
+3. **Monitor Updates section** (if enabled)
+   - Report date and monitored URL
+   - Change summaries
+   - Empty state message if no changes
+4. Footer with branding
+
+### 5.8 Email Inbox Parser (`agents/email_inbox_parser.py`)
+
+**Purpose**: Fetch and parse Law-to-Specification "Monitor updates" emails from Gmail inbox.
+
+**Input**:
+- Profile ID
+- List of email receiver addresses (any can forward emails)
+- Gmail IMAP credentials
+- Database connection
+
+**Output**: List of parsed monitor updates
+
+**Features**:
+- Gmail IMAP connection
+- Searches for subject "Monitor updates" (handles "FW:" prefix)
+- Matches emails from ANY configured receiver
+- Parses Law-to-Spec email format
+- Prevents duplicate processing via database tracking
+- Aggregates multiple emails into single report
+
+**Email Format Parsed**:
+```
+Daily Report of Regulatory Changes - YYYY-MM-DD
+Hello,
+The following meaningful updates were identified for link:
+https://www.example.gov/...
+- change summary 1
+- change summary 2
+...
+```
+
+**Key Functions**:
+```python
+def fetch_monitor_updates(
+    profile_id: int,
+    recipient_emails: List[str],
+    gmail_email: str,
+    gmail_app_password: str,
+    conn=None
+) -> List[Dict[str, Any]]
+
+def parse_law_to_spec_email(body: str) -> Dict[str, Any]
+
+def format_monitor_updates_for_email(monitor_updates: List[Dict]) -> Optional[Dict]
+```
+
+**Workflow**:
+1. Connect to Gmail IMAP
+2. Search for "Monitor updates" emails
+3. For each email:
+   - Check if "From" matches any configured receiver
+   - Check if already processed (database)
+   - Parse email body (report date, URL, changes)
+   - Mark as processed in database
+4. Aggregate all changes from unprocessed emails
+5. Return formatted data for email digest
+
+**Integration**: Called by `agents_controller.py` after news grouping, before sending email.
 
 ---
 
@@ -1236,8 +1406,18 @@ Each news item carries a `source_type` field that tracks its origin:
 │  5. GROUP                                                        │
 │     └── AI-powered topic grouping (GPT-4o-mini)                 │
 │                                                                  │
+│  5.5 MONITOR UPDATES (Law-to-Spec integration, if enabled)      │
+│     ├── Connect to Gmail IMAP                                   │
+│     ├── Search for "Monitor updates" emails                     │
+│     ├── Match emails from configured receivers                  │
+│     ├── Parse email body (report date, URL, changes)            │
+│     ├── Check database for already processed emails             │
+│     ├── Mark new emails as processed                            │
+│     └── Aggregate changes for email digest                      │
+│                                                                  │
 │  6. EMAIL                                                        │
-│     └── Send HTML digest via Gmail SMTP                         │
+│     ├── Build HTML digest (news sections + monitor updates)     │
+│     └── Send via Gmail SMTP                                     │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -1340,8 +1520,9 @@ legal-eagle/
 │   ├── __init__.py
 │   ├── agents_controller.py        # Main orchestrator
 │   ├── rss_parser.py               # RSS/Atom feed collection
-│   ├── tweet_feed.py               # Twitter/X timeline collection
+│   ├── tweet_feed.py               # Twitter/X Search API collection (v2.1+)
 │   ├── url_sources_runner.py       # Website scraping (static/dynamic)
+│   ├── date_filter.py              # Date-based filtering utility (v2.1+)
 │   ├── news_filter.py              # AI relevance filtering
 │   ├── compare_news.py             # Deduplication & update detection
 │   ├── news_grouper.py             # AI topic grouping
