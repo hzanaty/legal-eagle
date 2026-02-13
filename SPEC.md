@@ -1,6 +1,6 @@
-# Legal Eagle 2.2 — Technical Specification
+# Legal Eagle 2.3 — Technical Specification
 
-**Version:** 2.2 (Monitor Updates Integration + Law-to-Spec Email Parsing)  
+**Version:** 2.3 (Simplified Versioning + Documentation Improvements)  
 **Last Updated:** 2026-02-13
 
 This document provides the technical specification for Legal Eagle, an AI-powered regulatory compliance monitoring system for SAP Localization.

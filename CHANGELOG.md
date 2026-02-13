@@ -1,6 +1,12 @@
 # CHANGELOG
 
-## v2.2.0 — 2026-02-13
+## v2.3 — 2026-02-13
+### Documentation
+- Simplified versioning format from X.Y.Z to X.Y
+- Updated all version references for consistency
+- Consolidated documentation structure
+
+## v2.2 — 2026-02-13
 ### Major Features
 - **Monitor Updates Integration**: Law-to-Specification email monitoring
   - New agent: `agents/email_inbox_parser.py` 
@@ -46,7 +52,7 @@
 - Verified: Email parsing, database tracking, digest integration
 - Confirmed: Works with empty grouped_summary (no news items)
 
-## v2.1.0 — 2026-02-10
+## v2.1 — 2026-02-10
 ### Major Features
 - **Twitter Search API Integration**: Replaced per-account timeline fetching with multi-account Search API
   - Fetches tweets from ALL accounts in a single API call (more efficient)
@@ -80,23 +86,8 @@
 - Verified: 14 tweets from 2 accounts in single API call
 - Confirmed: Free tier rate limit is 1 request per 15 minutes for Search API
 
-## v2.0.1 — 2026-01-28
-### Improvements
-- Twitter API rate limit enforcement (15-minute rule per Free tier)
-- Round-robin account rotation for fair Twitter monitoring coverage
-- Resource skip optimization (2-hour rule for RSS/URLs to reduce unnecessary processing)
-- Status cards on run page matching review page design style
-- Backfill support for run timestamps from previous executions
-
-### Bug Fixes
-- Fixed Twitter max_results parameter (3 → 5, API minimum requirement)
-- Fixed missing last_full_run_time setting from previous runs
-
-### Documentation
-- Added TWITTER_RATE_LIMIT_FIX.md with detailed implementation guide
-
-## v2.0.0 — 2026-01-27
+## v2.0 — 2026-01-27
 ### Documentation Refactor & Baseline
-- Consolidated all technical documentation into SPEC.md v2.0
+- Consolidated all technical documentation into SPEC.md
 - Established baseline for future changelog entries
 - Previous development history available in git commits
