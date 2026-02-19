@@ -1797,6 +1797,13 @@ def run_unified_sources(url_sources: List[Dict[str, str]], profile_slug: Optiona
     print(f"[Sources] {len(url_sources)} sources to process")
     items: List[Dict] = []
     errors: List[Dict] = []
+    
+    # Import Resmi Gazete specialized scraper
+    try:
+        from agents.resmi_gazete_scraper import scrape_resmi_gazete
+        resmi_gazete_available = True
+    except Exception:
+        resmi_gazete_available = False
 
     def _static_path(u: str, detail_pattern: Optional[str], read_label: Optional[str]) -> Tuple[List[Dict], List[Dict]]:
         print(f"  [static] Fetch listing: {u}")
@@ -2134,14 +2141,35 @@ def run_unified_sources(url_sources: List[Dict[str, str]], profile_slug: Optiona
         sample = src.get("sample_link")
         detail_pattern = derive_detail_pattern(sample) if sample else None
         read_label = src.get("read_more_label")
+        date_scope = src.get("date_scope", "all")
+        
         try:
-            print(f"[Source {idx+1}/{len(url_sources)}] url={u} mode={mode} detail_prefix={detail_pattern or '-'} read_more_label={read_label or '-'}")
+            print(f"[Source {idx+1}/{len(url_sources)}] url={u} mode={mode} detail_prefix={detail_pattern or '-'} read_more_label={read_label or '-'} date_scope={date_scope}")
         except Exception:
             pass
 
         if not u:
             errors.append({"url": u, "error": "missing url"})
             continue
+        
+        # Special handling for Resmi Gazete (Turkish Official Gazette)
+        if resmi_gazete_available and "resmigazete.gov.tr" in u.lower():
+            try:
+                print(f"[Source {idx+1}] Detected Resmi Gazete - using specialized scraper")
+                days_back = 7
+                if date_scope == "last_7_days":
+                    days_back = 7
+                elif date_scope == "last_30_days":
+                    days_back = 30
+                
+                its, errs = scrape_resmi_gazete(u, days_back=days_back)
+                print(f"[Source {idx+1}] Resmi Gazete scraper: items={len(its)} errors={len(errs)}")
+                items.extend(its)
+                errors.extend(errs)
+                continue  # Skip normal processing
+            except Exception as e:
+                errors.append({"url": u, "error": f"Resmi Gazete scraper failed: {e}"})
+                continue
 
         try:
             if mode == "force_static":

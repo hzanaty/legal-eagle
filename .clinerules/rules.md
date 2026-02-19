@@ -105,6 +105,40 @@ When implementing changes:
 5. **Document**: Update `SPEC.md` with new functionality
 6. **Verify**: Run full pipeline to ensure no regressions
 
+### Backend → Frontend Sync Rule (CRITICAL)
+**Whenever a backend change is made, the Admin UI MUST be updated to expose that functionality.**
+
+Examples of changes requiring UI updates:
+- New database fields → Add to forms and display views
+- New configuration options → Add to settings/profile pages
+- New scrapers or modes → Add to URL source configuration
+- New features → Add buttons, forms, or displays in relevant pages
+
+**If the user can't see or interact with a feature in the Admin UI, the feature is incomplete.**
+
+Steps for backend→frontend sync:
+1. Make backend changes (database, agents, logic)
+2. Update Admin UI templates in `admin/templates/`
+3. Update Flask routes in `admin/app.py` if needed
+4. Test the UI to ensure the feature is visible and functional
+5. Document UI changes in `SPEC.md` and `CHANGELOG.md`
+
+### Add + Edit Consistency Rule (CRITICAL)
+**When adding UI fields, they must be present in BOTH Add and Edit modes.**
+
+For every new field:
+- **Add form**: Field must be present when creating new items
+- **Table display**: Field value must be visible in the list/table
+- **Edit form**: Field must be editable for existing items
+
+Examples:
+- New database field `date_scope` → Add to:
+  - Create form (when adding URL source)
+  - Table column (showing current value)
+  - Edit form (allowing modification)
+
+**Incomplete UI implementation = incomplete feature.**
+
 ### Environment Variables
 - All secrets in environment variables (never in code or database)
 - Use `LEGAL_EAGLE_` prefix for project-specific vars

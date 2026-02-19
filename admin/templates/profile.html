@@ -240,6 +240,7 @@
             <th>URL</th>
             <th style="width: 150px;">Sample Link</th>
             <th style="width: 120px;">Read More Label</th>
+            <th style="width: 120px;">Date Scope</th>
             <th style="width: 140px;">Crawl Type</th>
             <th style="width: 180px;">Recursive Settings</th>
             <th style="width: 120px;">Actions</th>
@@ -264,6 +265,16 @@
                 <span style="color: var(--sapNeutralColor);">—</span>
               {% endif %}
             </td>
+            <td style="font-size: var(--sapFontSmallSize);">
+              {% if s.date_scope and s.date_scope != 'all' %}
+                {% if s.date_scope == 'last_7_days' %}Last 7 days
+                {% elif s.date_scope == 'last_30_days' %}Last 30 days
+                {% else %}{{ s.date_scope }}
+                {% endif %}
+              {% else %}
+                <span style="color: var(--sapNeutralColor);">N/A</span>
+              {% endif %}
+            </td>
             <td>
               <select class="sapForm-select" disabled style="padding: 0.25rem 0.5rem; font-size: var(--sapFontSmallSize); width: 100%;">
                 <option {% if s.mode == 'auto' %}selected{% endif %}>Auto</option>
@@ -286,23 +297,54 @@
               {% endif %}
             </td>
             <td>
-              {% if s.mode == 'recursive' %}
               <button type="button" class="sapBtn sapBtn-sm" onclick="toggleEditRow('edit-{{ loop.index }}')">Edit</button>
-              {% endif %}
               <form method="post" action="{{ url_for('delete_url_source_route', profile_id=profile.id) }}" style="display: inline;">
                 <input type="hidden" name="url" value="{{ s.url }}">
                 <button type="submit" class="sapBtn sapBtn-reject sapBtn-sm">Delete</button>
               </form>
             </td>
           </tr>
-          {% if s.mode == 'recursive' %}
           <tr id="edit-{{ loop.index }}" style="display: none;">
-            <td colspan="7" style="padding: var(--sapSpacingM); background: var(--sapNeutralBackground);">
+            <td colspan="8" style="padding: var(--sapSpacingM); background: var(--sapNeutralBackground);">
+              {% if s.mode == 'recursive' %}
               <form method="post" action="{{ url_for('update_url_source_route', profile_id=profile.id) }}">
                 <input type="hidden" name="url" value="{{ s.url }}">
-                <input type="hidden" name="mode" value="recursive">
                 
-                <h4 style="margin: 0 0 var(--sapSpacingM) 0; color: var(--sapBrandColor);">Edit Recursive Settings</h4>
+                <h4 style="margin: 0 0 var(--sapSpacingM) 0; color: var(--sapBrandColor);">Edit URL Source</h4>
+                
+                <div style="margin-bottom: var(--sapSpacingM);">
+                  <label class="sapForm-label">Crawl Type</label>
+                  <select class="sapForm-select" name="mode">
+                    <option value="auto" {% if s.mode == 'auto' %}selected{% endif %}>Auto-detect (static/dynamic)</option>
+                    <option value="force_static" {% if s.mode == 'force_static' %}selected{% endif %}>Force Static HTML</option>
+                    <option value="force_dynamic" {% if s.mode == 'force_dynamic' %}selected{% endif %}>Force Browser Rendering</option>
+                    <option value="recursive" {% if s.mode == 'recursive' %}selected{% endif %}>Recursive (deep links)</option>
+                  </select>
+                  <span class="sapForm-help">How to crawl this URL source</span>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--sapSpacingM); margin-bottom: var(--sapSpacingM);">
+                  <div>
+                    <label class="sapForm-label">Sample Link (optional)</label>
+                    <input class="sapForm-input" name="sample_link" value="{{ s.sample_link or '' }}" placeholder="https://example.gov/news/12345">
+                  </div>
+                  <div>
+                    <label class="sapForm-label">Read More Label (optional)</label>
+                    <input class="sapForm-input" name="read_more_label" value="{{ s.read_more_label or '' }}" placeholder="e.g., اقرأ المزيد">
+                  </div>
+                  <div>
+                    <label class="sapForm-label">Date Scope</label>
+                    <select class="sapForm-select" name="date_scope">
+                      <option value="all" {% if (s.date_scope or 'all') == 'all' %}selected{% endif %}>N/A</option>
+                      <option value="last_7_days" {% if s.date_scope == 'last_7_days' %}selected{% endif %}>Last 7 days</option>
+                      <option value="last_30_days" {% if s.date_scope == 'last_30_days' %}selected{% endif %}>Last 30 days</option>
+                    </select>
+                    <span class="sapForm-help">For date-templated URLs</span>
+                  </div>
+                </div>
+                
+                <hr style="margin: var(--sapSpacingL) 0; border: 0; border-top: 1px solid var(--sapGroup_ContentBorderColor);">
+                <h4 style="margin-bottom: var(--sapSpacingM); color: var(--sapBrandColor);">Recursive Crawl Settings</h4>
                 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--sapSpacingM); margin-bottom: var(--sapSpacingM);">
                   <div>
@@ -321,31 +363,62 @@
                   <span class="sapForm-help">Only follow links to these domains</span>
                 </div>
                 
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--sapSpacingM); margin-bottom: var(--sapSpacingM);">
-                  <div>
-                    <label class="sapForm-label">Path Filter (optional)</label>
-                    <input class="sapForm-input" name="path_filter" value="{{ s.path_filter or '' }}" placeholder="e.g., /novedades/">
-                    <span class="sapForm-help">Only follow links with this in path</span>
-                  </div>
-                  <div>
-                    <label class="sapForm-label">Date Scope</label>
-                    <select class="sapForm-select" name="date_scope">
-                      <option value="all" {% if (s.date_scope or 'all') == 'all' %}selected{% endif %}>All dates</option>
-                      <option value="last_month" {% if s.date_scope == 'last_month' %}selected{% endif %}>Last month</option>
-                      <option value="last_3_months" {% if s.date_scope == 'last_3_months' %}selected{% endif %}>Last 3 months</option>
-                      <option value="last_6_months" {% if s.date_scope == 'last_6_months' %}selected{% endif %}>Last 6 months</option>
-                    </select>
-                  </div>
+                <div style="margin-bottom: var(--sapSpacingM);">
+                  <label class="sapForm-label">Path Filter (optional)</label>
+                  <input class="sapForm-input" name="path_filter" value="{{ s.path_filter or '' }}" placeholder="e.g., /novedades/">
+                  <span class="sapForm-help">Only follow links with this in path</span>
                 </div>
                 
                 <div style="display: flex; gap: var(--sapSpacingS);">
                   <button type="submit" class="sapBtn sapBtn-emphasized">Save Changes</button>
                   <button type="button" class="sapBtn" onclick="toggleEditRow('edit-{{ loop.index }}')">Cancel</button>
                 </div>
+              {% else %}
+              <form method="post" action="{{ url_for('update_url_source_route', profile_id=profile.id) }}">
+                <input type="hidden" name="url" value="{{ s.url }}">
+                
+                <h4 style="margin: 0 0 var(--sapSpacingM) 0; color: var(--sapBrandColor);">Edit URL Source Settings</h4>
+                
+                <div style="margin-bottom: var(--sapSpacingM);">
+                  <label class="sapForm-label">Crawl Type</label>
+                  <select class="sapForm-select" name="mode">
+                    <option value="auto" {% if s.mode == 'auto' %}selected{% endif %}>Auto-detect (static/dynamic)</option>
+                    <option value="force_static" {% if s.mode == 'force_static' %}selected{% endif %}>Force Static HTML</option>
+                    <option value="force_dynamic" {% if s.mode == 'force_dynamic' %}selected{% endif %}>Force Browser Rendering</option>
+                    <option value="recursive" {% if s.mode == 'recursive' %}selected{% endif %}>Recursive (deep links)</option>
+                  </select>
+                  <span class="sapForm-help">How to crawl this URL source</span>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--sapSpacingM); margin-bottom: var(--sapSpacingM);">
+                  <div>
+                    <label class="sapForm-label">Sample Link (optional)</label>
+                    <input class="sapForm-input" name="sample_link" value="{{ s.sample_link or '' }}" placeholder="https://example.gov/news/12345">
+                  </div>
+                  <div>
+                    <label class="sapForm-label">Read More Label (optional)</label>
+                    <input class="sapForm-input" name="read_more_label" value="{{ s.read_more_label or '' }}" placeholder="e.g., اقرأ المزيد">
+                  </div>
+                </div>
+                
+                <div style="margin-bottom: var(--sapSpacingM);">
+                  <label class="sapForm-label">Date Scope</label>
+                  <select class="sapForm-select" name="date_scope">
+                    <option value="all" {% if (s.date_scope or 'all') == 'all' %}selected{% endif %}>N/A</option>
+                    <option value="last_7_days" {% if s.date_scope == 'last_7_days' %}selected{% endif %}>Last 7 days</option>
+                    <option value="last_30_days" {% if s.date_scope == 'last_30_days' %}selected{% endif %}>Last 30 days</option>
+                  </select>
+                  <span class="sapForm-help">For date-templated URLs (like gazettes), generates multiple URLs based on dates</span>
+                </div>
+                
+                <div style="display: flex; gap: var(--sapSpacingS);">
+                  <button type="submit" class="sapBtn sapBtn-emphasized">Save Changes</button>
+                  <button type="button" class="sapBtn" onclick="toggleEditRow('edit-{{ loop.index }}')">Cancel</button>
+                </div>
+              {% endif %}
               </form>
             </td>
           </tr>
-          {% endif %}
           {% endfor %}
         </tbody>
       </table>
@@ -376,7 +449,7 @@
         </select>
         <span class="sapForm-help">How to crawl this URL source</span>
       </div>
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--sapSpacingM);">
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--sapSpacingM);">
         <div class="sapForm-group">
           <label class="sapForm-label">Sample Link (optional)</label>
           <input class="sapForm-input" name="sample_link" placeholder="https://example.gov/news/12345">
@@ -384,6 +457,15 @@
         <div class="sapForm-group">
           <label class="sapForm-label">Read More Label (optional)</label>
           <input class="sapForm-input" name="read_more_label" placeholder="e.g., اقرأ المزيد">
+        </div>
+        <div class="sapForm-group">
+          <label class="sapForm-label">Date Scope</label>
+          <select class="sapForm-select" name="date_scope">
+            <option value="all" selected>N/A</option>
+            <option value="last_7_days">Last 7 days</option>
+            <option value="last_30_days">Last 30 days</option>
+          </select>
+          <span class="sapForm-help">For date-templated URLs (like gazettes), generates multiple URLs based on dates</span>
         </div>
       </div>
       
@@ -415,17 +497,6 @@
           <label class="sapForm-label">Path Filter (optional)</label>
           <input class="sapForm-input" name="path_filter" placeholder="e.g., /novedades/ or news">
           <span class="sapForm-help">Only follow links containing this text in the path</span>
-        </div>
-        
-        <div class="sapForm-group">
-          <label class="sapForm-label">Date Scope</label>
-          <select class="sapForm-select" name="date_scope">
-            <option value="all" selected>All dates</option>
-            <option value="last_month">Last month</option>
-            <option value="last_3_months">Last 3 months</option>
-            <option value="last_6_months">Last 6 months</option>
-          </select>
-          <span class="sapForm-help">Filter articles by publication date</span>
         </div>
       </div>
       <button type="submit" class="sapBtn sapBtn-accept" style="width: 100%;">Add URL Source</button>
