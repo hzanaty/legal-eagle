@@ -105,6 +105,32 @@
   }
 </style>
 
+<!-- Profile Language Section -->
+<div class="sapCard">
+  <div class="sapCard-header">
+    <span>🌍 Profile Language</span>
+    <span style="color: var(--sapNeutralColor); font-weight: 400; font-size: var(--sapFontSmallSize);">
+      Language for AI news analysis
+    </span>
+  </div>
+  <div class="sapCard-content">
+    <form method="post" action="{{ url_for('update_profile_language', profile_id=profile.id) }}">
+      <div class="sapForm-row">
+        <div class="sapForm-group" style="margin-bottom: 0;">
+          <label class="sapForm-label">Analysis Language</label>
+          <select class="sapForm-select" name="language">
+            {% for code, name in language_names.items() %}
+            <option value="{{ code }}" {% if profile.language == code %}selected{% endif %}>{{ name }} ({{ code }})</option>
+            {% endfor %}
+          </select>
+          <span class="sapForm-help">Language used by AI to read and analyze news sources (e.g., Arabic for Saudi Arabia news)</span>
+        </div>
+        <button type="submit" class="sapBtn sapBtn-emphasized">Save Language</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- Schedule Section -->
 <div class="sapCard">
   <div class="sapCard-header">
@@ -212,6 +238,7 @@
           <tr>
             <th style="width: 40px;"><input type="checkbox" onclick="toggleAllCheckboxes(this, 'bulk_urls_form')"></th>
             <th>URL</th>
+            <th style="width: 150px;">Sample Link</th>
             <th style="width: 120px;">Read More Label</th>
             <th style="width: 140px;">Crawl Type</th>
             <th style="width: 180px;">Recursive Settings</th>
@@ -223,6 +250,13 @@
           <tr>
             <td style="text-align: center;"><input type="checkbox" name="urls" value="{{ s.url }}" form="bulk_urls_form"></td>
             <td style="font-family: monospace; font-size: var(--sapFontSmallSize);">{{ s.url }}</td>
+            <td style="font-size: var(--sapFontSmallSize); text-align: center;">
+              {% if s.sample_link %}
+                <a href="{{ s.sample_link }}" target="_blank" style="color: var(--sapLinkColor); text-decoration: none;" title="{{ s.sample_link }}">🔗</a>
+              {% else %}
+                <span style="color: var(--sapNeutralColor);">—</span>
+              {% endif %}
+            </td>
             <td style="font-size: var(--sapFontSmallSize);">
               {% if s.read_more_label %}
                 <span style="direction: rtl;">{{ s.read_more_label }}</span>
@@ -263,7 +297,7 @@
           </tr>
           {% if s.mode == 'recursive' %}
           <tr id="edit-{{ loop.index }}" style="display: none;">
-            <td colspan="6" style="padding: var(--sapSpacingM); background: var(--sapNeutralBackground);">
+            <td colspan="7" style="padding: var(--sapSpacingM); background: var(--sapNeutralBackground);">
               <form method="post" action="{{ url_for('update_url_source_route', profile_id=profile.id) }}">
                 <input type="hidden" name="url" value="{{ s.url }}">
                 <input type="hidden" name="mode" value="recursive">
@@ -491,7 +525,7 @@
       </div>
     </form>
     
-    {% if receivers and receivers|length > 0 %}
+    {% if receivers_with_lang and receivers_with_lang|length > 0 %}
     <div style="margin-top: var(--sapSpacingM);">
       <div class="sapTable-toolbar">
         <button type="submit" form="bulk_emails_form" class="sapBtn sapBtn-reject sapBtn-sm">Delete Selected</button>
@@ -503,13 +537,32 @@
             <tr>
               <th style="width: 40px;"><input type="checkbox" onclick="toggleAllCheckboxes(this, 'bulk_emails_form')"></th>
               <th>Email</th>
+              <th style="width: 200px;">Translation Language</th>
+              <th style="width: 100px;">Action</th>
             </tr>
           </thead>
           <tbody>
-            {% for e in receivers %}
+            {% for receiver in receivers_with_lang %}
             <tr>
-              <td style="text-align: center;"><input type="checkbox" name="emails" value="{{ e }}" form="bulk_emails_form"></td>
-              <td style="font-family: monospace; font-size: var(--sapFontSmallSize);">{{ e }}</td>
+              <td style="text-align: center;"><input type="checkbox" name="emails" value="{{ receiver.email }}" form="bulk_emails_form"></td>
+              <td style="font-family: monospace; font-size: var(--sapFontSmallSize);">{{ receiver.email }}</td>
+              <td>
+                <form method="post" action="{{ url_for('update_email_receiver_language', profile_id=profile.id) }}" style="display: flex; gap: var(--sapSpacingXS); align-items: center;">
+                  <input type="hidden" name="email" value="{{ receiver.email }}">
+                  <select class="sapForm-select" name="translation_lang" style="padding: 0.25rem 0.5rem; font-size: var(--sapFontSmallSize);">
+                    {% for code, name in language_names.items() %}
+                    <option value="{{ code }}" {% if receiver.translation_lang == code %}selected{% endif %}>{{ name }}</option>
+                    {% endfor %}
+                  </select>
+                  <button type="submit" class="sapBtn sapBtn-sm" style="padding: 0.25rem 0.75rem;">Save</button>
+                </form>
+              </td>
+              <td>
+                <form method="post" action="{{ url_for('delete_email_receiver_route', profile_id=profile.id) }}" style="display: inline;">
+                  <input type="hidden" name="email" value="{{ receiver.email }}">
+                  <button type="submit" class="sapBtn sapBtn-reject sapBtn-sm">Delete</button>
+                </form>
+              </td>
             </tr>
             {% endfor %}
           </tbody>

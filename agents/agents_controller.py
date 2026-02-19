@@ -20,6 +20,7 @@ from configurations.config_loader import (
     load_rss_feeds,
     load_tweet_accounts,
     load_email_receivers,
+    load_email_receivers_with_lang,
     load_glossary,
     get_setting_value,
     set_setting_value,
@@ -240,8 +241,16 @@ def run_controller():
 
         # 7. Email Composer Agent
         print("📧 Sending summary email...")
-        subject = f"🦅 Legal Eagle Daily Digest — {country}/{lob}"
-        ok = send_email(grouped_summary, EMAIL_RECEIVERS, GMAIL_CREDS, LANGUAGE_PREFERENCE)
+        EMAIL_RECEIVERS_WITH_LANG = load_email_receivers_with_lang(profile_id)
+        ok = send_email(
+            grouped_summary,
+            EMAIL_RECEIVERS_WITH_LANG,
+            GMAIL_CREDS,
+            LANGUAGE_PREFERENCE,
+            country,
+            lob,
+            OPENAI_API_KEY
+        )
         if ok:
             print(f"✅ Email sent to stakeholders for {country}/{lob}.\n")
         else:
@@ -465,8 +474,17 @@ def run_profile_once(profile_id: int) -> bool:
 
         # Email
         print("\n📧 Sending summary email...")
-        subject = f"🦅 Legal Eagle Daily Digest — {country}/{lob}"
-        ok = send_email(grouped_summary, EMAIL_RECEIVERS, GMAIL_CREDS, LANGUAGE_PREFERENCE, monitor_updates=monitor_updates_data)
+        EMAIL_RECEIVERS_WITH_LANG = load_email_receivers_with_lang(profile_id)
+        ok = send_email(
+            grouped_summary,
+            EMAIL_RECEIVERS_WITH_LANG,
+            GMAIL_CREDS,
+            LANGUAGE_PREFERENCE,
+            country,
+            lob,
+            OPENAI_API_KEY,
+            monitor_updates=monitor_updates_data
+        )
         if ok:
             print(f"✅ Email sent to stakeholders for {country}/{lob}.\n")
             return True

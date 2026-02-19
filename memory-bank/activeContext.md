@@ -1,11 +1,33 @@
-## Current State: v2.1.0 (2026-02-10)
+## Current State: v2.4.0 (2026-02-19)
 
-### Active Version: 2.1.0
-**Status**: Production-ready with enhanced data collection
+### Active Version: 2.4.0
+**Status**: Production-ready with multi-language translation support
 
-### Recent Major Changes (v2.1.0)
+### Recent Major Changes (v2.4.0)
 
-#### 1. Twitter Search API Integration
+#### 1. Translation & Language Features (v2.4.0)
+- **Per-Receiver Translation**: Each email receiver can set their preferred language
+  - New `translation_lang` column in `email_receivers` table
+  - 15 supported languages (English, Arabic, Spanish, French, German, etc.)
+  - Email sender groups receivers by language and caches translations
+  - Admin UI shows language dropdown per receiver
+
+- **Profile Language Editing**: Profile's analysis language now editable
+  - New "Profile Language" section in Admin UI
+  - Dropdown with all supported languages
+  - Separate from receiver translation languages
+  - Used by AI to read and analyze news sources
+
+- **Email Subject Enhancement**: Subject includes profile identifier
+  - Format: `🦅 Legal Eagle Daily Digest — SA/HCM — 2026-02-19`
+  - Helps LPMs managing multiple countries
+
+- **Translation Caching**: Optimized OpenAI API usage
+  - Groups receivers by language
+  - Translates once per language group
+  - Caches translations to avoid redundant calls
+
+#### 2. Twitter Search API Integration (v2.1.0)
 - **Migration**: Moved from per-account timeline API to multi-account Search API
 - **Efficiency**: Fetches all monitored accounts in single API call
 - **Endpoint**: `GET /2/tweets/search/recent` (replaces `GET /2/users/{id}/tweets`)

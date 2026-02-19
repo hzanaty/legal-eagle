@@ -1,6 +1,93 @@
-## Update v2.4.0 (2026-01-13 18:49:55Z)
+## Update v2.4.0 (2026-02-19)
 
-### v2.4.0 — Admin Run Page, Live Logs, Bulk Actions, and Credentials View (2026-01-13 18:49:55Z)
+### v2.4.0 — Translation & Language Features (2026-02-19)
+
+**Database Schema Changes**:
+- `email_receivers` table:
+  - Added `translation_lang` column (TEXT, default 'en')
+  - Stores preferred translation language per receiver
+  - 15 supported languages: en, ar, es, fr, de, zh, ja, ko, pt, ru, tr, hi, it, nl, pl
+
+**New Functions in config_loader.py**:
+```python
+# Language constant (15 languages)
+LANGUAGE_NAMES = {
+    "en": "English",
+    "ar": "Arabic",
+    "es": "Spanish",
+    "fr": "French",
+    "de": "German",
+    "zh": "Chinese",
+    "ja": "Japanese",
+    "ko": "Korean",
+    "pt": "Portuguese",
+    "ru": "Russian",
+    "tr": "Turkish",
+    "hi": "Hindi",
+    "it": "Italian",
+    "nl": "Dutch",
+    "pl": "Polish"
+}
+
+# Load receivers with translation language
+def load_email_receivers_with_lang(profile_id: int) -> List[Dict[str, str]]
+# Returns: [{"email": "user@example.com", "translation_lang": "en"}, ...]
+```
+
+**New Functions in db.py**:
+```python
+def upsert_email_receiver_with_lang(
+    conn: sqlite3.Connection,
+    profile_id: int,
+    email: str,
+    translation_lang: str = "en"
+) -> None
+# Inserts or updates email receiver with translation language preference
+```
+
+**Email Sender Changes** (email_sender.py):
+```python
+def translate_grouped_summary(
+    grouped_summary: List[Dict],
+    target_lang: str,
+    api_key: str
+) -> List[Dict]
+# Translates grouped news summary to target language using GPT-4o-mini
+
+# send_email() now:
+# 1. Groups receivers by translation_lang
+# 2. Caches translations per language
+# 3. Sends one email per language group
+# 4. Subject includes profile: "🦅 Legal Eagle Daily Digest — SA/HCM — 2026-02-19"
+```
+
+**Admin UI Routes** (admin/app.py):
+```python
+# Update profile's analysis language
+@app.route("/admin/profiles/<int:profile_id>/language/update", methods=["POST"])
+def update_profile_language(profile_id: int)
+
+# Update receiver's translation language
+@app.route("/admin/profiles/<int:profile_id>/emails/update_language", methods=["POST"])
+def update_email_receiver_language(profile_id: int)
+```
+
+**Admin UI Templates**:
+- `profile.html`:
+  - New "Profile Language" section (top of page)
+  - Email Receivers table has translation language column with dropdown
+  - Both use LANGUAGE_NAMES for language options
+
+**Migration Script**:
+- `scripts/migrate_add_translation_lang.py`
+- Adds `translation_lang` column to `email_receivers`
+- Sets default value 'en' for existing receivers
+
+---
+
+## Previous Updates
+
+### v2.4.0 (2026-01-13 18:49:55Z) [Internal Development]
 
 - Admin UI
   - New Run page (split layout): left pane has Confirm Run and 7-day Run History; right pane streams live logs via SSE and displays historical logs.
@@ -28,4 +115,3 @@
   - Live logs via SSE with auto-scroll.
   - History list shows Status, Started/Finished times; selecting a run shows its logs on the right pane.
   - Simple design (no filters/search) per requirement.
-

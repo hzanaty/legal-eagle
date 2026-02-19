@@ -1,5 +1,52 @@
 # CHANGELOG
 
+## v2.4 — 2026-02-19
+### Translation & Language Features
+- **Per-Receiver Translation Language**: Each email receiver can specify their preferred language
+  - New `translation_lang` column in `email_receivers` table (default: 'en')
+  - Admin UI displays language dropdown per receiver
+  - Email sender groups receivers by language and caches translations
+  - Supported languages: English, Arabic, Spanish, French, German, Chinese, Japanese, Korean, Portuguese, Russian, Turkish, Hindi, Italian, Dutch, Polish
+
+- **Profile Analysis Language Editing**: Profile's default language now editable in Admin UI
+  - New "🌍 Profile Language" section at top of configuration page
+  - Dropdown with all supported languages
+  - Language used by AI to read and analyze news sources
+  - Separate from receiver translation languages
+
+- **Email Subject Enhancement**: Subject line now includes profile identifier
+  - Format: `🦅 Legal Eagle Daily Digest — SA/HCM — 2026-02-19`
+  - Helps LPMs managing multiple countries distinguish emails
+
+- **Translation Caching**: Email sender optimizes OpenAI API usage
+  - Groups receivers by translation language
+  - Translates once per language group
+  - Caches translations to avoid redundant API calls
+  - Significant cost savings for multiple receivers
+
+### New Components
+- `LANGUAGE_NAMES` constant in `config_loader.py` (15 languages)
+- `load_email_receivers_with_lang()` in `config_loader.py`
+- `upsert_email_receiver_with_lang()` in `db.py`
+- `translate_grouped_summary()` in `email_sender.py`
+- Route: `/admin/profiles/<id>/language/update` (update profile language)
+- Route: `/admin/profiles/<id>/emails/update_language` (update receiver language)
+
+### Admin UI Changes
+- New "Profile Language" section shows current language with save button
+- Email Receivers table now has "Translation Language" column with dropdown
+- Both sections use same 15 language options
+- Save buttons per row for immediate feedback
+
+### Database Changes
+- Migration script: `scripts/migrate_add_translation_lang.py`
+- Sets default 'en' for all existing receivers
+
+### Documentation Updates
+- Updated SPEC.md to v2.4 with translation features
+- Added Memory Bank Protocol to `.clinerules/rules.md`
+- Updated all memory-bank files with v2.4.0 changes
+
 ## v2.3 — 2026-02-13
 ### Documentation
 - Simplified versioning format from X.Y.Z to X.Y

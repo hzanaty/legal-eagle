@@ -22,6 +22,7 @@ from configurations.config_loader import (
     load_rss_feeds,
     load_tweet_accounts,
     load_email_receivers,
+    load_email_receivers_with_lang,
     load_glossary,
     get_setting_value,
     set_setting_value,
@@ -30,6 +31,7 @@ from configurations.config_loader import (
     load_url_sources,
     load_global_credentials,
     migrate_urls_to_unified,
+    LANGUAGE_NAMES,
 )
 from configurations.db import (
     get_connection,
@@ -38,6 +40,7 @@ from configurations.db import (
     upsert_rss_feed,
     upsert_tweet_account,
     upsert_email_receiver,
+    upsert_email_receiver_with_lang,
     upsert_url_source,
     delete_url_source,
     add_audit_log,
@@ -550,6 +553,7 @@ def admin_profile_detail(profile_id: int):
     tweets = load_tweet_accounts(profile_id)
     receivers = load_email_receivers(profile_id)
     receivers_semicolon = "; ".join(receivers) if receivers else ""
+    receivers_with_lang = load_email_receivers_with_lang(profile_id)
 
     glossary = load_glossary(profile_id)
     reset_quota_date = get_setting_value(profile_id, 'tweets_reset_quota_date')
@@ -563,10 +567,39 @@ def admin_profile_detail(profile_id: int):
         tweets=tweets,
         receivers_semicolon=receivers_semicolon,
         receivers=receivers,
+        receivers_with_lang=receivers_with_lang,
         glossary=glossary,
         reset_quota_date=reset_quota_date,
         monitor_enabled=monitor_enabled,
+        language_names=LANGUAGE_NAMES,
     )
+
+
+@app.route("/admin/profiles/<int:profile_id>/language/update", methods=["POST"])
+def update_profile_language(profile_id: int):
+    """
+    Update the analysis language for a profile.
+    """
+    language = (request.form.get("language", "") or "").strip()
+    
+    if not language:
+        flash("Language is required.", "error")
+        return redirect(url_for("admin_profile_detail", profile_id=profile_id))
+    
+    # Validate language code
+    if language not in LANGUAGE_NAMES:
+        flash(f"Invalid language code: {language}", "error")
+        return redirect(url_for("admin_profile_detail", profile_id=profile_id))
+    
+    conn = get_connection()
+    create_schema_if_needed(conn)
+    conn.execute("UPDATE profiles SET language = ? WHERE id = ?", (language, profile_id))
+    add_audit_log(conn, entity="profiles", action="update_language", details=f"language={language}", profile_id=profile_id)
+    conn.close()
+    
+    lang_name = LANGUAGE_NAMES.get(language, language)
+    flash(f"Profile language updated to {lang_name}.", "success")
+    return redirect(url_for("admin_profile_detail", profile_id=profile_id))
 
 
 @app.route("/admin/profiles/<int:profile_id>/schedule/update", methods=["POST"])
@@ -914,6 +947,33 @@ def bulk_delete_email_receivers(profile_id: int):
     add_audit_log(conn, entity="email_receivers", action="bulk_delete", details=f"count={count}", profile_id=profile_id)
     conn.close()
     flash(f"Deleted {count} email receivers.", "success")
+    return redirect(url_for("admin_profile_detail", profile_id=profile_id))
+
+
+# Update receiver translation language
+@app.route("/admin/profiles/<int:profile_id>/emails/update_language", methods=["POST"])
+def update_email_receiver_language(profile_id: int):
+    email = request.form.get("email", "").strip()
+    translation_lang = request.form.get("translation_lang", "en").strip()
+    
+    if not email:
+        flash("Email is required.", "error")
+        return redirect(url_for("admin_profile_detail", profile_id=profile_id))
+    
+    # Validate language code
+    if translation_lang not in LANGUAGE_NAMES:
+        flash(f"Invalid language code: {translation_lang}", "error")
+        return redirect(url_for("admin_profile_detail", profile_id=profile_id))
+    
+    conn = get_connection()
+    create_schema_if_needed(conn)
+    upsert_email_receiver_with_lang(conn, profile_id, email, translation_lang)
+    add_audit_log(conn, entity="email_receivers", action="update_language", 
+                  details=f"email={email} lang={translation_lang}", profile_id=profile_id)
+    conn.close()
+    
+    lang_name = LANGUAGE_NAMES.get(translation_lang, translation_lang)
+    flash(f"Translation language updated to {lang_name}.", "success")
     return redirect(url_for("admin_profile_detail", profile_id=profile_id))
 
 

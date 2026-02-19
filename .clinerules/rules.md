@@ -110,3 +110,44 @@ When implementing changes:
 - Use `LEGAL_EAGLE_` prefix for project-specific vars
 - Document new env vars in `SPEC.md` Section 8.1
 - Provide sensible defaults where possible
+
+---
+
+## Memory Bank Protocol (MANDATORY)
+
+The `memory-bank/` directory contains critical project state that MUST be consulted and updated with every task.
+
+### Files in Memory Bank
+- **activeContext.md** - Current version, architecture, active features, and constraints
+- **progress.md** - Version history and detailed changelog of all changes
+- **techContext.md** - Technical details: database schema, APIs, data flows
+- **productContext.md** - Product vision and business context
+- **systemPatterns.md** - Design patterns and coding conventions
+- **projectbrief.md** - Project overview and high-level goals
+
+### BEFORE Starting Any Task
+1. **READ `memory-bank/activeContext.md`** - Understand current version and architecture
+2. **READ `memory-bank/progress.md`** - Review recent changes and version history
+3. **READ `memory-bank/techContext.md`** - If touching database schema or APIs
+4. **Understand the current state** before proposing solutions
+
+### AFTER Completing Any Task
+1. **UPDATE `memory-bank/progress.md`** - Add version entry with all changes
+2. **UPDATE `memory-bank/activeContext.md`** - Update current version and architecture
+3. **UPDATE `memory-bank/techContext.md`** - If database schema or APIs changed
+4. **UPDATE `SPEC.md`** - Update technical documentation
+5. **UPDATE `CHANGELOG.md`** - Add user-facing changes
+
+### Version Numbering
+- **Major** (v3.0, v4.0): Breaking changes, architectural shifts
+- **Minor** (v2.4, v2.5): New features, backwards compatible
+- **Patch** (v2.4.1, v2.4.2): Bug fixes only
+
+### Enforcement
+Failure to update memory-bank files leads to:
+- Lost context between sessions
+- Duplicate work
+- Conflicting implementations
+- Documentation drift
+
+**Always check and update memory-bank files - no exceptions.**

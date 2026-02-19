@@ -1,7 +1,7 @@
-# Legal Eagle 2.3 — Technical Specification
+# Legal Eagle 2.4 — Technical Specification
 
-**Version:** 2.3 (Simplified Versioning + Documentation Improvements)  
-**Last Updated:** 2026-02-13
+**Version:** 2.4 (Translation & Language Features)  
+**Last Updated:** 2026-02-19
 
 This document provides the technical specification for Legal Eagle, an AI-powered regulatory compliance monitoring system for SAP Localization.
 
@@ -228,13 +228,16 @@ Websites to scrape (unified static/dynamic).
 | `created_at` | TEXT | ISO timestamp |
 
 #### `email_receivers`
-Email recipients for daily digest.
+Email recipients for daily digest (v2.4: with translation language support).
 
 | Column | Type | Description |
 |--------|------|-------------|
 | `id` | INTEGER PK | Auto-increment ID |
 | `profile_id` | INTEGER FK | References `profiles(id)` |
 | `email` | TEXT | Email address |
+| `translation_lang` | TEXT | Translation language code (default: 'en') |
+
+**Supported Languages (v2.4+)**: English (en), Arabic (ar), Spanish (es), French (fr), German (de), Chinese (zh), Japanese (ja), Korean (ko), Portuguese (pt), Russian (ru), Turkish (tr), Hindi (hi), Italian (it), Dutch (nl), Polish (pl)
 
 ### 4.3 Glossary Tables
 

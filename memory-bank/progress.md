@@ -1,3 +1,60 @@
+## Update v2.4.0 (2026-02-19)
+
+### v2.4.0 — Translation & Language Features (2026-02-19)
+
+**Major Features**:
+- **Per-Receiver Translation Language**: Each email receiver can specify their preferred language
+  - New `translation_lang` column in `email_receivers` table (default: 'en')
+  - Admin UI displays language dropdown per receiver
+  - Email sender groups receivers by language and caches translations
+  - Supported languages: English, Arabic, Spanish, French, German, Chinese, Japanese, Korean, Portuguese, Russian, Turkish, Hindi, Italian, Dutch, Polish
+
+- **Profile Analysis Language Editing**: Profile's default language now editable in Admin UI
+  - New "Profile Language" section at top of configuration page
+  - Dropdown with all supported languages
+  - Language used by AI to read and analyze news sources
+  - Separate from receiver translation languages
+
+- **Email Subject Includes Profile**: Subject line now shows country/LoB for multi-profile LPMs
+  - Format: `🦅 Legal Eagle Daily Digest — SA/HCM — 2026-02-19`
+  - Helps LPMs managing multiple countries distinguish emails
+
+- **Translation Caching**: Email sender optimizes OpenAI API calls
+  - Groups receivers by translation language
+  - Translates once per language group
+  - Caches translations to avoid redundant API calls
+  - Significant cost savings for multiple receivers
+
+**Key Components Added**:
+- `LANGUAGE_NAMES` constant in `config_loader.py` (15 languages)
+- `load_email_receivers_with_lang()` in `config_loader.py`
+- `upsert_email_receiver_with_lang()` in `db.py`
+- `translate_grouped_summary()` in `email_sender.py`
+- `update_profile_language()` route in `admin/app.py`
+- `update_email_receiver_language()` route in `admin/app.py`
+
+**Database Changes**:
+- `email_receivers` table: Added `translation_lang` column (TEXT, default 'en')
+- Migration script: `scripts/migrate_add_translation_lang.py`
+
+**Admin UI Changes**:
+- New "Profile Language" section in profile configuration page
+- Email Receivers table now shows translation language column with dropdown
+- Language selection with save button per receiver
+- Both changes use same language options (LANGUAGE_NAMES)
+
+**Testing**:
+- Tested with multiple receivers in different languages
+- Verified translation caching works correctly
+- Confirmed email subject includes profile identifier
+
+**Documentation Updated**:
+- SPEC.md → v2.4 (added translation features, database schema, routes)
+- .clinerules/rules.md → Added Memory Bank Protocol section
+- memory-bank/ files updated with v2.4.0 changes
+
+---
+
 ## Update v2.1.0 (2026-02-10)
 
 ### v2.1.0 — Twitter Search API, Date Filtering, and Lookback Window (2026-02-10)

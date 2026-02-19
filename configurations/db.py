@@ -111,11 +111,17 @@ def create_schema_if_needed(conn: sqlite3.Connection) -> None:
                 id INTEGER PRIMARY KEY,
                 profile_id INTEGER NOT NULL,
                 email TEXT NOT NULL,
+                translation_lang TEXT DEFAULT 'en',
                 UNIQUE(profile_id, email),
                 FOREIGN KEY(profile_id) REFERENCES profiles(id) ON DELETE CASCADE
             );
             """
         )
+        # Attempt to add translation_lang column for existing databases
+        try:
+            conn.execute("ALTER TABLE email_receivers ADD COLUMN translation_lang TEXT DEFAULT 'en'")
+        except Exception:
+            pass
 
         # Glossary (normalized) per profile
         conn.execute(
@@ -407,6 +413,33 @@ def list_snap_urls(conn: sqlite3.Connection, profile_id: int) -> List[str]:
 
 def list_email_receivers(conn: sqlite3.Connection, profile_id: int) -> List[str]:
     return _list_simple(conn, "email_receivers", "email", profile_id)
+
+
+def list_email_receivers_with_lang(conn: sqlite3.Connection, profile_id: int) -> List[Dict[str, Any]]:
+    """
+    List email receivers with their translation language preference.
+    Returns: [{"email": "x@y.com", "translation_lang": "en"}, ...]
+    """
+    rows = conn.execute(
+        "SELECT email, COALESCE(translation_lang, 'en') as translation_lang FROM email_receivers WHERE profile_id = ? ORDER BY email",
+        (profile_id,)
+    ).fetchall()
+    return [{"email": r["email"], "translation_lang": r["translation_lang"]} for r in rows]
+
+
+def upsert_email_receiver_with_lang(conn: sqlite3.Connection, profile_id: int, email: str, translation_lang: str = "en") -> None:
+    """
+    Insert or update an email receiver with translation language preference.
+    """
+    with conn:
+        conn.execute(
+            """
+            INSERT INTO email_receivers(profile_id, email, translation_lang)
+            VALUES(?,?,?)
+            ON CONFLICT(profile_id, email) DO UPDATE SET translation_lang=excluded.translation_lang
+            """,
+            (profile_id, email, translation_lang)
+        )
 
 
 # -----------------------

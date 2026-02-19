@@ -1,6 +1,71 @@
 import os
 from typing import List, Dict, Any, Optional
 
+# -----------------------------
+# Country-to-Language Mapping
+# -----------------------------
+
+COUNTRY_LANG_MAP = {
+    # Middle East
+    "SA": "ar", "AE": "ar", "EG": "ar", "JO": "ar", "KW": "ar", "QA": "ar", "BH": "ar", "OM": "ar",
+    # Europe - Spanish
+    "ES": "es", "MX": "es", "AR": "es", "CO": "es", "CL": "es", "PE": "es", "VE": "es",
+    # Europe - German
+    "DE": "de", "AT": "de", "CH": "de",
+    # Europe - French
+    "FR": "fr", "BE": "fr", "LU": "fr",
+    # Europe - Italian
+    "IT": "it",
+    # Europe - Portuguese
+    "PT": "pt", "BR": "pt",
+    # Asia
+    "CN": "zh", "JP": "ja", "KR": "ko", "IN": "hi", "TH": "th", "VN": "vi",
+    # English-speaking
+    "US": "en", "UK": "en", "GB": "en", "AU": "en", "CA": "en", "NZ": "en", "IE": "en",
+    # Others
+    "RU": "ru", "TR": "tr", "PL": "pl", "NL": "nl", "SE": "sv", "NO": "no", "DK": "da", "FI": "fi",
+}
+
+LANGUAGE_NAMES = {
+    "en": "English",
+    "ar": "Arabic",
+    "es": "Spanish",
+    "de": "German",
+    "fr": "French",
+    "it": "Italian",
+    "pt": "Portuguese",
+    "zh": "Chinese",
+    "ja": "Japanese",
+    "ko": "Korean",
+    "hi": "Hindi",
+    "th": "Thai",
+    "vi": "Vietnamese",
+    "ru": "Russian",
+    "tr": "Turkish",
+    "pl": "Polish",
+    "nl": "Dutch",
+    "sv": "Swedish",
+    "no": "Norwegian",
+    "da": "Danish",
+    "fi": "Finnish",
+}
+
+def get_language_for_country(country_code: str) -> str:
+    """
+    Get the default language for a country code.
+    Returns 'en' if country not found in mapping.
+    """
+    return COUNTRY_LANG_MAP.get(country_code.upper(), "en")
+
+
+def get_language_display_name(lang_code: str) -> str:
+    """
+    Get the display name for a language code.
+    Returns the code itself if not found in mapping.
+    """
+    return LANGUAGE_NAMES.get(lang_code.lower(), lang_code)
+
+
 # Environment-based credentials loader (.env locally, CI secrets in GitHub Actions)
 from .env_loader import load_env_credentials
 
@@ -145,10 +210,20 @@ def load_snap_urls(profile_id: int) -> List[str]:
 
 def load_email_receivers(profile_id: int) -> List[str]:
     """
-    List email receivers for the profile.
+    List email receivers for the profile (backward compatibility).
     """
     conn = _get_conn()
     return list_email_receivers(conn, profile_id)
+
+
+def load_email_receivers_with_lang(profile_id: int) -> List[Dict[str, Any]]:
+    """
+    List email receivers with their translation language preference.
+    Returns: [{"email": "x@y.com", "translation_lang": "en"}, ...]
+    """
+    from .db import list_email_receivers_with_lang as db_list_email_receivers_with_lang
+    conn = _get_conn()
+    return db_list_email_receivers_with_lang(conn, profile_id)
 
 
 def load_glossary(profile_id: int) -> Dict[str, Any]:
