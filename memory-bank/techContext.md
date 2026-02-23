@@ -1,3 +1,104 @@
+## Update v2.5.0 (2026-02-23)
+
+### v2.5.0 — Turkey Official Gazette Support (2026-02-23)
+
+**New Module**: `agents/resmi_gazete_scraper.py`
+
+**Purpose**: Specialized scraper for Turkey's Official Gazette (Resmi Gazete)
+
+**Key Functions**:
+```python
+def generate_date_urls(
+    base_url: str, 
+    start_date: str, 
+    days_count: int = 7
+) -> List[Tuple[str, str]]
+# Generates Resmi Gazete URLs for date range
+# Args:
+#   base_url: Base gazette URL (e.g., https://www.resmigazete.gov.tr/)
+#   start_date: Starting date in DD.MM.YYYY format (e.g., "01.08.2024")
+#   days_count: How many days to process going forward (default: 7)
+# Returns: List of (url, date_str) tuples
+# Format: https://www.resmigazete.gov.tr/DD.MM.YYYY
+
+def extract_gazette_items(
+    url: str, 
+    html: str, 
+    date_str: str
+) -> List[Dict]
+# Extracts gazette items (title + link) from daily listing page
+# Similar to GOSI pattern: extract visible items, not full content
+# Filters out navigation elements automatically:
+#   - T.C.CUMHURBAŞKANLIĞI, RESMÎ GAZETE
+#   - Son Mükerrer, PDF Görüntüle
+#   - Önceki Sayı, Sonraki Sayı, etc.
+# Returns: List of items with title, link, date, source
+
+def scrape_resmi_gazete(
+    base_url: str, 
+    start_date: str = None,
+    days_count: int = 7
+) -> Tuple[List[Dict], List[Dict]]
+# Main entry point for Resmi Gazete scraping
+# Args:
+#   base_url: Base gazette URL
+#   start_date: Starting date in DD.MM.YYYY (None = today)
+#   days_count: How many days to process (default: 7)
+# Returns: (items, errors) tuple
+```
+
+**Integration in url_sources_runner.py**:
+```python
+# Auto-detection (line ~2048)
+if resmi_gazete_available and "resmigazete.gov.tr" in u.lower():
+    # Determine start date and days count from date_scope
+    start_date = src.get("start_date")  # Optional: DD.MM.YYYY format
+    days_count = 7
+    
+    if date_scope == "last_7_days":
+        days_count = 7
+    elif date_scope == "last_30_days":
+        days_count = 30
+    
+    # Call scraper with start_date (if provided) or None (defaults to today)
+    its, errs = scrape_resmi_gazete(
+        base_url=u,
+        start_date=start_date,  # None means start from today
+        days_count=days_count
+    )
+```
+
+**URL Source Configuration**:
+- **url**: `https://www.resmigazete.gov.tr/`
+- **mode**: `auto` (scraper auto-detects, mode ignored)
+- **date_scope**: `last_7_days` or `last_30_days`
+- **start_date**: Optional field (DD.MM.YYYY) for historical scraping
+- **sample_link**: Optional (not used by scraper)
+- **read_more_label**: Optional (not used by scraper)
+
+**Item Structure**:
+```python
+{
+    "source": "resmigazete.gov.tr",
+    "source_type": "URL_Static",
+    "title": "7524 Vergi Kanunları ile Bazı Kanunlarda...",  # First 500 chars
+    "link": "https://www.resmigazete.gov.tr/eskiler/2024/08/20240802-2.htm",
+    "date": "02.08.2024",
+    "content": ""  # Empty - user clicks link to read
+}
+```
+
+**Design Pattern**:
+- Similar to GOSI scraper: extract titles + links only
+- No PDF parsing (reduces complexity, faster)
+- User clicks links to view full documents
+- Date-forward iteration (not backwards from today)
+- Deduplication by title
+
+**Test Script**: `scripts/test_resmi_gazete_august.py`
+
+---
+
 ## Update v2.4.0 (2026-02-19)
 
 ### v2.4.0 — Translation & Language Features (2026-02-19)

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 from urllib.parse import urljoin, urlparse
 
@@ -999,6 +999,187 @@ def gosi_click_discover(url: str, detail_pattern: Optional[str] = None, timeout_
         return []
 
 # -------------------------------
+# Resmi Gazete (Turkish Official Gazette) specialized scraping
+# -------------------------------
+
+def _generate_gazette_date_urls(base_url: str, start_date: str, days_count: int = 7) -> List[Tuple[str, str]]:
+    """
+    Generate Resmi Gazete URLs starting from a specific date going forward.
+    
+    Format: https://www.resmigazete.gov.tr/DD.MM.YYYY
+    Example: https://www.resmigazete.gov.tr/01.08.2024
+    
+    Args:
+        base_url: Base gazette URL (e.g., https://www.resmigazete.gov.tr/)
+        start_date: Starting date in DD.MM.YYYY format (e.g., "01.08.2024")
+        days_count: How many days to process going forward (default: 7)
+    
+    Returns:
+        List of (url, date_str) tuples
+    """
+    urls = []
+    
+    try:
+        # Parse start date (DD.MM.YYYY)
+        day, month, year = start_date.split('.')
+        start = datetime(int(year), int(month), int(day))
+        
+        # Generate URLs for each day
+        for i in range(days_count):
+            date = start + timedelta(days=i)
+            date_str = date.strftime("%d.%m.%Y")
+            url = f"{base_url.rstrip('/')}/{date_str}"
+            urls.append((url, date_str))
+    except Exception as e:
+        print(f"[Resmi Gazete] Error generating date URLs: {e}")
+        return []
+    
+    return urls
+
+
+def _extract_gazette_items(url: str, html: str, date_str: str) -> List[Dict]:
+    """
+    Extract gazette items (title + link) from the daily listing page.
+    
+    This is similar to GOSI: extract visible items from the listing,
+    not the full content. User will click links to read details later.
+    
+    Args:
+        url: The gazette URL for this date
+        html: HTML content of the page
+        date_str: Date string for this gazette (DD.MM.YYYY)
+    
+    Returns:
+        List of items with title, link, date, source
+    """
+    items: List[Dict] = []
+    
+    try:
+        soup = BeautifulSoup(html, "html.parser")
+        
+        # Strategy: Find all text blocks that look like gazette entries
+        # The page has sections like:
+        # YASAMA BÖLÜMÜ (Legislative Section)
+        #   KANUNLAR (Laws)
+        #     7523 Title text here...
+        #     7524 Title text here...
+        # YÜRÜTME VE İDARE BÖLÜMÜ (Executive Section)
+        #   CUMHURBAŞKANI KARARLARI (Presidential Decisions)
+        #     -- Title text here...
+        
+        # Also look for the specific section headers
+        main_sections = [
+            "YASAMA BÖLÜMÜ",           # Legislative
+            "YÜRÜTME VE İDARE BÖLÜMÜ", # Executive
+            "YARGI BÖLÜMÜ",           # Judicial
+            "İLÂN BÖLÜMÜ"             # Announcements
+        ]
+        
+        # Try to find all clickable elements first
+        # Skip navigation elements
+        skip_texts = [
+            "T.C.CUMHURBAŞKANLIĞI", "RESMÎ GAZETE", "Son Mükerrer", "PDF Görüntüle",
+            "Önceki Sayı", "Sonraki Sayı", "Arşiv", "Arama", "Tüm Kategoriler",
+            "Zaman Aralığı", "Kuruluş", "Kurulu", "ana sayfa", "anasayfa"
+        ]
+        
+        for a in soup.find_all('a', href=True):
+            text = a.get_text(strip=True)
+            href = a.get('href')
+            
+            # Skip navigation/header links
+            if not text or len(text) < 10:
+                continue
+            
+            # Skip anchor links and javascript
+            if href.startswith('#') or href.startswith('javascript:'):
+                continue
+            
+            # Skip navigation elements
+            skip = False
+            text_lower = text.lower()
+            for skip_text in skip_texts:
+                if skip_text.lower() in text_lower:
+                    skip = True
+                    break
+            
+            if skip:
+                continue
+            
+            # Only include links that point to actual gazette items
+            # These typically have patterns like /eskiler/YYYY/MM/YYYYMMDD
+            # or are PDF files, or are .htm files
+            if not ('.pdf' in href.lower() or '.htm' in href.lower() or 'eskiler' in href.lower()):
+                # Skip other navigation-like links
+                continue
+            
+            # Build absolute URL
+            abs_url = urljoin(url, href)
+            
+            # This looks like a gazette item
+            items.append({
+                "source": "resmigazete.gov.tr",
+                "source_type": "URL_Static",
+                "title": text[:500],  # Titles can be long in legal texts
+                "link": abs_url,
+                "date": date_str,
+                "content": "",  # Empty - user will click to read
+            })
+        
+        # If we didn't find clickable items, extract text blocks
+        # (Some gazette items might not have direct links)
+        if not items:
+            # Find content after section headers
+            # Look for text patterns like "7523 Title..." or "-- Title..."
+            
+            all_text = soup.get_text('\n', strip=True)
+            lines = all_text.split('\n')
+            
+            current_section = ""
+            for line in lines:
+                line = line.strip()
+                
+                # Skip empty lines
+                if not line:
+                    continue
+                
+                # Check if this is a section header
+                if line in main_sections or line.endswith('BÖLÜMÜ'):
+                    current_section = line
+                    continue
+                
+                # Check if this looks like an item (starts with number or --)
+                if len(line) > 20:  # Minimum length for a real item
+                    # Pattern: starts with number (law number) or --
+                    if line[0].isdigit() or line.startswith('--') or line.startswith('—'):
+                        # This looks like a gazette item
+                        # Use the main page URL since we don't have individual links
+                        items.append({
+                            "source": "resmigazete.gov.tr",
+                            "source_type": "URL_Static",
+                            "title": line[:500],
+                            "link": url,  # Main page URL
+                            "date": date_str,
+                            "content": f"Section: {current_section}" if current_section else "",
+                        })
+        
+        # Deduplicate by title
+        seen_titles = set()
+        unique_items = []
+        for item in items:
+            title = item['title']
+            if title not in seen_titles:
+                seen_titles.add(title)
+                unique_items.append(item)
+        
+        return unique_items[:50]  # Limit to 50 items per day
+    
+    except Exception as e:
+        print(f"[Resmi Gazete] Error parsing gazette items: {e}")
+        return []
+
+
+# -------------------------------
 # RSS autodiscovery
 # -------------------------------
 
@@ -1797,13 +1978,6 @@ def run_unified_sources(url_sources: List[Dict[str, str]], profile_slug: Optiona
     print(f"[Sources] {len(url_sources)} sources to process")
     items: List[Dict] = []
     errors: List[Dict] = []
-    
-    # Import Resmi Gazete specialized scraper
-    try:
-        from agents.resmi_gazete_scraper import scrape_resmi_gazete
-        resmi_gazete_available = True
-    except Exception:
-        resmi_gazete_available = False
 
     def _static_path(u: str, detail_pattern: Optional[str], read_label: Optional[str]) -> Tuple[List[Dict], List[Dict]]:
         print(f"  [static] Fetch listing: {u}")
@@ -2153,19 +2327,60 @@ def run_unified_sources(url_sources: List[Dict[str, str]], profile_slug: Optiona
             continue
         
         # Special handling for Resmi Gazete (Turkish Official Gazette)
-        if resmi_gazete_available and "resmigazete.gov.tr" in u.lower():
+        if "resmigazete.gov.tr" in u.lower():
             try:
-                print(f"[Source {idx+1}] Detected Resmi Gazete - using specialized scraper")
-                days_back = 7
-                if date_scope == "last_7_days":
-                    days_back = 7
-                elif date_scope == "last_30_days":
-                    days_back = 30
+                print(f"[Source {idx+1}] Detected Resmi Gazete - using inline scraper")
                 
-                its, errs = scrape_resmi_gazete(u, days_back=days_back)
-                print(f"[Source {idx+1}] Resmi Gazete scraper: items={len(its)} errors={len(errs)}")
-                items.extend(its)
-                errors.extend(errs)
+                # Determine start date and days count from date_scope
+                start_date = src.get("start_date")  # Optional: explicit start date in DD.MM.YYYY format
+                days_count = 7
+                
+                if date_scope == "last_7_days":
+                    days_count = 7
+                elif date_scope == "last_30_days":
+                    days_count = 30
+                
+                # Default to today if no start date provided
+                if not start_date:
+                    start_date = datetime.now().strftime("%d.%m.%Y")
+                
+                print(f"[Resmi Gazete] Starting from {start_date}, processing {days_count} days")
+                
+                # Generate date URLs
+                date_urls = _generate_gazette_date_urls(u, start_date, days_count)
+                
+                if not date_urls:
+                    errors.append({"url": u, "error": f"Failed to generate date URLs from {start_date}"})
+                    continue
+                
+                print(f"[Resmi Gazete] Generated {len(date_urls)} date URLs")
+                
+                # Fetch and extract items from each date
+                gazette_items: List[Dict] = []
+                for date_url, date_str in date_urls:
+                    print(f"[Resmi Gazete] Fetching: {date_url}")
+                    
+                    status, html = http_get(date_url, timeout=20)
+                    
+                    if status != 200:
+                        errors.append({
+                            "url": date_url,
+                            "error": f"HTTP status {status}",
+                            "date": date_str
+                        })
+                        print(f"[Resmi Gazete] Failed to fetch {date_url}: status {status}")
+                        continue
+                    
+                    # Extract items from this day's gazette
+                    day_items = _extract_gazette_items(date_url, html, date_str)
+                    
+                    print(f"[Resmi Gazete] Extracted {len(day_items)} items from {date_str}")
+                    
+                    gazette_items.extend(day_items)
+                
+                print(f"[Resmi Gazete] Total items: {len(gazette_items)}, Errors: {len(errors)}")
+                
+                items.extend(gazette_items)
                 continue  # Skip normal processing
             except Exception as e:
                 errors.append({"url": u, "error": f"Resmi Gazete scraper failed: {e}"})

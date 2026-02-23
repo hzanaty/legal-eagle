@@ -1,3 +1,87 @@
+## Update v2.5.1 (2026-02-23)
+
+### v2.5.1 — Code Consolidation: Resmi Gazete Inline Integration (2026-02-23)
+
+**Refactoring**:
+- **Consolidated Resmi Gazete Logic**: Merged specialized scraper into unified URL sources runner
+  - Removed `agents/resmi_gazete_scraper.py` (external module)
+  - Moved all functions inline to `agents/url_sources_runner.py`:
+    - `_generate_gazette_date_urls()` - Internal function for date URL generation
+    - `_extract_gazette_items()` - Internal function for item extraction
+    - Inline scraping logic in `run_unified_sources()`
+  - Removed external import dependency
+  - Deleted test script `scripts/test_resmi_gazete_august.py` (referenced external module)
+
+**Benefits**:
+- Simpler architecture: All URL scraping logic in one unified module
+- No external module dependencies for specialized scrapers
+- Easier maintenance: One place to update scraping logic
+- Consistent with project architecture pattern
+
+**Functionality Unchanged**:
+- Turkey Official Gazette support remains fully functional
+- Same auto-detection when `resmigazete.gov.tr` URL is configured
+- Same date-based navigation via `date_scope` (last_7_days, last_30_days)
+- Same optional `start_date` parameter for historical scraping
+- Same title + link extraction (no PDF parsing)
+
+**Files Changed**:
+- Modified: `agents/url_sources_runner.py` (added inline functions, removed import)
+- Deleted: `agents/resmi_gazete_scraper.py`
+- Deleted: `scripts/test_resmi_gazete_august.py`
+- Updated: `memory-bank/progress.md`, `memory-bank/activeContext.md`
+
+---
+
+## Update v2.5.0 (2026-02-23)
+
+### v2.5.0 — Turkey Official Gazette Support (2026-02-23)
+
+**Major Features**:
+- **Turkey Official Gazette (Resmi Gazete) Support**: Added specialized handling for Turkey's official legal gazette
+  - Automatic detection when `resmigazete.gov.tr` URL is configured
+  - Date-based navigation (Last 7 days, Last 30 days via `date_scope`)
+  - Optional `start_date` parameter for historical scraping (DD.MM.YYYY format)
+  - Extracts gazette item titles with direct links to official documents
+  - Works with TR/HCM glossary for relevance filtering
+  - No PDF parsing required - user clicks links to read full documents
+
+**Key Components** (Note: Consolidated in v2.5.1):
+- Inline functions in `agents/url_sources_runner.py`:
+  - `_generate_gazette_date_urls()` - Generates daily gazette URLs from start date
+  - `_extract_gazette_items()` - Extracts titles and links from listing pages
+  - Inline scraping logic - Main entry point with date range support
+  - Filters out navigation elements automatically (PDF Görüntüle, Sonraki Sayı, etc.)
+
+**Integration**:
+- `agents/url_sources_runner.py` - Auto-detects Resmi Gazete URLs
+  - When `resmigazete.gov.tr` detected, uses inline scraping logic
+  - Passes `start_date` (if configured) and `days_count` from `date_scope`
+  - Falls back to today if no start_date provided
+  - Bypasses generic static/dynamic crawlers
+
+**User Workflow**:
+1. Configure Resmi Gazete URL in Admin UI: `https://www.resmigazete.gov.tr/`
+2. Set Date Scope: "Last 7 days" or "Last 30 days"
+3. Optionally add Turkish HCM glossary keywords
+4. Run profile - receives daily digest with gazette items matching keywords
+5. Click item links to view full legal documents on official site
+
+**Technical Design**:
+- Similar to GOSI scraper pattern: extract titles + links only
+- No PDF parsing (reduces complexity, faster processing)
+- Date-forward iteration (start_date → start_date + N days)
+- Same-origin link filtering with detail pattern support
+- Deduplicated by title to avoid navigation element duplicates
+
+**Documentation Updated**:
+- memory-bank/progress.md → Added v2.5.0 entry
+- memory-bank/activeContext.md → Updated to v2.5.0
+- memory-bank/techContext.md → Added Resmi Gazete technical details
+- CHANGELOG.md → Added v2.5.0 user-facing changes
+
+---
+
 ## Update v2.4.0 (2026-02-19)
 
 ### v2.4.0 — Translation & Language Features (2026-02-19)

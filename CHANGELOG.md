@@ -1,5 +1,47 @@
 # CHANGELOG
 
+## v2.5 — 2026-02-23
+### Turkey Official Gazette Support
+- **Resmi Gazete Integration**: Added support for Turkey's Official Gazette as a URL source
+  - Automatic detection when `resmigazete.gov.tr` is configured
+  - Date-based gazette navigation (Last 7 days, Last 30 days)
+  - Extracts gazette item titles with links to official documents
+  - Works with TR/HCM glossary for relevance filtering
+  - No PDF parsing required - user clicks links to read full documents
+
+### How It Works
+1. Configure URL source: `https://www.resmigazete.gov.tr/`
+2. Set Date Scope: "Last 7 days" or "Last 30 days"
+3. Add Turkish HCM glossary keywords (optional)
+4. Run profile - receives daily digest with gazette items matching keywords
+5. Click item links to view full legal documents on official site
+
+### New Components
+- `agents/resmi_gazete_scraper.py` - Specialized Resmi Gazete scraper module
+  - `generate_date_urls()` - Generates daily gazette URLs from start date
+  - `extract_gazette_items()` - Extracts titles and links from listing pages
+  - `scrape_resmi_gazete()` - Main entry point with date range support
+  - Automatically filters out navigation elements (PDF Görüntüle, Sonraki Sayı, etc.)
+
+### Integration
+- `agents/url_sources_runner.py` - Auto-detects Resmi Gazete URLs
+  - When `resmigazete.gov.tr` detected, uses specialized scraper
+  - Passes `start_date` (if configured) and `days_count` from `date_scope`
+  - Falls back to today if no start_date provided
+  - Bypasses generic static/dynamic crawlers
+
+### Testing
+- Test script: `scripts/test_resmi_gazete_august.py`
+- Successfully tested with August 2024 dates (01.08.2024 - 03.08.2024)
+- Verified extraction of 52 real gazette items across 3 days
+
+### Technical Design
+- Similar to GOSI scraper pattern: extract titles + links only
+- No PDF parsing (reduces complexity, faster processing)
+- Date-forward iteration (start_date → start_date + N days)
+- Same-origin link filtering with detail pattern support
+- Deduplicated by title to avoid navigation element duplicates
+
 ## v2.4 — 2026-02-19
 ### Translation & Language Features
 - **Per-Receiver Translation Language**: Each email receiver can specify their preferred language

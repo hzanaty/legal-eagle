@@ -1,9 +1,28 @@
-## Current State: v2.4.0 (2026-02-19)
+## Current State: v2.5.0 (2026-02-23)
 
-### Active Version: 2.4.0
-**Status**: Production-ready with multi-language translation support
+### Active Version: 2.5.0
+**Status**: Production-ready with Turkey Official Gazette support
 
-### Recent Major Changes (v2.4.0)
+### Recent Major Changes (v2.5.0)
+
+#### 1. Turkey Official Gazette Support (v2.5.0)
+- **Specialized Resmi Gazete Scraper**: Auto-detects and handles Turkey's official gazette
+  - Inline functions in `agents/url_sources_runner.py`:
+    - `_generate_gazette_date_urls()` - Generates date-based URLs
+    - `_extract_gazette_items()` - Extracts titles + links from listing pages
+  - Automatic detection when URL contains `resmigazete.gov.tr`
+  - Date-based navigation via `date_scope` field (last_7_days, last_30_days)
+  - Optional `start_date` parameter for historical scraping (DD.MM.YYYY)
+  - Extracts titles + links (no PDF parsing required)
+  - Filters out navigation elements automatically
+
+- **Integration**: Seamless URL sources runner integration
+  - Auto-bypasses generic static/dynamic crawlers
+  - Passes date parameters from profile configuration
+  - Works with TR/HCM glossary for relevance filtering
+  - User clicks links to read full documents on official site
+
+#### 2. Translation & Language Features (v2.4.0)
 
 #### 1. Translation & Language Features (v2.4.0)
 - **Per-Receiver Translation**: Each email receiver can set their preferred language

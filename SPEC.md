@@ -1,7 +1,7 @@
-# Legal Eagle 2.4 — Technical Specification
+# Legal Eagle 2.5 — Technical Specification
 
-**Version:** 2.4 (Translation & Language Features)  
-**Last Updated:** 2026-02-19
+**Version:** 2.5.0 (Turkey Official Gazette Support)  
+**Last Updated:** 2026-02-23
 
 This document provides the technical specification for Legal Eagle, an AI-powered regulatory compliance monitoring system for SAP Localization.
 
@@ -492,7 +492,7 @@ filtered_items = filter_items_by_date(all_news_items, days=7)
 
 ### 5.4 URL Sources Runner (`agents/url_sources_runner.py`)
 
-**Purpose**: Scrape news from government websites (static and dynamic).
+**Purpose**: Scrape news from government websites (static and dynamic), with specialized handling for official gazettes.
 
 **Input**: List of URL source configurations
 
@@ -510,6 +510,20 @@ filtered_items = filter_items_by_date(all_news_items, days=7)
 | `auto` | Try static first, fallback to dynamic if < 1 item |
 | `force_static` | Static only (HTTP GET + BeautifulSoup) |
 | `force_dynamic` | Dynamic only (Playwright headless browser) |
+
+**Specialized Handling (v2.5.0)**:
+
+**Turkey Official Gazette (Resmi Gazete)**:
+- Auto-detects URLs containing `resmigazete.gov.tr`
+- Date-based navigation via inline functions:
+  - `_generate_gazette_date_urls()`: Generates date-based URLs (format: DD.MM.YYYY)
+  - `_extract_gazette_items()`: Extracts titles and links from daily gazette pages
+- Configuration:
+  - `date_scope`: "last_7_days" or "last_30_days" (determines how many days to process)
+  - `start_date`: Optional explicit start date in DD.MM.YYYY format (defaults to today)
+- Filters out navigation elements automatically (PDF Görüntüle, Sonraki Sayı, etc.)
+- Returns titles with direct links to official documents (no PDF parsing)
+- Section detection: Identifies Legislative, Executive, Judicial, and Announcement sections
 
 **Static Pipeline**:
 1. HTTP GET listing page
