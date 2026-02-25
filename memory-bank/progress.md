@@ -1,3 +1,26 @@
+## Update v2.5.2 (2026-02-25)
+
+### v2.5.2 — Translation Bug Fix (2026-02-25)
+
+**Bug Fix**:
+- **Fixed Variable Name Collision in Translation**: Resolved critical bug in `translate_grouped_summary()` function
+  - **Issue**: Variable `translated_summary` was reused for two purposes:
+    - As a list to collect translated groups (line 44)
+    - As a string to hold translated summary text (line 91)
+  - **Error**: When trying to `append()` to the list, it was actually a string: `'str' object has no attribute 'append'`
+  - **Fix**: Renamed string variable to `translated_summary_text` to avoid collision
+  - **Impact**: Translation now works correctly for all language pairs
+
+**Files Changed**:
+- Modified: `agents/email_sender.py` (lines 91-94)
+- Updated: `memory-bank/progress.md`
+
+**Testing**:
+- Verified fix resolves TR/HCM translation errors
+- Translation from Turkish to English now completes successfully
+
+---
+
 ## Update v2.5.1 (2026-02-23)
 
 ### v2.5.1 — Code Consolidation: Resmi Gazete Inline Integration (2026-02-23)

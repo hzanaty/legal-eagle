@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## v2.5.2 — 2026-02-25
+### Bug Fix
+- **Translation Variable Collision**: Fixed critical bug in `translate_grouped_summary()` function
+  - Issue: Variable `translated_summary` was reused for two purposes (list and string)
+  - Error: `'str' object has no attribute 'append'` when translating summaries
+  - Fix: Renamed string variable to `translated_summary_text` to avoid collision
+  - Impact: Translation now works correctly for all language pairs (TR→EN, AR→EN, ES→EN, etc.)
+
 ## v2.5 — 2026-02-23
 ### Turkey Official Gazette Support
 - **Resmi Gazete Integration**: Added support for Turkey's Official Gazette as a URL source

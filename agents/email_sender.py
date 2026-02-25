@@ -92,17 +92,17 @@ Provide the translation in this exact JSON format:
                 
                 translation = json.loads(translation_text)
                 translated_title = translation.get("translated_title", title)
-                translated_summary = translation.get("translated_summary", summary)
+                translated_summary_text = translation.get("translated_summary", summary)
             except json.JSONDecodeError:
                 # Fallback: use original if parsing fails
                 print(f"   ⚠️ Translation parse failed for: {title[:50]}...")
                 translated_title = title
-                translated_summary = summary
+                translated_summary_text = summary
             
             # Create translated group (preserve all other fields)
             translated_group = group.copy()
             translated_group["title"] = translated_title
-            translated_group["summary"] = translated_summary
+            translated_group["summary"] = translated_summary_text
             
             translated_summary.append(translated_group)
         

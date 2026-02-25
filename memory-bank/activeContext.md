@@ -1,11 +1,18 @@
-## Current State: v2.5.0 (2026-02-23)
+## Current State: v2.5.2 (2026-02-25)
 
-### Active Version: 2.5.0
-**Status**: Production-ready with Turkey Official Gazette support
+### Active Version: 2.5.2
+**Status**: Production-ready with translation bug fix
 
-### Recent Major Changes (v2.5.0)
+### Recent Major Changes
 
-#### 1. Turkey Official Gazette Support (v2.5.0)
+#### 1. Translation Bug Fix (v2.5.2)
+- **Fixed Variable Name Collision**: Resolved critical bug in `translate_grouped_summary()` function
+  - Variable `translated_summary` was reused as both list and string
+  - Caused error: `'str' object has no attribute 'append'`
+  - Fixed by renaming string variable to `translated_summary_text`
+  - Translation now works correctly for all language pairs (TR→EN, AR→EN, etc.)
+
+#### 2. Turkey Official Gazette Support (v2.5.0)
 - **Specialized Resmi Gazete Scraper**: Auto-detects and handles Turkey's official gazette
   - Inline functions in `agents/url_sources_runner.py`:
     - `_generate_gazette_date_urls()` - Generates date-based URLs
