@@ -2,6 +2,8 @@
 
 **AI-powered regulatory compliance monitoring for SAP Localization**
 
+> Last updated: January 10, 2026
+
 Legal Eagle automatically monitors government sources for legal and regulatory changes, evaluates their impact on SAP localized products, and delivers daily actionable digests to Localization Product Managers (LPMs).
 
 ---
