@@ -1,11 +1,35 @@
-## Current State: v2.5.2 (2026-02-25)
+## Current State: v2.6.0 (2026-03-10)
 
-### Active Version: 2.5.2
-**Status**: Production-ready with translation bug fix
+### Active Version: 2.6.0
+**Status**: Production-ready with BTP Cloud Foundry deployment support
 
 ### Recent Major Changes
 
-#### 1. Translation Bug Fix (v2.5.2)
+#### 1. BTP Cloud Foundry Deployment (v2.6.0)
+- **Full BTP Deployment Support**: Complete deployment to SAP BTP Cloud Foundry environment
+  - Multi-buildpack configuration: apt-buildpack + python_buildpack
+  - apt-buildpack installs Chromium system libraries (23 libraries)
+  - .profile script auto-installs Playwright browser on container startup
+  - 1GB memory allocation for Playwright operations
+  - 60-second timeout for dynamic rendering (increased from 20s)
+
+- **Deployment Files**:
+  - `manifest.yaml` - CF deployment configuration (1GB memory, 2GB disk, routes)
+  - `apt.yml` - System package dependencies for Chromium
+  - `.profile` - Playwright browser installation script
+  - `.cfignore` - Files to exclude from CF deployment
+  - `Procfile` - Gunicorn start command
+  - `runtime.txt` - Python 3.11 specification
+  - `requirements.txt` - Root-level Python dependencies
+  - `BTP_DEPLOYMENT.md` - Complete deployment guide
+
+- **Known Issue**: Network connectivity limitations
+  - Saudi government websites (uqn.gov.sa) unreachable from BTP network
+  - Cloud provider IP ranges appear blocked by government infrastructure
+  - RSS feeds and Twitter API work fine from BTP
+  - Workaround: Hybrid architecture (BTP for RSS/Twitter, local for blocked sites)
+
+#### 2. Translation Bug Fix (v2.5.2)
 - **Fixed Variable Name Collision**: Resolved critical bug in `translate_grouped_summary()` function
   - Variable `translated_summary` was reused as both list and string
   - Caused error: `'str' object has no attribute 'append'`

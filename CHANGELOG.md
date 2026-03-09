@@ -1,5 +1,59 @@
 # CHANGELOG
 
+## v2.6 — 2026-03-10
+### BTP Cloud Foundry Deployment
+- **Full BTP Deployment Support**: Complete deployment to SAP BTP Cloud Foundry environment
+  - Multi-buildpack configuration: apt-buildpack + python_buildpack
+  - Playwright browser automation with Chromium system libraries
+  - 1GB memory allocation for browser operations
+  - 60-second timeout for slow government websites
+  - Complete deployment guide: `BTP_DEPLOYMENT.md`
+
+### Deployment Files Added
+- `manifest.yaml` - Cloud Foundry deployment configuration
+- `apt.yml` - System package dependencies for Chromium (23 libraries)
+- `.profile` - Playwright browser auto-installation script
+- `.cfignore` - Files to exclude from CF deployment
+- `Procfile` - Gunicorn start command
+- `runtime.txt` - Python 3.11 specification
+- `requirements.txt` - Root-level Python dependencies
+
+### Technical Improvements
+- **Increased Timeout**: Dynamic rendering timeout increased from 20s to 60s
+  - Modified: `agents/url_sources_runner.py`
+  - Accommodates slow-loading government websites
+  - Better success rate for JavaScript-heavy pages
+
+- **System Libraries**: apt-buildpack installs Chromium dependencies
+  - Libraries: libnspr4, libnss3, libgbm1, libxshmfence1, and 19 others
+  - Prevents "cannot open shared object file" errors
+  - Enables Playwright to run in Cloud Foundry environment
+
+- **Auto-Installation**: Playwright browser installed on container startup
+  - `.profile` script downloads Chromium (~167MB)
+  - Cached in `/home/vcap/app/.cache/ms-playwright/`
+  - No manual installation required
+
+### Known Issue
+- **Network Connectivity**: Some government websites unreachable from BTP network
+  - Affected: Saudi government sites (e.g., `uqn.gov.sa`)
+  - Working: RSS feeds, Twitter API, most other websites
+  - Root cause: Cloud provider IP ranges may be blocked by government infrastructure
+  - Workaround: Use hybrid architecture (BTP for RSS/Twitter, local for blocked sites)
+
+### How to Deploy to BTP
+1. Ensure BTP subaccount has Cloud Foundry enabled
+2. Login: `cf login`
+3. Deploy: `cf push`
+4. Configure environment variables via `cf set-env`
+5. Access Admin UI at your BTP route
+
+### Testing
+- Successfully deployed to BTP Cloud Foundry EU21 (Netherlands)
+- Playwright browser operational with all dependencies
+- RSS and Twitter sources working from BTP
+- Dynamic rendering functional (except blocked government sites)
+
 ## v2.5.2 — 2026-02-25
 ### Bug Fix
 - **Translation Variable Collision**: Fixed critical bug in `translate_grouped_summary()` function

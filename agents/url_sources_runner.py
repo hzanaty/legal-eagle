@@ -2000,7 +2000,7 @@ def run_unified_sources(url_sources: List[Dict[str, str]], profile_slug: Optiona
         errors: List[Dict] = []
 
         print(f"  [dynamic] Render listing: {u}")
-        ok, html, links = render_and_collect_links(u, read_label=read_label, detail_pattern=detail_pattern, timeout_ms=20000)
+        ok, html, links = render_and_collect_links(u, read_label=read_label, detail_pattern=detail_pattern, timeout_ms=60000)
         if not ok:
             print(f"  [dynamic] render failed: {html}")
             return [], [{"url": u, "error": html}]

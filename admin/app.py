@@ -1402,4 +1402,8 @@ if __name__ == "__main__":
     except Exception as e:
         # Do not block server start on migration errors
         print(f"⚠️ Auto-migration skipped or failed: {e}")
-    app.run(host="127.0.0.1", port=8080, debug=True)
+    
+    # BTP-compatible configuration: use PORT env var or default to 8080
+    port = int(os.environ.get("PORT", 8080))
+    debug = os.environ.get("FLASK_ENV") != "production"
+    app.run(host="0.0.0.0", port=port, debug=debug)

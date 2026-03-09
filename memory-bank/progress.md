@@ -1,3 +1,48 @@
+## Update v2.6.0 (2026-03-10)
+
+### v2.6.0 — BTP Cloud Foundry Deployment (2026-03-10)
+
+**Major Features**:
+- **BTP Cloud Foundry Deployment Support**: Full deployment to SAP BTP Cloud Foundry environment
+  - Multi-buildpack configuration: apt-buildpack + python_buildpack
+  - apt-buildpack installs Chromium system libraries (libnspr4, libnss3, libgbm1, etc.)
+  - .profile script auto-installs Playwright browser on container startup
+  - 1GB memory allocation for Playwright operations
+  - 60-second timeout for dynamic rendering (increased from 20s)
+
+**Deployment Files Added**:
+- `manifest.yaml` - Cloud Foundry deployment configuration (1GB memory, 2GB disk, routes)
+- `apt.yml` - System package dependencies for Chromium (23 libraries)
+- `.profile` - Playwright browser installation script (runs on startup)
+- `.cfignore` - Files to exclude from CF deployment
+- `Procfile` - Gunicorn start command
+- `runtime.txt` - Python 3.11 specification
+- `requirements.txt` - Root-level Python dependencies (Flask, Playwright, etc.)
+- `BTP_DEPLOYMENT.md` - Complete deployment guide
+
+**Code Changes**:
+- Modified: `agents/url_sources_runner.py` (timeout increased from 20s to 60s)
+
+**Known Issues**:
+- **Network Connectivity**: Saudi government websites (uqn.gov.sa) unreachable from BTP network
+  - Cloud provider IP ranges appear blocked by government infrastructure
+  - RSS feeds and Twitter API work fine
+  - Workaround: Hybrid architecture (BTP for RSS/Twitter, local for blocked sites)
+
+**Testing**:
+- Deployment successful on BTP Cloud Foundry EU21 (Netherlands)
+- Playwright browser installed and operational
+- System libraries correctly installed via apt-buildpack
+- RSS and Twitter sources working
+- Dynamic rendering functional (but blocked sites timeout)
+
+**Documentation Updated**:
+- BTP_DEPLOYMENT.md → Added Playwright section, known issues
+- memory-bank/progress.md → Added v2.6.0 entry
+- Deleted: BTP_QUOTA_ISSUE.md (obsolete after quota resolution)
+
+---
+
 ## Update v2.5.2 (2026-02-25)
 
 ### v2.5.2 — Translation Bug Fix (2026-02-25)

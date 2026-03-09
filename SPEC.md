@@ -1,7 +1,7 @@
-# Legal Eagle 2.5 — Technical Specification
+# Legal Eagle 2.6 — Technical Specification
 
-**Version:** 2.5.0 (Turkey Official Gazette Support)  
-**Last Updated:** 2026-02-23
+**Version:** 2.6.0 (BTP Cloud Foundry Deployment)  
+**Last Updated:** 2026-03-10
 
 This document provides the technical specification for Legal Eagle, an AI-powered regulatory compliance monitoring system for SAP Localization.
 
@@ -152,7 +152,140 @@ Legal Eagle monitors government sources for legal updates in chosen countries an
 
 ---
 
-## 4. Database Schema
+## 4. BTP Cloud Foundry Deployment
+
+### 4.1 Overview
+
+Legal Eagle can be deployed to SAP BTP Cloud Foundry environment for cloud-based operation. The deployment includes Playwright browser automation with full Chromium dependencies.
+
+**Deployment Guide**: See `BTP_DEPLOYMENT.md` for complete step-by-step instructions.
+
+### 4.2 Deployment Files
+
+| File | Purpose |
+|------|---------|
+| `manifest.yaml` | Cloud Foundry deployment configuration (memory, disk, buildpacks, routes) |
+| `apt.yml` | System package dependencies for Chromium (23 libraries) |
+| `.profile` | Playwright browser auto-installation script (runs on container startup) |
+| `.cfignore` | Files to exclude from CF deployment |
+| `Procfile` | Gunicorn start command |
+| `runtime.txt` | Python 3.11 specification |
+| `requirements.txt` | Root-level Python dependencies |
+
+### 4.3 Multi-Buildpack Configuration
+
+Legal Eagle uses **two buildpacks** in sequence:
+
+1. **apt-buildpack** (`https://github.com/cloudfoundry/apt-buildpack`)
+   - Installs system libraries required by Chromium
+   - Configuration file: `apt.yml`
+   - Libraries installed: libnspr4, libnss3, libgbm1, libxshmfence1, and 19 others
+   - Prevents "cannot open shared object file" errors
+
+2. **python_buildpack** (Cloud Foundry standard)
+   - Installs Python 3.11 and dependencies
+   - Reads `requirements.txt` for package list
+   - Configures Python environment
+
+### 4.4 Playwright Browser Installation
+
+Chromium browser is installed automatically on container startup via `.profile` script:
+
+```bash
+# .profile content (simplified)
+echo "Installing Playwright Chromium..."
+playwright install chromium
+playwright install-deps chromium
+```
+
+**Behavior**:
+- Runs once per container start
+- Downloads Chromium (~167MB)
+- Caches in `/home/vcap/app/.cache/ms-playwright/`
+- No manual installation required
+
+### 4.5 Resource Requirements
+
+| Resource | Requirement | Reason |
+|----------|-------------|--------|
+| Memory | 1GB | Chromium requires significant memory for rendering |
+| Disk | 2GB | Chromium binaries + Python dependencies + cache |
+| Timeout | 60s | Slow government websites need extended timeout |
+
+**Note**: Deployment fails with 512MB memory allocation.
+
+### 4.6 Environment Variables (BTP)
+
+Environment variables must be configured via Cloud Foundry CLI:
+
+```bash
+cf set-env legal-eagle-ui LEGAL_EAGLE_OPENAI_API_KEY "your-key"
+cf set-env legal-eagle-ui LEGAL_EAGLE_TWITTER_BEARER_TOKEN "your-token"
+cf set-env legal-eagle-ui LEGAL_EAGLE_GMAIL_EMAIL_SENDER "your-email"
+cf set-env legal-eagle-ui LEGAL_EAGLE_GMAIL_APP_PASSWORD "your-password"
+cf restage legal-eagle-ui
+```
+
+See Section 8.1 for complete list of environment variables.
+
+### 4.7 Deployment Commands
+
+```bash
+# Login to Cloud Foundry
+cf login -a https://api.cf.eu21.hana.ondemand.com
+
+# Deploy application
+cf push
+
+# Check status
+cf app legal-eagle-ui
+
+# View logs
+cf logs legal-eagle-ui --recent
+
+# Scale resources
+cf scale legal-eagle-ui -m 1G -k 2G
+```
+
+### 4.8 Known Issues
+
+#### Network Connectivity Limitations
+
+**Problem**: Some government websites are unreachable from BTP Cloud Foundry network.
+
+**Affected Sources**:
+- Saudi government sites (e.g., `uqn.gov.sa`)
+- Timeouts occur on both static HTTP and dynamic Playwright requests
+
+**Working Sources**:
+- RSS feeds ✅
+- Twitter API ✅
+- Most other websites ✅
+
+**Root Cause**: Cloud provider IP ranges may be blocked by government infrastructure or intermediary firewalls.
+
+**Workaround**: Use hybrid architecture:
+- Deploy to BTP for RSS/Twitter sources (works fine)
+- Keep local scheduler for blocked government sites
+- Both can use same SQLite database (synced via file sharing)
+
+### 4.9 BTP vs Local Deployment
+
+| Feature | BTP Cloud Foundry | Local (macOS/Linux) |
+|---------|-------------------|---------------------|
+| Setup | cf push (automated) | Manual Python setup |
+| Scaling | `cf scale` command | Manual process management |
+| Monitoring | CF logs + metrics | Local logs |
+| Scheduling | Job Scheduler service | launchd/systemd/cron |
+| Cost | Per GB-hour | Hardware cost |
+| Network | Some sites blocked | Full access |
+| Maintenance | Managed by SAP | Self-managed |
+
+**Recommendation**: Use BTP for production if all sources are accessible. Use local deployment if government sites are blocked from BTP network.
+
+---
+
+## 5. Database Schema
 
 Database file: `configurations/config.db` (SQLite)
 
