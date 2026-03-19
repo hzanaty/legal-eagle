@@ -5,8 +5,7 @@ from typing import Optional, Dict, Any, List
 from urllib.parse import urlparse
 
 from configurations.config_loader import creds, add_news_item, get_weekly_baseline
-from openai import OpenAI
-import httpx
+from agents.sap_ai_client import SAPAICoreClient
 import numpy as np
 import os
 import time
@@ -19,13 +18,18 @@ from agents.text_utils import (
     hash_signature,
 )
 
-# OpenAI client factory: disable HTTP/2, configurable timeout/base_url via env
-def _get_openai_client():
-    api_key = creds.get("openai_api_key")
-    base_url = os.environ.get("LEGAL_EAGLE_OPENAI_BASE_URL")
-    timeout_s = float(os.environ.get("LEGAL_EAGLE_OPENAI_TIMEOUT", "60"))
-    http_client = httpx.Client(http2=False, timeout=timeout_s)
-    return OpenAI(api_key=api_key, base_url=base_url, http_client=http_client)
+# AI client factory: Returns SAP AI Core client
+def _get_ai_client():
+    """Get SAP AI Core client from credentials."""
+    sap_cfg = creds.get("sap_aicore", {})
+    return SAPAICoreClient(
+        base_url=sap_cfg["base_url"],
+        auth_url=sap_cfg["auth_url"],
+        client_id=sap_cfg["client_id"],
+        client_secret=sap_cfg["client_secret"],
+        chat_deployment_id=sap_cfg["chat_deployment_id"],
+        embeddings_deployment_id=sap_cfg["embeddings_deployment_id"]
+    )
 
 # Embedding request safety: truncate texts and batch to avoid 8k token limit per request
 MAX_CHARS_PER_ITEM = 1000  # ~250 tokens heuristic
@@ -248,7 +252,7 @@ def run_compare_news_agent(
 
     # Embeddings for cosine similarity
     print("🔍 Generating embeddings for semantic comparison (weekly baseline)...")
-    client = _get_openai_client()
+    client = _get_ai_client()
     baseline_emb = _embed_texts(baseline_texts, client)
     curr_emb = _embed_texts(curr_texts, client)
 

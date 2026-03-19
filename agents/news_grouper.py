@@ -1,9 +1,23 @@
-from openai import OpenAI
 from datetime import datetime
 import json
+from agents.sap_ai_client import SAPAICoreClient
+from configurations.config_loader import creds
 
 
-def are_related(text1, text2, client: OpenAI):
+def _get_ai_client():
+    """Get SAP AI Core client from credentials."""
+    sap_cfg = creds.get("sap_aicore", {})
+    return SAPAICoreClient(
+        base_url=sap_cfg["base_url"],
+        auth_url=sap_cfg["auth_url"],
+        client_id=sap_cfg["client_id"],
+        client_secret=sap_cfg["client_secret"],
+        chat_deployment_id=sap_cfg["chat_deployment_id"],
+        embeddings_deployment_id=sap_cfg["embeddings_deployment_id"]
+    )
+
+
+def are_related(text1, text2, client: SAPAICoreClient):
     """Uses LLM to check if two texts refer to the same event."""
     prompt = f"""
 Are the following two news items about the same topic or event, even if written differently?
@@ -24,7 +38,7 @@ Reply with only "Yes" or "No".
         return {"error": True, "message": f"Similarity check failed: {e}"}
 
 
-def group_news(items, client: OpenAI):
+def group_news(items, client: SAPAICoreClient):
     """Groups related items together (within a single category)."""
     groups = []
     for item in items:
@@ -42,7 +56,7 @@ def group_news(items, client: OpenAI):
     return groups
 
 
-def summarize_group(group, client: OpenAI, LANGUAGE_PREFERENCE):
+def summarize_group(group, client: SAPAICoreClient, LANGUAGE_PREFERENCE):
     """Summarizes all content in a group into 2–3 concise sentences."""
     combined_text = "\n\n".join([item["content"] for item in group])
     prompt = f"""
@@ -123,14 +137,19 @@ def format_update_output(update_item, category):
     }
 
 
-def group_and_summarize_news(items, OPENAI_API_KEY, LANGUAGE_PREFERENCE):
+def group_and_summarize_news(items, sap_ai_client=None, LANGUAGE_PREFERENCE="en"):
     """
     Orchestrates grouping + summarization for already filtered items.
     Produces separate sections per category: New (grouped by similarity) and Updates (one per item with deltas).
     HCM groups appear first, then FIN, then others.
+    
+    Args:
+        items: List of news items to group and summarize
+        sap_ai_client: Optional SAP AI Core client (deprecated parameter for compatibility)
+        LANGUAGE_PREFERENCE: Language for summaries (default: 'en')
     """
     results = []
-    client = OpenAI(api_key=OPENAI_API_KEY)
+    client = _get_ai_client()
 
     # Split items by category and by update flag
     new_by_cat = {}

@@ -4,19 +4,27 @@ import os
 import json
 import re
 from datetime import datetime, timedelta, timezone
-from openai import OpenAI
-import httpx
 from agents.text_utils import normalize_arabic
+
+# Import SAP AI Core client
+from agents.sap_ai_client import SAPAICoreClient
+from configurations.config_loader import creds
 
 # Maximum age of news in days. Articles older than this will be discarded.
 MAX_NEWS_AGE_DAYS = int(os.environ.get("LEGAL_EAGLE_MAX_NEWS_AGE_DAYS", "7"))
 
-# OpenAI client factory: disable HTTP/2, configurable timeout/base_url via env
-def _get_openai_client(api_key: str):
-    base_url = os.environ.get("LEGAL_EAGLE_OPENAI_BASE_URL")
-    timeout_s = float(os.environ.get("LEGAL_EAGLE_OPENAI_TIMEOUT", "30"))
-    http_client = httpx.Client(http2=False, timeout=timeout_s)
-    return OpenAI(api_key=api_key, base_url=base_url, http_client=http_client)
+# AI client factory: Returns SAP AI Core client
+def _get_ai_client():
+    """Get SAP AI Core client from credentials."""
+    sap_cfg = creds.get("sap_aicore", {})
+    return SAPAICoreClient(
+        base_url=sap_cfg["base_url"],
+        auth_url=sap_cfg["auth_url"],
+        client_id=sap_cfg["client_id"],
+        client_secret=sap_cfg["client_secret"],
+        chat_deployment_id=sap_cfg["chat_deployment_id"],
+        embeddings_deployment_id=sap_cfg["embeddings_deployment_id"]
+    )
 
 
 def _parse_publication_date(date_str: str) -> datetime | None:
@@ -102,7 +110,7 @@ def is_news_too_old(item: dict, max_age_days: int = MAX_NEWS_AGE_DAYS) -> bool:
 
 
 # 🧠 LLM-based Semantic Glossary Check
-def semantic_glossary_check(item: dict, OPENAI_API_KEY: str, GLOSSARY: dict, LANGUAGE_PREFERENCE: str, lob: str) -> dict:
+def semantic_glossary_check(item: dict, sap_ai_client, GLOSSARY: dict, LANGUAGE_PREFERENCE: str, lob: str) -> dict:
     """
     Uses an LLM to perform a semantic relevance check.
     The LLM understands the *meaning* of the glossary terms, not just keywords.
@@ -152,11 +160,11 @@ Example for an irrelevant article:
 {{"is_relevant": false, "reasoning": "The article is about a diplomatic meeting between two countries and does not concern HR, Payroll, or Finance regulations."}}
 """
     
-    client = _get_openai_client(OPENAI_API_KEY)
+    client = _get_ai_client()
     try:
         timeout_s = float(os.environ.get("LEGAL_EAGLE_OPENAI_TIMEOUT", "30"))
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4o",  # Model name ignored, uses configured deployment
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"},
             timeout=timeout_s
@@ -175,7 +183,7 @@ Example for an irrelevant article:
 
 
 # 🔗 Semantic Similarity Check (for "Second Chance" against baseline)
-def is_similar_to_baseline(item: dict, baseline_items: list, OPENAI_API_KEY: str, threshold: float = 0.85) -> bool:
+def is_similar_to_baseline(item: dict, baseline_items: list, sap_ai_client, threshold: float = 0.85) -> bool:
     """
     Uses embeddings to check if a new item is semantically similar to any item
     in the high-score baseline.
@@ -183,7 +191,7 @@ def is_similar_to_baseline(item: dict, baseline_items: list, OPENAI_API_KEY: str
     Args:
         item: The news item to check.
         baseline_items: A list of previously reviewed, high-score items.
-        OPENAI_API_KEY: API key for OpenAI.
+        sap_ai_client: SAP AI Core client (deprecated parameter for compatibility).
         threshold: Cosine similarity threshold (default 0.85).
 
     Returns:
@@ -196,12 +204,12 @@ def is_similar_to_baseline(item: dict, baseline_items: list, OPENAI_API_KEY: str
     if not new_text:
         return False
 
-    client = _get_openai_client(OPENAI_API_KEY)
+    client = _get_ai_client()
 
     try:
         # Get embedding for the new item
         new_embedding_response = client.embeddings.create(
-            model="text-embedding-3-small",
+            model="text-embedding-ada-002",  # Model name ignored, uses configured deployment
             input=[new_text]
         )
         new_embedding = new_embedding_response.data[0].embedding
@@ -217,7 +225,7 @@ def is_similar_to_baseline(item: dict, baseline_items: list, OPENAI_API_KEY: str
             return False
 
         baseline_embedding_response = client.embeddings.create(
-            model="text-embedding-3-small",
+            model="text-embedding-ada-002",  # Model name ignored, uses configured deployment
             input=baseline_texts
         )
 
@@ -244,7 +252,7 @@ def is_similar_to_baseline(item: dict, baseline_items: list, OPENAI_API_KEY: str
 # ✅ Entry point: filter news items using LLM semantic check + high-score baseline rescue
 def get_relevant_news(
     all_news_items: list,
-    OPENAI_API_KEY: str,
+    sap_ai_client,
     GLOSSARY: dict,
     LANGUAGE_PREFERENCE: str,
     lob: str,
@@ -258,7 +266,7 @@ def get_relevant_news(
     
     Args:
         all_news_items: List of news items to filter.
-        OPENAI_API_KEY: OpenAI API key for LLM classification and embeddings.
+        sap_ai_client: SAP AI Core client (deprecated parameter for compatibility).
         GLOSSARY: Dictionary with HCM/FIN/OTHER term lists.
         LANGUAGE_PREFERENCE: Preferred output language.
         lob: Line of Business (HCM or FIN).
@@ -282,7 +290,7 @@ def get_relevant_news(
             continue
 
         # --- Step 2: Semantic Glossary Check (LLM) ---
-        result = semantic_glossary_check(item, OPENAI_API_KEY, GLOSSARY, LANGUAGE_PREFERENCE, lob)
+        result = semantic_glossary_check(item, sap_ai_client, GLOSSARY, LANGUAGE_PREFERENCE, lob)
 
         if result.get("error"):
             errors.append({
@@ -297,7 +305,7 @@ def get_relevant_news(
             relevant.append(item)
         else:
             # --- Step 3: "Second Chance" against High-Score Baseline ---
-            if is_similar_to_baseline(item, baseline, OPENAI_API_KEY):
+            if is_similar_to_baseline(item, baseline, sap_ai_client):
                 item["filter_reasoning"] = "Rescued: Similar to a previously reviewed high-score item."
                 item["rescued"] = True
                 relevant.append(item)

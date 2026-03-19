@@ -1,5 +1,32 @@
 # CHANGELOG
 
+## v2.7 — 2026-03-19
+### Changed
+- **Migrated from OpenAI to SAP AI Core** for all AI operations
+  - Replaced personal OpenAI API key with SAP internal AI Core credentials
+  - All agents now use SAP AI Core client with OAuth2 authentication
+  - Uses gpt-4o model for chat completions (deployment: `d1555c6d43e6f446`)
+  - Uses text-embedding-ada-002 for embeddings (deployment: `d987a899a829c105`)
+  - Credentials stored securely in environment variables only
+
+### Added
+- New `agents/sap_ai_client.py` module providing OpenAI-compatible interface
+- Automatic OAuth2 token management with caching and refresh
+- Test scripts for SAP AI Core connection validation
+
+### Security
+- Removed hardcoded credential files
+- All credentials now loaded from environment variables
+- Updated BTP deployment guide with new environment variables
+
+### Environment Variables (New)
+- `LEGAL_EAGLE_SAP_AICORE_BASE_URL`
+- `LEGAL_EAGLE_SAP_AICORE_AUTH_URL`
+- `LEGAL_EAGLE_SAP_AICORE_CLIENT_ID`
+- `LEGAL_EAGLE_SAP_AICORE_CLIENT_SECRET`
+- `LEGAL_EAGLE_SAP_AICORE_CHAT_DEPLOYMENT_ID`
+- `LEGAL_EAGLE_SAP_AICORE_EMBEDDINGS_DEPLOYMENT_ID`
+
 ## v2.6 — 2026-03-10
 ### BTP Cloud Foundry Deployment
 - **Full BTP Deployment Support**: Complete deployment to SAP BTP Cloud Foundry environment

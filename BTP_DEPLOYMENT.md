@@ -48,10 +48,22 @@ Before deploying, you need to configure environment variables for your applicati
 1. Go to BTP Cockpit → Cloud Foundry → Spaces → `prod`
 2. After first deployment, set these variables via:
    ```bash
-   cf set-env legal-eagle-ui LEGAL_EAGLE_OPENAI_API_KEY "your-openai-key"
+   # SAP AI Core credentials (replaces OpenAI)
+   cf set-env legal-eagle-ui LEGAL_EAGLE_SAP_AICORE_BASE_URL "https://api.ai.internalprod.eu-central-1.aws.ml.hana.ondemand.com"
+   cf set-env legal-eagle-ui LEGAL_EAGLE_SAP_AICORE_AUTH_URL "https://sapaicore-vkibf89l.authentication.sap.hana.ondemand.com"
+   cf set-env legal-eagle-ui LEGAL_EAGLE_SAP_AICORE_CLIENT_ID "your-client-id"
+   cf set-env legal-eagle-ui LEGAL_EAGLE_SAP_AICORE_CLIENT_SECRET "your-client-secret"
+   cf set-env legal-eagle-ui LEGAL_EAGLE_SAP_AICORE_CHAT_DEPLOYMENT_ID "d1555c6d43e6f446"
+   cf set-env legal-eagle-ui LEGAL_EAGLE_SAP_AICORE_EMBEDDINGS_DEPLOYMENT_ID "d987a899a829c105"
+   
+   # Twitter/X
    cf set-env legal-eagle-ui LEGAL_EAGLE_TWITTER_BEARER_TOKEN "your-twitter-token"
+   
+   # Gmail
    cf set-env legal-eagle-ui LEGAL_EAGLE_GMAIL_EMAIL_SENDER "your-email@sap.com"
    cf set-env legal-eagle-ui LEGAL_EAGLE_GMAIL_APP_PASSWORD "your-gmail-app-password"
+   
+   # Admin secret
    cf set-env legal-eagle-ui LEGAL_EAGLE_ADMIN_SECRET "your-secure-random-string"
    ```
 

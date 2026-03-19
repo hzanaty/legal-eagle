@@ -106,7 +106,7 @@ def run_controller():
     print("🧠 Starting Legal Eagle Controller...\n")
 
     # --- Credentials loaded once here ---
-    OPENAI_API_KEY = creds["openai_api_key"]
+    # SAP AI Core credentials are loaded directly by agents via config_loader
     X_BEARER_TOKEN = creds["twitter"]["x_bearer_token"]
     GMAIL_CREDS = creds["gmail"]
 
@@ -211,7 +211,7 @@ def run_controller():
         high_score_baseline = get_reviewed_baseline(profile_id, min_score=4)
         print(f"\n🧹 Filtering for relevance (before comparison)... (high-score baseline: {len(high_score_baseline)} items)")
         filter_result = get_relevant_news(
-            all_news_items, OPENAI_API_KEY, GLOSSARY, LANGUAGE_PREFERENCE, lob,
+            all_news_items, "", GLOSSARY, LANGUAGE_PREFERENCE, lob,
             high_score_baseline=high_score_baseline
         )
         filtered_items = filter_result.get("items", [])
@@ -236,7 +236,7 @@ def run_controller():
 
         # 6. News Grouper Agent
         print("\n🧠 Grouping similar news items...")
-        grouped_summary = group_and_summarize_news(final_items, OPENAI_API_KEY, LANGUAGE_PREFERENCE)
+        grouped_summary = group_and_summarize_news(final_items, "", LANGUAGE_PREFERENCE)
         print(f"✅ Grouped summary ready with {len(grouped_summary)} entries.")
 
         # 7. Email Composer Agent
@@ -249,7 +249,7 @@ def run_controller():
             LANGUAGE_PREFERENCE,
             country,
             lob,
-            OPENAI_API_KEY
+            ""
         )
         if ok:
             print(f"✅ Email sent to stakeholders for {country}/{lob}.\n")
@@ -291,7 +291,7 @@ def run_profile_once(profile_id: int) -> bool:
         URL_SOURCES = load_url_sources(profile_id)
 
         # Credentials
-        OPENAI_API_KEY = creds["openai_api_key"]
+        # SAP AI Core credentials are loaded directly by agents via config_loader
         X_BEARER_TOKEN = creds["twitter"]["x_bearer_token"]
         GMAIL_CREDS = creds["gmail"]
 
@@ -414,7 +414,7 @@ def run_profile_once(profile_id: int) -> bool:
                 print(f"   ⚠️ Failed to save filtered item: {e}")
         
         filter_result = get_relevant_news(
-            all_news_items, OPENAI_API_KEY, GLOSSARY, LANGUAGE_PREFERENCE, lob,
+            all_news_items, "", GLOSSARY, LANGUAGE_PREFERENCE, lob,
             high_score_baseline=high_score_baseline, on_filtered=_save_filtered_item
         )
         filtered_items = filter_result.get("items", [])
@@ -434,7 +434,7 @@ def run_profile_once(profile_id: int) -> bool:
 
         # Group
         print("\n🧠 Grouping similar news items...")
-        grouped_summary = group_and_summarize_news(final_items, OPENAI_API_KEY, LANGUAGE_PREFERENCE)
+        grouped_summary = group_and_summarize_news(final_items, "", LANGUAGE_PREFERENCE)
         print(f"✅ Grouped summary ready with {len(grouped_summary)} entries.")
 
         # Monitor Updates (Law-to-Specification email integration)
@@ -482,7 +482,7 @@ def run_profile_once(profile_id: int) -> bool:
             LANGUAGE_PREFERENCE,
             country,
             lob,
-            OPENAI_API_KEY,
+            "",
             monitor_updates=monitor_updates_data
         )
         if ok:

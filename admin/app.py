@@ -277,6 +277,13 @@ def admin_profile_runs(profile_id: int):
         news_count = int(row_cnt["cnt"] or 0)
     except Exception:
         news_count = 0
+    
+    # Also check filtered_news count (items awaiting manual review)
+    try:
+        row_filtered = conn.execute("SELECT COUNT(*) AS cnt FROM filtered_news WHERE profile_id = ?", (profile_id,)).fetchone()
+        filtered_news_count = int(row_filtered["cnt"] or 0)
+    except Exception:
+        filtered_news_count = 0
     run_active_row = conn.execute("SELECT 1 FROM runs WHERE profile_id = ? AND status = 'Running' LIMIT 1", (profile_id,)).fetchone()
     run_active = bool(run_active_row)
 
@@ -380,6 +387,7 @@ def admin_profile_runs(profile_id: int):
         runs=runs,
         selected_run=selected_run,
         news_count=news_count,
+        filtered_news_count=filtered_news_count,
         run_active=run_active,
         twitter_status=twitter_status,
         resource_status=resource_status,
@@ -1167,14 +1175,28 @@ def clear_profile_news(profile_id: int):
         conn.close()
         flash("Cannot clear while a run is active.", "error")
         return redirect(url_for("admin_profile_runs", profile_id=profile_id))
-    # Count and clear
-    row = conn.execute("SELECT COUNT(*) AS cnt FROM news_items WHERE profile_id = ?", (profile_id,)).fetchone()
-    count = int(row["cnt"] or 0)
-    if count > 0:
-        conn.execute("DELETE FROM news_items WHERE profile_id = ?", (profile_id,))
-        add_audit_log(conn, entity="news_items", action="clear_all", details=f"count={count}", profile_id=profile_id)
+    
+    # Count both tables
+    row_news = conn.execute("SELECT COUNT(*) AS cnt FROM news_items WHERE profile_id = ?", (profile_id,)).fetchone()
+    news_count = int(row_news["cnt"] or 0)
+    
+    row_filtered = conn.execute("SELECT COUNT(*) AS cnt FROM filtered_news WHERE profile_id = ?", (profile_id,)).fetchone()
+    filtered_count = int(row_filtered["cnt"] or 0)
+    
+    total_count = news_count + filtered_count
+    
+    if total_count > 0:
+        # Clear both tables
+        if news_count > 0:
+            conn.execute("DELETE FROM news_items WHERE profile_id = ?", (profile_id,))
+        if filtered_count > 0:
+            conn.execute("DELETE FROM filtered_news WHERE profile_id = ?", (profile_id,))
+        
+        add_audit_log(conn, entity="news_history", action="clear_all", 
+                     details=f"baseline={news_count} filtered={filtered_count} total={total_count}", 
+                     profile_id=profile_id)
         conn.close()
-        flash(f"Cleared {count} news items for this profile.", "success")
+        flash(f"Cleared {total_count} items ({news_count} baseline + {filtered_count} filtered).", "success")
     else:
         conn.close()
         flash("No historical news to clear.", "info")

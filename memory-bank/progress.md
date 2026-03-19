@@ -1,3 +1,63 @@
+## Update v2.7 (2026-03-19)
+
+### v2.7 — SAP AI Core Integration (2026-03-19)
+
+**Major Changes**:
+- **SAP AI Core Integration**: Replaced OpenAI API with SAP AI Core for all AI operations
+  - New module: `agents/sap_ai_client.py` - SAP AI Core client with OAuth2 authentication
+  - Credentials stored in environment variables (no personal API keys)
+  - Chat completions (GPT-4o-mini equivalent) for filtering and grouping
+  - Text embeddings (text-embedding-3-small equivalent) for similarity
+  - Automatic token refresh and error handling
+
+**Environment Variables** (New):
+- `LEGAL_EAGLE_SAP_AICORE_BASE_URL` - AI Core API endpoint
+- `LEGAL_EAGLE_SAP_AICORE_AUTH_URL` - OAuth2 authentication endpoint
+- `LEGAL_EAGLE_SAP_AICORE_CLIENT_ID` - OAuth2 client ID
+- `LEGAL_EAGLE_SAP_AICORE_CLIENT_SECRET` - OAuth2 client secret
+- `LEGAL_EAGLE_SAP_AICORE_CHAT_DEPLOYMENT_ID` - Chat model deployment ID
+- `LEGAL_EAGLE_SAP_AICORE_EMBEDDINGS_DEPLOYMENT_ID` - Embeddings model deployment ID
+
+**Environment Variables** (Deprecated):
+- `LEGAL_EAGLE_OPENAI_API_KEY` - No longer used (replaced by SAP AI Core credentials)
+
+**Code Changes**:
+- Created: `agents/sap_ai_client.py` - SAP AI Core client with OAuth2 flow
+- Modified: `agents/news_filter.py` - Uses `_get_ai_client()` for SAP AI Core
+- Modified: `agents/news_grouper.py` - Uses `_get_ai_client()` for SAP AI Core
+- Modified: `agents/compare_news.py` - Uses `_get_ai_client()` for SAP AI Core
+- Modified: `agents/email_sender.py` - Uses `_get_ai_client()` for SAP AI Core
+- Modified: `configurations/env_loader.py` - Loads SAP AI Core credentials
+- Modified: `configurations/config_loader.py` - Provides SAP AI Core config
+- Updated: `.env.example` - Added SAP AI Core variables
+- Updated: `BTP_DEPLOYMENT.md` - SAP AI Core deployment instructions
+
+**Admin UI Changes**:
+- Fixed: "Clear Historical News" button now clears both `news_items` and `filtered_news` tables
+- Shows detailed feedback: "Cleared 262 items (0 baseline + 262 filtered)."
+
+**Testing**:
+- Created: `scripts/test_sap_aicore.py` - Test script for SAP AI Core connection
+- Created: `scripts/list_sap_aicore_deployments.py` - List available models
+- Verified: Filtering, grouping, translation, and embeddings work correctly
+- Tested: TR/HCM profile run completed successfully with SAP AI Core
+
+**Documentation Updated**:
+- SPEC.md → v2.7 (updated version, date, SAP AI Core integration)
+- CHANGELOG.md → Added v2.7 entry
+- BTP_DEPLOYMENT.md → SAP AI Core environment variables section
+- memory-bank/progress.md → Added v2.7 entry
+- memory-bank/activeContext.md → Updated to v2.7
+- memory-bank/techContext.md → SAP AI Core technical details
+
+**Security Improvements**:
+- Removed personal OpenAI API keys from codebase
+- Credentials managed via environment variables
+- OAuth2 token refresh handled automatically
+- No API keys stored in database or configuration files
+
+---
+
 ## Update v2.6.0 (2026-03-10)
 
 ### v2.6.0 — BTP Cloud Foundry Deployment (2026-03-10)

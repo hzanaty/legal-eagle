@@ -31,7 +31,13 @@ def load_env_credentials() -> Dict[str, Any]:
     No secrets are read from files or databases.
 
     Required:
-      - LEGAL_EAGLE_OPENAI_API_KEY
+      - SAP AI Core credentials (replaces OpenAI):
+        - LEGAL_EAGLE_SAP_AICORE_BASE_URL
+        - LEGAL_EAGLE_SAP_AICORE_AUTH_URL
+        - LEGAL_EAGLE_SAP_AICORE_CLIENT_ID
+        - LEGAL_EAGLE_SAP_AICORE_CLIENT_SECRET
+        - LEGAL_EAGLE_SAP_AICORE_CHAT_DEPLOYMENT_ID
+        - LEGAL_EAGLE_SAP_AICORE_EMBEDDINGS_DEPLOYMENT_ID
       - LEGAL_EAGLE_TWITTER_BEARER_TOKEN
       - LEGAL_EAGLE_GMAIL_EMAIL_SENDER
       - LEGAL_EAGLE_GMAIL_APP_PASSWORD
@@ -43,8 +49,15 @@ def load_env_credentials() -> Dict[str, Any]:
       - LEGAL_EAGLE_GMAIL_SCOPE
       - LEGAL_EAGLE_GMAIL_TOKEN_URI
     """
-    # Required values
-    openai_key = _require_env("LEGAL_EAGLE_OPENAI_API_KEY")
+    # Required SAP AI Core values
+    sap_aicore_base_url = _require_env("LEGAL_EAGLE_SAP_AICORE_BASE_URL")
+    sap_aicore_auth_url = _require_env("LEGAL_EAGLE_SAP_AICORE_AUTH_URL")
+    sap_aicore_client_id = _require_env("LEGAL_EAGLE_SAP_AICORE_CLIENT_ID")
+    sap_aicore_client_secret = _require_env("LEGAL_EAGLE_SAP_AICORE_CLIENT_SECRET")
+    sap_aicore_chat_deployment = _require_env("LEGAL_EAGLE_SAP_AICORE_CHAT_DEPLOYMENT_ID")
+    sap_aicore_embeddings_deployment = _require_env("LEGAL_EAGLE_SAP_AICORE_EMBEDDINGS_DEPLOYMENT_ID")
+    
+    # Required Twitter and Gmail values
     twitter_bearer = _require_env("LEGAL_EAGLE_TWITTER_BEARER_TOKEN")
     gmail_sender = _require_env("LEGAL_EAGLE_GMAIL_EMAIL_SENDER")
     gmail_app_pw = _require_env("LEGAL_EAGLE_GMAIL_APP_PASSWORD")
@@ -58,7 +71,14 @@ def load_env_credentials() -> Dict[str, Any]:
     gmail_token_uri = env.get("LEGAL_EAGLE_GMAIL_TOKEN_URI")
 
     return {
-        "openai_api_key": openai_key,
+        "sap_aicore": {
+            "base_url": sap_aicore_base_url,
+            "auth_url": sap_aicore_auth_url,
+            "client_id": sap_aicore_client_id,
+            "client_secret": sap_aicore_client_secret,
+            "chat_deployment_id": sap_aicore_chat_deployment,
+            "embeddings_deployment_id": sap_aicore_embeddings_deployment,
+        },
         "gmail": {
             "email_sender": gmail_sender,
             "app_password": gmail_app_pw,

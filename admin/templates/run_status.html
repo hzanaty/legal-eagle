@@ -186,15 +186,17 @@
         <span>▶️ Run Workflow</span>
       </div>
       <div class="sapCard-content">
-        {% set disable_clear = run_active or (news_count == 0) %}
+        {% set total_history = (news_count or 0) + (filtered_news_count or 0) %}
+        {% set disable_clear = run_active or (total_history == 0) %}
         
         <button 
           type="button" 
           class="sapBtn sapBtn-reject sapBtn-sm" 
           style="width: 100%; margin-bottom: var(--sapSpacingS);"
           onclick="showClearDialog()"
-          {% if disable_clear %}disabled{% endif %}>
-          Clear Historical News
+          {% if disable_clear %}disabled{% endif %}
+          title="Clear {{ news_count or 0 }} baseline + {{ filtered_news_count or 0 }} filtered items">
+          Clear Historical News ({{ total_history }})
         </button>
 
         <form method="post" action="{{ url_for('admin_start_run', profile_id=profile.id) }}">
@@ -334,21 +336,39 @@
 </div>
 
 <script>
+// Global functions for dialog control
 function showClearDialog() {
-  document.getElementById('clearNewsModal').classList.add('show');
+  console.log('showClearDialog called');
+  const modal = document.getElementById('clearNewsModal');
+  if (modal) {
+    modal.classList.add('show');
+    console.log('Modal shown');
+  } else {
+    console.error('clearNewsModal not found');
+  }
 }
 
 function hideClearDialog() {
-  document.getElementById('clearNewsModal').classList.remove('show');
+  const modal = document.getElementById('clearNewsModal');
+  if (modal) {
+    modal.classList.remove('show');
+  }
 }
 
-// Close dialog on overlay click
-document.getElementById('clearNewsModal').addEventListener('click', function(e) {
-  if (e.target === this) {
-    hideClearDialog();
+// Setup dialog after DOM loads
+document.addEventListener('DOMContentLoaded', function() {
+  const modal = document.getElementById('clearNewsModal');
+  if (modal) {
+    // Close dialog on overlay click
+    modal.addEventListener('click', function(e) {
+      if (e.target === this) {
+        hideClearDialog();
+      }
+    });
   }
 });
 
+// Log streaming (IIFE for scoping)
 (function() {
   const logEl = document.getElementById('log');
   const statusEl = document.getElementById('run-status');

@@ -4,12 +4,26 @@ from datetime import datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import List, Dict, Any
-import openai
+from agents.sap_ai_client import SAPAICoreClient
+from configurations.config_loader import creds
 
 
 # ---------------------------------------------------------------------
 # 🦅  Email Sender using Gmail App Password + RTL & Category Logic
 # ---------------------------------------------------------------------
+
+def _get_ai_client():
+    """Get SAP AI Core client from credentials."""
+    sap_cfg = creds.get("sap_aicore", {})
+    return SAPAICoreClient(
+        base_url=sap_cfg["base_url"],
+        auth_url=sap_cfg["auth_url"],
+        client_id=sap_cfg["client_id"],
+        client_secret=sap_cfg["client_secret"],
+        chat_deployment_id=sap_cfg["chat_deployment_id"],
+        embeddings_deployment_id=sap_cfg["embeddings_deployment_id"]
+    )
+
 
 def translate_grouped_summary(grouped_summary: List[Dict[str, Any]], from_lang: str, to_lang: str, openai_api_key: str) -> List[Dict[str, Any]]:
     """
@@ -44,7 +58,7 @@ def translate_grouped_summary(grouped_summary: List[Dict[str, Any]], from_lang: 
     translated_summary = []
     
     try:
-        client = openai.OpenAI(api_key=openai_api_key)
+        client = _get_ai_client()
         
         for group in grouped_summary:
             # Extract fields to translate

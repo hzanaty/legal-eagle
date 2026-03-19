@@ -1,7 +1,7 @@
-# Legal Eagle 2.6 — Technical Specification
+# Legal Eagle 2.7 — Technical Specification
 
-**Version:** 2.6.0 (BTP Cloud Foundry Deployment)  
-**Last Updated:** 2026-03-10
+**Version:** 2.7 (SAP AI Core Integration)  
+**Last Updated:** 2026-03-19
 
 This document provides the technical specification for Legal Eagle, an AI-powered regulatory compliance monitoring system for SAP Localization.
 

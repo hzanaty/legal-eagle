@@ -76,7 +76,14 @@ try:
 except RuntimeError:
     env = os.environ
     creds = {
-        "openai_api_key": env.get("LEGAL_EAGLE_OPENAI_API_KEY"),
+        "sap_aicore": {
+            "base_url": env.get("LEGAL_EAGLE_SAP_AICORE_BASE_URL"),
+            "auth_url": env.get("LEGAL_EAGLE_SAP_AICORE_AUTH_URL"),
+            "client_id": env.get("LEGAL_EAGLE_SAP_AICORE_CLIENT_ID"),
+            "client_secret": env.get("LEGAL_EAGLE_SAP_AICORE_CLIENT_SECRET"),
+            "chat_deployment_id": env.get("LEGAL_EAGLE_SAP_AICORE_CHAT_DEPLOYMENT_ID"),
+            "embeddings_deployment_id": env.get("LEGAL_EAGLE_SAP_AICORE_EMBEDDINGS_DEPLOYMENT_ID"),
+        },
         "gmail": {
             "email_sender": env.get("LEGAL_EAGLE_GMAIL_EMAIL_SENDER"),
             "app_password": env.get("LEGAL_EAGLE_GMAIL_APP_PASSWORD"),

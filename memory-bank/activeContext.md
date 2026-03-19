@@ -1,7 +1,7 @@
-## Current State: v2.6.0 (2026-03-10)
+## Current State: v2.7 (2026-03-19)
 
-### Active Version: 2.6.0
-**Status**: Production-ready with BTP Cloud Foundry deployment support
+### Active Version: 2.7
+**Status**: Production-ready with SAP AI Core integration
 
 ### Recent Major Changes
 
@@ -219,7 +219,12 @@
 `/Users/i077750/Documents/GitHub/legal-eagle`
 
 ### Key Environment Variables
-- `LEGAL_EAGLE_OPENAI_API_KEY` - OpenAI API key (required)
+- `LEGAL_EAGLE_SAP_AICORE_BASE_URL` - SAP AI Core API endpoint (required)
+- `LEGAL_EAGLE_SAP_AICORE_AUTH_URL` - OAuth2 authentication endpoint (required)
+- `LEGAL_EAGLE_SAP_AICORE_CLIENT_ID` - OAuth2 client ID (required)
+- `LEGAL_EAGLE_SAP_AICORE_CLIENT_SECRET` - OAuth2 client secret (required)
+- `LEGAL_EAGLE_SAP_AICORE_CHAT_DEPLOYMENT_ID` - Chat model deployment ID (required)
+- `LEGAL_EAGLE_SAP_AICORE_EMBEDDINGS_DEPLOYMENT_ID` - Embeddings model deployment ID (required)
 - `LEGAL_EAGLE_TWITTER_BEARER_TOKEN` - Twitter API bearer token (required)
 - `LEGAL_EAGLE_GMAIL_EMAIL_SENDER` - Gmail sender address (required)
 - `LEGAL_EAGLE_GMAIL_APP_PASSWORD` - Gmail app password (required)
