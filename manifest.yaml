@@ -1,7 +1,7 @@
 ---
 applications:
 - name: legal-eagle-ui
-  memory: 1G
+  memory: 512M
   disk_quota: 2G
   instances: 1
   buildpacks:
