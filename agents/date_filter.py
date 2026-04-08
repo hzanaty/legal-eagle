@@ -8,28 +8,44 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 
 
-def filter_items_by_date(items: List[Dict[str, Any]], days: int = 7) -> List[Dict[str, Any]]:
+def filter_items_by_date(
+    items: List[Dict[str, Any]], 
+    days: Optional[int] = None,
+    since_date: Optional[datetime] = None
+) -> List[Dict[str, Any]]:
     """
-    Filter news items to only include those from the last X days.
+    Filter news items by date using either a lookback window or a specific start date.
     
     Args:
         items: List of news items (RSS, tweets, URL sources, etc.)
-        days: Lookback window in days (default: 7)
+        days: Lookback window in days (e.g., 7 for last 7 days). Mutually exclusive with since_date.
+        since_date: Fetch items published since this datetime (incremental mode). Mutually exclusive with days.
     
     Returns:
         Filtered list containing only items within the date range
     
     Note:
-        Tries multiple date field names: 'date', 'published', 'published_at', 'pubDate'
-        Items without parseable dates are KEPT (fail-safe: don't lose data)
+        - Tries multiple date field names: 'date', 'published', 'published_at', 'pubDate'
+        - Items without parseable dates are KEPT (fail-safe: don't lose data)
+        - If neither days nor since_date provided, defaults to 7 days
+        - If both provided, since_date takes precedence
     """
     if not items:
         return []
     
-    if days <= 0:
-        return items  # No filtering if days is 0 or negative
-    
-    cutoff_date = datetime.utcnow() - timedelta(days=days)
+    # Determine cutoff date
+    if since_date:
+        # Incremental mode: fetch since specific datetime
+        cutoff_date = since_date
+    elif days is not None and days > 0:
+        # Window mode: fetch last N days
+        cutoff_date = datetime.utcnow() - timedelta(days=days)
+    elif days == 0 or days is None:
+        # Default: last 7 days
+        cutoff_date = datetime.utcnow() - timedelta(days=7)
+    else:
+        # No filtering if days is negative
+        return items
     filtered = []
     skipped_count = 0
     no_date_count = 0

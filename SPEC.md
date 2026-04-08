@@ -1448,13 +1448,20 @@ Create Profile Page → [Cancel Button] → Dashboard
 
 ### 8.1 Environment Variables
 
+**Security Note**: All credentials are stored in environment variables only. The database (`config.db`) does NOT store any API keys, passwords, or tokens. This ensures secrets are never committed to version control and can be managed separately per environment.
+
 **Required**:
 | Variable | Description |
 |----------|-------------|
-| `LEGAL_EAGLE_OPENAI_API_KEY` | OpenAI API key |
+| `LEGAL_EAGLE_SAP_AICORE_BASE_URL` | SAP AI Core API base URL |
+| `LEGAL_EAGLE_SAP_AICORE_AUTH_URL` | SAP AI Core OAuth2 token URL |
+| `LEGAL_EAGLE_SAP_AICORE_CLIENT_ID` | SAP AI Core OAuth2 client ID |
+| `LEGAL_EAGLE_SAP_AICORE_CLIENT_SECRET` | SAP AI Core OAuth2 client secret |
+| `LEGAL_EAGLE_SAP_AICORE_CHAT_DEPLOYMENT_ID` | SAP AI Core chat model deployment ID |
+| `LEGAL_EAGLE_SAP_AICORE_EMBEDDINGS_DEPLOYMENT_ID` | SAP AI Core embeddings model deployment ID |
 | `LEGAL_EAGLE_TWITTER_BEARER_TOKEN` | Twitter/X API bearer token |
-| `LEGAL_EAGLE_GMAIL_EMAIL_SENDER` | Gmail sender address |
-| `LEGAL_EAGLE_GMAIL_APP_PASSWORD` | Gmail App Password |
+| `LEGAL_EAGLE_GMAIL_EMAIL` | Gmail sender address |
+| `LEGAL_EAGLE_GMAIL_APP_PASSWORD` | Gmail App Password (16-character code from Google) |
 
 **Optional**:
 | Variable | Default | Description |

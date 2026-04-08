@@ -85,7 +85,7 @@ except RuntimeError:
             "embeddings_deployment_id": env.get("LEGAL_EAGLE_SAP_AICORE_EMBEDDINGS_DEPLOYMENT_ID"),
         },
         "gmail": {
-            "email_sender": env.get("LEGAL_EAGLE_GMAIL_EMAIL_SENDER"),
+            "email_sender": env.get("LEGAL_EAGLE_GMAIL_EMAIL"),
             "app_password": env.get("LEGAL_EAGLE_GMAIL_APP_PASSWORD"),
             "client_id": env.get("LEGAL_EAGLE_GMAIL_CLIENT_ID"),
             "client_secret": env.get("LEGAL_EAGLE_GMAIL_CLIENT_SECRET"),
@@ -319,10 +319,43 @@ def get_reviewed_baseline(profile_id: int, min_score: int = 4) -> List[Dict[str,
 def load_url_sources(profile_id: int) -> List[Dict[str, Any]]:
     """
     Load unified URL sources for a profile.
-    Returns list of dicts: {"url", "mode", "sample_link", "created_at"}.
+    Returns list of dicts: {"url", "mode", "sample_link", "created_at", "last_successful_fetch", ...}.
     """
     conn = _get_conn()
     return list_url_sources(conn, profile_id)
+
+
+def parse_date_scope(date_scope: str) -> int:
+    """
+    Convert date_scope string to number of days (max lookback window).
+    
+    Args:
+        date_scope: One of 'all', 'last_7_days', 'last_30_days'
+    
+    Returns:
+        Number of days (7 for last_7_days, 30 for last_30_days, 7 for 'all' or unknown)
+    """
+    if date_scope == 'last_7_days':
+        return 7
+    elif date_scope == 'last_30_days':
+        return 30
+    else:
+        # Default to 7 days for 'all' or unknown values
+        return 7
+
+
+def update_url_source_fetch_timestamp(profile_id: int, url: str, timestamp: str) -> None:
+    """
+    Update last_successful_fetch timestamp for a URL source after successful fetch.
+    
+    Args:
+        profile_id: Profile ID
+        url: URL source
+        timestamp: ISO 8601 datetime string (e.g., datetime.utcnow().isoformat())
+    """
+    from .db import update_url_source_last_fetch
+    conn = _get_conn()
+    update_url_source_last_fetch(conn, profile_id, url, timestamp)
 
 
 def load_global_credentials() -> Dict[str, Any]:

@@ -178,6 +178,7 @@ def run_compare_news_agent(
     outputs_dir: Optional[str] = "outputs",
     glossary: Optional[Dict[str, str]] = None,
     language: Optional[str] = "en",
+    skip_comparison: bool = False,
 ):
     """
     DB-backed compare agent:
@@ -186,12 +187,43 @@ def run_compare_news_agent(
     - Classify each current item as New, Update, or Duplicate using:
       exact keys -> fuzzy -> embeddings cosine + Jaccard
     - For Update: extract delta sentences and include in result
+    
+    Args:
+        skip_comparison: If True, bypass comparison and treat all items as new
+    
     Returns:
       {"new_items": [...], "update_items": [...]}
     Also keeps latest/daily snapshots for manual inspection.
     """
 
     print("🧠 Running Compare News Agent...")
+    
+    # Skip comparison mode: treat all items as new
+    if skip_comparison:
+        print("⏭️ Skip comparison mode: Treating all items as new (bypassing duplicate detection)")
+        
+        out_dir = Path(outputs_dir or "outputs")
+        out_dir.mkdir(parents=True, exist_ok=True)
+        snapshot_path = out_dir / "all_news.json"
+        
+        # Still persist items to DB for future baseline
+        print("🗃️ Persisting current items to DB baseline...")
+        for item in current_items:
+            try:
+                rec = _build_item_record(item)
+                add_news_item(item.get("profile_id") or 1, rec)
+            except Exception as e:
+                print(f"⚠️ Failed to upsert news item to DB: {e}")
+        
+        # Save snapshot
+        try:
+            with open(snapshot_path, "w", encoding="utf-8") as f:
+                json.dump(current_items, f, ensure_ascii=False, indent=2)
+            print(f"💾 Updated snapshot → {snapshot_path}")
+        except Exception as e:
+            print(f"⚠️ Failed to write snapshot: {e}")
+        
+        return {"new_items": list(current_items), "update_items": []}
 
     out_dir = Path(outputs_dir or "outputs")
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -202,7 +234,13 @@ def run_compare_news_agent(
     # This ensures we can detect a truly empty baseline for the "no history" shortcut
     profile_id = current_items[0].get("profile_id") or 1 if current_items else 1
     baseline_items = get_weekly_baseline(profile_id, days=WEEKLY_BASELINE_DAYS)
-    print(f"📚 Weekly baseline size: {len(baseline_items)}")
+    print(f"📚 Weekly baseline size: {len(baseline_items)} (profile_id={profile_id}, days={WEEKLY_BASELINE_DAYS})")
+    
+    # DEBUG: Log first 3 baseline items to understand what's being loaded
+    if baseline_items:
+        print(f"🔍 DEBUG: First baseline item: source_type={baseline_items[0].get('source_type')}, title={baseline_items[0].get('title', '')[:50]}")
+        if len(baseline_items) > 1:
+            print(f"🔍 DEBUG: Baseline item sources: {[b.get('source_type') for b in baseline_items[:5]]}")
 
     # NOTE: Reviewed items from filtered_news are NOT merged into the deduplication baseline.
     # They are only used in news_filter.py for the "second chance" rescue mechanism.

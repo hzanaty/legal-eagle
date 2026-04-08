@@ -1,5 +1,72 @@
 # CHANGELOG
 
+## v2.8 — 2026-04-07
+### Bug Fixes
+- **Gmail Environment Variable**: Fixed incorrect environment variable name for Gmail sender
+  - Changed from `LEGAL_EAGLE_GMAIL_EMAIL_SENDER` to `LEGAL_EAGLE_GMAIL_EMAIL`
+  - Updated `configurations/config_loader.py` to read correct variable
+  - Updated `.env` file with correct variable name
+  - Updated SPEC.md documentation (Section 8.1)
+  - Impact: "Resend Last Email" feature now works correctly
+  - Simplified credential loading - removed unnecessary fallback logic
+
+- **CRITICAL: Clear Historical News Fixed**: Resolved issue where clearing news baseline was clearing wrong profile's data
+  - Root cause: `profile_id` parameter not passed to `clear_news_baseline()` function
+  - Fix: Added `profile_id` parameter and passed through from route handler
+  - Impact: Users can now safely clear historical news without affecting other profiles
+  - Files modified: `admin/app.py`, `configurations/config_loader.py`, `configurations/db.py`
+
+- **Auto-reload After Clear**: Page now automatically reloads after clearing historical news
+  - Added JavaScript redirect after successful clear operation
+  - Provides immediate feedback that operation completed
+  - Eliminates need for manual page refresh
+
+- **Force Run Now Working**: Removed 2-hour cooldown restriction on manual runs
+  - Previous: Manual runs blocked if last run was < 2 hours ago
+  - New: Manual runs always allowed (cooldown only for scheduled runs)
+  - Rationale: Users should control when to run, not the system
+  - Files modified: `agents/agents_controller.py`
+
+### New Features
+- **Resend Email from HTML Preview**: New "📧 Resend Last Email" button on Run page
+  - Parses `email_preview.html` and sends to all configured receivers
+  - Supports translation for each receiver's preferred language
+  - Allows testing email delivery without running the full pipeline
+  - Uses existing `send_email()` function with full translation support
+  - New module: `scripts/resend_email_from_html.py` with HTML parser
+  - Route: `/admin/profiles/<id>/resend_email` (POST)
+  - Test script: `scripts/test_resend_email.py`
+
+- **Skip Comparison Option**: Added checkbox to bypass news comparison during runs
+  - Use case: When you want fresh baseline without comparing to old data
+  - Location: Run page, appears before "Confirm Run" button
+  - Behavior: When checked, skips `compare_news` agent (no deduplication/update detection)
+  - All collected news treated as new items
+  - Useful after clearing historical news or starting fresh
+
+- **Improved Reset Button**: Enhanced "Clear Historical News" button with better labeling
+  - New tooltip: "Clear all historical news from the baseline (last 7 days). Use before 'Skip comparison' to start completely fresh."
+  - Clarifies relationship between Clear and Skip Comparison
+  - Helps users understand the two-step reset workflow
+
+### Security
+- **Credentials Migration**: Removed all credentials from database storage
+  - Verified no `credentials` table exists in SQLite database
+  - All credentials now loaded exclusively from environment variables
+  - Updated `.env` file with correct Gmail App Password
+  - Tested email sending - working correctly
+  - Updated SPEC.md with security note about environment-only credentials
+
+### UI Improvements
+- Better tooltips and help text for run controls
+- Clearer separation between manual and scheduled run behaviors
+- Improved user feedback for destructive operations
+
+### Testing
+- All bug fixes tested and verified working
+- Email credentials tested with successful send
+- Skip comparison tested with SA/HCM profile
+
 ## v2.7 — 2026-03-19
 ### Changed
 - **Migrated from OpenAI to SAP AI Core** for all AI operations

@@ -398,15 +398,22 @@ def admin_profile_runs(profile_id: int):
 @app.route("/admin/profiles/<int:profile_id>/runs/start", methods=["POST"])
 def admin_start_run(profile_id: int):
     _ensure_schema()
+    
+    # Get run options from form
+    force_run = request.form.get('force_run') == '1'
+    skip_comparison = request.form.get('skip_comparison') == '1'
+    skip_email = request.form.get('skip_email') == '1'
+    
     conn = get_connection()
     create_schema_if_needed(conn)
-    # Audit request
-    add_audit_log(conn, entity="profiles", action="run_requested", details="manual run from run page", profile_id=profile_id)
+    # Audit request with options
+    run_details = f"manual run from run page (force_run={force_run}, skip_comparison={skip_comparison}, skip_email={skip_email})"
+    add_audit_log(conn, entity="profiles", action="run_requested", details=run_details, profile_id=profile_id)
     run_id = create_run(conn, profile_id, origin="manual")
     conn.close()
 
     # Background worker
-    def _worker(pid: int, rid: int):
+    def _worker(pid: int, rid: int, force: bool, skip_comp: bool, skip_mail: bool):
         # hook stdout to DB logs with line buffering
         class _DBLogger:
             def __init__(self, run_id: int):
@@ -463,9 +470,13 @@ def admin_start_run(profile_id: int):
                 cconn.close()
                 return flag
 
-            ok = run_profile_once(pid)  # leverage existing prints which are captured
+            ok = run_profile_once(pid, force_run=force, skip_comparison=skip_comp, skip_email=skip_mail)
             status_final = "Success" if ok else "Failed"
             email_status = "Sent" if ok else "Failed"
+            
+            # Override email status if skip_email was used
+            if skip_mail:
+                email_status = "Skipped (test mode)"
         except Exception as e:
             status_final = "Failed"
             conn_e = get_connection()
@@ -489,7 +500,7 @@ def admin_start_run(profile_id: int):
             append_run_log(fconn, rid, "INFO", f"🏁 Run {rid} finished with status {status_mark}")
             fconn.close()
 
-    threading.Thread(target=_worker, args=(profile_id, run_id), daemon=True).start()
+    threading.Thread(target=_worker, args=(profile_id, run_id, force_run, skip_comparison, skip_email), daemon=True).start()
     return redirect(url_for("admin_profile_runs", profile_id=profile_id, run_id=run_id))
 
 
@@ -558,6 +569,29 @@ def admin_profile_detail(profile_id: int):
 
     rss = load_rss_feeds(profile_id)
     urls = load_url_sources(profile_id)
+    
+    # Enhance URL sources with formatted timestamps
+    for s in urls:
+        if s.get('last_successful_fetch'):
+            try:
+                dt = datetime.fromisoformat(s['last_successful_fetch'])
+                now = datetime.utcnow()
+                delta = now - dt
+                
+                # Relative time (e.g., "2 hours ago")
+                if delta.days > 0:
+                    s['last_successful_fetch_relative'] = f"{delta.days}d ago"
+                elif delta.seconds >= 3600:
+                    s['last_successful_fetch_relative'] = f"{delta.seconds // 3600}h ago"
+                else:
+                    s['last_successful_fetch_relative'] = f"{delta.seconds // 60}m ago"
+                
+                # Absolute time (e.g., "Jan 5, 10:30 AM")
+                s['last_successful_fetch_formatted'] = dt.strftime("%b %d, %I:%M %p")
+            except Exception:
+                s['last_successful_fetch_relative'] = "Unknown"
+                s['last_successful_fetch_formatted'] = s['last_successful_fetch']
+    
     tweets = load_tweet_accounts(profile_id)
     receivers = load_email_receivers(profile_id)
     receivers_semicolon = "; ".join(receivers) if receivers else ""
@@ -809,6 +843,30 @@ def bulk_delete_url_sources(profile_id: int):
     add_audit_log(conn, entity="url_sources", action="bulk_delete", details=f"count={count}", profile_id=profile_id)
     conn.close()
     flash(f"Deleted {count} URL sources.", "success")
+    return redirect(url_for("admin_profile_detail", profile_id=profile_id))
+
+
+@app.route("/admin/profiles/<int:profile_id>/url-sources/reset-fetch", methods=["POST"])
+def reset_url_source_fetch(profile_id: int):
+    """
+    Reset last_successful_fetch timestamp for a URL source.
+    Forces the next run to do a full scan instead of delta.
+    """
+    url = request.form.get("url", "").strip()
+    if not url:
+        flash("URL is required.", "error")
+        return redirect(url_for("admin_profile_detail", profile_id=profile_id))
+    
+    conn = get_connection()
+    create_schema_if_needed(conn)
+    conn.execute(
+        "UPDATE url_sources SET last_successful_fetch = NULL WHERE profile_id = ? AND url = ?",
+        (profile_id, url)
+    )
+    add_audit_log(conn, entity="url_sources", action="reset_fetch", details=f"url={url}", profile_id=profile_id)
+    conn.close()
+    
+    flash(f"Reset fetch timestamp for {url}. Next run will do a full scan.", "success")
     return redirect(url_for("admin_profile_detail", profile_id=profile_id))
 
 
@@ -1186,15 +1244,16 @@ def clear_profile_news(profile_id: int):
     total_count = news_count + filtered_count
     
     if total_count > 0:
-        # Clear both tables
-        if news_count > 0:
-            conn.execute("DELETE FROM news_items WHERE profile_id = ?", (profile_id,))
-        if filtered_count > 0:
-            conn.execute("DELETE FROM filtered_news WHERE profile_id = ?", (profile_id,))
-        
-        add_audit_log(conn, entity="news_history", action="clear_all", 
-                     details=f"baseline={news_count} filtered={filtered_count} total={total_count}", 
-                     profile_id=profile_id)
+        # Clear both tables (wrapped in transaction for commit)
+        with conn:
+            if news_count > 0:
+                conn.execute("DELETE FROM news_items WHERE profile_id = ?", (profile_id,))
+            if filtered_count > 0:
+                conn.execute("DELETE FROM filtered_news WHERE profile_id = ?", (profile_id,))
+            
+            add_audit_log(conn, entity="news_history", action="clear_all", 
+                         details=f"baseline={news_count} filtered={filtered_count} total={total_count}", 
+                         profile_id=profile_id)
         conn.close()
         flash(f"Cleared {total_count} items ({news_count} baseline + {filtered_count} filtered).", "success")
     else:
@@ -1413,6 +1472,91 @@ def bulk_delete_filtered_news(profile_id: int):
     
     flash(f"Deleted {count} items.", "success")
     return redirect(url_for("admin_review_news", profile_id=profile_id))
+
+
+# Email preview route
+@app.route("/admin/profiles/<int:profile_id>/email_preview")
+def serve_email_preview(profile_id: int):
+    """
+    Serve the email preview HTML file generated during test mode runs.
+    """
+    _ensure_schema()
+    conn = get_connection()
+    create_schema_if_needed(conn)
+    prof = conn.execute("SELECT * FROM profiles WHERE id = ?", (profile_id,)).fetchone()
+    conn.close()
+    
+    if not prof:
+        flash("Profile not found.", "error")
+        return redirect(url_for("admin_dashboard"))
+    
+    country_code = prof["country_code"]
+    lob = prof["lob"]
+    profile_slug = f"{country_code}_{lob}"
+    
+    preview_path = os.path.join(BASE_DIR, "outputs", profile_slug, "email_preview.html")
+    
+    if not os.path.exists(preview_path):
+        flash("No email preview available. Run the profile in test mode first.", "error")
+        return redirect(url_for("admin_profile_runs", profile_id=profile_id))
+    
+    try:
+        with open(preview_path, 'r', encoding='utf-8') as f:
+            html_content = f.read()
+        from flask import Response
+        return Response(html_content, mimetype='text/html')
+    except Exception as e:
+        flash(f"Error loading email preview: {e}", "error")
+        return redirect(url_for("admin_profile_runs", profile_id=profile_id))
+
+
+# Resend email from HTML preview
+@app.route("/admin/profiles/<int:profile_id>/resend_email", methods=["POST"])
+def resend_email_from_preview(profile_id: int):
+    """
+    Resend email from HTML preview file with translation support.
+    Parses email_preview.html and sends to all configured receivers.
+    """
+    _ensure_schema()
+    conn = get_connection()
+    create_schema_if_needed(conn)
+    prof = conn.execute("SELECT * FROM profiles WHERE id = ?", (profile_id,)).fetchone()
+    
+    if not prof:
+        conn.close()
+        flash("Profile not found.", "error")
+        return redirect(url_for("admin_dashboard"))
+    
+    country_code = prof["country_code"]
+    lob = prof["lob"]
+    profile_slug = f"{country_code}_{lob}"
+    
+    # Check if email preview exists
+    preview_path = os.path.join(BASE_DIR, "outputs", profile_slug, "email_preview.html")
+    if not os.path.exists(preview_path):
+        conn.close()
+        flash("No email preview available. Run the profile first.", "error")
+        return redirect(url_for("admin_profile_runs", profile_id=profile_id))
+    
+    add_audit_log(conn, entity="email", action="resend_from_preview", details=f"profile={profile_slug}", profile_id=profile_id)
+    conn.close()
+    
+    # Import the resend function
+    from scripts.resend_email_from_html import resend_email_from_html
+    
+    try:
+        success = resend_email_from_html(profile_id, country_code, lob)
+        if success:
+            flash("Email sent successfully to all receivers with translation!", "success")
+        else:
+            flash("Email sending failed. Check logs for details.", "error")
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"❌ Resend email error:\n{error_details}")
+        flash(f"Error: {str(e)}", "error")
+    
+    return redirect(url_for("admin_profile_runs", profile_id=profile_id))
 
 
 # Run Flask

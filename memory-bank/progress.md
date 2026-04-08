@@ -1,3 +1,82 @@
+## Update v2.8 (2026-04-07)
+
+### v2.8 — Bug Fixes, Security, and UX Improvements (2026-04-07)
+
+**Additional Bug Fix** (2026-04-08):
+- **Gmail Environment Variable**: Fixed incorrect environment variable name for Gmail sender
+  - Changed from `LEGAL_EAGLE_GMAIL_EMAIL_SENDER` to `LEGAL_EAGLE_GMAIL_EMAIL`
+  - Updated `configurations/config_loader.py` to read correct variable
+  - Updated `.env` file with correct variable name
+  - Updated SPEC.md documentation (Section 8.1)
+  - Impact: "Resend Last Email" feature now works correctly
+  - Simplified credential loading - removed unnecessary fallback logic
+
+
+**Critical Bug Fixes**:
+- **Fixed Clear Historical News**: Resolved issue where clearing news baseline was clearing wrong profile's data
+  - Root cause: `profile_id` parameter not passed to `clear_news_baseline()` function
+  - Added `profile_id` parameter throughout call chain: route → config_loader → db
+  - Impact: Users can now safely clear historical news without affecting other profiles
+  - Files: `admin/app.py`, `configurations/config_loader.py`, `configurations/db.py`
+
+- **Auto-reload After Clear**: Page now automatically reloads after clearing historical news
+  - Added JavaScript redirect after successful clear operation
+  - Provides immediate feedback that operation completed
+  - Eliminates need for manual page refresh
+
+- **Force Run Now Working**: Removed 2-hour cooldown restriction on manual runs
+  - Previous: Manual runs blocked if last run was < 2 hours ago
+  - New: Manual runs always allowed (cooldown only applies to scheduled runs)
+  - Rationale: Users should control when to run, not the system
+  - File: `agents/agents_controller.py`
+
+**New Features**:
+- **Skip Comparison Option**: Added checkbox to bypass news comparison during runs
+  - Use case: When you want fresh baseline without comparing to old data
+  - Location: Run page, appears before "Confirm Run" button
+  - Behavior: When checked, skips `compare_news` agent (no deduplication/update detection)
+  - All collected news treated as new items
+  - Useful after clearing historical news or starting fresh
+  - File: `admin/templates/run_status.html`
+
+- **Improved Reset Button**: Enhanced "Clear Historical News" button with better labeling
+  - New tooltip: "Clear all historical news from the baseline (last 7 days). Use before 'Skip comparison' to start completely fresh."
+  - Clarifies relationship between Clear and Skip Comparison
+  - Helps users understand the two-step reset workflow
+
+**Security Improvements**:
+- **Credentials Migration**: Removed all credentials from database storage
+  - Verified no `credentials` table exists in SQLite database
+  - All credentials now loaded exclusively from environment variables
+  - Updated `.env` file with correct Gmail App Password (16-character code)
+  - Tested email sending - working correctly
+  - Updated SPEC.md with security note about environment-only credentials
+  - Files: `.env`, `SPEC.md` (Section 8.1)
+
+**Testing**:
+- All bug fixes tested and verified working
+- Email credentials tested with successful SMTP send to hanyzanaty@gmail.com
+- Skip comparison tested with SA/HCM profile
+- Clear historical news tested with correct profile isolation
+
+**Documentation Updated**:
+- CHANGELOG.md → Added v2.8 entry with all changes
+- SPEC.md → Added security note to Section 8.1 (Environment Variables)
+- memory-bank/progress.md → Added v2.8 entry
+- memory-bank/activeContext.md → Updated to v2.8
+
+**Files Modified**:
+- `admin/app.py` - Fixed clear route, added skip_comparison parameter
+- `admin/templates/run_status.html` - Added skip comparison checkbox
+- `configurations/config_loader.py` - Added profile_id to clear_news_baseline()
+- `configurations/db.py` - Added profile_id to clear_news_baseline()
+- `agents/agents_controller.py` - Removed 2-hour cooldown, added skip_comparison logic
+- `.env` - Updated Gmail credentials
+- `SPEC.md` - Added security note
+- `CHANGELOG.md` - Added v2.8 entry
+
+---
+
 ## Update v2.7 (2026-03-19)
 
 ### v2.7 — SAP AI Core Integration (2026-03-19)

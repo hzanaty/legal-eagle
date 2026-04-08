@@ -1,9 +1,45 @@
-## Current State: v2.7 (2026-03-19)
+## Current State: v2.8 (2026-04-07)
 
-### Active Version: 2.7
-**Status**: Production-ready with SAP AI Core integration
+### Active Version: 2.8
+**Status**: Production-ready with bug fixes and UX improvements
 
 ### Recent Major Changes
+
+#### 1. Critical Bug Fixes (v2.8)
+- **Gmail Environment Variable Fix** (2026-04-08): Corrected environment variable name
+  - Changed from `LEGAL_EAGLE_GMAIL_EMAIL_SENDER` to `LEGAL_EAGLE_GMAIL_EMAIL`
+  - Updated `configurations/config_loader.py` to read correct variable
+  - Updated `.env` file with correct variable name
+  - Impact: "Resend Last Email" feature now works correctly
+  - Simplified credential loading - removed unnecessary fallback logic
+
+- **Fixed Clear Historical News**: Resolved issue where clearing baseline cleared wrong profile's data
+  - Added `profile_id` parameter throughout call chain (route → config_loader → db)
+  - Users can now safely clear historical news without affecting other profiles
+  - Auto-reload after clear operation for immediate feedback
+
+- **Fixed Force Run**: Removed 2-hour cooldown restriction on manual runs
+  - Manual runs now always allowed (cooldown only for scheduled runs)
+  - Users have full control over when to run profiles
+  - File: `agents/agents_controller.py`
+
+- **Skip Comparison Option**: Added checkbox to bypass news comparison
+  - Use case: Fresh baseline without comparing to old data
+  - Location: Run page, before "Confirm Run" button
+  - Skips `compare_news` agent when checked (all news treated as new)
+  - Useful after clearing historical news or starting fresh
+
+- **Improved Reset Button**: Enhanced "Clear Historical News" tooltip
+  - Clarifies relationship between Clear and Skip Comparison
+  - Helps users understand two-step reset workflow
+
+- **Security**: Credentials migration complete
+  - No credentials stored in database (verified no `credentials` table)
+  - All credentials in environment variables only
+  - Updated `.env` with Gmail App Password
+  - Email sending tested and working
+
+#### 2. BTP Cloud Foundry Deployment (v2.6.0)
 
 #### 1. BTP Cloud Foundry Deployment (v2.6.0)
 - **Full BTP Deployment Support**: Complete deployment to SAP BTP Cloud Foundry environment

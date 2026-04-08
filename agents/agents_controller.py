@@ -26,6 +26,8 @@ from configurations.config_loader import (
     set_setting_value,
     load_url_sources,
     get_reviewed_baseline,
+    parse_date_scope,
+    update_url_source_fetch_timestamp,
 )
 print("✅ Config and creds imported")
 from configurations.db import get_connection, create_schema_if_needed, insert_filtered_news
@@ -41,29 +43,6 @@ from agents.date_filter import filter_items_by_date
 from agents.email_inbox_parser import fetch_monitor_updates, format_monitor_updates_for_email
 from urllib.parse import urlparse
 
-
-def should_skip_resources(profile_id: int, conn=None) -> bool:
-    """
-    Check if RSS and URL sources should be skipped based on 2-hour rule.
-    Returns True if last full run was < 2 hours ago.
-    """
-    try:
-        from configurations.db import get_setting as db_get_setting
-        if conn and db_get_setting:
-            last_full = db_get_setting(conn, profile_id, 'last_full_run_time')
-        else:
-            last_full = get_setting_value(profile_id, 'last_full_run_time')
-        
-        if not last_full:
-            return False
-        
-        last_dt = datetime.fromisoformat(last_full)
-        now = datetime.utcnow()
-        elapsed_hours = (now - last_dt).total_seconds() / 3600
-        
-        return elapsed_hours < 2
-    except Exception:
-        return False
 
 def _build_category_glossary_text(glossary_flat: dict, lob: str) -> dict:
     """
@@ -259,10 +238,17 @@ def run_controller():
     print("✅ All active profiles processed.\n")
 
 
-def run_profile_once(profile_id: int) -> bool:
+def run_profile_once(profile_id: int, force_run: bool = False, skip_email: bool = False, skip_comparison: bool = False) -> bool:
     """
     Run the full workflow for a single profile id (even if inactive).
     Used by the Admin UI 'Run' button. Logs progress and sends the email.
+    
+    Args:
+        profile_id: The profile ID to run
+        force_run: If True, force FULL fetch mode (ignore delta timestamps)
+        skip_email: If True, run pipeline but don't send emails (test mode)
+        skip_comparison: If True, bypass duplicate detection (treat all as new)
+    
     Returns True on success, False on error.
     """
     try:
@@ -279,7 +265,25 @@ def run_profile_once(profile_id: int) -> bool:
         country = row["country_code"]
         lob = row["lob"]
         profile_slug = f"{country}_{lob}"
-        print(f"\n===== ▶️ Running single profile {country}/{lob} (id={profile_id}) =====")
+        
+        # Show run mode indicators
+        mode_indicators = []
+        if force_run:
+            mode_indicators.append("FORCE RUN")
+        if skip_comparison:
+            mode_indicators.append("SKIP COMPARISON")
+        if skip_email:
+            mode_indicators.append("TEST MODE")
+        
+        mode_str = f" ({' + '.join(mode_indicators)})" if mode_indicators else ""
+        print(f"\n===== ▶️ Running single profile {country}/{lob} (id={profile_id}){mode_str} =====")
+        
+        if force_run:
+            print("🔄 Force run: Fetching full lookback window (ignoring delta)")
+        if skip_comparison:
+            print("⏭️ Skip comparison: All items will be treated as new")
+        if skip_email:
+            print("🧪 Test mode: Emails will NOT be sent")
 
         # Load per-profile config from DB
         LANGUAGE_PREFERENCE = load_language(profile_id)
@@ -299,22 +303,17 @@ def run_profile_once(profile_id: int) -> bool:
         lookback_days = int(get_setting_value(profile_id, 'news_lookback_days', '7'))
         print(f"📅 News lookback window: {lookback_days} days")
 
-        # Check if should skip RSS/URL resources (2-hour rule)
         conn = get_connection()
         create_schema_if_needed(conn)
-        skip_resources = should_skip_resources(profile_id, conn)
         
-        # 1) RSS (skip if < 2 hours)
+        # 1) RSS Agent (always runs)
         rss_items = []
-        if skip_resources:
-            print("⏭️ Skipping RSS Agent (last full run < 2 hours ago)")
-        else:
-            print("📰 Running RSS Parser Agent...")
-            for url in RSS_FEED_URLS:
-                rss_items.extend(parse_rss_feed(url))
-            print(f"✅ Total RSS items collected: {len(rss_items)}")
-            # Apply date filter
-            rss_items = filter_items_by_date(rss_items, days=lookback_days)
+        print("📰 Running RSS Parser Agent...")
+        for url in RSS_FEED_URLS:
+            rss_items.extend(parse_rss_feed(url))
+        print(f"✅ Total RSS items collected: {len(rss_items)}")
+        # Apply date filter
+        rss_items = filter_items_by_date(rss_items, days=lookback_days)
 
         # 2) Tweets (with 15-minute rate limit, Search API for all accounts)
         disable_tweets = os.environ.get("DISABLE_TWEETS")
@@ -369,27 +368,57 @@ def run_profile_once(profile_id: int) -> bool:
                 )
                 print(f"✅ Total tweets collected from all accounts: {len(tweet_items)}")
 
-        # 3) URL sources (skip if < 2 hours)
+        # 3) URL sources with incremental fetching
         url_items = []
-        if skip_resources:
-            print("\n⏭️ Skipping URL Sources Agent (last full run < 2 hours ago)")
-        else:
-            print("\n🕵️‍♂️ Running URL Sources Runner (auto/static/dynamic)...")
-            url_result = run_unified_sources(URL_SOURCES, profile_slug=profile_slug)
-            url_items = url_result.get("items", [])
-            url_errors = url_result.get("errors", [])
-            print(f"✅ Total monitored site items collected: {len(url_items)}")
-            if url_errors:
-                print(f"⚠️ {len(url_errors)} errors while scraping:")
-                for err in url_errors:
-                    print(f"   - {err}")
+        print("\n🕵️‍♂️ Running URL Sources Runner...")
+        
+        # Calculate delta window for each URL source (max lookback acts as safety cap)
+        url_sources_with_delta = []
+        for source in URL_SOURCES:
+            source_copy = source.copy()
+            last_fetch = source.get('last_successful_fetch')
+            date_scope = source.get('date_scope', 'all')
+            max_lookback_days = parse_date_scope(date_scope)
             
-            # Apply date filter
-            url_items = filter_items_by_date(url_items, days=lookback_days)
+            if force_run or not last_fetch:
+                # FULL mode: force run OR first run OR after reset
+                source_copy['days'] = max_lookback_days
+                mode_reason = "force run" if force_run else "first run"
+                print(f"   ↳ {source['url']}: FULL mode ({mode_reason}, max lookback: {max_lookback_days} days)")
+            else:
+                # DELTA mode: fetch since last successful run
+                try:
+                    since_date = datetime.fromisoformat(last_fetch)
+                    # Apply safety cap: don't exceed max lookback window
+                    max_lookback = datetime.utcnow() - timedelta(days=max_lookback_days)
+                    since_date = max(since_date, max_lookback)
+                    source_copy['since_date'] = since_date
+                    print(f"   ↳ {source['url']}: DELTA mode (since {since_date.strftime('%Y-%m-%d %H:%M')})")
+                except Exception as e:
+                    # Fallback to full window on parse error
+                    source_copy['days'] = max_lookback_days
+                    print(f"   ↳ {source['url']}: FULL mode (parse error: {e})")
             
-            # Update last full run time (only after full RSS+URL collection)
-            from configurations.db import set_setting as db_set_setting
-            db_set_setting(conn, profile_id, 'last_full_run_time', datetime.utcnow().isoformat())
+            url_sources_with_delta.append(source_copy)
+        
+        # Run unified sources with delta information
+        url_result = run_unified_sources(url_sources_with_delta, profile_slug=profile_slug)
+        url_items = url_result.get("items", [])
+        url_errors = url_result.get("errors", [])
+        
+        print(f"✅ Total monitored site items collected: {len(url_items)}")
+        if url_errors:
+            print(f"⚠️ {len(url_errors)} errors while scraping:")
+            for err in url_errors:
+                print(f"   - {err}")
+        
+        # Update last_successful_fetch timestamp for each source after successful fetch
+        now_timestamp = datetime.utcnow().isoformat()
+        for source in URL_SOURCES:
+            try:
+                update_url_source_fetch_timestamp(profile_id, source['url'], now_timestamp)
+            except Exception as e:
+                print(f"   ⚠️ Failed to update timestamp for {source['url']}: {e}")
         
         conn.close()
 
@@ -423,8 +452,18 @@ def run_profile_once(profile_id: int) -> bool:
         print(f"📋 Saved {filtered_count} filtered items for manual review")
 
         # Compare AFTER filtering (only relevant items are processed)
+        # CRITICAL: Attach profile_id to all items so compare_news loads the correct baseline
+        for item in filtered_items:
+            item["profile_id"] = profile_id
+        
         outputs_dir = f"outputs/{profile_slug}"
-        compare_result = run_compare_news_agent(filtered_items, outputs_dir=outputs_dir, glossary=GLOSSARY, language=LANGUAGE_PREFERENCE)
+        compare_result = run_compare_news_agent(
+            filtered_items, 
+            outputs_dir=outputs_dir, 
+            glossary=GLOSSARY, 
+            language=LANGUAGE_PREFERENCE,
+            skip_comparison=skip_comparison
+        )
         new_items = compare_result.get("new_items", [])
         update_items = compare_result.get("update_items", [])
         print(f"✅ {len(new_items)} new items and {len(update_items)} updates after semantic comparison.")
@@ -472,25 +511,50 @@ def run_profile_once(profile_id: int) -> bool:
         elif monitor_enabled == 'true' and not EMAIL_RECEIVERS:
             print("\n⚠️ Monitor updates enabled but no email receivers configured")
 
-        # Email
-        print("\n📧 Sending summary email...")
-        EMAIL_RECEIVERS_WITH_LANG = load_email_receivers_with_lang(profile_id)
-        ok = send_email(
-            grouped_summary,
-            EMAIL_RECEIVERS_WITH_LANG,
-            GMAIL_CREDS,
-            LANGUAGE_PREFERENCE,
-            country,
-            lob,
-            "",
-            monitor_updates=monitor_updates_data
-        )
-        if ok:
-            print(f"✅ Email sent to stakeholders for {country}/{lob}.\n")
+        # Email (or save preview in test mode)
+        if skip_email:
+            print("\n📧 [TEST MODE] Generating email preview...")
+            # Save email preview to file
+            import json
+            preview_path = f"outputs/{profile_slug}/email_preview.html"
+            os.makedirs(f"outputs/{profile_slug}", exist_ok=True)
+            
+            # Generate email HTML (without sending)
+            from agents.email_sender import generate_email_html
+            email_html = generate_email_html(
+                grouped_summary,
+                LANGUAGE_PREFERENCE,
+                country,
+                lob,
+                monitor_updates=monitor_updates_data
+            )
+            
+            with open(preview_path, 'w', encoding='utf-8') as f:
+                f.write(email_html)
+            
+            print(f"📁 Email preview saved to: {preview_path}")
+            print(f"👀 Open file to review before sending")
+            print(f"⚠️  No emails sent (test mode active)\n")
             return True
         else:
-            print(f"❌ Email send failed for {country}/{lob}. See logs above for details.\n")
-            return False
+            print("\n📧 Sending summary email...")
+            EMAIL_RECEIVERS_WITH_LANG = load_email_receivers_with_lang(profile_id)
+            ok = send_email(
+                grouped_summary,
+                EMAIL_RECEIVERS_WITH_LANG,
+                GMAIL_CREDS,
+                LANGUAGE_PREFERENCE,
+                country,
+                lob,
+                "",
+                monitor_updates=monitor_updates_data
+            )
+            if ok:
+                print(f"✅ Email sent to stakeholders for {country}/{lob}.\n")
+                return True
+            else:
+                print(f"❌ Email send failed for {country}/{lob}. See logs above for details.\n")
+                return False
     except Exception as e:
         print(f"❌ Exception during single profile run: {e}")
         return False

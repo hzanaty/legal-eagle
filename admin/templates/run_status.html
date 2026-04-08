@@ -198,8 +198,59 @@
           title="Clear {{ news_count or 0 }} baseline + {{ filtered_news_count or 0 }} filtered items">
           Clear Historical News ({{ total_history }})
         </button>
+        
+        <form method="post" action="{{ url_for('resend_email_from_preview', profile_id=profile.id) }}" style="margin-bottom: var(--sapSpacingS);">
+          <button 
+            type="submit" 
+            class="sapBtn sapBtn-default sapBtn-sm" 
+            style="width: 100%;"
+            {% if run_active %}disabled{% endif %}
+            title="Parse email_preview.html and send with translation to all configured receivers">
+            📧 Resend Last Email
+          </button>
+        </form>
 
         <form method="post" action="{{ url_for('admin_start_run', profile_id=profile.id) }}">
+          <!-- Run Options -->
+          <div style="margin-bottom: var(--sapSpacingM); padding: var(--sapSpacingS); background: var(--sapNeutralBackground); border-radius: 0.25rem;">
+            <div style="font-weight: 600; margin-bottom: var(--sapSpacingS); font-size: var(--sapFontSmallSize); color: var(--sapNeutralColor);">
+              Run Options:
+            </div>
+            
+            <label style="display: flex; align-items: center; gap: var(--sapSpacingS); margin-bottom: var(--sapSpacingXS); cursor: pointer;">
+              <input type="checkbox" name="force_run" value="1" style="cursor: pointer;">
+              <span style="font-size: var(--sapFontSmallSize);">
+                <strong>Force full fetch</strong>
+                <br>
+                <span style="color: var(--sapNeutralColor); font-size: 11px;">
+                  Fetch full lookback window (ignore delta timestamps)
+                </span>
+              </span>
+            </label>
+            
+            <label style="display: flex; align-items: center; gap: var(--sapSpacingS); margin-bottom: var(--sapSpacingXS); cursor: pointer;">
+              <input type="checkbox" name="skip_comparison" value="1" style="cursor: pointer;">
+              <span style="font-size: var(--sapFontSmallSize);">
+                <strong>Skip comparison (treat all as new)</strong>
+                <br>
+                <span style="color: var(--sapNeutralColor); font-size: 11px;">
+                  Bypass duplicate detection, useful for testing
+                </span>
+              </span>
+            </label>
+            
+            <label style="display: flex; align-items: center; gap: var(--sapSpacingS); cursor: pointer;">
+              <input type="checkbox" name="skip_email" value="1" style="cursor: pointer;">
+              <span style="font-size: var(--sapFontSmallSize);">
+                <strong>Test mode (skip emails)</strong>
+                <br>
+                <span style="color: var(--sapNeutralColor); font-size: 11px;">
+                  Run pipeline without sending emails
+                </span>
+              </span>
+            </label>
+          </div>
+          
           <button type="submit" class="sapBtn sapBtn-accept" style="width: 100%;">
             Start Run
           </button>
@@ -328,7 +379,7 @@
     </div>
     <div class="sapDialog-footer">
       <button type="button" class="sapBtn sapBtn-default" onclick="hideClearDialog()">Cancel</button>
-      <form method="post" action="{{ url_for('clear_profile_news', profile_id=profile.id) }}" style="display: inline;">
+      <form method="post" action="{{ url_for('clear_profile_news', profile_id=profile.id) }}" style="display: inline;" onsubmit="handleClearSubmit(event)">
         <button type="submit" class="sapBtn sapBtn-reject">Delete All</button>
       </form>
     </div>
@@ -355,6 +406,33 @@ function hideClearDialog() {
   }
 }
 
+// Handle clear form submission with auto-reload
+function handleClearSubmit(event) {
+  // Let the form submit normally, but reload page after response
+  const form = event.target;
+  event.preventDefault();
+  
+  fetch(form.action, {
+    method: 'POST',
+    body: new FormData(form)
+  })
+  .then(response => {
+    if (response.ok) {
+      // Success - reload page to refresh baseline
+      window.location.reload();
+    } else {
+      // Error - show message and close dialog
+      alert('Failed to clear news items. Please try again.');
+      hideClearDialog();
+    }
+  })
+  .catch(error => {
+    console.error('Clear failed:', error);
+    alert('Failed to clear news items. Please try again.');
+    hideClearDialog();
+  });
+}
+
 // Setup dialog after DOM loads
 document.addEventListener('DOMContentLoaded', function() {
   const modal = document.getElementById('clearNewsModal');
@@ -374,6 +452,45 @@ document.addEventListener('DOMContentLoaded', function() {
   const statusEl = document.getElementById('run-status');
   
   {% if selected_run %}
+  // Check for email preview after run completes
+  function checkEmailPreview() {
+    fetch("{{ url_for('serve_email_preview', profile_id=profile.id) }}", { method: 'HEAD' })
+      .then(response => {
+        if (response.ok) {
+          showEmailPreviewBanner();
+        }
+      })
+      .catch(() => {
+        // Preview not available
+      });
+  }
+  
+  function showEmailPreviewBanner() {
+    const logViewer = document.querySelector('.sapLogViewer');
+    if (!logViewer) return;
+    
+    // Check if banner already exists
+    if (document.getElementById('emailPreviewBanner')) return;
+    
+    const banner = document.createElement('div');
+    banner.id = 'emailPreviewBanner';
+    banner.style.cssText = 'margin-top: var(--sapSpacingM); padding: var(--sapSpacingM); background: #e5f5ff; border: 1px solid #0070f2; border-radius: 0.25rem; display: flex; align-items: center; justify-content: space-between;';
+    banner.innerHTML = `
+      <div style="display: flex; align-items: center; gap: var(--sapSpacingS);">
+        <span style="font-size: 1.5rem;">📧</span>
+        <div>
+          <div style="font-weight: 600; margin-bottom: var(--sapSpacingXS);">Email Preview Available</div>
+          <div style="font-size: var(--sapFontSmallSize); color: var(--sapNeutralColor);">Generated in test mode</div>
+        </div>
+      </div>
+      <a href="{{ url_for('serve_email_preview', profile_id=profile.id) }}" target="_blank" class="sapBtn sapBtn-emphasized" style="text-decoration: none;">
+        View Preview →
+      </a>
+    `;
+    
+    logViewer.parentElement.appendChild(banner);
+  }
+  
   // Log streaming
   const es = new EventSource("{{ url_for('stream_run_logs', run_id=selected_run.id) }}");
   

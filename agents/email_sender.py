@@ -271,6 +271,45 @@ def build_email_body(grouped_summary: list[dict], lang: str, monitor_updates: di
     return "\n".join(html)
 
 
+def generate_email_html(
+    grouped_summary: List[Dict[str, Any]],
+    profile_lang: str,
+    country: str,
+    lob: str,
+    monitor_updates: dict = None
+) -> str:
+    """
+    Generate email HTML without sending (for test mode preview).
+    
+    Args:
+        grouped_summary: List of grouped news items
+        profile_lang: Profile's analysis language
+        country: Country code
+        lob: Line of Business
+        monitor_updates: Optional monitor updates data
+    
+    Returns:
+        HTML string of the email body
+    """
+    from datetime import datetime
+    today = datetime.now().strftime('%Y-%m-%d')
+    subject = f"🦅 Legal Eagle Daily Digest — {country}/{lob} — {today}"
+    body = build_email_body(grouped_summary, profile_lang, monitor_updates)
+    
+    # Wrap in basic HTML email structure
+    html = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>{subject}</title>
+</head>
+<body>
+{body}
+</body>
+</html>"""
+    return html
+
+
 def send_email(
     grouped_summary: List[Dict[str, Any]], 
     receivers_with_lang: List[Dict[str, str]], 

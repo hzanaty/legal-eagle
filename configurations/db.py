@@ -728,10 +728,11 @@ def list_url_sources(conn: sqlite3.Connection, profile_id: int) -> List[Dict[str
     Return a list of URL sources with mode and sample_link for the given profile.
     Shape:
       [{"url": str, "mode": "auto|force_static|force_dynamic|recursive", "sample_link": Optional[str], "read_more_label": Optional[str], 
-        "crawl_version": str, "max_depth": int, "allowed_domains": str, "path_filter": str, "max_results": int, "date_scope": str, "created_at": str}]
+        "crawl_version": str, "max_depth": int, "allowed_domains": str, "path_filter": str, "max_results": int, "date_scope": str, 
+        "last_successful_fetch": Optional[str], "created_at": str}]
     """
     rows = conn.execute(
-        "SELECT url, mode, sample_link, read_more_label, crawl_version, max_depth, allowed_domains, path_filter, max_results, date_scope, created_at FROM url_sources WHERE profile_id = ? ORDER BY url",
+        "SELECT url, mode, sample_link, read_more_label, crawl_version, max_depth, allowed_domains, path_filter, max_results, date_scope, last_successful_fetch, created_at FROM url_sources WHERE profile_id = ? ORDER BY url",
         (profile_id,)
     ).fetchall()
     return [
@@ -746,6 +747,7 @@ def list_url_sources(conn: sqlite3.Connection, profile_id: int) -> List[Dict[str
             "path_filter": r["path_filter"],
             "max_results": r["max_results"],
             "date_scope": r["date_scope"],
+            "last_successful_fetch": r["last_successful_fetch"],
             "created_at": r["created_at"],
         }
         for r in rows
@@ -798,6 +800,23 @@ def delete_url_source(conn: sqlite3.Connection, profile_id: int, url: str) -> No
     """
     with conn:
         conn.execute("DELETE FROM url_sources WHERE profile_id = ? AND url = ?", (profile_id, url))
+
+
+def update_url_source_last_fetch(conn: sqlite3.Connection, profile_id: int, url: str, timestamp: str) -> None:
+    """
+    Update last_successful_fetch timestamp for a URL source after successful fetch.
+    
+    Args:
+        conn: Database connection
+        profile_id: Profile ID
+        url: URL source
+        timestamp: ISO 8601 datetime string (e.g., datetime.utcnow().isoformat())
+    """
+    with conn:
+        conn.execute(
+            "UPDATE url_sources SET last_successful_fetch = ? WHERE profile_id = ? AND url = ?",
+            (timestamp, profile_id, url)
+        )
 
 
 # -----------------------
