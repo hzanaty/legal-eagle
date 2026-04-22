@@ -131,9 +131,9 @@ def run_controller():
         # 1. RSS Agent
         rss_items = []
         print("📰 Running RSS Parser Agent...")
-        for url in RSS_FEED_URLS:
-            items = parse_rss_feed(url)
-            rss_items.extend(items)
+        for feed in RSS_FEED_URLS:
+            feed_url = feed["url"] if isinstance(feed, dict) else feed
+            rss_items.extend(parse_rss_feed(feed_url))
         print(f"✅ Total RSS items collected: {len(rss_items)}")
 
         # 2. Tweet Feed Agent (timeline-only, iterate all accounts; no throttle)
@@ -154,15 +154,14 @@ def run_controller():
         elif is_blocked:
             print(f"\n🐦 Tweet Agent disabled until {reset_str}. Skipping.")
         elif TWEET_ACCOUNTS:
-            print("\n🐦 Running Tweet Feed Agent...")
-            for account_name in TWEET_ACCOUNTS:
-                print(f"   ↳ @{account_name}")
-                items = fetch_recent_tweets(account_name, X_BEARER_TOKEN, profile_id)
-                if isinstance(items, dict) and items.get("error"):
-                    print(f"   ❌ Tweet fetch failed for @{account_name}: {items}")
-                    continue
-                tweet_items.extend(items)
-            print(f"✅ Total tweets collected across {len(TWEET_ACCOUNTS)} accounts: {len(tweet_items)}")
+            _tw_handles = [a["handle"].lstrip("@") if isinstance(a, dict) else str(a).lstrip("@") for a in TWEET_ACCOUNTS]
+            print("")
+            print(f"Tweet Feed Agent (Search API): {len(_tw_handles)} account(s)")
+            _conn_tw2 = get_connection()
+            create_schema_if_needed(_conn_tw2)
+            tweet_items = search_tweets_multi_account(_tw_handles, X_BEARER_TOKEN, profile_id, _conn_tw2, days=7)
+            _conn_tw2.close()
+            print(f"Total tweets collected from all accounts: {len(tweet_items)}")
         else:
             print("⚠️ No tweet accounts configured for this profile.")
 
@@ -308,8 +307,9 @@ def run_profile_once(profile_id: int, force_run: bool = False, skip_email: bool 
         # 1) RSS Agent (always runs)
         rss_items = []
         print("📰 Running RSS Parser Agent...")
-        for url in RSS_FEED_URLS:
-            rss_items.extend(parse_rss_feed(url))
+        for feed in RSS_FEED_URLS:
+            feed_url = feed["url"] if isinstance(feed, dict) else feed
+            rss_items.extend(parse_rss_feed(feed_url))
         print(f"✅ Total RSS items collected: {len(rss_items)}")
         # Apply date filter
         rss_items = filter_items_by_date(rss_items, days=lookback_days)
@@ -356,7 +356,7 @@ def run_profile_once(profile_id: int, force_run: bool = False, skip_email: bool 
             else:
                 # Use Search API to fetch from ALL accounts in one call
                 print("\n🐦 Running Tweet Feed Agent (Search API)...")
-                print(f"   ↳ Fetching from {len(TWEET_ACCOUNTS)} accounts: {', '.join('@' + a.lstrip('@') for a in TWEET_ACCOUNTS)}")
+                print(f"   ↳ Fetching from {len(TWEET_ACCOUNTS)} accounts: {', '.join('@' + (a['handle'].lstrip('@') if isinstance(a, dict) else str(a).lstrip('@')) for a in TWEET_ACCOUNTS)}")
                 
                 tweet_items = search_tweets_multi_account(
                     TWEET_ACCOUNTS, 
