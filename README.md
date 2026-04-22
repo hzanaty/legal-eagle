@@ -1,8 +1,8 @@
-# Legal Eagle 2.0
+# Legal Eagle 2.11
 
 **AI-powered regulatory compliance monitoring for SAP Localization**
 
-> Last updated: January 10, 2026
+> Last updated: April 22, 2026
 
 The Legal Eagle automatically monitors government sources for legal and regulatory changes, evaluates their impact on SAP localized products, and delivers daily actionable digests to Localization Product Managers (LPMs).
 
@@ -20,7 +20,7 @@ Localization Product Managers face a constant challenge: staying on top of legal
 **Legal Eagle solves this** by providing an automated, AI-powered monitoring system that:
 
 - ✅ Continuously scans authoritative sources (government websites, RSS feeds, Twitter/X)
-- ✅ Uses AI to understand the *meaning* of content, not just keywords
+- ✅ Uses AI (SAP AI Core) to understand the *meaning* of content, not just keywords
 - ✅ Filters for genuine legal relevance to HR/Payroll (HCM) or Finance (FIN) domains
 - ✅ Detects both new regulations and updates to existing ones
 - ✅ Delivers a concise, actionable daily email digest
@@ -56,30 +56,27 @@ A daily email digest containing:
 
 ## 🗺️ Roadmap
 
-### v2.0 — Current Release ✅
-**Focus**: Solid foundation with multi-source monitoring
+### v2.11 — Current Release ✝✝
+**Focus**: Bilingual email digests, robust source handling, SAP AI Core
 
-**Delivered Features**:
-- Multi-profile support (Country + LoB combinations)
+**Delivered Features (v2.0 - v2.11)**:
+- Multi-profile support (Country + LoB: SA/HCM, TR/HCM, ES/HCM, and more)
 - Triple-source collection: RSS feeds, Twitter/X, Government websites
-- AI-powered relevance filtering (GPT-4o-mini)
-- Semantic deduplication & update detection
+- AI-powered relevance filtering via **SAP AI Core** (gpt-4o + embeddings)
+- Semantic deduplication and update detection
 - SAP Fiori Admin UI with live log streaming
-- Daily email digests with grouped summaries
+- **Bilingual email digests**: native language + English in one card per news group
+  - Flag-inspired card colours per country (green for SA/AE, red for TR/ES, etc.)
+  - Single email to all recipients; no per-receiver translation needed
+- **Turkey Official Gazette** (Resmi Gazete) support with date-based navigation
+- **SAP BTP Cloud Foundry deployment** with Playwright/Chromium auto-install
+- **Monitor Updates integration** (Law-to-Spec email alerts in digest)
+- **Per-source fetch tracking** (last fetch date + configurable max lookback days)
+- **Twitter error flag** system with smart status banner and one-click retry
+- **Review/score workflow**: score news items 1-5 for AI learning and rescue baseline
 - Human-in-the-loop feedback for continuous improvement
 
-**Recent Improvements**:
-
-**v2.1.0 — Feb 2026**:
-- Twitter Search API Integration (multi-account fetching in single call)
-- Profile-level Lookback Window (configurable `news_lookback_days`, default 7 days)
-- Date Filtering Utility (unified date filtering across all sources)
-- Deprecated round-robin account selection (no longer needed with Search API)
-
-**v2.0.1 — Jan 2026**:
-- Twitter Free tier optimization (15-min rate limiting)
-- Resource skip optimization (2-hour rule for RSS/URLs)
-- Enhanced status visibility with clean stat cards
+**Recent versions**: v2.9 (per-source tracking), v2.10 (Twitter error flags), v2.11 (bilingual email)
 
 ---
 
@@ -231,8 +228,8 @@ A Flask-based dashboard for:
 ### Prerequisites
 
 - **Python 3.11+**
-- **API Keys**:
-  - OpenAI API key (for GPT-4o-mini and embeddings)
+- **API Keys / Credentials**:
+  - SAP AI Core credentials (for LLM filtering, grouping, translation)
   - Twitter/X Bearer Token (for timeline access)
   - Gmail App Password (for sending emails)
 
@@ -272,16 +269,20 @@ A Flask-based dashboard for:
 Create a `.env` file in the project root:
 
 ```bash
-# Required
-LEGAL_EAGLE_OPENAI_API_KEY=sk-...
-LEGAL_EAGLE_TWITTER_BEARER_TOKEN=AAAAAAAA...
-LEGAL_EAGLE_GMAIL_EMAIL_SENDER=your-email@gmail.com
-LEGAL_EAGLE_GMAIL_APP_PASSWORD=your-app-password
+# SAP AI Core (required for AI filtering, grouping, translation)
+LEGAL_EAGLE_SAP_AICORE_BASE_URL=https://api.ai.internalprod...
+LEGAL_EAGLE_SAP_AICORE_AUTH_URL=https://...authentication.sap.hana.ondemand.com
+LEGAL_EAGLE_SAP_AICORE_CLIENT_ID=your-client-id
+LEGAL_EAGLE_SAP_AICORE_CLIENT_SECRET=your-client-secret
+LEGAL_EAGLE_SAP_AICORE_CHAT_DEPLOYMENT_ID=your-chat-deployment-id
+LEGAL_EAGLE_SAP_AICORE_EMBEDDINGS_DEPLOYMENT_ID=your-embeddings-deployment-id
 
-# Optional (for Gmail OAuth - not required for App Password)
-LEGAL_EAGLE_GMAIL_CLIENT_ID=
-LEGAL_EAGLE_GMAIL_CLIENT_SECRET=
-LEGAL_EAGLE_GMAIL_REFRESH_TOKEN=
+# Twitter/X (required for social media monitoring)
+LEGAL_EAGLE_TWITTER_BEARER_TOKEN=AAAAAAAA...
+
+# Gmail (required for sending email digests)
+LEGAL_EAGLE_GMAIL_EMAIL=your-email@gmail.com
+LEGAL_EAGLE_GMAIL_APP_PASSWORD=your-app-password
 ```
 
 ---
