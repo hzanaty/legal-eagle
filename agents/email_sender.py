@@ -7,6 +7,31 @@ from typing import List, Dict, Any
 from agents.sap_ai_client import SAPAICoreClient
 from configurations.config_loader import creds
 
+# Flag-inspired colours per country (bilingual card top half).
+COUNTRY_COLORS = {
+    "SA": {"border": "#006c35", "bg": "#f0faf4"},
+    "AE": {"border": "#006c35", "bg": "#f0faf4"},
+    "KW": {"border": "#007a3d", "bg": "#f0faf4"},
+    "TR": {"border": "#e30a17", "bg": "#fff5f5"},
+    "ES": {"border": "#c60b1e", "bg": "#fff5f5"},
+    "MA": {"border": "#c1272d", "bg": "#fff5f5"},
+    "EG": {"border": "#ce1126", "bg": "#fff5f5"},
+    "DE": {"border": "#1a1a1a", "bg": "#f7f7f7"},
+    "FR": {"border": "#002395", "bg": "#f0f4ff"},
+    "GB": {"border": "#012169", "bg": "#f0f4ff"},
+    "IN": {"border": "#FF9933", "bg": "#fff8f0"},
+    "CN": {"border": "#DE2910", "bg": "#fff5f5"},
+    "JP": {"border": "#bc002d", "bg": "#fff5f5"},
+}
+COUNTRY_COLOR_DEFAULT = {"border": "#4a90d9", "bg": "#f0f7ff"}
+LANG_BADGES = {
+    "en": "EN", "ar": "AR", "tr": "TR", "es": "ES",
+    "de": "DE", "fr": "FR", "it": "IT", "pt": "PT",
+    "zh": "ZH", "ja": "JA", "ko": "KO", "hi": "HI",
+    "ru": "RU", "nl": "NL", "pl": "PL",
+}
+
+
 
 # ---------------------------------------------------------------------
 # 🦅  Email Sender using Gmail App Password + RTL & Category Logic
@@ -60,7 +85,7 @@ def translate_grouped_summary(grouped_summary: List[Dict[str, Any]], from_lang: 
     try:
         client = _get_ai_client()
         
-        for group in grouped_summary:
+        for _idx, group in enumerate(grouped_summary):
             # Extract fields to translate
             title = group.get("title", "")
             summary = group.get("summary", "")
@@ -147,7 +172,7 @@ def normalize_group_for_email(group: dict) -> tuple[str, str]:
     return str(title), str(summary)
 
 
-def build_email_body(grouped_summary: list[dict], lang: str, monitor_updates: dict = None) -> str:
+def build_email_body(grouped_summary: list, lang: str, monitor_updates: dict = None, english_summary: list = None, country_code: str = "") -> str:
     """
     Builds an HTML email body for grouped news items.
     Per category (HCM/FIN/Other), shows two sections when present:
@@ -165,6 +190,15 @@ def build_email_body(grouped_summary: list[dict], lang: str, monitor_updates: di
     rtl_langs = ["ar", "he", "fa", "ur"]
     direction = "rtl" if lang in rtl_langs else "ltr"
     align = "right" if direction == "rtl" else "left"
+    is_bilingual = (lang != "en") and bool(english_summary)
+    cs = COUNTRY_COLORS.get(country_code.upper(), COUNTRY_COLOR_DEFAULT)
+    native_border = cs["border"]
+    native_bg = cs["bg"]
+    native_badge = LANG_BADGES.get(lang, lang.upper())
+    en_map = {}
+    if is_bilingual and english_summary:
+        for _i, _g in enumerate(english_summary):
+            en_map[_i] = _g
 
     html = [
         f"<div dir='{direction}' style='text-align:{align}; font-family:Arial, sans-serif;'>",
@@ -183,7 +217,7 @@ def build_email_body(grouped_summary: list[dict], lang: str, monitor_updates: di
     printed_new = False
     printed_updates = False
 
-    for group in grouped_summary:
+    for _idx, group in enumerate(grouped_summary):
         title, summary = normalize_group_for_email(group)
         category = group.get("category", "Uncategorized")
         is_update = bool(group.get("is_update_section"))
@@ -208,31 +242,63 @@ def build_email_body(grouped_summary: list[dict], lang: str, monitor_updates: di
             html.append("<h4>♻️ تحديثات</h4>" if lang == "ar" else "<h4>♻️ Updates</h4>")
             printed_updates = True
 
-        # Render group
-        html.append(f"<p><b>📚 {title}</b></p>")
-
-        if is_update:
-            # Prefer delta bullets if available; otherwise show summary as plain text
-            delta_lines = group.get("delta") or []
-            if delta_lines:
-                html.append("<ul>")
-                for d in delta_lines:
-                    html.append(f"<li>{d}</li>")
-                html.append("</ul>")
+        # Render group (bilingual or monolingual)
+        if is_bilingual:
+            _eg = en_map.get(_idx, group)
+            _et, _es = normalize_group_for_email(_eg)
+            _ed = _eg.get("delta") or []
+            _elk = _eg.get("links", []) or []
+            _elt = _eg.get("titles", []) or []
+            if bool(_eg.get("is_update_section")) and _ed:
+                _ec = "<ul>" + "".join("<li>" + d + "</li>" for d in _ed) + "</ul>"
             else:
-                html.append(f"<p>{summary}</p>")
+                _ec = "<p>" + _es + "</p>"
+            _ep = " ".join(
+                "<a href=" + chr(39) + lk + chr(39) + ">" + (lb or "Src")[:60] + "</a>"
+                for lk, lb in zip(_elk, _elt or _elk)
+            )
+            _dls = group.get("delta") or []
+            if is_update and _dls:
+                _nc = "<ul>" + "".join("<li>" + d + "</li>" for d in _dls) + "</ul>"
+            else:
+                _nc = "<p>" + summary + "</p>"
+            html.append(
+                "<table width=" + chr(39) + "100%" + chr(39) +
+                " style=" + chr(39) + "margin-bottom:12px;border-radius:8px;overflow:hidden;border:1px solid #e2e8f0;" + chr(39) + ">"
+                "<tr><td style=" + chr(39) + "padding:12px 16px 10px;background:" + nbg + ";border-left:4px solid " + nb + ";" + chr(39) + ">"
+                "<small style=" + chr(39) + "font-weight:700;color:" + nb + ";font-size:10px;" + chr(39) + ">" + badge + "</small>"
+                "<p style=" + chr(39) + "margin:4px 0 0;font-size:14px;font-weight:700;color:#1a202c;" + chr(39) + ">" + title + "</p>"
+                + _nc +
+                "</td></tr>"
+                "<tr><td style=" + chr(39) + "height:1px;background:#e2e8f0;padding:0;" + chr(39) + "></td></tr>"
+                "<tr><td style=" + chr(39) + "padding:12px 16px 12px;background:#f9fafb;border-left:4px solid #9ca3af;" + chr(39) + ">"
+                "<small style=" + chr(39) + "font-weight:700;color:#9ca3af;font-size:10px;" + chr(39) + ">EN</small>"
+                "<p style=" + chr(39) + "margin:4px 0 0;font-size:14px;font-weight:700;color:#2b6cb0;" + chr(39) + ">" + _et + "</p>"
+                + _ec + ("<p>" + _ep + "</p>" if _ep else "") +
+                "</td></tr></table>"
+            )
         else:
-            html.append(f"<p>{summary}</p>")
-
-        # Links
-        links = group.get('links', []) or []
-        titles = group.get('titles', []) or []
-        if links:
-            html.append("<ul>")
-            for link, item_title in zip(links, titles):
-                safe_title = item_title or "Source"
-                html.append(f"<li><a href='{link}'>{safe_title}</a></li>")
-            html.append("</ul>")
+            # Monolingual card
+            html.append("<p><b>📚 " + title + "</b></p>")
+            if is_update:
+                delta_lines = group.get("delta") or []
+                if delta_lines:
+                    html.append("<ul>")
+                    for d in delta_lines:
+                        html.append("<li>" + d + "</li>")
+                    html.append("</ul>")
+                else:
+                    html.append("<p>" + summary + "</p>")
+            else:
+                html.append("<p>" + summary + "</p>")
+            links = group.get("links", []) or []
+            titles_g = group.get("titles", []) or []
+            if links:
+                html.append("<ul>")
+                for link, item_title in zip(links, titles_g):
+                    safe_title = item_title or "Source"
+                    html.append("<li><a href=" + chr(39) + link + chr(39) + ">" + safe_title + "</a></li>")
+                html.append("</ul>")
 
     # Monitor Updates Section (Law-to-Specification email integration)
     if monitor_updates is not None:
@@ -294,7 +360,7 @@ def generate_email_html(
     from datetime import datetime
     today = datetime.now().strftime('%Y-%m-%d')
     subject = f"🦅 Legal Eagle Daily Digest — {country}/{lob} — {today}"
-    body = build_email_body(grouped_summary, profile_lang, monitor_updates)
+    body = build_email_body(grouped_summary, profile_lang, monitor_updates=monitor_updates, country_code=country)
     
     # Wrap in basic HTML email structure
     html = f"""<!DOCTYPE html>
@@ -311,105 +377,89 @@ def generate_email_html(
 
 
 def send_email(
-    grouped_summary: List[Dict[str, Any]], 
-    receivers_with_lang: List[Dict[str, str]], 
-    GMAIL_CREDS: dict, 
+    grouped_summary: List[Dict[str, Any]],
+    receivers_with_lang,
+    GMAIL_CREDS: dict,
     profile_lang: str,
     country: str,
     lob: str,
-    openai_api_key: str,
+    openai_api_key: str = "",
     monitor_updates: dict = None
 ) -> bool:
     """
-    Sends the Legal Eagle digest email with per-receiver translation support.
-    
-    Args:
-        grouped_summary: List of grouped news items (in profile language)
-        receivers_with_lang: List of dicts with {"email": str, "translation_lang": str}
-        GMAIL_CREDS: Gmail credentials dict
-        profile_lang: Profile's analysis language (source language)
-        country: Country code for subject line (e.g., 'SA')
-        lob: Line of Business for subject line (e.g., 'HCM')
-        openai_api_key: OpenAI API key for translation
-        monitor_updates: Optional monitor updates data from Law-to-Specification
-    
-    Returns:
-        True on success, False on failure (after retries).
+    Send the daily digest email.
+
+    Bilingual mode (profile_lang != en):
+      Translates grouped_summary to English once, then builds ONE bilingual email
+      body (native + English card per group) and sends it to ALL receivers together.
+
+    Monolingual mode (profile_lang == en):
+      Sends a standard single-language email to all receivers.
     """
     EMAIL_SENDER = GMAIL_CREDS["email_sender"]
     APP_PASSWORD = GMAIL_CREDS["app_password"]
-    
-    # Handle backward compatibility: if receivers_with_lang is a simple list of strings
+
+    # Collect all recipient email addresses
     if receivers_with_lang and isinstance(receivers_with_lang[0], str):
-        receivers_with_lang = [{"email": email, "translation_lang": profile_lang} for email in receivers_with_lang]
-    
-    # Group receivers by translation language
-    lang_groups = {}
-    for receiver in receivers_with_lang:
-        email = receiver["email"]
-        trans_lang = receiver.get("translation_lang") or profile_lang
-        lang_groups.setdefault(trans_lang, []).append(email)
-    
-    print(f"\n📧 Sending emails to {len(receivers_with_lang)} receiver(s) in {len(lang_groups)} language(s)")
-    
-    overall_success = True
-    translation_cache = {}  # Cache translations to avoid re-translating for multiple receivers
-    
-    # Send to each language group
-    for target_lang, emails in lang_groups.items():
-        print(f"\n   Language: {target_lang} → {len(emails)} receiver(s)")
-        
-        # Translate if needed (with caching)
-        if target_lang not in translation_cache:
-            if target_lang == profile_lang:
-                translation_cache[target_lang] = grouped_summary
-            else:
-                translation_cache[target_lang] = translate_grouped_summary(
-                    grouped_summary, profile_lang, target_lang, openai_api_key
-                )
-        
-        translated_summary = translation_cache[target_lang]
-        
-        # Build email with profile in subject
-        today = datetime.now().strftime('%Y-%m-%d')
-        subject = f"🦅 Legal Eagle Daily Digest — {country}/{lob} — {today}"
-        body = build_email_body(translated_summary, target_lang, monitor_updates)
-        
-        msg = MIMEMultipart()
-        msg["From"] = EMAIL_SENDER
-        msg["To"] = ", ".join(emails)
-        msg["Subject"] = subject
-        msg.attach(MIMEText(body, "html"))
-        
-        # Send with retries
-        sent = False
-        for attempt in range(1, 3):
-            # First try STARTTLS on port 587
+        all_emails = list(receivers_with_lang)
+    else:
+        all_emails = [r["email"] for r in receivers_with_lang if r.get("email")]
+
+    if not all_emails:
+        print("No email receivers configured.")
+        return False
+
+    print(f"Preparing email for {len(all_emails)} receiver(s)...")
+
+    # Translate to English for bilingual body (if needed)
+    english_summary = None
+    if profile_lang != "en" and grouped_summary:
+        english_summary = translate_grouped_summary(
+            grouped_summary, profile_lang, "en", openai_api_key
+        )
+
+    # Build ONE bilingual/monolingual body
+    today = datetime.now().strftime("%Y-%m-%d")
+    subject = f"Legal Eagle Daily Digest - {country}/{lob} - {today}"
+    body = build_email_body(
+        grouped_summary,
+        profile_lang,
+        monitor_updates=monitor_updates,
+        english_summary=english_summary,
+        country_code=country
+    )
+
+    msg = MIMEMultipart()
+    msg["From"] = EMAIL_SENDER
+    msg["To"] = ", ".join(all_emails)
+    msg["Subject"] = subject
+    msg.attach(MIMEText(body, "html"))
+
+    # Send with retries
+    sent = False
+    for attempt in range(1, 3):
+        try:
+            with smtplib.SMTP("smtp.gmail.com", 587, timeout=120) as server:
+                server.ehlo()
+                server.starttls()
+                server.ehlo()
+                server.login(EMAIL_SENDER, APP_PASSWORD)
+                server.sendmail(EMAIL_SENDER, all_emails, msg.as_string())
+            print(f"Email sent successfully via STARTTLS to {len(all_emails)} receiver(s)")
+            sent = True
+            break
+        except Exception as e1:
+            print(f"STARTTLS send failed (attempt {attempt}/2): {e1}")
             try:
-                with smtplib.SMTP("smtp.gmail.com", 587, timeout=120) as server:
-                    server.ehlo()
-                    server.starttls()
-                    server.ehlo()
+                with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=120) as server:
                     server.login(EMAIL_SENDER, APP_PASSWORD)
-                    server.sendmail(EMAIL_SENDER, emails, msg.as_string())
-                print(f"   ✅ Email sent successfully via STARTTLS to {', '.join(emails)}")
+                    server.sendmail(EMAIL_SENDER, all_emails, msg.as_string())
+                print(f"Email sent successfully via SSL to {len(all_emails)} receiver(s)")
                 sent = True
                 break
-            except Exception as e1:
-                print(f"   ❌ STARTTLS send failed (attempt {attempt}/2): {e1}")
-                # Fallback to SSL on port 465
-                try:
-                    with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=120) as server:
-                        server.login(EMAIL_SENDER, APP_PASSWORD)
-                        server.sendmail(EMAIL_SENDER, emails, msg.as_string())
-                    print(f"   ✅ Email sent successfully via SSL to {', '.join(emails)}")
-                    sent = True
-                    break
-                except Exception as e2:
-                    print(f"   ❌ SSL send failed (attempt {attempt}/2): {e2}")
-        
-        if not sent:
-            overall_success = False
-            print(f"   ❌ Failed to send to {', '.join(emails)} after retries")
-    
-    return overall_success
+            except Exception as e2:
+                print(f"SSL send failed (attempt {attempt}/2): {e2}")
+
+    if not sent:
+        print(f"Failed to send email after retries")
+    return sent

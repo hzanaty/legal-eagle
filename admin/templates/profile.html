@@ -625,7 +625,6 @@
             <tr>
               <th style="width: 40px;"><input type="checkbox" onclick="toggleAllCheckboxes(this, 'bulk_emails_form')"></th>
               <th>Email</th>
-              <th style="width: 200px;">Translation Language</th>
               <th style="width: 100px;">Action</th>
             </tr>
           </thead>
@@ -634,17 +633,7 @@
             <tr>
               <td style="text-align: center;"><input type="checkbox" name="emails" value="{{ receiver.email }}" form="bulk_emails_form"></td>
               <td style="font-family: monospace; font-size: var(--sapFontSmallSize);">{{ receiver.email }}</td>
-              <td>
-                <form method="post" action="{{ url_for('update_email_receiver_language', profile_id=profile.id) }}" style="display: flex; gap: var(--sapSpacingXS); align-items: center;">
-                  <input type="hidden" name="email" value="{{ receiver.email }}">
-                  <select class="sapForm-select" name="translation_lang" style="padding: 0.25rem 0.5rem; font-size: var(--sapFontSmallSize);">
-                    {% for code, name in language_names.items() %}
-                    <option value="{{ code }}" {% if receiver.translation_lang == code %}selected{% endif %}>{{ name }}</option>
-                    {% endfor %}
-                  </select>
-                  <button type="submit" class="sapBtn sapBtn-sm" style="padding: 0.25rem 0.75rem;">Save</button>
-                </form>
-              </td>
+
               <td>
                 <form method="post" action="{{ url_for('delete_email_receiver_route', profile_id=profile.id) }}" style="display: inline;">
                   <input type="hidden" name="email" value="{{ receiver.email }}">

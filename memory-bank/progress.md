@@ -1,3 +1,30 @@
+## v2.11 (2026-04-22) — Bilingual Email Body
+
+**Changes**:
+- `agents/email_sender.py`: Added `COUNTRY_COLORS` and `LANG_BADGES` dicts with flag-inspired colours per country.
+- `agents/email_sender.py`: `build_email_body()` now accepts `english_summary` and `country_code` params.
+  - Bilingual mode: renders ONE card per news group with TWO halves (native top + English bottom) separated by thin divider.
+  - Top half uses flag-inspired left border + tinted background (green for SA/AE, red for TR/ES, etc.)
+  - Bottom half uses gray left border (#9ca3af) + light gray background (#f9fafb)
+  - Language badge (e.g. "TR", "EN") at top of each half
+  - Source links appear only in English half
+  - Monolingual fallback when profile lang = English
+- `agents/email_sender.py`: `send_email()` simplified — translates once to English, builds ONE bilingual body, sends to ALL receivers in single SMTP call.
+- `agents/agents_controller.py`: Updated both `run_controller()` and `run_profile_once()` to use new simplified `send_email()` call.
+- `admin/templates/profile.html`: Removed per-receiver "Translation Language" column and dropdown.
+- `CHANGELOG.md`: Added v2.11 entry.
+
+**Result**: Emails are now bilingual by default for non-English profiles. All recipients get the same email with both languages. Per-receiver language preference is no longer needed.
+
+**Files Changed**:
+- `agents/email_sender.py`
+- `agents/agents_controller.py`
+- `admin/templates/profile.html`
+- `CHANGELOG.md`
+- `memory-bank/progress.md`, `memory-bank/activeContext.md`
+
+---
+
 ## Update v2.8 (2026-04-07)
 
 ### v2.8 — Bug Fixes, Security, and UX Improvements (2026-04-07)

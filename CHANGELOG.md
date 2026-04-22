@@ -1,5 +1,30 @@
 # CHANGELOG
 
+## v2.11 — 2026-04-22
+### Bilingual Email Body
+- **Bilingual card design**: Each news group now renders as a single card with two halves:
+  - Top half: profile language (flag-inspired left border + tinted background per country)
+  - Bottom half: English translation (gray left border + light gray background)
+  - Thin horizontal divider separates the two halves
+  - Language badge (e.g. "TR", "EN") shown at top of each half
+  - Source links appear only in the English half
+- **Country-coded colours**: Left border and background tint inspired by national flag colours
+  - Saudi Arabia / UAE / Kuwait → green; Turkey / Spain / Morocco → red; Germany → dark; France / UK → blue
+- **Single email send**: All recipients receive one bilingual email ("To" includes all addresses)
+  - Eliminated per-receiver translation language grouping
+  - Translation to English done once via SAP AI Core, then reused for the entire email
+- **Simplified send_email()**: No longer groups receivers by language; single SMTP call
+- **Admin UI**: Removed per-receiver "Translation Language" dropdown (no longer needed)
+- **Monolingual fallback**: When profile language is English, standard single-language card is used
+
+### Files Changed
+-  — COUNTRY_COLORS, LANG_BADGES, bilingual build_email_body, simplified send_email
+-  — Updated send_email calls
+-  — Removed Translation Language column from Email Receivers table
+
+---
+
+
 ## v2.8 — 2026-04-07
 ### Bug Fixes
 - **Gmail Environment Variable**: Fixed incorrect environment variable name for Gmail sender

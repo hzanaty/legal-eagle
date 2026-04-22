@@ -223,12 +223,11 @@ def run_controller():
         EMAIL_RECEIVERS_WITH_LANG = load_email_receivers_with_lang(profile_id)
         ok = send_email(
             grouped_summary,
-            EMAIL_RECEIVERS_WITH_LANG,
+            EMAIL_RECEIVERS,
             GMAIL_CREDS,
             LANGUAGE_PREFERENCE,
             country,
-            lob,
-            ""
+            lob
         )
         if ok:
             print(f"✅ Email sent to stakeholders for {country}/{lob}.\n")
@@ -538,15 +537,13 @@ def run_profile_once(profile_id: int, force_run: bool = False, skip_email: bool 
             return True
         else:
             print("\n📧 Sending summary email...")
-            EMAIL_RECEIVERS_WITH_LANG = load_email_receivers_with_lang(profile_id)
             ok = send_email(
                 grouped_summary,
-                EMAIL_RECEIVERS_WITH_LANG,
+                EMAIL_RECEIVERS,
                 GMAIL_CREDS,
                 LANGUAGE_PREFERENCE,
                 country,
                 lob,
-                "",
                 monitor_updates=monitor_updates_data
             )
             if ok:
