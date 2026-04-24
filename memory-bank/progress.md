@@ -1,40 +1,100 @@
-## v2.12 (2026-04-24) — Server Stability & Auto-Reload
+## v2.13 (2026-04-24) — Strategic Roadmap Update & AI4GPM Submission
 
 **Changes**:
-- **Fixed Flask Reloader Crashes**: Disabled Flask's built-in reloader (`use_reloader=False`) to prevent orphan processes
-  - Issue: Flask reloader creates parent + child processes; crashes leave orphans blocking port 8080
-  - Solution: Disabled reloader in `admin/app.py` for stability
-  - Trade-off: Manual restart needed after code changes (but more reliable)
+- **Strategic Evolution Expanded**: Updated from 5-stage to 6-stage roadmap
+  - Added **Stage 3 — SAP Consultant** with Taxonomy MCP integration
+    - Maps legal changes to affected SAP products (HCM, Payroll, SuccessFactors, S/4HANA)
+    - Identifies impacted SAP objects, processes, and functional areas
+    - Determines configuration vs enhancement requirements
+    - Bridges gap between legal interpretation and implementable SAP requirements
+  - New sequence: Journalist → Lawyer → **SAP Consultant** → Smart MCP → Virtual LPM → Executive Advisor
+  - Updated stage numbering: Virtual LPM (Stage 5), Executive Advisor (Stage 6)
 
-- **Auto-Reload with Watchdog**: Added smart file-watching script for development
-  - New script: `scripts/start_admin_with_autoreload.sh`
-  - Uses `watchdog` package (v6.0.0) to monitor all Python files
-  - Automatically restarts server when any `.py` file changes
-  - Cleans up old processes before restart (no port conflicts)
-  - Watches recursively: `admin/`, `agents/`, `configurations/`
-  - Ignores: test files, `__pycache__`, hidden files
+- **AI4GPM Idea Submission**: Created production JIRA idea
+  - Issue: GSIDEAS-457
+  - Title: "Legal Eagle: From Regulatory Intelligence to Virtual Localization Product Manager"
+  - Complete 6-stage evolution roadmap with quantifiable benefits
+  - User story includes all 5 personas in evolution sequence
+  - Submitted to AI4GPM evaluation pipeline
+  - URL: https://jira.tools.sap/browse/GSIDEAS-457
 
-- **Fixed Admin UI Dict Error**: Resolved crash on run page
-  - Error: `AttributeError: 'dict' object has no attribute 'lstrip'` on line 330
-  - Cause: `load_tweet_accounts()` returns `List[Dict]` but code expected `List[str]`
-  - Fix: Updated to handle both formats: `a['handle'] if isinstance(a, dict) else a`
-  - Impact: Run page now displays Twitter account list correctly
+- **Documentation Cleanup**: Resolved naming conflict
+  - Renamed `docs/README.md` → `docs/INDEX.md`
+  - Updated header to "Legal Eagle Documentation Index"
+  - Clarified purpose as documentation navigation/index file
+  - No broken references (verified via search)
 
-**Development Workflow**:
-- **Best of Both Worlds**: Auto-reload during development + auto-start after restart
-  - Development: Use `start_admin_with_autoreload.sh` for instant code reload
-  - Production: Add same script to Login Items for auto-start on login
-  - No need to choose between features anymore
+**Rationale**:
+- **SAP Consultant Stage Critical**: Bridges gap between "what changed in law" (Lawyer) and "how to build it in SAP" (Virtual LPM)
+- **Strategic Alignment**: README.md now matches Big_Picture.md v4 (which already had 6 stages)
+- **AI4GPM Visibility**: Formal submission makes Legal Eagle vision visible to SAP AI leadership
+- **Documentation Clarity**: Eliminated confusion between root README.md and docs/README.md
 
 **Files Changed**:
-- `admin/app.py` — Set `use_reloader=False`, fixed Dict handling on line 330
-- `scripts/start_admin_with_autoreload.sh` — New auto-reload script with watchdog
-- `requirements.txt` — Added watchdog==6.0.0
+- `README.md` — Updated vision with 6-stage evolution, added SAP Consultant stage description
+- `Big_Picture.md` — Already contained v4 with 6-stage roadmap (source of truth, no changes)
+- `docs/INDEX.md` — Renamed from docs/README.md, updated header
+- `CHANGELOG.md` — Added v2.13 entry
+- `memory-bank/activeContext.md` — Updated to v2.13
+- `memory-bank/progress.md` — This entry
+
+**External Changes**:
+- GSIDEAS-457 created in production JIRA (AI4GPM idea)
+- User story and context panels updated with complete 6-stage roadmap
+
+---
+
+## v2.12 (2026-04-24) — Documentation Restructure & UI5 Migration Roadmap
+
+**Changes**:
+- **Documentation Restructure**: Separated strategic roadmap from technical specification
+  - Created `UI5_MIGRATION_ROADMAP.md` - Comprehensive standalone roadmap (828 lines)
+    - 12 detailed sections covering migration strategy
+    - MCP server configuration (UI5 MCP, SAPUI5 MCP, Fiori Elements Brain)
+    - SAP MCP Server Registry link for additional resources
+    - 5-week implementation timeline with phases
+    - Hybrid architecture approach (Flask + SAPUI5)
+    - REST API conversion guide with examples
+    - Testing strategy and deployment considerations
+  
+  - Updated `README.md` - Enhanced with strategic roadmap
+    - Version bumped to 2.12
+    - Added "Major Initiatives" section under Roadmap
+    - UI5/Fiori Migration initiative with high-level overview
+    - Updated documentation links section
+    - Cleaner separation: current features vs future plans
+  
+  - Updated `SPEC.md` - Cleaned up technical specification
+    - Removed Section 13 (UI5/Fiori Migration)
+    - Updated Table of Contents (now ends at Section 12)
+    - Added "Future Plans" section with links to roadmap files
+    - Kept focused on current v2.12 architecture only
+
+- **Server Stability Improvements** (earlier in v2.12):
+  - Fixed Flask Reloader Crashes: Disabled `use_reloader=False` to prevent orphan processes
+  - Auto-Reload with Watchdog: Added `scripts/start_admin_with_autoreload.sh`
+  - Fixed Admin UI Dict Error on run page
+
+**Rationale**:
+- **Separation of Concerns**: Current technical spec vs future strategic plans
+- **Scalability**: Can now add more roadmap initiatives without cluttering SPEC.md
+- **Maintainability**: Easier to update migration plan independently
+- **Clarity**: README shows high-level vision, detailed plans in dedicated files
+
+**Files Changed**:
+- `UI5_MIGRATION_ROADMAP.md` — NEW: Complete UI5/Fiori migration roadmap
+- `README.md` — Added Major Initiatives section, updated to v2.12
+- `SPEC.md` — Removed Section 13, updated TOC, added Future Plans section
+- `admin/app.py` — Set `use_reloader=False`, fixed Dict handling (earlier)
+- `scripts/start_admin_with_autoreload.sh` — New auto-reload script (earlier)
+- `requirements.txt` — Added watchdog==6.0.0 (earlier)
 
 **Documentation Updated**:
 - `CHANGELOG.md` — Added v2.10 (missing), v2.12 entries
-- `SPEC.md` — Updated version header from v2.7 to v2.12
-- `memory-bank/activeContext.md` — Updated to v2.12
+- `SPEC.md` — Updated version header, restructured
+- `README.md` — Version 2.12, Major Initiatives section
+- `UI5_MIGRATION_ROADMAP.md` — NEW comprehensive roadmap
+- `memory-bank/activeContext.md` — Updated to v2.12 with documentation structure
 - `memory-bank/progress.md` — This entry
 
 ---

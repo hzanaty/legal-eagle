@@ -1,5 +1,45 @@
 # Legal Eagle — Project Goal & Scope
 
+---
+
+## Communication Protocol
+
+### Agent Addressing Convention
+When interacting with different agents, use the following prefixes to clearly indicate which agent you're addressing:
+
+- **"Hey Eagle"** → Address Cline (the AI assistant) for:
+  - Project architecture and planning
+  - Code development and modifications
+  - Documentation updates
+  - Database schema changes
+  - Admin UI updates
+  - General Legal Eagle project tasks
+
+- **"Hey Loka"** → Address Loka MCP server for:
+  - Searching RCM regulations
+  - Querying SAP Globalization Services data
+  - Accessing SAP Help Portal (future)
+  - Accessing SAP Community (future)
+
+- **[Future MCPs]** → As new MCP servers are added, document their prefixes here
+  - Example: "Hey Browser" for browser automation
+  - Example: "Hey Database" for direct database queries
+
+### Usage Examples
+```
+"Hey Eagle, add a new field to the database schema for tracking regulation status"
+"Hey Loka, search for Turkey social security regulations related to SGK"
+"Hey Eagle, update the Admin UI to display the new field"
+```
+
+### Benefits
+- **Clear Context**: Prevents ambiguity about which agent should handle the request
+- **Better Routing**: Enables proper routing of requests to appropriate handlers
+- **Scalability**: Easy to extend as more MCP servers are added
+- **Documentation**: Makes conversation history more understandable
+
+---
+
 ## Goal
 Build an AI-driven “Legal Eagle” agent that continuously monitors government sources for legal updates in a chosen country and Line of Business—HR & Payroll (HCM) or Finance (FIN)—and assesses impact on SAP’s localized products (SAP HCM, SAP Payroll, SAP SuccessFactors, SAP S/4HANA). It flags true legal changes, evaluates product impact, and delivers a daily, actionable briefing to the responsible Localization Product Manager (LPM).
 

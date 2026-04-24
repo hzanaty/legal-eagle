@@ -1,225 +1,153 @@
-# Legal Eagle 2.11
+# Legal Eagle
 
-**AI-powered regulatory compliance monitoring for SAP Localization**
+**From Regulatory Intelligence to Virtual Localization Product Manager**
 
-> Last updated: April 22, 2026
-
-The Legal Eagle automatically monitors government sources for legal and regulatory changes, evaluates their impact on SAP localized products, and delivers daily actionable digests to Localization Product Managers (LPMs).
+> AI-powered platform that monitors legal changes, interprets their meaning, and helps SAP Localization teams respond faster with higher intelligence.
 
 ---
 
-## 🎯 The Why
+## 🎯 The Vision
 
-Localization Product Managers face a constant challenge: staying on top of legal and regulatory changes across multiple countries and domains. Manual monitoring is:
+Legal Eagle is evolving through strategic stages to become a complete **Localization Intelligence Platform**:
 
-- **Time-consuming**: Checking dozens of government websites, RSS feeds, and social media accounts daily
-- **Error-prone**: Easy to miss critical updates buried in lengthy documents
-- **Language barriers**: Many sources publish in local languages only
-- **Inconsistent**: Different team members may interpret relevance differently
+**Stage 1: Journalist** → **Stage 2: Lawyer** → **Stage 3: SAP Consultant** → **Stage 4: Virtual LPM** → **Stage 5: Executive Advisor**
 
-**Legal Eagle solves this** by providing an automated, AI-powered monitoring system that:
+Starting from a solid foundation as a Regulatory Intelligence Engine, Legal Eagle will progressively gain the ability to not just report legal changes, but interpret them, connect them to SAP systems, and ultimately assist LPMs like a virtual team member.
 
-- ✅ Continuously scans authoritative sources (government websites, RSS feeds, Twitter/X)
-- ✅ Uses AI (SAP AI Core) to understand the *meaning* of content, not just keywords
-- ✅ Filters for genuine legal relevance to HR/Payroll (HCM) or Finance (FIN) domains
-- ✅ Detects both new regulations and updates to existing ones
-- ✅ Delivers a concise, actionable daily email digest
+This isn't a future dream—**Stage 1 is operational today**. Each subsequent stage builds on this working foundation through modular expansion, not rewrites.
+
+📄 **Full Strategic Vision**: See [Big_Picture.md](Big_Picture.md) for the complete evolution roadmap
 
 ---
 
-## 🔍 What It Does
+## ✅ Current Status: Stage 1 — Journalist (Ready Now)
 
-Legal Eagle monitors regulatory changes for a specific **Country** and **Line of Business (LoB)**:
+Legal Eagle Core is **operational today** as a Regulatory Intelligence Engine, monitoring legal and regulatory changes across multiple countries and delivering actionable intelligence to Localization Product Managers.
 
-| LoB | Focus Areas |
-|-----|-------------|
+### What It Does
+
+Legal Eagle automatically:
+- 🔍 **Monitors** government sources, official gazettes, RSS feeds, and social media
+- 🤖 **Filters** using AI semantic understanding (not keyword matching)
+- 🔄 **Detects** both new regulations and updates to existing ones
+- 📊 **Groups** related changes by theme for easy scanning
+- 📧 **Delivers** daily actionable digests with direct links to sources
+- 🗄️ **Maintains** searchable historical intelligence baseline
+
+### Core Capabilities
+
+| Capability | Description |
+|------------|-------------|
+| **Multi-Source Collection** | RSS feeds, Twitter/X, government websites (static + dynamic), email monitoring |
+| **AI-Powered Filtering** | SAP AI Core (GPT-4o) semantic relevance evaluation |
+| **Smart Deduplication** | Detects duplicate news and updates to previously reported items |
+| **Intelligent Grouping** | AI clusters related news by regulatory theme |
+| **Multi-Profile Support** | Country + Line of Business combinations (SA/HCM, TR/HCM, ES/HCM, etc.) |
+| **Bilingual Digests** | Native language + English translation in single email |
+| **Human-in-the-Loop** | Review/score workflow continuously improves accuracy |
+| **Specialized Scrapers** | Custom support for Turkey Official Gazette, Saudi GOSI, and more |
+
+### Supported Regions & Domains
+
+| Line of Business | Focus Areas |
+|------------------|-------------|
 | **HCM** | HR, Payroll, Social Insurance, Labor Law, Pensions, Benefits |
 | **FIN** | Tax, E-Invoicing, Financial Reporting, Accounting Standards |
 
-### Supported Source Types
+**Current Deployments**: Saudi Arabia, Turkey, Spain, UAE (more countries being added)
 
-| Source | Description |
-|--------|-------------|
-| **RSS Feeds** | Government news feeds, ministry announcements |
-| **Twitter/X** | Official government and ministry accounts |
-| **Websites** | Dynamic government portals (rendered with headless browser) |
-
-### Output
-
-A daily email digest containing:
-- 📰 **New** legal changes detected
-- 🔄 **Updates** to previously reported items (with change highlights)
-- 🏷️ Grouped by topic for easy scanning
-- 🔗 Direct links to source documents
+📋 **Technical Details**: See [SPEC.md](SPEC.md) for complete v2.12 architecture
 
 ---
 
-## 🗺️ Roadmap
+## 🗺️ Evolution Roadmap
 
-### v2.11 — Current Release ✝✝
-**Focus**: Bilingual email digests, robust source handling, SAP AI Core
+### Stage 2 — Lawyer (Next)
 
-**Delivered Features (v2.0 - v2.11)**:
-- Multi-profile support (Country + LoB: SA/HCM, TR/HCM, ES/HCM, and more)
-- Triple-source collection: RSS feeds, Twitter/X, Government websites
-- AI-powered relevance filtering via **SAP AI Core** (gpt-4o + embeddings)
-- Semantic deduplication and update detection
-- SAP Fiori Admin UI with live log streaming
-- **Bilingual email digests**: native language + English in one card per news group
-  - Flag-inspired card colours per country (green for SA/AE, red for TR/ES, etc.)
-  - Single email to all recipients; no per-receiver translation needed
-- **Turkey Official Gazette** (Resmi Gazete) support with date-based navigation
-- **SAP BTP Cloud Foundry deployment** with Playwright/Chromium auto-install
-- **Monitor Updates integration** (Law-to-Spec email alerts in digest)
-- **Per-source fetch tracking** (last fetch date + configurable max lookback days)
-- **Twitter error flag** system with smart status banner and one-click retry
-- **Review/score workflow**: score news items 1-5 for AI learning and rescue baseline
-- Human-in-the-loop feedback for continuous improvement
+Build **Legal Analyzer** capability to interpret legal text:
+- Explain what changed vs previous wording
+- Identify linked articles and dependencies
+- Detect obligations, penalties, exceptions
+- Translate legal language into business meaning
 
-**Recent versions**: v2.9 (per-source tracking), v2.10 (Twitter error flags), v2.11 (bilingual email)
+**Strategic Importance**: Bridges the gap between raw legal text and business/system impact.
 
 ---
 
-### v3.0 — Enhanced Intelligence 🔮
-**Target**: Q2 2026  
-**Focus**: Advanced AI analysis and contextual understanding
+### Stage 3 — SAP Consultant
 
-**Planned Features**:
-- **Deep Impact Analysis**: AI assessment of legal changes on specific SAP modules
-- **Risk Scoring**: Automatic priority/severity classification
-- **Multi-language Translation**: Native language monitoring → English analysis
-- **Trend Detection**: Pattern recognition across multiple countries
-- **Predictive Alerts**: Early warning for similar changes in other regions
-- **Enhanced Grouping**: Topic clustering with regulatory themes
-- **Sentiment Analysis**: Urgency detection from official language
+Build **Taxonomy MCP integration** to translate legal changes into SAP solution impact:
+- Map legal changes to affected SAP products (HCM, Payroll, SuccessFactors, S/4HANA)
+- Identify impacted SAP objects, processes, and functional areas
+- Determine if changes require standard configuration or custom enhancement
+- Generate draft PRD outlines for implementation
+- Provide business-term-to-SAP-object mapping
 
-**Technical Improvements**:
-- Upgrade to GPT-4 Turbo for complex reasoning
-- Vector database for historical context (Pinecone, Weaviate, or similar)
-- Custom fine-tuned models for SAP localization domain knowledge
-- Agentic workflows with multi-step reasoning chains
+**Strategic Importance**: Bridges the gap between legal interpretation and implementable SAP requirements. Answers "What SAP systems are affected and how?"
 
 ---
 
-### v4.0 — LOKA Integration 🔗
-**Target**: Q4 2026  
-**Focus**: End-to-end compliance workflow automation
+### Stage 4 — Smart Legal Eagle MCP
 
-**Planned Features**:
-- **LOKA MCP Integration**: Bidirectional sync with SAP's localization knowledge base
-- **Regulation Matching**: Auto-link detected legal changes to existing LOKA regulations
-- **Impact Propagation**: Push Legal Eagle findings to LOKA requirements/features
-- **LPM Workflow**: Seamless handoff from monitoring → requirement → implementation
-- **Requirement Templates**: AI-generated initial requirement drafts from legal changes
-- **Backlog Integration**: Direct creation of JIRA Requirements from detected changes
-- **Compliance Dashboard**: Unified view of legal changes → requirements → features → releases
-
-**LOKA MCP Tools to be Used**:
-- `loka_search_regulations`: Check if change already tracked
-- `loka_get_regulation`: Fetch existing regulation details
-- `loka_prepare_blog_context`: Generate compliance communications
-- `loka_search_requirements`: Find related development work
-- `loka_find_stakeholders`: Identify responsible LPMs/teams
-
-**Expected Benefits**:
-- **Zero Manual Entry**: Legal changes auto-create LOKA regulations
-- **Full Traceability**: Legal source → regulation → requirement → feature
-- **Faster Response**: Reduce detection-to-delivery time by 60%
-- **Better Coverage**: No legal changes slip through the cracks
+Upgrade to **MCP protocol** with analyzer-powered services:
+- `latest_news()` - Recent regulatory updates
+- `daily_digest()` - Summarized intelligence
+- `search_news()` - Historical search
+- `analyze_article()` - Deep legal interpretation
+- `explain_change()` - Change impact analysis
+- `compare_old_new()` - Article comparison
 
 ---
 
-### Beyond v4.0 — Future Vision 🚀
+### Stage 5 — Virtual LPM (Orchestrator)
 
-**Potential Enhancements**:
-- Multi-tenant SaaS deployment for all SAP localization teams globally
-- REST API for third-party integrations (Confluence, ServiceNow, etc.)
-- Mobile app for LPM push notifications
-- AI chatbot for natural language queries ("What changed in Brazil payroll?")
-- Regulatory change calendar with visual deadline tracking
-- Automated compliance reporting for audit purposes
-- Real-time alerts for critical/urgent changes (not just daily digests)
+Connect **external enterprise capabilities** into Legal Eagle:
+- **LOKA** (JIRA / RCM / historical changes / documentation)
+- **Taxonomy** (SAP functional area mapping)
+- **Documentation repositories**
+- **Future MCP servers and APIs**
 
----
+**Intelligent Flow Example**:
+1. Detect new legal change
+2. Interpret it using Legal Analyzer
+3. Search precedents in LOKA
+4. Map SAP impact through Taxonomy
+5. Return structured LPM briefing
 
-## ⚙️ How It Works
-
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                        LEGAL EAGLE PIPELINE                             │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│   ┌─────────┐   ┌─────────┐   ┌─────────┐                              │
-│   │   RSS   │   │ Twitter │   │ Website │   ← Data Sources             │
-│   └────┬────┘   └────┬────┘   └────┬────┘                              │
-│        │             │             │                                    │
-│        └─────────────┼─────────────┘                                    │
-│                      ▼                                                  │
-│              ┌───────────────┐                                          │
-│              │   COLLECT     │  ← Gather all news items                 │
-│              └───────┬───────┘                                          │
-│                      ▼                                                  │
-│              ┌───────────────┐                                          │
-│              │    FILTER     │  ← AI semantic relevance check           │
-│              └───────┬───────┘                                          │
-│                      ▼                                                  │
-│              ┌───────────────┐                                          │
-│              │   COMPARE     │  ← Deduplicate + detect updates          │
-│              └───────┬───────┘                                          │
-│                      ▼                                                  │
-│              ┌───────────────┐                                          │
-│              │    GROUP      │  ← AI-powered topic grouping             │
-│              └───────┬───────┘                                          │
-│                      ▼                                                  │
-│              ┌───────────────┐                                          │
-│              │    EMAIL      │  ← Send daily digest                     │
-│              └───────────────┘                                          │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
-### Multi-Profile Support
-
-Legal Eagle supports multiple **profiles**, each representing a Country + LoB combination:
-
-- `SA/HCM` — Saudi Arabia, HR & Payroll
-- `AE/FIN` — UAE, Finance
-- `DE/HCM` — Germany, HR & Payroll
-
-Each profile has its own:
-- Data sources (RSS feeds, Twitter accounts, websites)
-- Glossary of relevant terms
-- Email recipients
-- Schedule (which day of the week to run)
+**Strategic Role**: Behaves like a **Virtual Localization Product Manager** assisting human LPMs.
 
 ---
 
-## ✨ Key Features
+### Stage 6 — Executive Advisor
 
-### 🧠 AI-Powered Semantic Filtering
-Unlike keyword-based systems, Legal Eagle uses GPT-4o-mini to understand the *meaning* of content. It can:
-- Match Arabic news against English glossary terms
-- Distinguish between genuinely relevant legal changes and tangentially related news
-- Filter out general politics, diplomacy, and trade news
+Future **management-oriented capabilities**:
+- Prioritize legal changes by urgency and impact
+- Estimate delivery complexity
+- Suggest JIRA requirement drafts
+- Suggest RCM entry drafts
+- Cross-country compliance dashboards
+- Readiness and risk reporting
 
-### 🔄 Smart Deduplication
-Uses embeddings (text-embedding-3-small) to:
-- Detect duplicate news from different sources
-- Identify updates to previously reported items
-- Extract and highlight what changed
+---
 
-### 📋 Human-in-the-Loop Feedback
-The **Review News** feature allows LPMs to:
-- Score filtered-out items (1-5 relevance)
-- High-scored items become a "rescue baseline" for future filtering
-- Continuously improves accuracy over time
+## 🔧 Platform Modernization
 
-### 🖥️ Web-Based Admin UI
-A Flask-based dashboard for:
-- Managing profiles and sources
-- Running jobs manually with live log streaming
-- Reviewing filtered news
-- Monitoring run history
+### UI5/Fiori Migration
+
+**Status**: Planned  
+**Approach**: Hybrid Architecture (Flask + SAPUI5)
+
+Transform the current Flask/Jinja2 admin UI to a modern SAPUI5 application while keeping the Python backend intact.
+
+**Key Benefits**:
+- True SAP Fiori user experience with native UI5 controls
+- Modern, responsive design with SAP design system
+- Better integration with SAP ecosystem
+- Improved maintainability and developer experience
+
+**Timeline**: 5-week migration with page-by-page incremental approach
+
+📄 **Migration Plan**: See [UI5_MIGRATION_ROADMAP.md](UI5_MIGRATION_ROADMAP.md)
 
 ---
 
@@ -229,15 +157,15 @@ A Flask-based dashboard for:
 
 - **Python 3.11+**
 - **API Keys / Credentials**:
-  - SAP AI Core credentials (for LLM filtering, grouping, translation)
-  - Twitter/X Bearer Token (for timeline access)
-  - Gmail App Password (for sending emails)
+  - SAP AI Core credentials (for AI filtering, grouping, translation)
+  - Twitter/X Bearer Token (for social media monitoring)
+  - Gmail App Password (for sending email digests)
 
 ### Quick Setup
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/hzanaty/legal-eagle.git
+   git clone https://github.tools.sap/I077750/legal-eagle.git
    cd legal-eagle
    ```
 
@@ -270,138 +198,119 @@ Create a `.env` file in the project root:
 
 ```bash
 # SAP AI Core (required for AI filtering, grouping, translation)
-LEGAL_EAGLE_SAP_AICORE_BASE_URL=https://api.ai.internalprod...
-LEGAL_EAGLE_SAP_AICORE_AUTH_URL=https://...authentication.sap.hana.ondemand.com
-LEGAL_EAGLE_SAP_AICORE_CLIENT_ID=your-client-id
-LEGAL_EAGLE_SAP_AICORE_CLIENT_SECRET=your-client-secret
-LEGAL_EAGLE_SAP_AICORE_CHAT_DEPLOYMENT_ID=your-chat-deployment-id
-LEGAL_EAGLE_SAP_AICORE_EMBEDDINGS_DEPLOYMENT_ID=your-embeddings-deployment-id
+LEGAL_EAGLE_SAP_AICORE_BASE_URL=https://api.ai.prod.eu-central-1.aws.ml.hana.ondemand.com
+LEGAL_EAGLE_SAP_AICORE_AUTH_URL=https://auth.ai.prod.eu-central-1.aws.ml.hana.ondemand.com/oauth/token
+LEGAL_EAGLE_SAP_AICORE_CLIENT_ID=<client-id>
+LEGAL_EAGLE_SAP_AICORE_CLIENT_SECRET=<client-secret>
+LEGAL_EAGLE_SAP_AICORE_CHAT_DEPLOYMENT_ID=<deployment-id>
+LEGAL_EAGLE_SAP_AICORE_EMBEDDINGS_DEPLOYMENT_ID=<deployment-id>
 
 # Twitter/X (required for social media monitoring)
-LEGAL_EAGLE_TWITTER_BEARER_TOKEN=AAAAAAAA...
+LEGAL_EAGLE_TWITTER_BEARER_TOKEN=<bearer-token>
 
 # Gmail (required for sending email digests)
-LEGAL_EAGLE_GMAIL_EMAIL=your-email@gmail.com
-LEGAL_EAGLE_GMAIL_APP_PASSWORD=your-app-password
+LEGAL_EAGLE_GMAIL_EMAIL=<gmail-address>
+LEGAL_EAGLE_GMAIL_APP_PASSWORD=<app-password>
 ```
 
 ---
 
-## 🖥️ Admin UI Guide
+## 🖥️ Admin UI Overview
 
 ### Dashboard
-
-The main dashboard shows all configured profiles with their status:
-- **Active/Inactive** toggle
-- **Run** button to execute immediately
-- **Create Profile** to add new Country/LoB combinations
+- View all configured profiles (Country + LoB combinations)
+- Quick access to run executions and configuration
+- Status indicators for active/inactive profiles
 
 ### Profile Configuration
+Each profile allows you to configure:
+- **Data Sources**: RSS feeds, Twitter accounts, government websites
+- **Email Recipients**: LPMs who receive daily digests
+- **Glossary**: Domain-specific terms for relevance filtering
+- **Schedule**: Which day(s) to run automatic monitoring
+- **Monitor Settings**: Email inbox monitoring for Law-to-Spec updates
 
-Each profile page allows you to configure:
+### Run Execution
+- Manual execution with live log streaming
+- View run history and metrics
+- Cancel running executions cooperatively
 
-| Section | Description |
-|---------|-------------|
-| **Schedule** | Day of week to run (or Unset to skip) |
-| **RSS Feeds** | URLs of RSS/Atom feeds to monitor |
-| **URL Sources** | Websites to scrape (static or dynamic) |
-| **Twitter Accounts** | @handles to monitor |
-| **Email Receivers** | Recipients for the daily digest |
-| **Glossary** | Terms that define relevance for this LoB |
+### Review Filtered News
+- Score filtered-out items for continuous improvement
+- Approve items to add to baseline
+- High-scored items become "rescue baseline" for future filtering
 
-### URL Sources Configuration
+---
 
-For each website, you can configure:
-- **Mode**: `auto` (try static, fallback to dynamic), `force_static`, or `force_dynamic`
-- **Sample Link**: An example detail page URL to help derive the URL pattern
-- **Read More Label**: Text of the "read more" button (for dynamic sites)
+## ⚙️ How It Works
 
-### Running Jobs
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     LEGAL EAGLE PIPELINE                         │
+└─────────────────────────────────────────────────────────────────┘
 
-1. Navigate to a profile's **Run** page
-2. Click **Confirm Run**
-3. Watch live logs stream in the right panel
-4. View run history and past logs
+1. COLLECT
+   ├─> RSS Feeds (government announcements)
+   ├─> Twitter/X (official accounts)
+   ├─> Websites (static + dynamic with Playwright)
+   └─> Email Inbox (Law-to-Spec monitoring)
 
-### Reviewing Filtered News
+2. FILTER (AI)
+   └─> SAP AI Core evaluates relevance (0.0-1.0 score)
+       Uses country/LoB context + glossary terms
 
-The **Review News** page shows items that were filtered out:
-1. Score each item 1-5 based on actual relevance
-2. Items scored 4-5 become part of the "rescue baseline"
-3. Future similar items will be rescued from filtering
+3. COMPARE (Deduplication)
+   └─> Match against 7-day baseline
+       Detect: new items, updated items, unchanged
+
+4. GROUP (AI)
+   └─> Cluster related items by theme
+       Generate summaries per group
+
+5. EMAIL (Conditional)
+   └─> Bilingual HTML digest (native + English)
+       Skip if no new/updated items
+
+6. BASELINE UPDATE
+   └─> Store new items for future comparison
+```
+
+---
+
+## 📖 Documentation
+
+### Strategic & Planning
+- **[Big_Picture.md](Big_Picture.md)** — Strategic evolution plan (Journalist → Executive Advisor)
+- **[UI5_MIGRATION_ROADMAP.md](UI5_MIGRATION_ROADMAP.md)** — UI5/Fiori migration detailed plan
+
+### Technical & Operations
+- **[SPEC.md](SPEC.md)** — Technical specification (v2.12 current architecture)
+- **[CHANGELOG.md](CHANGELOG.md)** — Version history and release notes
+- **[BTP_DEPLOYMENT.md](BTP_DEPLOYMENT.md)** — SAP BTP Cloud Foundry deployment guide
+
+### User Guide
+- **README.md** (this file) — Vision, current capabilities, getting started
 
 ---
 
 ## 🌐 Deployment Options
 
 ### Local Development
-
-Run the Admin UI locally:
 ```bash
 python admin/app.py
 ```
 
-### GitHub Actions (Automated Daily Runs)
-
-1. **Configure Repository Secrets**
-   
-   Go to your repository → Settings → Secrets and variables → Actions → New repository secret
-   
-   Add these secrets:
-   - `LEGAL_EAGLE_OPENAI_API_KEY`
-   - `LEGAL_EAGLE_TWITTER_BEARER_TOKEN`
-   - `LEGAL_EAGLE_GMAIL_EMAIL_SENDER`
-   - `LEGAL_EAGLE_GMAIL_APP_PASSWORD`
-
-2. **Create Workflow File**
-   
-   Create `.github/workflows/daily-run.yml`:
-   ```yaml
-   name: Legal Eagle Daily Run
-   on:
-     schedule:
-       - cron: '0 3 * * *'  # 3 AM UTC daily
-     workflow_dispatch:  # Manual trigger
-   
-   jobs:
-     run:
-       runs-on: ubuntu-latest
-       steps:
-         - uses: actions/checkout@v4
-         - uses: actions/setup-python@v5
-           with:
-             python-version: '3.11'
-         - name: Install dependencies
-           run: |
-             pip install -r configurations/requirements.txt
-             playwright install chromium
-         - name: Initialize DB
-           run: python scripts/migrate_config_to_sqlite.py
-         - name: Run Legal Eagle
-           env:
-             LEGAL_EAGLE_OPENAI_API_KEY: ${{ secrets.LEGAL_EAGLE_OPENAI_API_KEY }}
-             LEGAL_EAGLE_TWITTER_BEARER_TOKEN: ${{ secrets.LEGAL_EAGLE_TWITTER_BEARER_TOKEN }}
-             LEGAL_EAGLE_GMAIL_EMAIL_SENDER: ${{ secrets.LEGAL_EAGLE_GMAIL_EMAIL_SENDER }}
-             LEGAL_EAGLE_GMAIL_APP_PASSWORD: ${{ secrets.LEGAL_EAGLE_GMAIL_APP_PASSWORD }}
-           run: python scripts/schedule_runner.py --ignore-schedule
-   ```
-
-### Hosting the Admin UI
-
-For persistent Admin UI access, you can deploy the Flask app:
-
-**Option 1: Local Server (macOS/Linux)**
+### Production (macOS/Linux)
 ```bash
 # Using launchd (macOS) or systemd (Linux)
 # See scripts/launchd/ and scripts/systemd/ for templates
 ```
 
-**Option 2: Cloud Hosting**
-- Deploy to any Python-compatible platform (Heroku, Railway, Render, etc.)
-- Set environment variables in the platform's dashboard
-- The SQLite database will be created automatically
-
-**Option 3: Docker** (coming soon)
+### SAP BTP Cloud Foundry
+```bash
+cf push
+```
+See [BTP_DEPLOYMENT.md](BTP_DEPLOYMENT.md) for complete deployment guide.
 
 ---
 
@@ -409,38 +318,17 @@ For persistent Admin UI access, you can deploy the Flask app:
 
 ```
 legal-eagle/
-├── admin/                    # Flask Admin UI
-│   ├── app.py               # Main Flask application
-│   └── templates/           # HTML templates
-├── agents/                   # Processing pipeline agents
-│   ├── agents_controller.py # Main orchestrator
-│   ├── rss_parser.py        # RSS feed collection
-│   ├── tweet_feed.py        # Twitter/X collection
-│   ├── url_sources_runner.py# Website scraping
-│   ├── news_filter.py       # AI relevance filtering
-│   ├── compare_news.py      # Deduplication & updates
-│   ├── news_grouper.py      # Topic grouping
-│   └── email_sender.py      # Email delivery
-├── configurations/           # Config and database
-│   ├── config_loader.py     # Configuration API
-│   ├── db.py                # SQLite helpers
-│   └── requirements.txt     # Python dependencies
-├── scripts/                  # Utilities and schedulers
-│   ├── schedule_runner.py   # CLI runner for scheduling
-│   ├── migrate_config_to_sqlite.py
-│   └── launchd/, systemd/   # OS scheduler templates
-├── outputs/                  # Generated output files
-├── .env.example             # Environment template
-├── README.md                # This file
-└── SPEC.md                  # Technical specification
+├── agents/                   # Processing pipeline (collect, filter, group, email)
+├── admin/                    # Flask Admin UI + templates
+├── configurations/           # Database, config loader, environment variables
+├── scripts/                  # Utilities, schedulers, migrations
+├── outputs/                  # Generated artifacts (JSON, HTML, logs)
+├── memory-bank/              # Project memory and documentation
+├── Big_Picture.md            # Strategic evolution roadmap
+├── README.md                 # This file
+├── SPEC.md                   # Technical specification
+└── UI5_MIGRATION_ROADMAP.md  # UI5/Fiori migration plan
 ```
-
----
-
-## 📖 Documentation
-
-- **README.md** (this file) — Project overview and user guide
-- **[SPEC.md](SPEC.md)** — Technical specification for developers
 
 ---
 
@@ -455,3 +343,11 @@ For issues, questions, or feature requests:
 ## 📜 License
 
 Proprietary — Internal SAP project.
+
+---
+
+## 🎯 End Goal
+
+A scalable internal AI platform helping SAP localization teams react faster to legal change, reuse knowledge better, and operate globally with higher intelligence.
+
+**Legal Eagle Core is live today. The journey to Virtual LPM starts now.**

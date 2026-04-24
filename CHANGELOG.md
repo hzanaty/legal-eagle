@@ -1,5 +1,36 @@
 # CHANGELOG
 
+## v2.13 — 2026-04-24
+### Strategic Roadmap Update & AI4GPM Submission
+- **Updated Strategic Evolution**: Expanded from 5-stage to 6-stage roadmap
+  - Added **Stage 3 — SAP Consultant** with Taxonomy MCP integration
+  - Maps legal changes to affected SAP products (HCM, Payroll, SuccessFactors, S/4HANA)
+  - Identifies impacted SAP objects, processes, and functional areas
+  - Determines if changes require standard configuration or custom enhancement
+  - Bridges gap between legal interpretation and implementable SAP requirements
+  - New sequence: Journalist → Lawyer → **SAP Consultant** → Smart MCP → Virtual LPM → Executive Advisor
+
+- **AI4GPM Idea Submission**: Created production JIRA idea (GSIDEAS-457)
+  - Title: "Legal Eagle: From Regulatory Intelligence to Virtual Localization Product Manager"
+  - Complete 6-stage evolution roadmap with quantifiable benefits
+  - Submitted to AI4GPM evaluation pipeline for review
+  - URL: https://jira.tools.sap/browse/GSIDEAS-457
+
+- **Documentation Cleanup**: Renamed `docs/README.md` to `docs/INDEX.md`
+  - Eliminated naming conflict with root README.md
+  - Clarified purpose as documentation navigation/index file
+  - Updated header to "Legal Eagle Documentation Index"
+
+### Files Changed
+- `README.md` — Updated vision with 6-stage evolution, added SAP Consultant stage description
+- `Big_Picture.md` — Already contained v4 with 6-stage roadmap (source of truth)
+- `docs/INDEX.md` — Renamed from docs/README.md, updated header
+- `CHANGELOG.md` — This entry
+- `memory-bank/activeContext.md` — Updated to v2.13
+- `memory-bank/progress.md` — Added v2.13 entry
+
+---
+
 ## v2.12 — 2026-04-24
 ### Server Stability & Auto-Reload
 - **Fixed Flask Reloader Crashes**: Disabled Flask's built-in reloader to prevent orphan processes

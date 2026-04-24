@@ -98,19 +98,10 @@ Legal Eagle monitors government sources for legal updates in chosen countries an
 │  └──────────────────────────────────────────────────────────────────────┘   │
 │                                                                              │
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
-│  │                         STORAGE                                       │   │
-│  │  ┌─────────────────┐    ┌─────────────────┐                          │   │
-│  │  │ SQLite DB       │    │ Environment     │                          │   │
-│  │  │ (config.db)     │    │ Variables       │                          │   │
-│  │  │ - Profiles      │    │ - API Keys      │                          │   │
-│  │  │ - Sources       │    │ - Credentials   │                          │   │
-│  │  │ - Glossary      │    │ - Gmail IMAP    │                          │   │
-│  │  │ - News Baseline │    │                 │                          │   │
-│  │  │ - Runs/Logs     │    │                 │                          │   │
-│  │  │ - Monitor Hist. │    │                 │                          │   │
-│  │  └─────────────────┘    └─────────────────┘                          │   │
+│  │                     CONFIGURATION (SQLite)                            │   │
+│  │  • Profiles    • RSS Feeds    • Twitter Accounts    • URL Sources    │   │
+│  │  • Glossary    • Email Receivers    • Settings    • Audit Log        │   │
 │  └──────────────────────────────────────────────────────────────────────┘   │
-│                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -118,401 +109,361 @@ Legal Eagle monitors government sources for legal updates in chosen countries an
 
 ## 3. Technology Stack
 
-### 3.1 Runtime
+### 3.1 Backend
 
-| Component | Version | Purpose |
-|-----------|---------|---------|
-| Python | 3.11+ | Primary language |
-| SQLite | 3.x | Configuration and baseline storage |
-| Playwright | Latest | Headless browser for dynamic sites |
+- **Language**: Python 3.11+
+- **Framework**: Flask 3.0+ (Admin UI)
+- **Database**: SQLite 3 (configuration storage)
+- **AI/LLM**: SAP AI Core (gpt-4o, text-embedding-ada-002)
+- **Scheduling**: APScheduler or cron
 
-### 3.2 Python Dependencies
+### 3.2 Frontend (Current)
 
-| Package | Purpose |
-|---------|---------|
-| `feedparser` | RSS/Atom feed parsing |
-| `openai` | GPT-4o-mini (filtering, grouping) and embeddings |
-| `requests` | HTTP requests for static content |
-| `beautifulsoup4` | HTML parsing |
-| `playwright` | Dynamic website rendering |
-| `numpy` | Numerical operations (cosine similarity) |
-| `httpx` | HTTP client for OpenAI (HTTP/2 disabled) |
-| `flask` | Admin UI web framework |
-| `python-dotenv` | Environment variable loading |
+- **Templates**: Jinja2 (server-side rendering)
+- **Styling**: Custom CSS with SAP Fiori design tokens
+- **JavaScript**: Vanilla JS (minimal, for interactive features)
 
-### 3.3 External Services
+### 3.3 Data Sources
 
-| Service | Model/Endpoint | Purpose |
-|---------|----------------|---------|
-| OpenAI | `gpt-4o-mini` | Semantic filtering and grouping |
-| OpenAI | `text-embedding-3-small` | Semantic similarity for deduplication |
-| Twitter/X API | `GET /2/tweets/search/recent` | Multi-account tweet search (v2.1+) |
-| Twitter/X API | `GET /2/users/{id}/tweets` | Single-account timeline (legacy) |
-| Gmail SMTP | `smtp.gmail.com:587` | Email delivery |
+- **RSS**: feedparser library
+- **Twitter/X**: Twitter API v2 (bearer token authentication)
+- **Web Scraping**: requests + BeautifulSoup4
+- **Email**: imaplib (Gmail IMAP)
+
+### 3.4 Deployment
+
+- **Platform**: SAP Business Technology Platform (Cloud Foundry)
+- **Buildpack**: Python buildpack
+- **Process**: Gunicorn WSGI server
 
 ---
 
-## 4. BTP Cloud Foundry Deployment
+## 4. Database Schema
 
-### 4.1 Overview
+### 4.1 SQLite Database: `configurations/config.db`
 
-Legal Eagle can be deployed to SAP BTP Cloud Foundry environment for cloud-based operation. The deployment includes Playwright browser automation with full Chromium dependencies.
+#### Table: `profiles`
 
-**Deployment Guide**: See `BTP_DEPLOYMENT.md` for complete step-by-step instructions.
+Stores country/LoB profile configurations.
 
-### 4.2 Deployment Files
-
-| File | Purpose |
-|------|---------|
-| `manifest.yaml` | Cloud Foundry deployment configuration (memory, disk, buildpacks, routes) |
-| `apt.yml` | System package dependencies for Chromium (23 libraries) |
-| `.profile` | Playwright browser auto-installation script (runs on container startup) |
-| `.cfignore` | Files to exclude from CF deployment |
-| `Procfile` | Gunicorn start command |
-| `runtime.txt` | Python 3.11 specification |
-| `requirements.txt` | Root-level Python dependencies |
-
-### 4.3 Multi-Buildpack Configuration
-
-Legal Eagle uses **two buildpacks** in sequence:
-
-1. **apt-buildpack** (`https://github.com/cloudfoundry/apt-buildpack`)
-   - Installs system libraries required by Chromium
-   - Configuration file: `apt.yml`
-   - Libraries installed: libnspr4, libnss3, libgbm1, libxshmfence1, and 19 others
-   - Prevents "cannot open shared object file" errors
-
-2. **python_buildpack** (Cloud Foundry standard)
-   - Installs Python 3.11 and dependencies
-   - Reads `requirements.txt` for package list
-   - Configures Python environment
-
-### 4.4 Playwright Browser Installation
-
-Chromium browser is installed automatically on container startup via `.profile` script:
-
-```bash
-# .profile content (simplified)
-echo "Installing Playwright Chromium..."
-playwright install chromium
-playwright install-deps chromium
+```sql
+CREATE TABLE profiles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    country_code TEXT NOT NULL,
+    lob TEXT NOT NULL,
+    name TEXT,
+    active INTEGER DEFAULT 1,
+    language TEXT DEFAULT 'en',
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(country_code, lob)
+);
 ```
 
-**Behavior**:
-- Runs once per container start
-- Downloads Chromium (~167MB)
-- Caches in `/home/vcap/app/.cache/ms-playwright/`
-- No manual installation required
+**Columns:**
+- `id`: Auto-increment primary key
+- `country_code`: ISO country code (e.g., 'SA', 'AE', 'TR')
+- `lob`: Line of Business ('HCM' or 'FIN')
+- `name`: Optional human-readable name
+- `active`: 1 = active, 0 = inactive
+- `language`: Analysis language (default: 'en')
+- `created_at`: ISO 8601 timestamp
 
-### 4.5 Resource Requirements
+#### Table: `rss_feeds`
 
-| Resource | Requirement | Reason |
-|----------|-------------|--------|
-| Memory | 1GB | Chromium requires significant memory for rendering |
-| Disk | 2GB | Chromium binaries + Python dependencies + cache |
-| Timeout | 60s | Slow government websites need extended timeout |
+RSS feed sources per profile.
 
-**Note**: Deployment fails with 512MB memory allocation.
-
-### 4.6 Environment Variables (BTP)
-
-Environment variables must be configured via Cloud Foundry CLI:
-
-```bash
-cf set-env legal-eagle-ui LEGAL_EAGLE_OPENAI_API_KEY "your-key"
-cf set-env legal-eagle-ui LEGAL_EAGLE_TWITTER_BEARER_TOKEN "your-token"
-cf set-env legal-eagle-ui LEGAL_EAGLE_GMAIL_EMAIL_SENDER "your-email"
-cf set-env legal-eagle-ui LEGAL_EAGLE_GMAIL_APP_PASSWORD "your-password"
-cf restage legal-eagle-ui
+```sql
+CREATE TABLE rss_feeds (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    profile_id INTEGER NOT NULL,
+    url TEXT NOT NULL,
+    max_lookback_days INTEGER DEFAULT 7,
+    last_fetch_date TEXT,
+    FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE,
+    UNIQUE(profile_id, url)
+);
 ```
 
-See Section 8.1 for complete list of environment variables.
+**Columns:**
+- `id`: Auto-increment primary key
+- `profile_id`: Foreign key to profiles table
+- `url`: RSS feed URL
+- `max_lookback_days`: Maximum days to look back for articles (default: 7)
+- `last_fetch_date`: ISO 8601 timestamp of last successful fetch
 
-### 4.7 Deployment Commands
+#### Table: `tweet_accounts`
 
-```bash
-# Login to Cloud Foundry
-cf login -a https://api.cf.eu21.hana.ondemand.com
+Twitter/X accounts to monitor per profile.
 
-# Deploy application
-cf push
-
-# Check status
-cf app legal-eagle-ui
-
-# View logs
-cf logs legal-eagle-ui --recent
-
-# Scale resources
-cf scale legal-eagle-ui -m 1G -k 2G
+```sql
+CREATE TABLE tweet_accounts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    profile_id INTEGER NOT NULL,
+    handle TEXT NOT NULL,
+    max_lookback_days INTEGER DEFAULT 7,
+    last_fetch_date TEXT,
+    FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE,
+    UNIQUE(profile_id, handle)
+);
 ```
 
-### 4.8 Known Issues
+**Columns:**
+- `id`: Auto-increment primary key
+- `profile_id`: Foreign key to profiles table
+- `handle`: Twitter handle (without @)
+- `max_lookback_days`: Maximum days to look back for tweets (default: 7)
+- `last_fetch_date`: ISO 8601 timestamp of last successful fetch
 
-#### Network Connectivity Limitations
+#### Table: `url_sources`
 
-**Problem**: Some government websites are unreachable from BTP Cloud Foundry network.
+Website sources (static and dynamic crawling).
 
-**Affected Sources**:
-- Saudi government sites (e.g., `uqn.gov.sa`)
-- Timeouts occur on both static HTTP and dynamic Playwright requests
+```sql
+CREATE TABLE url_sources (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    profile_id INTEGER NOT NULL,
+    url TEXT NOT NULL,
+    mode TEXT DEFAULT 'auto',
+    date_scope TEXT DEFAULT 'last_7_days',
+    sample_link TEXT,
+    read_more_label TEXT,
+    recursive_crawl INTEGER DEFAULT 0,
+    crawl_version TEXT DEFAULT 'v1',
+    last_successful_fetch TEXT,
+    use_proxy INTEGER DEFAULT 0,
+    FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
+);
+```
 
-**Working Sources**:
-- RSS feeds ✅
-- Twitter API ✅
-- Most other websites ✅
+**Columns:**
+- `id`: Auto-increment primary key
+- `profile_id`: Foreign key to profiles table
+- `url`: Website URL
+- `mode`: Crawl mode ('auto', 'force_static', 'force_dynamic')
+- `date_scope`: Date filtering ('last_7_days', 'last_30_days', 'all')
+- `sample_link`: Optional sample link for pattern detection
+- `read_more_label`: Optional "read more" button text
+- `recursive_crawl`: 1 = crawl subpages, 0 = single page only
+- `crawl_version`: Crawl engine version ('v1' or 'v2')
+- `last_successful_fetch`: ISO 8601 timestamp of last successful fetch
+- `use_proxy`: 1 = use BrightData proxy, 0 = direct connection
 
-**Root Cause**: Cloud provider IP ranges may be blocked by government infrastructure or intermediary firewalls.
+#### Table: `email_receivers`
 
-**Workaround**: Use hybrid architecture:
-- Deploy to BTP for RSS/Twitter sources (works fine)
-- Keep local scheduler for blocked government sites
-- Both can use same SQLite database (synced via file sharing)
+Email recipients for daily digest per profile.
 
-### 4.9 BTP vs Local Deployment
+```sql
+CREATE TABLE email_receivers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    profile_id INTEGER NOT NULL,
+    email TEXT NOT NULL,
+    translation_lang TEXT DEFAULT 'en',
+    FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE,
+    UNIQUE(profile_id, email)
+);
+```
 
-| Feature | BTP Cloud Foundry | Local (macOS/Linux) |
-|---------|-------------------|---------------------|
-| Setup | cf push (automated) | Manual Python setup |
-| Scaling | `cf scale` command | Manual process management |
-| Monitoring | CF logs + metrics | Local logs |
-| Scheduling | Job Scheduler service | launchd/systemd/cron |
-| Cost | Per GB-hour | Hardware cost |
-| Network | Some sites blocked | Full access |
-| Maintenance | Managed by SAP | Self-managed |
+**Columns:**
+- `id`: Auto-increment primary key
+- `profile_id`: Foreign key to profiles table
+- `email`: Recipient email address
+- `translation_lang`: Preferred language for email translation (default: 'en')
 
-**Recommendation**: Use BTP for production if all sources are accessible. Use local deployment if government sites are blocked from BTP network.
+#### Table: `glossary`
 
----
+Custom terms/keywords per profile for filtering.
 
-## 5. Database Schema
+```sql
+CREATE TABLE glossary (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    profile_id INTEGER NOT NULL,
+    term TEXT NOT NULL,
+    FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE,
+    UNIQUE(profile_id, term)
+);
+```
 
-Database file: `configurations/config.db` (SQLite)
+**Columns:**
+- `id`: Auto-increment primary key
+- `profile_id`: Foreign key to profiles table
+- `term`: Custom term or keyword
 
-### 4.1 Core Tables
+#### Table: `settings`
 
-#### `profiles`
-Defines Country + LoB combinations.
+Key-value configuration storage per profile.
 
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | INTEGER PK | Auto-increment ID |
-| `country_code` | TEXT | ISO alpha-2 country code (e.g., `SA`, `AE`) |
-| `lob` | TEXT | Line of Business (`HCM` or `FIN`) |
-| `name` | TEXT | Optional display name |
-| `language` | TEXT | Output language (default: `en`) |
-| `active` | INTEGER | 1 = active, 0 = inactive |
-| `schedule_day` | TEXT | Day of week to run (e.g., `Sunday`) |
+```sql
+CREATE TABLE settings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    profile_id INTEGER NOT NULL,
+    key TEXT NOT NULL,
+    value TEXT,
+    FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE,
+    UNIQUE(profile_id, key)
+);
+```
 
-**Unique constraint**: `(country_code, lob, name)`
+**Columns:**
+- `id`: Auto-increment primary key
+- `profile_id`: Foreign key to profiles table
+- `key`: Setting key (e.g., 'schedule', 'monitor_updates')
+- `value`: Setting value (JSON string or plain text)
 
-#### `settings`
-Per-profile key-value settings.
+#### Table: `news_items`
 
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | INTEGER PK | Auto-increment ID |
-| `profile_id` | INTEGER FK | References `profiles(id)` |
-| `key` | TEXT | Setting key |
-| `value` | TEXT | Setting value |
+Historical news items (weekly baseline).
 
-**Unique constraint**: `(profile_id, key)`
+```sql
+CREATE TABLE news_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    profile_id INTEGER NOT NULL,
+    source TEXT NOT NULL,
+    source_type TEXT,
+    title TEXT NOT NULL,
+    link TEXT,
+    date TEXT,
+    content TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
+);
+```
 
-**Common Settings** (v2.1+):
-| Key | Default | Description |
-|-----|---------|-------------|
-| `news_lookback_days` | `7` | Lookback window for news collection (max 7 for Twitter Free tier) |
-| `twitter_last_fetch_time` | - | Last Twitter API call timestamp (ISO) |
-| `tweets_reset_quota_date` | - | Date to resume Twitter collection (ISO date) |
-| `twitter_last_account_index` | `0` | **Deprecated in v2.1**: Round-robin index (no longer used with Search API) |
+**Columns:**
+- `id`: Auto-increment primary key
+- `profile_id`: Foreign key to profiles table
+- `source`: Source name (e.g., RSS feed URL, Twitter handle)
+- `source_type`: Type ('RSS', 'Twitter', 'URL_Static', 'URL_Dynamic')
+- `title`: News item title
+- `link`: URL to full article
+- `date`: Publication date (ISO 8601)
+- `content`: Article content or summary
+- `created_at`: Timestamp when added to database
 
-### 4.2 Source Tables
+#### Table: `filtered_news`
 
-#### `rss_feeds`
-RSS/Atom feed URLs per profile.
+Filtered news items awaiting review.
 
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | INTEGER PK | Auto-increment ID |
-| `profile_id` | INTEGER FK | References `profiles(id)` |
-| `url` | TEXT | Feed URL |
+```sql
+CREATE TABLE filtered_news (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    profile_id INTEGER NOT NULL,
+    source TEXT NOT NULL,
+    source_type TEXT,
+    title TEXT NOT NULL,
+    link TEXT,
+    date TEXT,
+    content TEXT,
+    score REAL DEFAULT 0.0,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
+);
+```
 
-#### `tweet_accounts`
-Twitter/X handles to monitor.
+**Columns:**
+- `id`: Auto-increment primary key
+- `profile_id`: Foreign key to profiles table
+- `source`: Source name
+- `source_type`: Type ('RSS', 'Twitter', 'URL_Static', 'URL_Dynamic')
+- `title`: News item title
+- `link`: URL to full article
+- `date`: Publication date (ISO 8601)
+- `content`: Article content or summary
+- `score`: Relevance score from AI filter (0.0-1.0)
+- `created_at`: Timestamp when filtered
 
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | INTEGER PK | Auto-increment ID |
-| `profile_id` | INTEGER FK | References `profiles(id)` |
-| `handle` | TEXT | Twitter handle (without @) |
+#### Table: `runs`
 
-#### `url_sources`
-Websites to scrape (unified static/dynamic).
+Execution history for profile runs.
 
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | INTEGER PK | Auto-increment ID |
-| `profile_id` | INTEGER FK | References `profiles(id)` |
-| `url` | TEXT | Listing page URL |
-| `mode` | TEXT | `auto`, `force_static`, or `force_dynamic` |
-| `sample_link` | TEXT | Example detail page URL (for pattern derivation) |
-| `read_more_label` | TEXT | Text of "read more" button (for dynamic sites) |
-| `crawl_version` | TEXT | `v1` or `v2` (runner version) |
-| `created_at` | TEXT | ISO timestamp |
+```sql
+CREATE TABLE runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    profile_id INTEGER NOT NULL,
+    status TEXT DEFAULT 'Pending',
+    started_at TEXT,
+    finished_at TEXT,
+    duration_seconds REAL,
+    items_collected INTEGER DEFAULT 0,
+    items_filtered INTEGER DEFAULT 0,
+    items_new INTEGER DEFAULT 0,
+    items_updated INTEGER DEFAULT 0,
+    email_sent INTEGER DEFAULT 0,
+    error_message TEXT,
+    FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
+);
+```
 
-#### `email_receivers`
-Email recipients for daily digest (v2.4: with translation language support).
+**Columns:**
+- `id`: Auto-increment primary key
+- `profile_id`: Foreign key to profiles table
+- `status`: Run status ('Pending', 'Running', 'Completed', 'Failed', 'Canceled')
+- `started_at`: ISO 8601 timestamp
+- `finished_at`: ISO 8601 timestamp
+- `duration_seconds`: Execution duration
+- `items_collected`: Total items collected from sources
+- `items_filtered`: Items passing AI filter
+- `items_new`: New items (not in baseline)
+- `items_updated`: Updated items
+- `email_sent`: 1 = email sent, 0 = not sent
+- `error_message`: Error details if failed
 
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | INTEGER PK | Auto-increment ID |
-| `profile_id` | INTEGER FK | References `profiles(id)` |
-| `email` | TEXT | Email address |
-| `translation_lang` | TEXT | Translation language code (default: 'en') |
+#### Table: `run_logs`
 
-**Supported Languages (v2.4+)**: English (en), Arabic (ar), Spanish (es), French (fr), German (de), Chinese (zh), Japanese (ja), Korean (ko), Portuguese (pt), Russian (ru), Turkish (tr), Hindi (hi), Italian (it), Dutch (nl), Polish (pl)
+Log entries for each run.
 
-### 4.3 Glossary Tables
+```sql
+CREATE TABLE run_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id INTEGER NOT NULL,
+    sequence INTEGER NOT NULL,
+    timestamp TEXT DEFAULT (datetime('now')),
+    message TEXT NOT NULL,
+    FOREIGN KEY (run_id) REFERENCES runs(id) ON DELETE CASCADE
+);
+```
 
-#### `glossary_terms`
-Terms that define relevance for a profile's LoB.
+**Columns:**
+- `id`: Auto-increment primary key
+- `run_id`: Foreign key to runs table
+- `sequence`: Log line number (for ordering)
+- `timestamp`: ISO 8601 timestamp
+- `message`: Log message text
 
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | INTEGER PK | Auto-increment ID |
-| `profile_id` | INTEGER FK | References `profiles(id)` |
-| `term` | TEXT | The glossary term |
-| `lang` | TEXT | Language code (default: `en`) |
-| `category` | TEXT | `HCM`, `FIN`, or NULL |
-| `product` | TEXT | Optional product association |
-| `weight` | REAL | Term weight (default: 1.0) |
-| `notes` | TEXT | Optional notes |
+#### Table: `global_credentials`
 
-#### `glossary_synonyms`
-Synonyms for glossary terms.
+Global credentials (legacy, mostly moved to environment variables).
 
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | INTEGER PK | Auto-increment ID |
-| `term_id` | INTEGER FK | References `glossary_terms(id)` |
-| `synonym` | TEXT | Synonym text |
+```sql
+CREATE TABLE global_credentials (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    key TEXT UNIQUE NOT NULL,
+    value TEXT
+);
+```
 
-#### `glossary_patterns`
-Regex patterns for glossary terms.
+**Columns:**
+- `id`: Auto-increment primary key
+- `key`: Credential key
+- `value`: Credential value (deprecated - use environment variables)
 
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | INTEGER PK | Auto-increment ID |
-| `term_id` | INTEGER FK | References `glossary_terms(id)` |
-| `regex` | TEXT | Regular expression pattern |
+#### Table: `audit_log`
 
-### 4.4 News Baseline Tables
+Audit trail for admin UI actions.
 
-#### `news_items`
-Rolling 7-day baseline for deduplication and update detection.
+```sql
+CREATE TABLE audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp TEXT DEFAULT (datetime('now')),
+    action TEXT NOT NULL,
+    details TEXT
+);
+```
 
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | INTEGER PK | Auto-increment ID |
-| `profile_id` | INTEGER FK | References `profiles(id)` |
-| `source_type` | TEXT | `RSS`, `Tweet`, `URL_Static`, `URL_Dynamic` |
-| `source_id` | TEXT | Unique ID from source (guid, tweet_id) |
-| `url` | TEXT | Article URL |
-| `domain` | TEXT | Source domain |
-| `title` | TEXT | Article title |
-| `content` | TEXT | Article content/summary |
-| `published_at` | TEXT | Publication date (ISO) |
-| `first_seen_at` | TEXT | First seen timestamp (ISO) |
-| `last_seen_at` | TEXT | Last seen timestamp (ISO) |
-| `hash_signature` | TEXT | Normalized text hash |
-
-**Indexes**: `(profile_id, first_seen_at)`, `(profile_id, last_seen_at)`, `(profile_id, url)`, `(profile_id, source_type, source_id)`
-
-#### `filtered_news`
-Items filtered out, available for manual review.
-
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | INTEGER PK | Auto-increment ID |
-| `profile_id` | INTEGER FK | References `profiles(id)` |
-| `run_id` | INTEGER FK | References `runs(id)` (nullable) |
-| `source_type` | TEXT | Source type |
-| `url` | TEXT | Article URL |
-| `title` | TEXT | Article title |
-| `content` | TEXT | Article content |
-| `filter_reason` | TEXT | `too_old`, `semantic_check_failed` |
-| `relevance_score` | INTEGER | Manual score 1-5 (NULL until reviewed) |
-| `reviewed_at` | TEXT | Review timestamp (ISO) |
-| `published_at` | TEXT | Publication date |
-| `created_at` | TEXT | Created timestamp |
-
-### 4.5 Run History Tables
-
-#### `runs`
-Execution history for each profile.
-
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | INTEGER PK | Auto-increment ID |
-| `profile_id` | INTEGER FK | References `profiles(id)` |
-| `status` | TEXT | `Queued`, `Running`, `Success`, `Failed`, `Canceled` |
-| `origin` | TEXT | `manual` or `scheduled` |
-| `started_at` | TEXT | Start timestamp (ISO) |
-| `finished_at` | TEXT | Finish timestamp (ISO) |
-| `duration_ms` | INTEGER | Duration in milliseconds |
-| `rss_count` | INTEGER | RSS items collected |
-| `tweet_count` | INTEGER | Tweets collected |
-| `url_count` | INTEGER | URL items collected |
-| `filtered_count` | INTEGER | Items after filtering |
-| `grouped_count` | INTEGER | Groups in email |
-| `email_status` | TEXT | `Sent` or `Failed` |
-| `cancel_requested` | INTEGER | 1 if cancel requested |
-| `created_at` | TEXT | Created timestamp |
-
-#### `run_logs`
-Log lines for each run (for live streaming).
-
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | INTEGER PK | Auto-increment ID |
-| `run_id` | INTEGER FK | References `runs(id)` |
-| `ts` | TEXT | Timestamp (ISO) |
-| `level` | TEXT | `INFO`, `WARN`, `ERROR` |
-| `line` | TEXT | Log message |
-| `seq` | INTEGER | Sequence number |
-
-### 4.6 Monitor Updates Table
-
-#### `monitor_updates_processed`
-Tracks processed Law-to-Specification "Monitor updates" emails to prevent duplicates.
-
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | INTEGER PK | Auto-increment ID |
-| `profile_id` | INTEGER FK | References `profiles(id)` |
-| `email_message_id` | TEXT | Email Message-ID header |
-| `report_date` | TEXT | Report date from email (ISO format) |
-| `monitored_url` | TEXT | URL being monitored |
-| `changes_json` | TEXT | JSON array of change summaries |
-| `processed_at` | TEXT | Processing timestamp (ISO) |
-
-**Indexes**: `(profile_id, email_message_id)` (unique), `(profile_id, processed_at)`
-
-**Purpose**: Prevents re-processing forwarded emails when profile runs multiple times.
-
-### 4.7 Audit Table
-
-#### `audit_log`
-Tracks admin actions for accountability.
-
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | INTEGER PK | Auto-increment ID |
-| `profile_id` | INTEGER FK | References `profiles(id)` (nullable) |
-| `entity` | TEXT | Entity type (e.g., `profiles`, `rss_feeds`) |
-| `action` | TEXT | Action performed (e.g., `create`, `delete`) |
-| `details` | TEXT | Additional details |
-| `created_at` | TEXT | Timestamp |
+**Columns:**
+- `id`: Auto-increment primary key
+- `timestamp`: ISO 8601 timestamp
+- `action`: Action performed (e.g., 'create_profile', 'delete_rss_feed')
+- `details`: JSON string with action details
 
 ---
 
@@ -520,927 +471,430 @@ Tracks admin actions for accountability.
 
 ### 5.1 RSS Parser (`agents/rss_parser.py`)
 
-**Purpose**: Collect news items from RSS/Atom feeds.
+**Purpose**: Fetch and parse RSS feeds.
 
-**Input**: List of feed URLs
-
-**Output**: List of news items with:
-- `source`: Feed domain
-- `source_type`: `"RSS"`
-- `title`: Entry title
-- `link`: Entry URL
-- `date`: Publication date
-- `content`: Entry summary/description
-- `guid`: Entry ID (for deduplication)
-
-**Key Function**:
+**Key Functions**:
 ```python
-def parse_rss_feed(url: str) -> List[Dict]
+def parse_rss_feeds(
+    feeds: List[Dict],
+    max_lookback_days: int = 7
+) -> Tuple[List[Dict], List[Dict]]
 ```
+
+**Input**:
+- `feeds`: List of feed dicts with `url`, `max_lookback_days`, `last_fetch_date`
+- `max_lookback_days`: Default lookback (overridden by per-feed setting)
+
+**Output**:
+- Tuple of (items, errors)
+- Items: List of dicts with `source`, `source_type`, `title`, `link`, `date`, `content`
+
+**Date Filtering**:
+- Uses per-feed `last_fetch_date` if available
+- Falls back to `max_lookback_days` calculation
+- Updates `last_fetch_date` after successful fetch
+
+---
 
 ### 5.2 Tweet Feed (`agents/tweet_feed.py`)
 
-**Purpose**: Collect tweets from monitored Twitter/X accounts.
-
-**Input**: List of account handles, bearer token, profile_id, lookback days
-
-**Output**: List of tweet items with:
-- `source`: `"Twitter"`
-- `source_type`: `"Tweet"`
-- `title`: Tweet text (truncated)
-- `link`: Tweet URL
-- `date`: Tweet timestamp
-- `content`: Full tweet text
-- `tweet_id`: Tweet ID (for deduplication)
-- `author_id`: Tweet author ID
-
-**Key Features (v2.1+)**:
-- **Multi-Account Search API**: Fetches from ALL accounts in single API call (more efficient)
-- Uses `GET /2/tweets/search/recent` endpoint
-- Enforces 15-minute rate limit (Free tier)
-- Configurable lookback window (max 7 days on Free tier)
-- Returns up to 100 tweets per request
-
-**Legacy Features (deprecated)**:
-- Timeline endpoint `GET /2/users/{id}/tweets` (single account)
-- Round-robin account rotation (no longer needed)
-- `since_id` incremental fetching
+**Purpose**: Fetch tweets from specified Twitter/X accounts.
 
 **Key Functions**:
 ```python
-# v2.1+ (recommended)
 def search_tweets_multi_account(
-    accounts: List[str],
+    handles: List[Dict],
     bearer_token: str,
-    profile_id: int,
-    conn=None,
-    days: int = 7,
-    max_results: int = 100
-) -> List[Dict]
-
-# Legacy (deprecated)
-def fetch_recent_tweets(account_name: str, bearer_token: str, profile_id: int) -> List[Dict]
+    max_lookback_days: int = 7
+) -> Tuple[List[Dict], List[Dict]]
 ```
-
-**Rate Limiting**:
-- `check_twitter_rate_limit(profile_id, conn)` enforces 15-minute rule
-- Stores `twitter_last_fetch_time` in settings
-- Returns `(can_run: bool, minutes_to_wait: int)`
-
-### 5.3 Date Filter (`agents/date_filter.py`)
-
-**Purpose**: Filter news items by publication date across all source types (v2.1+).
-
-**Input**: 
-- List of news items (RSS, tweets, URL sources)
-- Lookback window in days (default: 7)
-
-**Output**: Filtered list containing only items within the date range
-
-**Key Features**:
-- **Unified date filtering**: Works across RSS, Twitter, and URL sources
-- **Flexible date field detection**: Tries multiple field names (`date`, `published`, `published_at`, `pubDate`, `created_at`)
-- **Multiple format support**: ISO 8601 and simple YYYY-MM-DD formats
-- **Fail-safe behavior**: Items without parseable dates are KEPT (don't lose data)
-- **Configurable lookback**: Per-profile setting `news_lookback_days` (stored in `settings` table)
-
-**Configuration**:
-- Profile-level setting: `news_lookback_days` (default: 7)
-- Twitter Search API limited to max 7 days on Free tier
-- Applied BEFORE filtering for efficiency
-
-**Key Functions**:
-```python
-def filter_items_by_date(items: List[Dict[str, Any]], days: int = 7) -> List[Dict[str, Any]]
-def parse_item_date(item: Dict[str, Any]) -> Optional[datetime]
-```
-
-**Usage Example**:
-```python
-from agents.date_filter import filter_items_by_date
-
-# Apply 7-day lookback window
-filtered_items = filter_items_by_date(all_news_items, days=7)
-```
-
-### 5.4 URL Sources Runner (`agents/url_sources_runner.py`)
-
-**Purpose**: Scrape news from government websites (static and dynamic), with specialized handling for official gazettes.
-
-**Input**: List of URL source configurations
-
-**Output**: List of news items with:
-- `source`: Website domain
-- `source_type`: `"URL_Static"` or `"URL_Dynamic"`
-- `title`: Article title
-- `link`: Article URL
-- `date`: Publication date
-- `content`: Article content
-
-**Modes**:
-| Mode | Behavior |
-|------|----------|
-| `auto` | Try static first, fallback to dynamic if < 1 item |
-| `force_static` | Static only (HTTP GET + BeautifulSoup) |
-| `force_dynamic` | Dynamic only (Playwright headless browser) |
-
-**Specialized Handling (v2.5.0)**:
-
-**Turkey Official Gazette (Resmi Gazete)**:
-- Auto-detects URLs containing `resmigazete.gov.tr`
-- Date-based navigation via inline functions:
-  - `_generate_gazette_date_urls()`: Generates date-based URLs (format: DD.MM.YYYY)
-  - `_extract_gazette_items()`: Extracts titles and links from daily gazette pages
-- Configuration:
-  - `date_scope`: "last_7_days" or "last_30_days" (determines how many days to process)
-  - `start_date`: Optional explicit start date in DD.MM.YYYY format (defaults to today)
-- Filters out navigation elements automatically (PDF Görüntüle, Sonraki Sayı, etc.)
-- Returns titles with direct links to official documents (no PDF parsing)
-- Section detection: Identifies Legislative, Executive, Judicial, and Announcement sections
-
-**Static Pipeline**:
-1. HTTP GET listing page
-2. RSS autodiscovery (if available)
-3. Extract listing links using heuristics
-4. Fetch and parse detail pages
-
-**Dynamic Pipeline**:
-1. Render listing page with Playwright (Chromium)
-2. Wait for site-specific selectors (e.g., `#newsList` for GOSI)
-3. Progressive scrolling to trigger lazy loading
-4. Collect links via:
-   - Anchor `href` attributes
-   - SPA attributes (`routerlink`, `ng-reflect-router-link`, `data-href`)
-   - `onclick` URL patterns
-   - Label-based discovery (e.g., "اقرأ المزيد")
-5. Fetch and parse detail pages
-6. Fallback: Extract listing cards if detail links unavailable
-
-**Key Function**:
-```python
-def run_unified_sources(url_sources: List[Dict], profile_slug: str) -> Dict
-```
-
-### 5.4 News Filter (`agents/news_filter.py`)
-
-**Purpose**: Filter news items for relevance to the profile's LoB using AI.
-
-**Input**: 
-- All collected news items
-- OpenAI API key
-- Glossary (HCM/FIN terms)
-- Language preference
-- LoB (`HCM` or `FIN`)
-- High-score baseline (for "second chance" rescue)
-
-**Output**: 
-- `items`: Relevant items
-- `errors`: Processing errors
-- `filtered`: Filtered-out items with reasons
-
-**Filter Pipeline**:
-
-1. **Age Gate**: Discard items older than 7 days (configurable via `LEGAL_EAGLE_MAX_NEWS_AGE_DAYS`)
-
-2. **Semantic Glossary Check**: 
-   - Uses GPT-4o-mini to analyze content meaning
-   - Compares against glossary terms semantically (not keyword matching)
-   - Works across languages (e.g., Arabic content vs English glossary)
-   - Returns `is_relevant` boolean and `reasoning`
-
-3. **"Second Chance" Rescue**:
-   - Items that fail semantic check are compared against high-score baseline
-   - Uses `text-embedding-3-small` for semantic similarity
-   - Cosine similarity threshold: 0.85
-   - Rescued items marked with `rescued=True`
-
-**Filter Reasons**:
-| Reason | Description |
-|--------|-------------|
-| `too_old` | Publication date > 7 days ago |
-| `semantic_check_failed` | LLM determined not relevant |
-
-**Key Function**:
-```python
-def get_relevant_news(
-    all_news_items: list,
-    OPENAI_API_KEY: str,
-    GLOSSARY: dict,
-    LANGUAGE_PREFERENCE: str,
-    lob: str,
-    high_score_baseline: list = None,
-    on_filtered = None
-) -> dict
-```
-
-### 5.5 Compare News (`agents/compare_news.py`)
-
-**Purpose**: Deduplicate items and detect updates to previously seen news.
 
 **Input**:
-- Filtered news items
-- Output directory
-- Glossary
-- Language
+- `handles`: List of handle dicts with `handle`, `max_lookback_days`, `last_fetch_date`
+- `bearer_token`: Twitter API bearer token
+- `max_lookback_days`: Default lookback (overridden by per-handle setting)
 
 **Output**:
-- `new_items`: Genuinely new items
-- `update_items`: Updates to existing items (with delta highlights)
+- Tuple of (items, errors)
+- Items: List of dicts with `source`, `source_type`, `title`, `link`, `date`, `content`
 
-**Comparison Pipeline**:
+**Error Handling**:
+- Pre-flight token validation with `validate_twitter_token()`
+- Sets error flag on 402/401/403 responses
+- Clears error flag on successful 200 response
+- Controller skips Twitter if error flag is set
 
-1. **Load Weekly Baseline**: Items from last 7 days in `news_items` table
-
-2. **Persist Current Items**: Upsert to database for future baseline
-
-3. **Exact Match Check**: Skip if `source_id`, `url`, or `hash_signature` matches
-
-4. **Semantic Comparison**:
-   - Generate embeddings for all items
-   - Compute cosine similarity against baseline
-   - Compute Jaccard token overlap
-
-5. **Classification**:
-   | Cosine | Jaccard | Classification |
-   |--------|---------|----------------|
-   | ≥ 0.92 | ≥ 0.70 | Duplicate (skip) |
-   | ≥ 0.85 | 0.40-0.70 | Update candidate |
-   | < 0.85 | any | New item |
-
-6. **Delta Extraction** (for updates):
-   - Split into sentences
-   - Find sentences with low overlap to baseline
-   - Require glossary term presence for meaningful delta
-   - Extract 2-4 delta bullets
-
-**Thresholds**:
+**Error Flag Functions**:
 ```python
-DEDUP_COSINE_DUP = 0.92
-DEDUP_COSINE_UPDATE = 0.85
-JACCARD_DUP_MIN = 0.70
-JACCARD_UPDATE_MIN = 0.40
-WEEKLY_BASELINE_DAYS = 7
+def set_twitter_error_flag(profile_id: int, error_msg: str) -> None
+def get_twitter_error_flag(profile_id: int) -> Optional[Dict]
+def clear_twitter_error_flag(profile_id: int) -> None
 ```
 
-**Key Function**:
+---
+
+### 5.3 URL Sources Runner (`agents/url_sources_runner.py`)
+
+**Purpose**: Crawl and extract content from websites.
+
+**Key Functions**:
 ```python
-def run_compare_news_agent(
-    current_items: List[Dict],
-    outputs_dir: str = "outputs",
-    glossary: Dict = None,
+def run_url_sources(
+    profile_id: int,
+    sources: List[Dict],
+    date_scope: str = "last_7_days"
+) -> Tuple[List[Dict], List[Dict]]
+```
+
+**Input**:
+- `profile_id`: Profile ID
+- `sources`: List of URL source dicts
+- `date_scope`: Date filtering ('last_7_days', 'last_30_days', 'all')
+
+**Output**:
+- Tuple of (items, errors)
+- Items: List of dicts with `source`, `source_type`, `title`, `link`, `date`, `content`
+
+**Modes**:
+- `auto`: Try static scraping first, fallback to dynamic (Playwright)
+- `force_static`: Static only (faster, no JavaScript)
+- `force_dynamic`: Dynamic only (Playwright, JavaScript execution)
+
+**Specialized Scrapers**:
+- **GOSI** (gosi.gov.sa): Custom scraper for Saudi Arabia GOSI
+- **Resmi Gazete** (resmigazete.gov.tr): Custom scraper for Turkey Official Gazette
+
+**Proxy Support**:
+- BrightData proxy integration for blocked sites
+- Enabled via `use_proxy` flag on URL source
+
+---
+
+### 5.4 Email Inbox Parser (`agents/email_inbox_parser.py`)
+
+**Purpose**: Monitor Gmail inbox for Law-to-Spec updates.
+
+**Key Functions**:
+```python
+def check_inbox_for_updates(
+    profile_id: int,
+    gmail_email: str,
+    gmail_password: str,
+    days_back: int = 7
+) -> List[Dict]
+```
+
+**Input**:
+- `profile_id`: Profile ID
+- `gmail_email`: Gmail address
+- `gmail_password`: Gmail app password
+- `days_back`: Days to look back for emails
+
+**Output**:
+- List of update dicts with `title`, `content`, `date`, `link`
+
+**Filter Logic**:
+- Subject contains profile country code
+- Sender is from Law-to-Spec team
+- Email received within lookback period
+
+---
+
+### 5.5 News Filter (`agents/news_filter.py`)
+
+**Purpose**: AI-powered relevance filtering using LLM.
+
+**Key Functions**:
+```python
+def filter_news_items(
+    items: List[Dict],
+    country_code: str,
+    lob: str,
+    glossary: List[str],
+    api_key: str,
     language: str = "en"
-) -> Dict
+) -> Tuple[List[Dict], List[Dict]]
 ```
 
-### 5.6 News Grouper (`agents/news_grouper.py`)
-
-**Purpose**: Group similar news items and generate summaries using AI.
-
 **Input**:
-- Final items (new + updates)
-- OpenAI API key
-- Language preference
+- `items`: Raw news items from sources
+- `country_code`: Profile country code
+- `lob`: Profile Line of Business
+- `glossary`: Custom terms for context
+- `api_key`: SAP AI Core API key
+- `language`: Analysis language
 
-**Output**: List of grouped summaries for email
+**Output**:
+- Tuple of (filtered_items, rejected_items)
+- Filtered items include `score` field (0.0-1.0)
 
-**Key Function**:
+**AI Prompt**:
+- Evaluates legal relevance to country/LoB
+- Considers SAP product scope (HCM, Payroll, SuccessFactors, S/4HANA)
+- Uses glossary terms for domain context
+- Returns structured JSON with score and reasoning
+
+---
+
+### 5.6 Compare News (`agents/compare_news.py`)
+
+**Purpose**: Deduplicate and detect updates against baseline.
+
+**Key Functions**:
 ```python
-def group_and_summarize_news(items: List[Dict], api_key: str, language: str) -> List[Dict]
+def compare_with_baseline(
+    new_items: List[Dict],
+    baseline_items: List[Dict]
+) -> Dict[str, List[Dict]]
 ```
 
-### 5.7 Email Sender (`agents/email_sender.py`)
+**Input**:
+- `new_items`: Filtered items from current run
+- `baseline_items`: Historical items from database
 
-**Purpose**: Send the daily digest email to configured recipients.
+**Output**:
+- Dict with keys: `new`, `updated`, `unchanged`
+- `new`: Items not in baseline
+- `updated`: Items with content changes
+- `unchanged`: Duplicate items
+
+**Comparison Logic**:
+- Title-based matching (fuzzy similarity)
+- Content hash comparison for updates
+- Link matching as fallback
+
+---
+
+### 5.7 News Grouper (`agents/news_grouper.py`)
+
+**Purpose**: Group related news items using AI clustering.
+
+**Key Functions**:
+```python
+def group_news_items(
+    items: List[Dict],
+    api_key: str,
+    language: str = "en"
+) -> List[Dict]
+```
 
 **Input**:
-- Grouped summary
-- Email receivers list
-- Gmail credentials
-- Language preference
-- Monitor updates (optional)
+- `items`: New/updated items to group
+- `api_key`: SAP AI Core API key
+- `language`: Analysis language
 
-**Output**: Boolean success status
+**Output**:
+- List of group dicts with `theme`, `items`, `summary`
 
-**Features**:
-- Gmail SMTP with App Password
-- STARTTLS with SSL fallback
-- Retry on transient errors
-- HTML formatted email with RTL support
-- Monitor updates section integration
+**AI Prompt**:
+- Identifies common themes across items
+- Groups related items together
+- Generates concise summary per group
+- Returns structured JSON
 
-**Key Function**:
+---
+
+### 5.8 Email Sender (`agents/email_sender.py`)
+
+**Purpose**: Send daily digest emails with grouped news.
+
+**Key Functions**:
 ```python
 def send_email(
+    profile_id: int,
+    country_code: str,
+    lob: str,
     grouped_summary: List[Dict],
-    receivers: List[str],
-    gmail_creds: Dict,
-    language: str,
-    monitor_updates: Dict = None
+    receivers: List[Dict],
+    gmail_email: str,
+    gmail_password: str,
+    api_key: str,
+    profile_language: str = "en"
 ) -> bool
 ```
 
-**Email Structure**:
-1. Header with date
-2. News sections by category (HCM/FIN/Other)
-   - New items
-   - Updates (with delta bullets)
-3. **Monitor Updates section** (if enabled)
-   - Report date and monitored URL
-   - Change summaries
-   - Empty state message if no changes
-4. Footer with branding
-
-### 5.8 Email Inbox Parser (`agents/email_inbox_parser.py`)
-
-**Purpose**: Fetch and parse Law-to-Specification "Monitor updates" emails from Gmail inbox.
-
 **Input**:
-- Profile ID
-- List of email receiver addresses (any can forward emails)
-- Gmail IMAP credentials
-- Database connection
+- `profile_id`: Profile ID
+- `country_code`: Profile country code
+- `lob`: Profile Line of Business
+- `grouped_summary`: Grouped news from news_grouper
+- `receivers`: List of receiver dicts with `email`, `translation_lang`
+- `gmail_email`: Sender Gmail address
+- `gmail_password`: Gmail app password
+- `api_key`: SAP AI Core API key (for translation)
+- `profile_language`: Profile analysis language
 
-**Output**: List of parsed monitor updates
+**Output**:
+- Boolean: True if email sent successfully
 
-**Features**:
-- Gmail IMAP connection
-- Searches for subject "Monitor updates" (handles "FW:" prefix)
-- Matches emails from ANY configured receiver
-- Parses Law-to-Spec email format
-- Prevents duplicate processing via database tracking
-- Aggregates multiple emails into single report
+**Email Features**:
+- **Bilingual**: Single email with profile language + English translation
+- **Country-specific styling**: Color-coded by country
+- **Language badges**: Visual indicators for each language section
+- **Grouped format**: News items organized by theme
+- **HTML template**: Responsive design with SAP Fiori styling
 
-**Email Format Parsed**:
-```
-Daily Report of Regulatory Changes - YYYY-MM-DD
-Hello,
-The following meaningful updates were identified for link:
-https://www.example.gov/...
-- change summary 1
-- change summary 2
-...
-```
+**Translation Logic**:
+- Groups receivers by `translation_lang`
+- Caches translations per language
+- Sends one email per language group
+- Subject includes profile: "🦅 Legal Eagle Daily Digest — SA/HCM — 2026-04-24"
+
+---
+
+### 5.9 SAP AI Client (`agents/sap_ai_client.py`)
+
+**Purpose**: Unified client for SAP AI Core API calls.
 
 **Key Functions**:
 ```python
-def fetch_monitor_updates(
-    profile_id: int,
-    recipient_emails: List[str],
-    gmail_email: str,
-    gmail_app_password: str,
-    conn=None
-) -> List[Dict[str, Any]]
+def get_chat_completion(
+    messages: List[Dict],
+    deployment_id: str,
+    base_url: str,
+    auth_url: str,
+    client_id: str,
+    client_secret: str,
+    temperature: float = 0.7,
+    max_tokens: int = 4000
+) -> str
 
-def parse_law_to_spec_email(body: str) -> Dict[str, Any]
-
-def format_monitor_updates_for_email(monitor_updates: List[Dict]) -> Optional[Dict]
+def get_embeddings(
+    texts: List[str],
+    deployment_id: str,
+    base_url: str,
+    auth_url: str,
+    client_id: str,
+    client_secret: str
+) -> List[List[float]]
 ```
 
-**Workflow**:
-1. Connect to Gmail IMAP
-2. Search for "Monitor updates" emails
-3. For each email:
-   - Check if "From" matches any configured receiver
-   - Check if already processed (database)
-   - Parse email body (report date, URL, changes)
-   - Mark as processed in database
-4. Aggregate all changes from unprocessed emails
-5. Return formatted data for email digest
+**Authentication**:
+- OAuth2 client credentials flow
+- Token caching with expiration handling
+- Automatic token refresh
 
-**Integration**: Called by `agents_controller.py` after news grouping, before sending email.
+**Error Handling**:
+- Retry logic for transient failures
+- Detailed error messages
+- Rate limiting awareness
 
 ---
 
 ## 6. Controller Logic
 
-### 6.1 Main Controller (`agents/agents_controller.py`)
+### 6.1 Agents Controller (`agents/agents_controller.py`)
 
-**Purpose**: Orchestrate the full pipeline for all active profiles.
+**Purpose**: Orchestrate the entire processing pipeline.
 
-**Entry Points**:
-- `run_controller()`: Run all active profiles (respects schedule_day)
-- `run_profile_once(profile_id)`: Run a single profile (used by Admin UI)
+**Key Functions**:
+```python
+def run_profile_once(profile_id: int) -> Dict
+```
 
 **Execution Flow**:
+1. **Load Configuration**: Profile, sources, receivers, glossary
+2. **Validate Twitter**: Pre-flight check, skip if error flag set
+3. **Collect Data**: RSS feeds, tweets, URL sources, email inbox
+4. **Filter**: AI-powered relevance filtering
+5. **Compare**: Deduplicate and detect updates against baseline
+6. **Group**: AI clustering of related items
+7. **Email**: Send digest to receivers (if new/updated items found)
+8. **Update Baseline**: Store new items in database
+9. **Log**: Record execution metrics and logs
 
-```
-1. Load credentials from environment
-2. List active profiles from database
-3. For each profile:
-   a. Check schedule_day matches today (Asia/Dubai timezone)
-   b. Load profile configuration:
-      - Language, RSS feeds, Twitter accounts
-      - URL sources, email receivers, glossary
-   c. Run RSS Parser Agent
-   d. Run Tweet Feed Agent (if not disabled/blocked)
-   e. Run URL Sources Runner
-   f. Combine all items
-   g. Load high-score baseline for rescue
-   h. Run News Filter Agent
-   i. Run Compare News Agent
-   j. Run News Grouper Agent
-   k. Run Email Sender Agent
-4. Log completion
-```
+**Skip Flags**:
+- `skip_comparison`: Skip baseline comparison (force all items as new)
+- `force_run`: Force execution even if no new items
+- `skip_email`: Skip email sending (dry run)
 
-**Schedule Enforcement**:
-- Profiles have a `schedule_day` (e.g., "Sunday")
-- Controller compares against current day in Asia/Dubai timezone
-- Profiles without schedule_day or mismatched day are skipped
-
-**Tweet Quota Reset**:
-- Setting `tweets_reset_quota_date` blocks tweets until that date
-- Comparison: `today_dubai < reset_date` → skip tweets
-
-### 6.2 Schedule Runner (`scripts/schedule_runner.py`)
-
-**Purpose**: CLI runner for OS schedulers (launchd, systemd, cron).
-
-**Usage**:
-```bash
-# Run all active profiles scheduled for today
-python scripts/schedule_runner.py
-
-# Run single profile (respects schedule_day)
-python scripts/schedule_runner.py --profile-id 1
-
-# Run all active profiles ignoring schedule_day
-python scripts/schedule_runner.py --ignore-schedule
-```
-
-**Features**:
-- Creates `runs` entries in database
-- Captures stdout to `run_logs` table
-- Visible in Admin UI run history
+**Cooperative Cancellation**:
+- Checks `is_cancel_requested(run_id)` after each step
+- Finishes current step gracefully
+- Sends email with collected results
+- Marks run status as 'Canceled'
 
 ---
 
 ## 7. Admin UI
 
-### 7.1 Overview
-
-The Admin UI is a Flask web application built with **SAP Fiori Design System** for managing Legal Eagle configuration and monitoring runs.
-
-**File**: `admin/app.py`  
-**Port**: 8080 (default)  
-**URL**: http://127.0.0.1:8080/admin  
-**Design Version**: 2.1 (SAP Fiori)
-
-### 7.2 SAP Fiori Design System
-
-#### 7.2.1 Design Philosophy
-
-Legal Eagle admin UI follows SAP Fiori design principles for a professional, enterprise-grade experience:
-- **Consistent**: Unified look across all pages matching SAP Launchpad
-- **Role-based**: Optimized for Localization Product Managers (LPMs)
-- **Efficient**: Selection-based actions, no button repetition
-- **Accessible**: Keyboard navigation, semantic HTML, proper focus states
-- **Responsive**: Mobile-friendly layouts with adaptive breakpoints
-
-#### 7.2.2 Color Palette
-
-**CSS Variables** (defined in `base.html`):
-```css
-/* Brand Colors */
---sapBrandColor: #0a6ed1;        /* SAP Blue (primary actions) */
---sapHighlightColor: #0854a0;    /* Darker blue (hover states) */
---sapShellColor: #354a5f;        /* Dark blue-gray (shell bar) */
-
-/* Background Colors */
---sapBackgroundColor: #f7f7f7;   /* Page background */
---sapTileBackground: #ffffff;    /* Card/tile background */
---sapBaseColor: #ffffff;         /* Base white */
-
-/* Semantic Colors */
---sapPositiveColor: #107e3e;     /* Success/green */
---sapNegativeColor: #b00;        /* Error/red */
---sapCriticalColor: #e9730c;     /* Warning/orange */
---sapNeutralColor: #6a6d70;      /* Neutral/gray */
-
-/* Text Colors */
---sapTextColor: #32363a;         /* Primary text */
---sapLinkColor: #0a6ed1;         /* Links */
-```
-
-**Usage**:
-- **Blue**: Primary actions (Configure, Create, Update)
-- **Green**: Success actions (Run, Add, Start)
-- **Red**: Destructive actions (Delete, Clear)
-- **Orange**: Warning actions (Cancel, Deactivate)
-- **Gray**: Secondary/neutral actions
-
-#### 7.2.3 Typography
-
-**Font Family**: `"72", "72full", Arial, Helvetica, sans-serif`
-- SAP's official font family with graceful fallbacks
-
-**Size Scale**:
-```css
---sapFontSmallSize: 0.75rem;    /* 12px - Buttons, labels */
---sapFontSize: 0.875rem;        /* 14px - Body text (Fiori standard) */
---sapFontLargeSize: 1rem;       /* 16px - Emphasized text */
---sapFontHeader3Size: 1.25rem;  /* 20px - Section headers */
---sapFontHeader2Size: 1.5rem;   /* 24px - Page headers */
---sapFontHeader1Size: 2rem;     /* 32px - Main headers */
-```
-
-**Line Height**: 1.4 (optimal for readability)
-
-#### 7.2.4 Spacing System
-
-**Base Unit**: 16px (1rem)
-
-**Scale**:
-```css
---sapSpacingXS: 0.25rem;   /* 4px - Tight spacing */
---sapSpacingS: 0.5rem;     /* 8px - Small gaps */
---sapSpacingM: 1rem;       /* 16px - Standard spacing */
---sapSpacingL: 1.5rem;     /* 24px - Large spacing */
---sapSpacingXL: 2rem;      /* 32px - Extra large spacing */
-```
-
-**Application**:
-- Card padding: `--sapSpacingM` (16px)
-- Section gaps: `--sapSpacingL` (24px)
-- Button gaps: `--sapSpacingS` (8px)
-- Form field margins: `--sapSpacingM` (16px)
-
-#### 7.2.5 Components Library
-
-**Shell Bar**:
-```html
-<header class="sapShellBar">
-  <div class="sapShellBar-top">
-    <!-- SAP logo, search, utilities -->
-  </div>
-  <div class="sapShellBar-subtitle">
-    Legal Eagle - Compliance Management
-  </div>
-</header>
-```
-- Two-row design: Logo/search/icons + subtitle
-- Fixed positioning with z-index: 1000
-- 76px total height (44px + 32px)
-
-**Cards**:
-```html
-<div class="sapCard">
-  <div class="sapCard-header">Title</div>
-  <div class="sapCard-content">Content</div>
-</div>
-```
-- White background with subtle shadow
-- 1px border (#d9d9d9)
-- 0.25rem border radius
-
-**Buttons**:
-| Class | Style | Usage |
-|-------|-------|-------|
-| `.sapBtn-emphasized` | Blue, filled | Primary actions (Configure, Save) |
-| `.sapBtn-accept` | Green, filled | Success actions (Run, Add, Start) |
-| `.sapBtn-reject` | Red, filled | Destructive actions (Delete, Clear) |
-| `.sapBtn-attention` | Orange, filled | Warning actions (Review, Cancel) |
-| `.sapBtn-default` | Gray, outlined | Secondary actions (Create, Cancel) |
-| `.sapBtn-transparent` | No background | Tertiary actions (Toggle) |
-| `.sapBtn-sm` | Small size | Toolbar buttons (12px font) |
-
-**Button Color Guidelines** (v2.1):
-- **Configure** = Blue (`.sapBtn-emphasized`) - Primary configuration action
-- **Run/Start** = Green (`.sapBtn-accept`) - Success/execution action
-- **Review** = Orange (`.sapBtn-attention`) - Warning/review action
-- **Create** = Gray (`.sapBtn-default`) - Secondary creation action
-- **Delete/Clear** = Red (`.sapBtn-reject`) - Destructive action
-- **Cancel** = Gray (`.sapBtn-default`) - Secondary cancel action
-
-**Button Design Standards**:
-- **No emoji icons**: Buttons use text-only labels without decorative icons
-- **Clear labels**: Descriptive text like "Configure", "Delete Selected", "Save Schedule"
-- **Semantic colors**: Button colors convey meaning (blue=primary, green=success, red=danger, orange=warning, gray=secondary)
-- **Consistency**: Same actions use same colors across all pages
-- **Accessibility**: Text-only buttons are screen-reader friendly
-- **Example**: `<button class="sapBtn sapBtn-accept">Run</button>` (not "▶️ Run")
-
-**Badges**:
-```html
-<span class="sapBadge sapBadge-positive">● Active</span>
-<span class="sapBadge sapBadge-negative">✗ Failed</span>
-<span class="sapBadge sapBadge-critical">⚠️ Warning</span>
-<span class="sapBadge sapBadge-neutral">○ Inactive</span>
-```
-
-**Tables with Selection**:
-```html
-<div class="sapTable-toolbar">
-  <button class="sapBtn sapBtn-emphasized sapBtn-sm">Configure</button>
-  <button class="sapBtn sapBtn-accept sapBtn-sm">Run</button>
-</div>
-<table class="sapTable">
-  <thead>
-    <tr>
-      <th class="sapTable-selection"></th>
-      <th>Column 1</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr onclick="selectRow(this)">
-      <td><input type="radio" name="selection"></td>
-      <td>Data</td>
-    </tr>
-  </tbody>
-</table>
-```
-- **Selection column**: 40px width, radio/checkbox
-- **Toolbar**: Action buttons enabled/disabled by selection
-- **No inline buttons**: Clean, scalable design
-
-**Forms**:
-```html
-<div class="sapForm-group">
-  <label class="sapForm-label">Field Label</label>
-  <input class="sapForm-input" placeholder="...">
-  <span class="sapForm-help">Help text</span>
-</div>
-```
-
-**Message Strips**:
-```html
-<div class="sapMessageStrip sapMessageStrip-success">
-  <span>Success message</span>
-  <button class="sapMessageStrip-close">×</button>
-</div>
-```
-Types: `success`, `error`, `warning`, `info`
-
-#### 7.2.6 Selection-Based Action Pattern
-
-**Fiori Standard**: Actions in toolbar, not repeated on every row.
-
-**Before (Non-Fiori)**:
-```
-┌──────────────────────────────────────────────────────────┐
-│ ID | Country | [Configure] [Run] [Review] [Toggle]     │ ← Repeated
-│ 1  | SA      | [Configure] [Run] [Review] [Toggle]     │ ← Repeated
-│ 2  | AE      | [Configure] [Run] [Review] [Toggle]     │ ← Repeated
-└──────────────────────────────────────────────────────────┘
-```
-
-**After (Fiori)**:
-```
-┌──────────────────────────────────────────────────────────┐
-│ [Configure] [Run] [Review] [Toggle]                      │ ← Toolbar
-├──────────────────────────────────────────────────────────┤
-│ ○ | ID | Country | LoB | Status                         │
-│ ○ | 1  | SA      | HCM | ● Active                       │
-│ ● | 2  | AE      | FIN | ● Active  ← Selected           │
-└──────────────────────────────────────────────────────────┘
-```
-
-**Benefits**:
-- Scalable with 2 or 200 records
-- Cleaner visual hierarchy
-- Reduced horizontal space usage
-- Standard enterprise UX pattern
-
-#### 7.2.7 Responsive Design
-
-**Breakpoints**:
-```css
-@media (max-width: 768px) {
-  .sapShellBar-center { display: none; }      /* Hide search */
-  .sapContainer { padding: var(--sapSpacingM); } /* Reduce padding */
-  .sapObjectPage-nav { flex-direction: column; } /* Stack nav */
-  .sapGrid-2col { grid-template-columns: 1fr; } /* Single column */
-  .sapSplitPanel { grid-template-columns: 1fr; } /* Stack panels */
-}
-```
-
-**Mobile Optimizations**:
-- Shell bar utilities remain visible
-- Object page navigation stacks vertically
-- Grid layouts become single column
-- Tables scroll horizontally
-
-### 7.3 Navigation
-
-#### 7.3.1 Shell Bar
-
-**SAP Fiori Shell Bar** (top of every page):
-- **Row 1**: SAP logo (left) + Search (center) + Utilities (right)
-- **Row 2**: "Legal Eagle - Compliance Management" subtitle
-- **Color**: SAP Shell Blue (#354a5f)
-- **Fixed positioning**: Always visible when scrolling
-
-**Components**:
-- ☰ **Menu button**: Returns to dashboard
-- **Search**: Quick profile search (placeholder)
-- 🔔 **Notifications**: Alert center (placeholder)
-- 👤 **User**: User profile (placeholder)
-- ⚙️ **Settings**: System settings (placeholder)
-
-#### 7.3.2 Object Page Navigation
-
-**Profile-specific navigation** (appears when profile is selected):
-- Shows profile title: `SA/HCM - Default SA/HCM` with status badge
-- Three tabs: **Configure**, **Run**, **Review**
-- Each tab has semantic color when active:
-  - **Configure** = Blue (primary configuration)
-  - **Run** = Green (success/execution)
-  - **Review** = Orange (warning/review)
-- No icons in tab labels (clean text-only design)
-- Hover states show the tab's semantic color
-- Active tab has filled background with white text
-- Consistent across all profile pages
-- Responsive (stacks on mobile)
-
-**Implementation**: Defined in `base.html`, rendered when `{% if profile %}` is true
-
-### 7.4 Page Designs
-
-#### 7.4.1 Dashboard (`dashboard.html`)
-
-**Layout**: Single column (full width)
-
-**Profiles Card**:
-- **Card header** with profile count and "Create" button (top-right, emphasized/blue)
-- **Selection-based toolbar** with action buttons
-- Radio button selection (single selection)
-- Columns: ID, Country, LoB, Name, Language, Status
-- Clean rows without inline buttons
-- Toolbar buttons: Configure, Run, Review, Toggle Active
-- Empty state: Icon + message when no profiles
-
-**Create Button Behavior**:
-- Navigates to dedicated `/admin/profiles/create` page (GET)
-- Follows Fiori pattern: list pages show data, create actions navigate to separate pages
-- Button placement: Top-right in card header (standard Fiori action placement)
-
-**Key Features**:
-- Click anywhere on row to select it
-- Toolbar buttons enable/disable based on selection
-- Toggle button text changes based on selected profile status
-- Clean separation: Dashboard for listing, dedicated page for creation
-
-#### 7.4.2 Create Profile Page (`create_profile.html`)
-
-**Layout**: Centered form (max-width: 600px)
-
-**Components**:
-1. **Breadcrumb Navigation**: Dashboard › Create Profile
-2. **Page Header**: 
-   - Title: "Create Profile"
-   - Subtitle: "Set up a new monitoring profile for a country and line of business"
-3. **Profile Configuration Card**:
-   - Country (ISO alpha-2) - required field with datalist
-   - Line of Business (HCM/FIN) - radio buttons with visual selection
-   - Display Name - optional text input
-   - Language - text input (default: "en")
-4. **Form Actions**:
-   - "Create Profile" button (emphasized/blue, full width)
-   - "Cancel" button (default/gray, full width, returns to dashboard)
-5. **Quick Start Guide Card**: 5-step onboarding instructions
-
-**Key Features**:
-- Dedicated page for profile creation (Fiori pattern)
-- Auto-uppercase country code input
-- Form validation with inline feedback
-- Loading state on submit ("⏳ Creating Profile...")
-- Enhanced radio button styling with hover/selection states
-- Required field indicators (red asterisk)
-- Cancel functionality returns to dashboard
-- POST to existing `/admin/profiles/create` route
-- After creation, redirects to profile detail page
-
-**Navigation Flow**:
-```
-Dashboard → [Create Button] → Create Profile Page
-                               ↓ [Submit]
-                          Profile Detail Page (new profile)
-                               
-Create Profile Page → [Cancel Button] → Dashboard
-```
-
-#### 7.4.3 Profile Configuration (`profile.html`)
-
-**Layout**: Single column with multiple cards
-
-**Cards**:
-1. **🗓️ Schedule**: Day of week selector with save button
-2. **📡 RSS Feeds**: Selection table + add form
-3. **🌐 URL Sources**: Editable table with inline form fields
-4. **🐦 Twitter Accounts**: Selection table + add form + quota reset
-5. **📧 Email Receivers**: Add form + selection table
-6. **📖 Glossary**: Term items + add form + bulk add
-
-**Pattern**:
-- Each section is a Fiori card with header
-- Tables have selection checkboxes + toolbar for bulk delete
-- Add forms at bottom of each card
-- Empty states with icons when no items
-- Icon emojis for visual identification
-
-#### 7.4.4 Run Status (`run_status.html`)
-
-**Layout**: Split panel (320px / flexible)
-
-**Left Panel**:
-- **Run Controls Card**: Start/Cancel buttons, Clear history
-- **History Card**: Compact table of last 7 days
-  - Columns: ID, Status, Started
-  - Status badges with icons (✓ ✗ ⏸ ⟳)
-  - Clickable rows navigate to run logs
-
-**Right Panel**:
-- **Log Viewer Card**: Terminal-style dark theme
-  - 500px height
-  - Real-time streaming via SSE
-  - Auto-scroll to bottom
-  - Status badge in header
-
-**Key Features**:
-- Real-time log updates during execution
-- Run history with semantic status colors
-- Cancel button appears only when run is active
-- Dark terminal aesthetic for logs
-
-#### 7.4.5 Review News (`review_news.html`)
-
-**Layout**: Single column with progressive disclosure
-
-**Components**:
-1. **Stat Cards** (3-column grid):
-   - Total (gray border)
-   - Pending Review (orange border)
-   - Reviewed (green border)
-   - Large numbers (3rem font)
-
-2. **Segmented Buttons**: All / Pending / Reviewed filters
-
-3. **Bulk Actions Card**:
-   - Toolbar: Clear All, Clear Reviewed
-   - Actions: Bulk Score, Apply, Select All, Delete Selected
-   - Horizontal layout with flexbox
-
-4. **News Items Table**:
-   - Checkboxes for multi-selection
-   - Columns: Source, Title/Content, Filter Reason, Score, Dates, Actions
-   - Inline scoring dropdown + submit button
-   - Inline delete button
-   - Semantic badges for filter reasons
-
-5. **Pagination**: Fiori-style with Previous/Next + page numbers
-
-6. **Help Card**: Scoring guide + filter reasons
-
-**Key Features**:
-- Quick scoring with inline dropdown
-- Bulk operations via selection
-- Semantic color coding (badges)
-- Link to glossary for improvement
-
-### 7.3 Routes
-
-| Route | Method | Description |
-|-------|--------|-------------|
-| `/admin` | GET | Dashboard (list all profiles) |
-| `/admin/profiles/create` | GET | Show create profile page (new in v2.1) |
-| `/admin/profiles/create` | POST | Create new profile |
-| `/admin/profiles/<id>` | GET | Profile detail/configuration |
-| `/admin/profiles/<id>/toggle` | POST | Toggle active status |
-| `/admin/profiles/<id>/runs` | GET | Run page (history + live logs) |
-| `/admin/profiles/<id>/runs/start` | POST | Start a new run |
-| `/admin/profiles/<id>/review` | GET | Review filtered news |
-| `/admin/profiles/<id>/news/clear` | POST | Clear historical news baseline |
-| `/admin/runs/<id>/stream` | GET | SSE stream for live logs |
-| `/admin/runs/<id>/cancel` | POST | Request run cancellation |
-
-### 7.3 Templates
-
-| Template | Purpose |
-|----------|---------|
-| `base.html` | Base layout with SAP Fiori shell bar and navigation |
-| `dashboard.html` | Profile list with selection-based toolbar (v2.1: single column) |
-| `create_profile.html` | Dedicated profile creation page (new in v2.1) |
-| `profile.html` | Profile configuration (sources, glossary, etc.) |
-| `run_status.html` | Run execution and history with live log streaming |
-| `review_news.html` | Filtered news review interface |
-
-### 7.4 Live Log Streaming
-
-- Uses Server-Sent Events (SSE)
-- Endpoint: `/admin/runs/<id>/stream`
-- Polls `run_logs` table every 750ms
-- Sends `done` event when run completes
-
-### 7.5 Run Execution
-
-1. User clicks "Confirm Run"
-2. Server creates `runs` entry with status `Queued`
-3. Background thread starts:
-   - Updates status to `Running`
-   - Redirects stdout to `_DBLogger` (writes to `run_logs`)
-   - Calls `run_profile_once(profile_id)`
-   - Updates status to `Success`/`Failed`/`Canceled`
-4. Frontend streams logs via SSE
+### 7.1 Flask Application (`admin/app.py`)
+
+**Routes**:
+
+#### Dashboard
+- `GET /admin/` - List all profiles with status
+
+#### Profile Management
+- `GET /admin/create` - Create new profile form
+- `POST /admin/create` - Submit new profile
+- `GET /admin/profiles/<id>` - Profile configuration page
+- `POST /admin/profiles/<id>/language/update` - Update profile language
+- `POST /admin/profiles/<id>/delete` - Delete profile
+
+#### RSS Feeds
+- `POST /admin/profiles/<id>/rss/add` - Add RSS feed
+- `POST /admin/profiles/<id>/rss/delete` - Delete RSS feed
+- `POST /admin/profiles/<id>/rss/bulk_delete` - Bulk delete RSS feeds
+
+#### Twitter Accounts
+- `POST /admin/profiles/<id>/tweets/add` - Add Twitter account
+- `POST /admin/profiles/<id>/tweets/delete` - Delete Twitter account
+- `POST /admin/profiles/<id>/tweets/bulk_delete` - Bulk delete Twitter accounts
+- `POST /admin/profiles/<id>/tweets/clear_error` - Clear Twitter error flag
+
+#### URL Sources
+- `POST /admin/profiles/<id>/urls/add` - Add URL source
+- `POST /admin/profiles/<id>/urls/delete` - Delete URL source
+- `POST /admin/profiles/<id>/urls/bulk_delete` - Bulk delete URL sources
+
+#### Email Receivers
+- `POST /admin/profiles/<id>/emails/add` - Add email receiver
+- `POST /admin/profiles/<id>/emails/update_language` - Update receiver language
+- `POST /admin/profiles/<id>/emails/delete` - Delete email receiver
+- `POST /admin/profiles/<id>/emails/bulk_delete` - Bulk delete email receivers
+
+#### Glossary
+- `POST /admin/profiles/<id>/glossary/add` - Add glossary term
+- `POST /admin/profiles/<id>/glossary/bulk_add` - Bulk add glossary terms
+- `POST /admin/profiles/<id>/glossary/delete` - Delete glossary term
+- `POST /admin/profiles/<id>/glossary/bulk_delete` - Bulk delete glossary terms
+
+#### Schedule
+- `POST /admin/profiles/<id>/schedule/update` - Update run schedule
+
+#### Monitor Updates
+- `POST /admin/profiles/<id>/monitor/toggle` - Toggle email inbox monitoring
+
+#### Run Execution
+- `GET /admin/profiles/<id>/run` - Run status page
+- `POST /admin/profiles/<id>/run/start` - Start profile execution
+- `POST /admin/profiles/<id>/run/cancel` - Cancel running execution
+- `GET /admin/profiles/<id>/run/<run_id>/logs` - Stream execution logs (SSE)
+
+#### Review News
+- `GET /admin/profiles/<id>/review` - Review filtered news items
+- `POST /admin/profiles/<id>/review/<item_id>/approve` - Approve filtered item
+- `POST /admin/profiles/<id>/review/<item_id>/reject` - Reject filtered item
+- `POST /admin/profiles/<id>/review/<item_id>/score` - Update relevance score
+- `POST /admin/profiles/<id>/review/clear` - Clear all filtered news
+
+### 7.2 Templates (`admin/templates/`)
+
+**Current Templates** (Jinja2 + Custom CSS):
+- `base.html` - Base template with Fiori styling (CSS variables)
+- `dashboard.html` - Profile list and overview
+- `create_profile.html` - Create new profile form
+- `profile.html` - Profile configuration (Configure tab)
+- `run_status.html` - Run execution and logs (Run tab)
+- `review_news.html` - Filtered news review (Review tab)
+
+**Design System**:
+- SAP Fiori color palette (CSS variables)
+- Fiori shell bar pattern
+- Object page pattern for profile navigation
+- Card-based layout
+- Semantic button styles (Emphasized, Accept, Reject, etc.)
 
 ---
 
@@ -1448,213 +902,356 @@ Create Profile Page → [Cancel Button] → Dashboard
 
 ### 8.1 Environment Variables
 
-**Security Note**: All credentials are stored in environment variables only. The database (`config.db`) does NOT store any API keys, passwords, or tokens. This ensures secrets are never committed to version control and can be managed separately per environment.
+All sensitive credentials stored in environment variables (not in database).
 
-**Required**:
-| Variable | Description |
-|----------|-------------|
-| `LEGAL_EAGLE_SAP_AICORE_BASE_URL` | SAP AI Core API base URL |
-| `LEGAL_EAGLE_SAP_AICORE_AUTH_URL` | SAP AI Core OAuth2 token URL |
-| `LEGAL_EAGLE_SAP_AICORE_CLIENT_ID` | SAP AI Core OAuth2 client ID |
-| `LEGAL_EAGLE_SAP_AICORE_CLIENT_SECRET` | SAP AI Core OAuth2 client secret |
-| `LEGAL_EAGLE_SAP_AICORE_CHAT_DEPLOYMENT_ID` | SAP AI Core chat model deployment ID |
-| `LEGAL_EAGLE_SAP_AICORE_EMBEDDINGS_DEPLOYMENT_ID` | SAP AI Core embeddings model deployment ID |
-| `LEGAL_EAGLE_TWITTER_BEARER_TOKEN` | Twitter/X API bearer token |
-| `LEGAL_EAGLE_GMAIL_EMAIL` | Gmail sender address |
-| `LEGAL_EAGLE_GMAIL_APP_PASSWORD` | Gmail App Password (16-character code from Google) |
+**Required Variables**:
+```bash
+# SAP AI Core
+LEGAL_EAGLE_SAP_AICORE_BASE_URL=https://api.ai.prod.eu-central-1.aws.ml.hana.ondemand.com
+LEGAL_EAGLE_SAP_AICORE_AUTH_URL=https://auth.ai.prod.eu-central-1.aws.ml.hana.ondemand.com/oauth/token
+LEGAL_EAGLE_SAP_AICORE_CLIENT_ID=<client-id>
+LEGAL_EAGLE_SAP_AICORE_CLIENT_SECRET=<client-secret>
+LEGAL_EAGLE_SAP_AICORE_CHAT_DEPLOYMENT_ID=<deployment-id>
+LEGAL_EAGLE_SAP_AICORE_EMBEDDINGS_DEPLOYMENT_ID=<deployment-id>
 
-**Optional**:
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `LEGAL_EAGLE_MAX_NEWS_AGE_DAYS` | `7` | Max age of news in days |
-| `LEGAL_EAGLE_OPENAI_TIMEOUT` | `60` | OpenAI API timeout (seconds) |
-| `LEGAL_EAGLE_OPENAI_BASE_URL` | - | Custom OpenAI base URL |
-| `LEGAL_EAGLE_EMBEDDINGS_RETRIES` | `2` | Embedding retry count |
-| `LEGAL_EAGLE_EMBEDDINGS_BACKOFF` | `1.0` | Embedding retry backoff (seconds) |
-| `LEGAL_EAGLE_RENDER_TIMEOUT_MS` | `60000` | Playwright render timeout |
-| `LEGAL_EAGLE_DETAIL_TIMEOUT_MS` | `60000` | Detail page fetch timeout |
-| `DISABLE_TWEETS` | - | Set to disable tweet collection |
+# Gmail
+LEGAL_EAGLE_GMAIL_EMAIL=<gmail-address>
+LEGAL_EAGLE_GMAIL_APP_PASSWORD=<app-password>
 
-**Gmail OAuth (optional, not required for App Password)**:
-| Variable | Description |
-|----------|-------------|
-| `LEGAL_EAGLE_GMAIL_CLIENT_ID` | OAuth client ID |
-| `LEGAL_EAGLE_GMAIL_CLIENT_SECRET` | OAuth client secret |
-| `LEGAL_EAGLE_GMAIL_REFRESH_TOKEN` | OAuth refresh token |
-| `LEGAL_EAGLE_GMAIL_SCOPE` | OAuth scope |
-| `LEGAL_EAGLE_GMAIL_TOKEN_URI` | OAuth token URI |
+# Twitter/X
+LEGAL_EAGLE_TWITTER_BEARER_TOKEN=<bearer-token>
+
+# BrightData Proxy (Optional)
+LEGAL_EAGLE_BRIGHTDATA_HOST=<proxy-host>
+LEGAL_EAGLE_BRIGHTDATA_PORT=<proxy-port>
+LEGAL_EAGLE_BRIGHTDATA_USERNAME=<username>
+LEGAL_EAGLE_BRIGHTDATA_PASSWORD=<password>
+
+# Admin UI
+LEGAL_EAGLE_ADMIN_SECRET=<secret-key>
+```
 
 ### 8.2 Configuration Loader (`configurations/config_loader.py`)
 
+**Purpose**: Centralized configuration access layer.
+
 **Key Functions**:
 ```python
-# Profile management
-list_active_profiles() -> List[Dict]
-resolve_profile(country_code, lob) -> Optional[int]
+# Profile Management
+def list_active_profiles() -> List[Dict]
+def resolve_profile(country_code: str, lob: str) -> Optional[Dict]
+def load_language(profile_id: int) -> str
 
-# Per-profile configuration
-load_language(profile_id) -> str
-load_rss_feeds(profile_id) -> List[str]
-load_tweet_accounts(profile_id) -> List[str]
-load_url_sources(profile_id) -> List[Dict]
-load_email_receivers(profile_id) -> List[str]
-load_glossary(profile_id) -> Dict
+# Source Loading
+def load_rss_feeds(profile_id: int) -> List[Dict]
+def load_tweet_accounts(profile_id: int) -> List[Dict]
+def load_url_sources(profile_id: int) -> List[Dict]
+
+# Email & Glossary
+def load_email_receivers(profile_id: int) -> List[str]
+def load_email_receivers_with_lang(profile_id: int) -> List[Dict]
+def load_glossary(profile_id: int) -> List[str]
 
 # Settings
-get_setting_value(profile_id, key, default) -> Optional[str]
-set_setting_value(profile_id, key, value) -> None
+def get_setting_value(profile_id: int, key: str) -> Optional[str]
+def set_setting_value(profile_id: int, key: str, value: str) -> None
 
-# News baseline
-add_news_item(profile_id, item) -> int
-get_weekly_baseline(profile_id, days) -> List[Dict]
-get_reviewed_baseline(profile_id, min_score) -> List[Dict]
+# Baseline
+def add_news_item(profile_id: int, item: Dict) -> None
+def get_weekly_baseline(profile_id: int, days: int = 7) -> List[Dict]
 
-# Global credentials
-load_global_credentials() -> Dict
+# Global Credentials (Legacy)
+def load_global_credentials() -> Dict[str, str]
 ```
 
 ---
 
 ## 9. Data Flow
 
-### 9.1 Provenance Tracking
-
-Each news item carries a `source_type` field that tracks its origin:
-
-| source_type | Set By | Description |
-|-------------|--------|-------------|
-| `RSS` | `rss_parser.py` | Items from RSS/Atom feeds |
-| `Tweet` | `tweet_feed.py` | Items from Twitter/X timeline |
-| `URL_Static` | `url_sources_runner.py` | Items from static HTTP scraping |
-| `URL_Dynamic` | `url_sources_runner.py` | Items from Playwright rendering |
-
-**Enforcement**: `compare_news.py` validates that `source_type` is one of the allowed values; no fallback inference.
-
-### 9.2 Pipeline Execution Order
+### 9.1 Daily Digest Flow
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    PIPELINE EXECUTION ORDER                      │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  1. COLLECTION (parallel-capable, currently sequential)         │
-│     ├── RSS Parser ──────────────▶ rss_items[]                  │
-│     ├── Tweet Feed ──────────────▶ tweet_items[]                │
-│     └── URL Sources Runner ──────▶ url_items[]                  │
-│                                                                  │
-│  2. MERGE                                                        │
-│     └── all_news_items = rss + tweets + urls                    │
-│                                                                  │
-│  3. FILTER (before comparison for efficiency)                   │
-│     ├── Load high-score baseline from filtered_news             │
-│     ├── Age gate (7 days)                                       │
-│     ├── Semantic check (GPT-4o-mini)                            │
-│     ├── Rescue check (embeddings vs baseline)                   │
-│     └── Save filtered items to filtered_news table              │
-│                                                                  │
-│  4. COMPARE (only relevant items)                               │
-│     ├── Load weekly baseline from news_items                    │
-│     ├── Persist current items to news_items                     │
-│     ├── Exact match deduplication                               │
-│     ├── Semantic deduplication (embeddings)                     │
-│     ├── Update detection (cosine + Jaccard)                     │
-│     └── Delta extraction for updates                            │
-│                                                                  │
-│  5. GROUP                                                        │
-│     └── AI-powered topic grouping (GPT-4o-mini)                 │
-│                                                                  │
-│  5.5 MONITOR UPDATES (Law-to-Spec integration, if enabled)      │
-│     ├── Connect to Gmail IMAP                                   │
-│     ├── Search for "Monitor updates" emails                     │
-│     ├── Match emails from configured receivers                  │
-│     ├── Parse email body (report date, URL, changes)            │
-│     ├── Check database for already processed emails             │
-│     ├── Mark new emails as processed                            │
-│     └── Aggregate changes for email digest                      │
-│                                                                  │
-│  6. EMAIL                                                        │
-│     ├── Build HTML digest (news sections + monitor updates)     │
-│     └── Send via Gmail SMTP                                     │
-│                                                                  │
+│                        DAILY DIGEST FLOW                         │
 └─────────────────────────────────────────────────────────────────┘
+
+1. SCHEDULER TRIGGER (Cron/APScheduler)
+   └─> agents_controller.run_profile_once(profile_id)
+
+2. LOAD CONFIGURATION
+   ├─> Profile settings (country, LoB, language)
+   ├─> Data sources (RSS, Twitter, URLs)
+   ├─> Email receivers
+   └─> Glossary terms
+
+3. COLLECT DATA (Parallel)
+   ├─> RSS Parser → parse_rss_feeds()
+   ├─> Tweet Feed → search_tweets_multi_account()
+   ├─> URL Sources → run_url_sources()
+   └─> Email Inbox → check_inbox_for_updates()
+   
+   Result: List[Dict] raw items
+
+4. FILTER (AI)
+   └─> news_filter.filter_news_items()
+       ├─> LLM evaluates relevance (0.0-1.0)
+       ├─> Uses country/LoB context
+       └─> Applies glossary terms
+   
+   Result: List[Dict] filtered items (score >= 0.6)
+
+5. COMPARE (Deduplication)
+   └─> compare_news.compare_with_baseline()
+       ├─> Load 7-day baseline from DB
+       ├─> Match by title/link
+       └─> Detect content updates
+   
+   Result: {new: [], updated: [], unchanged: []}
+
+6. GROUP (AI)
+   └─> news_grouper.group_news_items()
+       ├─> LLM identifies themes
+       ├─> Clusters related items
+       └─> Generates summaries
+   
+   Result: List[Dict] grouped items
+
+7. EMAIL (Conditional)
+   └─> email_sender.send_email()
+       ├─> Skip if no new/updated items
+       ├─> Translate per receiver language
+       ├─> Send bilingual HTML email
+       └─> Log sent status
+   
+   Result: Boolean (email sent)
+
+8. UPDATE BASELINE
+   └─> Add new items to news_items table
+
+9. RECORD METRICS
+   └─> Update runs table with stats
+```
+
+### 9.2 Monitor Updates Flow
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      MONITOR UPDATES FLOW                        │
+└─────────────────────────────────────────────────────────────────┘
+
+1. CHECK SETTING
+   └─> get_setting_value(profile_id, 'monitor_updates')
+       └─> If 'true', proceed
+
+2. CHECK INBOX
+   └─> email_inbox_parser.check_inbox_for_updates()
+       ├─> Connect to Gmail IMAP
+       ├─> Search for emails from Law-to-Spec
+       ├─> Filter by profile country code
+       └─> Extract updates (last 7 days)
+   
+   Result: List[Dict] updates
+
+3. SEND ALERT EMAIL
+   └─> email_sender.send_monitor_alert()
+       ├─> Format updates as HTML
+       ├─> Send to profile receivers
+       └─> Subject: "⚠️ Legal Eagle Monitor Alert — SA/HCM"
+   
+   Result: Boolean (alert sent)
 ```
 
 ---
 
 ## 10. API Reference
 
-### 10.1 Database Helpers (`configurations/db.py`)
+### 10.1 Database API (`configurations/db.py`)
 
-**Connection**:
+**Connection Management**:
 ```python
-get_connection(db_path: str = None) -> sqlite3.Connection
-create_schema_if_needed(conn: sqlite3.Connection) -> None
+def get_connection() -> sqlite3.Connection
+def create_schema_if_needed(conn: sqlite3.Connection) -> None
 ```
 
-**Profiles**:
+**Profile Operations**:
 ```python
-list_profiles(conn, active_only: bool = True) -> List[sqlite3.Row]
-get_profile(conn, country_code: str, lob: str) -> Optional[sqlite3.Row]
-create_profile(conn, country_code, lob, name, language, active) -> int
+def create_profile(
+    conn: sqlite3.Connection,
+    country_code: str,
+    lob: str,
+    name: str = None,
+    active: int = 1,
+    language: str = "en"
+) -> int
+
+def update_profile_language(
+    conn: sqlite3.Connection,
+    profile_id: int,
+    language: str
+) -> None
 ```
 
-**Sources**:
+**Source Management**:
 ```python
-list_rss_feeds(conn, profile_id: int) -> List[str]
-list_tweet_accounts(conn, profile_id: int) -> List[str]
-list_url_sources(conn, profile_id: int) -> List[Dict]
-list_email_receivers(conn, profile_id: int) -> List[str]
+def upsert_rss_feed(
+    conn: sqlite3.Connection,
+    profile_id: int,
+    url: str,
+    max_lookback_days: int = 7
+) -> None
 
-upsert_rss_feed(conn, profile_id: int, url: str) -> None
-upsert_tweet_account(conn, profile_id: int, handle: str) -> None
-upsert_url_source(conn, profile_id, url, mode, sample_link, read_more_label, crawl_version) -> None
-upsert_email_receiver(conn, profile_id: int, email: str) -> None
+def update_rss_feed_last_fetch(
+    conn: sqlite3.Connection,
+    profile_id: int,
+    url: str,
+    last_fetch_date: str
+) -> None
+
+def upsert_tweet_account(
+    conn: sqlite3.Connection,
+    profile_id: int,
+    handle: str,
+    max_lookback_days: int = 7
+) -> None
+
+def update_tweet_account_last_fetch(
+    conn: sqlite3.Connection,
+    profile_id: int,
+    handle: str,
+    last_fetch_date: str
+) -> None
+
+def upsert_url_source(
+    conn: sqlite3.Connection,
+    profile_id: int,
+    url: str,
+    mode: str = "auto",
+    date_scope: str = "last_7_days",
+    sample_link: str = None,
+    read_more_label: str = None,
+    recursive_crawl: int = 0,
+    crawl_version: str = "v1",
+    use_proxy: int = 0
+) -> None
+
+def delete_url_source(
+    conn: sqlite3.Connection,
+    source_id: int
+) -> None
 ```
 
-**Glossary**:
+**Email & Glossary**:
 ```python
-list_glossary_terms(conn, profile_id: int) -> List[Dict]
-add_glossary_term(conn, profile_id, term, lang, category, product, weight, notes) -> int
-add_glossary_synonym(conn, term_id: int, synonym: str) -> None
-add_glossary_pattern(conn, term_id: int, regex: str) -> None
-flatten_glossary_for_prompt(glossary_rows: List[Dict]) -> Dict
+def upsert_email_receiver(
+    conn: sqlite3.Connection,
+    profile_id: int,
+    email: str
+) -> None
+
+def upsert_email_receiver_with_lang(
+    conn: sqlite3.Connection,
+    profile_id: int,
+    email: str,
+    translation_lang: str = "en"
+) -> None
 ```
 
-**News Baseline**:
+**Run Management**:
 ```python
-upsert_news_item(conn, profile_id: int, item: Dict) -> int
-update_last_seen(conn, news_id: int) -> None
-list_baseline_items(conn, profile_id: int, days: int = 7) -> List[Dict]
+def create_run(
+    conn: sqlite3.Connection,
+    profile_id: int
+) -> int
+
+def start_run(
+    conn: sqlite3.Connection,
+    run_id: int
+) -> None
+
+def finish_run(
+    conn: sqlite3.Connection,
+    run_id: int,
+    status: str,
+    items_collected: int = 0,
+    items_filtered: int = 0,
+    items_new: int = 0,
+    items_updated: int = 0,
+    email_sent: int = 0,
+    error_message: str = None
+) -> None
+
+def append_run_log(
+    conn: sqlite3.Connection,
+    run_id: int,
+    message: str
+) -> None
+
+def list_runs_for_profile(
+    conn: sqlite3.Connection,
+    profile_id: int,
+    limit: int = 10
+) -> List[Dict]
+
+def get_run(
+    conn: sqlite3.Connection,
+    run_id: int
+) -> Optional[Dict]
+
+def list_run_logs(
+    conn: sqlite3.Connection,
+    run_id: int
+) -> List[Dict]
+
+def set_cancel_requested(
+    conn: sqlite3.Connection,
+    run_id: int
+) -> None
+
+def is_cancel_requested(
+    conn: sqlite3.Connection,
+    run_id: int
+) -> bool
+
+def prune_old_runs(
+    conn: sqlite3.Connection,
+    days: int = 7
+) -> int
 ```
 
 **Filtered News**:
 ```python
-insert_filtered_news(conn, profile_id, item, filter_reason, run_id) -> int
-list_filtered_news(conn, profile_id, reviewed, limit, offset) -> List[Dict]
-count_filtered_news(conn, profile_id, reviewed) -> int
-update_filtered_news_score(conn, item_id: int, relevance_score: int) -> None
-delete_filtered_news(conn, item_id: int) -> None
-clear_filtered_news(conn, profile_id, reviewed_only: bool) -> int
-get_reviewed_news_baseline(conn, profile_id, min_score: int = 4) -> List[Dict]
-```
+def list_filtered_news(
+    conn: sqlite3.Connection,
+    profile_id: int,
+    limit: int = 100,
+    offset: int = 0
+) -> List[Dict]
 
-**Runs & Logs**:
-```python
-create_run(conn, profile_id: int, origin: str = "manual") -> int
-start_run(conn, run_id: int) -> None
-finish_run(conn, run_id: int, status: str, metrics: Dict = None) -> None
-append_run_log(conn, run_id: int, level: str, line: str) -> int
-list_runs_for_profile(conn, profile_id: int, limit: int = 30) -> List[Dict]
-get_run(conn, run_id: int) -> Optional[Dict]
-list_run_logs(conn, run_id: int, after_seq: int = None, limit: int = 1000) -> List[Dict]
-set_cancel_requested(conn, run_id: int) -> None
-is_cancel_requested(conn, run_id: int) -> bool
-prune_old_runs(conn, days: int = 7) -> None
-```
+def count_filtered_news(
+    conn: sqlite3.Connection,
+    profile_id: int
+) -> int
 
-**Audit**:
-```python
-add_audit_log(conn, entity: str, action: str, details: str = None, profile_id: int = None) -> None
+def update_filtered_news_score(
+    conn: sqlite3.Connection,
+    item_id: int,
+    score: float
+) -> None
+
+def delete_filtered_news(
+    conn: sqlite3.Connection,
+    item_id: int
+) -> None
+
+def clear_filtered_news(
+    conn: sqlite3.Connection,
+    profile_id: int
+) -> int
+
+def prune_old_filtered_news(
+    conn: sqlite3.Connection,
+    days: int = 30
+) -> int
 ```
 
 ---
@@ -1663,149 +1260,177 @@ add_audit_log(conn, entity: str, action: str, details: str = None, profile_id: i
 
 ```
 legal-eagle/
-├── admin/                          # Flask Admin UI
-│   ├── app.py                      # Main Flask application (routes, SSE, run execution)
-│   ├── outputs/                    # Admin-specific outputs (if any)
-│   └── templates/                  # Jinja2 HTML templates
-│       ├── base.html               # Base layout
-│       ├── dashboard.html          # Profile list
-│       ├── profile.html            # Profile configuration
-│       ├── run_status.html         # Run execution & history
-│       └── review_news.html        # Filtered news review
-│
-├── agents/                         # Processing pipeline agents
+├── agents/                          # Processing pipeline
 │   ├── __init__.py
-│   ├── agents_controller.py        # Main orchestrator
-│   ├── rss_parser.py               # RSS/Atom feed collection
-│   ├── tweet_feed.py               # Twitter/X Search API collection (v2.1+)
-│   ├── url_sources_runner.py       # Website scraping (static/dynamic)
-│   ├── date_filter.py              # Date-based filtering utility (v2.1+)
-│   ├── news_filter.py              # AI relevance filtering
-│   ├── compare_news.py             # Deduplication & update detection
-│   ├── news_grouper.py             # AI topic grouping
-│   ├── email_sender.py             # Gmail SMTP delivery
-│   └── text_utils.py               # Text normalization utilities
+│   ├── agents_controller.py         # Main orchestrator
+│   ├── rss_parser.py                # RSS feed parser
+│   ├── tweet_feed.py                # Twitter/X integration
+│   ├── url_sources_runner.py        # Website crawler
+│   ├── email_inbox_parser.py        # Gmail inbox monitor
+│   ├── news_filter.py               # AI relevance filter
+│   ├── compare_news.py              # Deduplication
+│   ├── news_grouper.py              # AI clustering
+│   ├── email_sender.py              # Email delivery
+│   ├── sap_ai_client.py             # SAP AI Core client
+│   ├── loka_agent.py                # LOKA integration
+│   ├── loka_client.py               # LOKA HTTP client
+│   ├── mcp_client.py                # MCP protocol client
+│   └── text_utils.py                # Text utilities
 │
-├── configurations/                 # Configuration and database
+├── admin/                           # Flask admin UI
+│   ├── app.py                       # Flask application
+│   ├── templates/                   # Jinja2 templates
+│   │   ├── base.html                # Base template (Fiori CSS)
+│   │   ├── dashboard.html           # Profile list
+│   │   ├── create_profile.html      # Create profile
+│   │   ├── profile.html             # Configure tab
+│   │   ├── run_status.html          # Run tab
+│   │   └── review_news.html         # Review tab
+│   └── outputs/                     # Symlink to ../outputs/
+│
+├── configurations/                  # Configuration layer
 │   ├── __init__.py
-│   ├── config_loader.py            # High-level configuration API
-│   ├── db.py                       # SQLite database helpers
-│   ├── env_loader.py               # Environment variable loading
-│   ├── config.db                   # SQLite database (gitignored)
-│   └── requirements.txt            # Python dependencies
+│   ├── config_loader.py             # Unified config API
+│   ├── db.py                        # SQLite operations
+│   ├── env_loader.py                # Environment variables
+│   ├── config.db                    # SQLite database
+│   └── requirements.txt             # Config dependencies
 │
-├── scripts/                        # Utilities and schedulers
-│   ├── schedule_runner.py          # CLI runner for OS schedulers
-│   ├── scheduler_entry.sh          # Shell wrapper for schedulers
-│   ├── migrate_config_to_sqlite.py # Initial DB seeding
-│   ├── migrate_env_to_sqlite.py    # Environment migration
-│   ├── launchd/                    # macOS launchd templates
+├── scripts/                         # Utility scripts
+│   ├── schedule_runner.py           # APScheduler daemon
+│   ├── scheduler_entry.sh           # Cron entry point
+│   ├── launch_admin.py              # Admin UI launcher
+│   ├── start_admin.sh               # Admin UI startup
+│   ├── start_admin_nohup.sh         # Background admin
+│   ├── start_admin_launchd.sh       # macOS launchd
+│   ├── start_admin_on_login.sh      # Login startup
+│   ├── start_admin_with_autoreload.sh  # Dev mode
+│   ├── restart_admin.sh             # Restart admin
+│   ├── migrate_*.py                 # Database migrations
+│   ├── setup_*.py                   # Profile setup scripts
+│   ├── resend_email_from_html.py    # Email resend utility
+│   ├── launchd/                     # macOS launchd configs
+│   │   ├── com.legaleagle.admin.plist
 │   │   └── legal.eagle.scheduler.plist
-│   ├── systemd/                    # Linux systemd templates
-│   │   ├── legal-eagle.service
-│   │   └── legal-eagle.timer
-│   └── test_runs/                  # Test output directory (gitignored)
+│   └── systemd/                     # Linux systemd configs
+│       ├── legal-eagle.service
+│       └── legal-eagle.timer
 │
-├── outputs/                        # Generated output files
-│   └── {country}_{lob}/            # Per-profile outputs
-│       └── all_news.json           # Rolling news snapshot
+├── outputs/                         # Generated artifacts
+│   ├── {COUNTRY}_{LOB}/             # Per-profile outputs
+│   │   ├── all_news.json            # All collected items
+│   │   ├── filtered_news.json       # Filtered items
+│   │   ├── email_preview.html       # Email preview
+│   │   └── *.png                    # Screenshots
+│   ├── cache/                       # Crawler cache
+│   │   └── listings/                # Cached listings
+│   └── admin.pid                    # Admin UI PID file
 │
-├── snapshots/                      # Dynamic rendering snapshots (gitignored)
-│   └── {country}_{lob}/
-│       └── snap_output_YYYY-MM-DD.json
+├── memory-bank/                     # Project memory
+│   ├── activeContext.md             # Current state
+│   ├── progress.md                  # Version history
+│   ├── techContext.md               # Technical details
+│   ├── productContext.md            # Product vision
+│   ├── systemPatterns.md            # Design patterns
+│   └── projectbrief.md              # Project overview
 │
-├── archive/                        # Archived/deprecated modules
+├── docs/                            # Documentation
+│   └── README.md                    # User guide
 │
-├── memory-bank/                    # Project context files
+├── Resources/                       # Test resources
+│   └── *.pdf                        # Sample documents
 │
-├── .env.example                    # Environment variable template
-├── .gitignore                      # Git ignore rules
-├── README.md                       # User guide (LPMs/PMs)
-├── SPEC.md                         # Technical specification (this file)
-├── CHANGELOG.md                    # Version history
-└── run_local_tests.sh              # Local development script
+├── .cfignore                        # Cloud Foundry ignore
+├── .gitignore                       # Git ignore
+├── .profile                         # BTP startup script
+├── apt.yml                          # BTP apt packages
+├── manifest.yaml                    # BTP deployment config
+├── Procfile                         # BTP process config
+├── requirements.txt                 # Python dependencies
+├── runtime.txt                      # Python version
+├── README.md                        # Project README
+├── CHANGELOG.md                     # Version history
+├── SPEC.md                          # Technical spec (this file)
+└── BTP_DEPLOYMENT.md                # Deployment guide
 ```
 
 ---
 
 ## 12. Outputs & Artifacts
 
-### 12.1 Per-Profile Outputs
+### 12.1 Per-Profile Outputs (`outputs/{COUNTRY}_{LOB}/`)
 
-| Path | Description |
-|------|-------------|
-| `outputs/{country}_{lob}/all_news.json` | Rolling snapshot of all collected news |
+**Generated Files**:
+- `all_news.json` - All collected items (raw + filtered)
+- `filtered_news.json` - Items passing AI filter
+- `email_preview.html` - Preview of sent email
+- `*.png` - Screenshots from browser actions
 
-**Naming Convention**: ISO-2 country code + underscore + LoB (e.g., `SA_HCM`, `AE_FIN`)
+**JSON Structure**:
+```json
+{
+  "profile": {
+    "country_code": "SA",
+    "lob": "HCM",
+    "language": "en"
+  },
+  "timestamp": "2026-04-24T00:30:00Z",
+  "items": [
+    {
+      "source": "https://www.gosi.gov.sa/rss",
+      "source_type": "RSS",
+      "title": "New GOSI Regulation on Wage Protection",
+      "link": "https://www.gosi.gov.sa/news/123",
+      "date": "2026-04-23",
+      "content": "Full article text...",
+      "score": 0.85
+    }
+  ]
+}
+```
 
-### 12.2 Snapshots
+### 12.2 Email Artifacts
 
-| Path | Description |
-|------|-------------|
-| `snapshots/{country}_{lob}/snap_output_YYYY-MM-DD.json` | Daily snapshot from dynamic rendering |
+**Preview File** (`email_preview.html`):
+- Saved copy of sent email
+- Includes all HTML/CSS styling
+- Useful for debugging email rendering
 
-**Retention**: Keep last 30 daily snapshots per profile.
+**Email Structure**:
+- Subject: "🦅 Legal Eagle Daily Digest — {COUNTRY}/{LOB} — {DATE}"
+- From: LEGAL_EAGLE_GMAIL_EMAIL
+- To: Profile receivers
+- Format: HTML (responsive design)
+- Sections:
+  - Header (country-colored banner)
+  - Summary statistics
+  - Grouped news items (by theme)
+  - Footer (profile details)
 
-### 12.3 Database
+### 12.3 Database Snapshots
 
-| Path | Description |
-|------|-------------|
-| `configurations/config.db` | SQLite database (gitignored) |
+**Baseline** (`news_items` table):
+- Rolling 7-day window
+- Used for deduplication
+- Pruned automatically
 
-**Contains**: Profiles, sources, glossary, news baseline, runs, logs, audit trail.
+**Filtered News** (`filtered_news` table):
+- Items awaiting review
+- Scored by AI filter
+- Can be approved/rejected in Review tab
 
-### 12.4 Logs
-
-| Location | Description |
-|----------|-------------|
-| `runs` table | Run execution history |
-| `run_logs` table | Per-run log lines (for live streaming) |
-| `outputs/launchd-stdout.log` | macOS launchd stdout (if configured) |
-| `outputs/launchd-stderr.log` | macOS launchd stderr (if configured) |
+**Run History** (`runs` + `run_logs` tables):
+- Last 7 days of execution logs
+- Metrics per run (items collected, filtered, etc.)
+- Status tracking (Pending, Running, Completed, Failed, Canceled)
 
 ---
 
-## Appendix A: Glossary of Terms
+## Future Plans
 
-| Term | Definition |
-|------|------------|
-| **Profile** | A Country + LoB combination with isolated configuration |
-| **LoB** | Line of Business (HCM or FIN) |
-| **HCM** | Human Capital Management (HR, Payroll, Benefits) |
-| **FIN** | Finance (Tax, E-Invoicing, Accounting) |
-| **LPM** | Localization Product Manager |
-| **Baseline** | Rolling 7-day window of previously seen news items |
-| **Rescue** | "Second chance" mechanism for items similar to high-scored reviewed items |
-| **Delta** | Meaningful changes detected between an update and its baseline version |
-
----
-
-## Appendix B: Troubleshooting
-
-### B.1 Common Issues
-
-| Issue | Solution |
-|-------|----------|
-| Twitter 429 Too Many Requests | Wait for rate limit reset; check X-Rate-Limit headers |
-| Playwright timeouts | Increase `LEGAL_EAGLE_RENDER_TIMEOUT_MS`; check site availability |
-| OpenAI API errors | Check API key; increase `LEGAL_EAGLE_OPENAI_TIMEOUT` |
-| Empty email digest | Check filter settings; review filtered_news for false negatives |
-| No active profiles | Run migration script or create profile in Admin UI |
-
-### B.2 Debug Mode
-
-Enable verbose logging by setting environment variables:
-```bash
-export LEGAL_EAGLE_DEBUG=1
-```
-
-### B.3 Database Reset
-
-To reset the database and start fresh:
-```bash
-rm configurations/config.db
-python scripts/migrate_config_to_sqlite.py
-```
+For information about planned UI5/Fiori migration and other strategic initiatives, see:
+- **[UI5_MIGRATION_ROADMAP.md](UI5_MIGRATION_ROADMAP.md)** — Detailed UI5/Fiori migration plan
+- **[README.md](README.md)** — Roadmap section for all planned enhancements
 
 ---
 

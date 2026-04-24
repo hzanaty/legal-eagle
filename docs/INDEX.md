@@ -1,6 +1,6 @@
-# Legal Eagle Documentation
+# Legal Eagle Documentation Index
 
-Welcome to the Legal Eagle documentation directory.
+Welcome to the Legal Eagle documentation directory. This index helps you navigate available setup guides and operational documentation.
 
 ## Available Guides
 
