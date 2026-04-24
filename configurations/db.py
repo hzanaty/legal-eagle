@@ -67,22 +67,45 @@ def create_schema_if_needed(conn: sqlite3.Connection) -> None:
                 id INTEGER PRIMARY KEY,
                 profile_id INTEGER NOT NULL,
                 url TEXT NOT NULL,
+                max_lookback_days INTEGER DEFAULT 7,
+                last_fetch_date TEXT,
                 UNIQUE(profile_id, url),
                 FOREIGN KEY(profile_id) REFERENCES profiles(id) ON DELETE CASCADE
             );
             """
         )
+        # Add max_lookback_days and last_fetch_date to existing rss_feeds tables
+        try:
+            conn.execute("ALTER TABLE rss_feeds ADD COLUMN max_lookback_days INTEGER DEFAULT 7")
+        except Exception:
+            pass
+        try:
+            conn.execute("ALTER TABLE rss_feeds ADD COLUMN last_fetch_date TEXT")
+        except Exception:
+            pass
+
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS tweet_accounts (
                 id INTEGER PRIMARY KEY,
                 profile_id INTEGER NOT NULL,
                 handle TEXT NOT NULL,
+                max_lookback_days INTEGER DEFAULT 7,
+                last_fetch_date TEXT,
                 UNIQUE(profile_id, handle),
                 FOREIGN KEY(profile_id) REFERENCES profiles(id) ON DELETE CASCADE
             );
             """
         )
+        # Add max_lookback_days and last_fetch_date to existing tweet_accounts tables
+        try:
+            conn.execute("ALTER TABLE tweet_accounts ADD COLUMN max_lookback_days INTEGER DEFAULT 7")
+        except Exception:
+            pass
+        try:
+            conn.execute("ALTER TABLE tweet_accounts ADD COLUMN last_fetch_date TEXT")
+        except Exception:
+            pass
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS crawl_urls (
@@ -395,12 +418,42 @@ def _list_simple(conn: sqlite3.Connection, table: str, col: str, profile_id: int
     return [r[col] for r in conn.execute(sql, (profile_id,)).fetchall()]
 
 
-def list_rss_feeds(conn: sqlite3.Connection, profile_id: int) -> List[str]:
-    return _list_simple(conn, "rss_feeds", "url", profile_id)
+def list_rss_feeds(conn: sqlite3.Connection, profile_id: int) -> List[Dict[str, Any]]:
+    """
+    Return RSS feeds with per-source config (url, max_lookback_days, last_fetch_date).
+    Returns List[Dict] since v2.9.
+    """
+    rows = conn.execute(
+        "SELECT url, COALESCE(max_lookback_days, 7) as max_lookback_days, last_fetch_date FROM rss_feeds WHERE profile_id = ? ORDER BY url",
+        (profile_id,)
+    ).fetchall()
+    return [
+        {
+            "url": r["url"],
+            "max_lookback_days": r["max_lookback_days"],
+            "last_fetch_date": r["last_fetch_date"],
+        }
+        for r in rows
+    ]
 
 
-def list_tweet_accounts(conn: sqlite3.Connection, profile_id: int) -> List[str]:
-    return _list_simple(conn, "tweet_accounts", "handle", profile_id)
+def list_tweet_accounts(conn: sqlite3.Connection, profile_id: int) -> List[Dict[str, Any]]:
+    """
+    Return tweet accounts with per-source config (handle, max_lookback_days, last_fetch_date).
+    Returns List[Dict] since v2.9.
+    """
+    rows = conn.execute(
+        "SELECT handle, COALESCE(max_lookback_days, 7) as max_lookback_days, last_fetch_date FROM tweet_accounts WHERE profile_id = ? ORDER BY handle",
+        (profile_id,)
+    ).fetchall()
+    return [
+        {
+            "handle": r["handle"],
+            "max_lookback_days": r["max_lookback_days"],
+            "last_fetch_date": r["last_fetch_date"],
+        }
+        for r in rows
+    ]
 
 
 def list_crawl_urls(conn: sqlite3.Connection, profile_id: int) -> List[str]:
@@ -483,6 +536,40 @@ def upsert_email_receiver(conn: sqlite3.Connection, profile_id: int, email: str)
         conn.execute(
             "INSERT OR IGNORE INTO email_receivers(profile_id, email) VALUES(?,?)",
             (profile_id, email)
+        )
+
+
+def update_rss_feed_last_fetch(conn: sqlite3.Connection, profile_id: int, url: str, timestamp: str) -> None:
+    """
+    Update last_fetch_date for an RSS feed after successful fetch.
+
+    Args:
+        conn: Database connection
+        profile_id: Profile ID
+        url: RSS feed URL
+        timestamp: ISO 8601 datetime string
+    """
+    with conn:
+        conn.execute(
+            "UPDATE rss_feeds SET last_fetch_date = ? WHERE profile_id = ? AND url = ?",
+            (timestamp, profile_id, url)
+        )
+
+
+def update_tweet_account_last_fetch(conn: sqlite3.Connection, profile_id: int, handle: str, timestamp: str) -> None:
+    """
+    Update last_fetch_date for a Twitter account after successful fetch.
+
+    Args:
+        conn: Database connection
+        profile_id: Profile ID
+        handle: Twitter account handle (without @)
+        timestamp: ISO 8601 datetime string
+    """
+    with conn:
+        conn.execute(
+            "UPDATE tweet_accounts SET last_fetch_date = ? WHERE profile_id = ? AND handle = ?",
+            (timestamp, profile_id, handle)
         )
 
 

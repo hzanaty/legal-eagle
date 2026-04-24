@@ -327,7 +327,7 @@ def admin_profile_runs(profile_id: int):
                 pass
         
         # Format account list for display
-        account_list = ", ".join([f"@{a.lstrip('@')}" for a in twitter_accounts])
+        account_list = ", ".join([f"@{(a['handle'] if isinstance(a, dict) else a).lstrip('@')}" for a in twitter_accounts])
         
         twitter_status = {
             'can_fetch': can_fetch,
@@ -1571,5 +1571,8 @@ if __name__ == "__main__":
     
     # BTP-compatible configuration: use PORT env var or default to 8080
     port = int(os.environ.get("PORT", 8080))
+    # Enable debug mode for local development (auto-reload on code changes)
+    # But NEVER use reloader when running in background (causes orphan processes)
     debug = os.environ.get("FLASK_ENV") != "production"
-    app.run(host="0.0.0.0", port=port, debug=debug)
+    # Always disable reloader to prevent port conflicts and orphan processes
+    app.run(host="0.0.0.0", port=port, debug=debug, use_reloader=False)

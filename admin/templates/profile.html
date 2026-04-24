@@ -162,6 +162,92 @@
   </div>
 </div>
 
+<!-- Twitter Accounts (MOVED TO TOP) -->
+<div class="sapCard">
+  <div class="sapCard-header">
+    <span>🐦 Twitter Accounts</span>
+    <span style="color: var(--sapNeutralColor); font-weight: 400; font-size: var(--sapFontSmallSize);">
+      {{ tweets|length if tweets else 0 }} account{% if (tweets|length if tweets else 0) != 1 %}s{% endif %}
+    </span>
+  </div>
+
+  <!-- Error Banner (Red if error, Green if OK) -->
+  {% if twitter_error_flag %}
+  <div style="padding: var(--sapSpacingM); background: #ffeef0; border-left: 4px solid #d32f2f; border-bottom: 1px solid #f8d7da;">
+    <div style="display: flex; align-items: start; gap: var(--sapSpacingS);">
+      <span style="font-size: 1.2rem;">⚠️</span>
+      <div style="flex: 1;">
+        <strong style="color: #d32f2f;">Twitter API Error</strong>
+        <p style="margin: var(--sapSpacingXS) 0 var(--sapSpacingS) 0; color: #555; font-size: var(--sapFontSmallSize);">{{ twitter_error_flag }}</p>
+        <form method="post" action="{{ url_for('clear_twitter_error_flag_route', profile_id=profile.id) }}" style="margin: 0;">
+          <button type="submit" class="sapBtn sapBtn-emphasized sapBtn-sm">Clear Error & Retry</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div style="padding: var(--sapSpacingM); background: #e8f5e9; border-left: 4px solid #4caf50; border-bottom: 1px solid var(--sapGroup_ContentBorderColor);">
+    <div style="display: flex; align-items: center; gap: var(--sapSpacingS);">
+      <span style="font-size: 1.2rem;">✅</span>
+      <span style="color: #2e7d32; font-weight: 500;">Twitter API Status: OK</span>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if tweets and tweets|length > 0 %}
+  <div class="sapTable-toolbar">
+    <button type="submit" form="bulk_tweets_form" class="sapBtn sapBtn-reject sapBtn-sm">Delete Selected</button>
+  </div>
+
+  <div class="sapCard-content" style="padding: 0;">
+    <div style="overflow-x: auto;">
+      <table class="sapTable-compact">
+        <thead>
+          <tr>
+            <th style="width: 40px;"><input type="checkbox" onclick="toggleAllCheckboxes(this, 'bulk_tweets_form')"></th>
+            <th>Handle</th>
+            <th style="width: 180px;">Last Fetch</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for h in tweets %}
+          <tr>
+            <td style="text-align: center;"><input type="checkbox" name="handles" value="{{ h.handle if h is mapping else h }}" form="bulk_tweets_form"></td>
+            <td style="font-family: monospace; font-size: var(--sapFontSmallSize);">@{{ h.handle if h is mapping else h }}</td>
+            <td style="font-size: var(--sapFontSmallSize); color: var(--sapNeutralColor);">
+              {% if h is mapping and h.last_fetch_date %}
+                {{ h.last_fetch_date }}
+              {% else %}
+                <span style="font-style: italic;">Never</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="sapCard-content">
+    {% if not tweets or tweets|length == 0 %}
+    <div style="text-align: center; color: var(--sapNeutralColor); padding: var(--sapSpacingL) 0;">
+      <div style="font-size: 2rem; margin-bottom: var(--sapSpacingS);">🐦</div>
+      <p style="margin: 0;">No Twitter accounts yet</p>
+    </div>
+    {% endif %}
+
+    <form method="post" action="{{ url_for('add_tweet_account_route', profile_id=profile.id) }}">
+      <div class="sapForm-row">
+        <input class="sapForm-input" name="handle" placeholder="e.g., GOSI_SA" required>
+        <button type="submit" class="sapBtn sapBtn-accept">Add Account</button>
+      </div>
+    </form>
+
+    <form id="bulk_tweets_form" method="post" action="{{ url_for('bulk_delete_tweet_accounts', profile_id=profile.id) }}" style="display:none;"></form>
+  </div>
+</div>
+
 <!-- RSS Feeds -->
 <div class="sapCard">
   <div class="sapCard-header">
@@ -188,8 +274,8 @@
         <tbody>
           {% for u in rss %}
           <tr>
-            <td style="text-align: center;"><input type="checkbox" name="urls" value="{{ u }}" form="bulk_rss_form"></td>
-            <td style="font-family: monospace; font-size: var(--sapFontSmallSize);">{{ u }}</td>
+            <td style="text-align: center;"><input type="checkbox" name="urls" value="{{ u.url if u is mapping else u }}" form="bulk_rss_form"></td>
+            <td style="font-family: monospace; font-size: var(--sapFontSmallSize);">{{ u.url if u is mapping else u }}</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -520,79 +606,6 @@
     </form>
     
     <form id="bulk_urls_form" method="post" action="{{ url_for('bulk_delete_url_sources', profile_id=profile.id) }}" style="display:none;"></form>
-  </div>
-</div>
-
-<!-- Twitter Accounts -->
-<div class="sapCard">
-  <div class="sapCard-header">
-    <span>🐦 Twitter Accounts</span>
-    <span style="color: var(--sapNeutralColor); font-weight: 400; font-size: var(--sapFontSmallSize);">
-      {{ tweets|length if tweets else 0 }} account{% if (tweets|length if tweets else 0) != 1 %}s{% endif %}
-    </span>
-  </div>
-  
-  {% if tweets and tweets|length > 0 %}
-  <div class="sapTable-toolbar">
-    <button type="submit" form="bulk_tweets_form" class="sapBtn sapBtn-reject sapBtn-sm">Delete Selected</button>
-  </div>
-  
-  <div class="sapCard-content" style="padding: 0;">
-    <div style="overflow-x: auto;">
-      <table class="sapTable-compact">
-        <thead>
-          <tr>
-            <th style="width: 40px;"><input type="checkbox" onclick="toggleAllCheckboxes(this, 'bulk_tweets_form')"></th>
-            <th>Handle</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for h in tweets %}
-          <tr>
-            <td style="text-align: center;"><input type="checkbox" name="handles" value="{{ h }}" form="bulk_tweets_form"></td>
-            <td style="font-family: monospace; font-size: var(--sapFontSmallSize);">@{{ h }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-  {% endif %}
-  
-  <div class="sapCard-content">
-    {% if not tweets or tweets|length == 0 %}
-    <div style="text-align: center; color: var(--sapNeutralColor); padding: var(--sapSpacingL) 0;">
-      <div style="font-size: 2rem; margin-bottom: var(--sapSpacingS);">🐦</div>
-      <p style="margin: 0;">No Twitter accounts yet</p>
-    </div>
-    {% endif %}
-    
-    <form method="post" action="{{ url_for('add_tweet_account_route', profile_id=profile.id) }}">
-      <div class="sapForm-row">
-        <input class="sapForm-input" name="handle" placeholder="e.g., GOSI_SA" required>
-        <button type="submit" class="sapBtn sapBtn-accept">Add Account</button>
-      </div>
-    </form>
-    
-    <form id="bulk_tweets_form" method="post" action="{{ url_for('bulk_delete_tweet_accounts', profile_id=profile.id) }}" style="display:none;"></form>
-    
-    <hr style="margin: var(--sapSpacingL) 0; border: 0; border-top: 1px solid var(--sapGroup_ContentBorderColor);">
-    
-    <div class="sapForm-group">
-      <label class="sapForm-label" style="font-weight: 600;">Reset Quota Date</label>
-      <span class="sapForm-help">Tweets are disabled until this date; tweeting resumes on the date itself</span>
-      <div style="margin-top: var(--sapSpacingS); padding: var(--sapSpacingS); background: var(--sapNeutralBackground); border-radius: 0.25rem; font-size: var(--sapFontSmallSize);">
-        Current: <strong>{{ reset_quota_date or 'unset' }}</strong>
-      </div>
-    </div>
-    
-    <form method="post" action="{{ url_for('save_tweet_reset_quota_date', profile_id=profile.id) }}">
-      <div style="display: grid; grid-template-columns: 1fr auto auto; gap: var(--sapSpacingS); align-items: end;">
-        <input type="date" class="sapForm-input" name="reset_quota_date" value="{{ reset_quota_date or '' }}">
-        <button type="submit" class="sapBtn sapBtn-emphasized">Save</button>
-        <button type="submit" name="clear" value="1" class="sapBtn sapBtn-reject">Clear</button>
-      </div>
-    </form>
   </div>
 </div>
 

@@ -125,6 +125,9 @@ from .db import (
     list_url_sources,
     upsert_url_source,
     add_audit_log,
+    # Per-source last-fetch timestamp helpers (v2.9)
+    update_rss_feed_last_fetch,
+    update_tweet_account_last_fetch,
 )
 
 DB_PATH_DEFAULT = os.path.join(os.path.dirname(__file__), "config.db")
@@ -356,6 +359,32 @@ def update_url_source_fetch_timestamp(profile_id: int, url: str, timestamp: str)
     from .db import update_url_source_last_fetch
     conn = _get_conn()
     update_url_source_last_fetch(conn, profile_id, url, timestamp)
+
+
+def update_rss_feed_last_fetch_timestamp(profile_id: int, url: str, timestamp: str) -> None:
+    """
+    Update last_fetch_date for an RSS feed after successful fetch. (v2.9)
+    
+    Args:
+        profile_id: Profile ID
+        url: RSS feed URL
+        timestamp: ISO 8601 datetime string
+    """
+    conn = _get_conn()
+    update_rss_feed_last_fetch(conn, profile_id, url, timestamp)
+
+
+def update_tweet_account_last_fetch_timestamp(profile_id: int, handle: str, timestamp: str) -> None:
+    """
+    Update last_fetch_date for a Twitter account after successful fetch. (v2.9)
+    
+    Args:
+        profile_id: Profile ID
+        handle: Twitter account handle
+        timestamp: ISO 8601 datetime string
+    """
+    conn = _get_conn()
+    update_tweet_account_last_fetch(conn, profile_id, handle, timestamp)
 
 
 def load_global_credentials() -> Dict[str, Any]:

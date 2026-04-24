@@ -17,6 +17,8 @@ __pycache__/
 snapshots/
 # Test run artifacts (ignore local test outputs written by scripts)
 scripts/test_runs/
+scripts/archive/
+Restore/
 
 # Generated outputs (keep latest_all_news.json tracked by workflow; ignore dated dumps)
 outputs/all_news_*.json

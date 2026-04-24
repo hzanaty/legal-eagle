@@ -28,8 +28,8 @@ View logs:
 
     <key>ProgramArguments</key>
     <array>
-      <string>/Library/Frameworks/Python.framework/Versions/3.13/bin/python3</string>
-      <string>/Users/i077750/Documents/GitHub/legal-eagle/admin/app.py</string>
+      <string>/bin/bash</string>
+      <string>/Users/i077750/Documents/GitHub/legal-eagle/scripts/start_admin_launchd.sh</string>
     </array>
 
     <!-- Keep the server running always -->
@@ -39,15 +39,6 @@ View logs:
     <!-- Start when user logs in -->
     <key>RunAtLoad</key>
     <true/>
-
-    <!-- Environment variables -->
-    <key>EnvironmentVariables</key>
-    <dict>
-      <key>PYTHONPATH</key>
-      <string>/Users/i077750/Documents/GitHub/legal-eagle</string>
-      <key>PYTHONUNBUFFERED</key>
-      <string>1</string>
-    </dict>
 
     <!-- Logs -->
     <key>StandardOutPath</key>

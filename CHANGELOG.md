@@ -1,5 +1,41 @@
 # CHANGELOG
 
+## v2.12 — 2026-04-24
+### Server Stability & Auto-Reload
+- **Fixed Flask Reloader Crashes**: Disabled Flask's built-in reloader to prevent orphan processes
+  - Issue: Flask reloader creates parent + child processes; crashes leave orphans blocking port 8080
+  - Solution: Set `use_reloader=False` in `app.run()` to prevent port conflicts
+  - Trade-off: Manual restart required after code changes (but more stable)
+
+- **Auto-Reload with Watchdog**: Added smart file-watching script for development
+  - New script: `scripts/start_admin_with_autoreload.sh`
+  - Uses `watchdog` package to monitor all Python files
+  - Automatically restarts server when any `.py` file changes
+  - Cleans up old processes before restart (no port conflicts)
+  - Watches recursively: `admin/`, `agents/`, `configurations/`
+  - Ignores: test files, `__pycache__`, hidden files
+
+- **Fixed Admin UI Dict Error**: Resolved crash when viewing run page
+  - Error: `AttributeError: 'dict' object has no attribute 'lstrip'` on line 330
+  - Cause: `load_tweet_accounts()` now returns `List[Dict]` but code expected `List[str]`
+  - Fix: Updated to handle both formats: `a['handle'] if isinstance(a, dict) else a`
+  - Impact: Run page now displays Twitter account list correctly
+
+### Development Workflow
+- **Best of Both Worlds**: Auto-reload during development + auto-start after restart
+  - Development: Use `start_admin_with_autoreload.sh` for instant code reload
+  - Production: Add same script to Login Items for auto-start on login
+  - No need to choose between features anymore
+
+### Dependencies
+- Added `watchdog==6.0.0` for file monitoring
+
+### Files Changed
+- `admin/app.py` — Set `use_reloader=False`, fixed Dict handling on line 330
+- `scripts/start_admin_with_autoreload.sh` — New auto-reload script with watchdog
+
+---
+
 ## v2.11 — 2026-04-22
 ### Bilingual Email Body
 - **Bilingual card design**: Each news group now renders as a single card with two halves:
@@ -21,6 +57,128 @@
 -  — COUNTRY_COLORS, LANG_BADGES, bilingual build_email_body, simplified send_email
 -  — Updated send_email calls
 -  — Removed Translation Language column from Email Receivers table
+
+### Twitter Pipeline Improvements
+- **Removed 15-minute wait**: Eliminated artificial delay between Twitter fetches
+  - Previous: 15-minute mandatory wait after each account
+  - New: Immediate fetching (rate limits handled by API)
+  - Speeds up multi-account Twitter collection
+
+- **Error Flag System**: Persistent error tracking across runs
+  - `set_twitter_error_flag(profile_id, error_msg, conn)` — Sets error state
+  - `get_twitter_error_flag(profile_id, conn)` — Returns (error_msg, timestamp)
+  - `clear_twitter_error_flag(profile_id, conn)` — Clears error state
+  - Stored in SQLite settings table (key: `twitter_error_flag`)
+
+- **Smart Pipeline Skip**: Agents controller checks error flag before Twitter fetch
+  - If flag is set: Skips Twitter agent entirely
+  - Prevents repeated failures when credentials are invalid
+  - User must manually clear flag via Admin UI
+
+- **Admin UI Error Banner**: Visual error status on profile page
+  - Red banner: Shows error message + "Clear Error & Retry" button
+  - Green banner: "Twitter API Status: OK" when no errors
+  - Twitter section moved to top of profile page for visibility
+
+- **POST Route**: `/admin/profiles/<id>/tweets/clear_error`
+  - Clears error flag and allows retry
+  - Redirects back to profile page
+  - Enables quick recovery from transient errors
+
+### UI/UX Improvements
+- **Profile Page Reordering**: Twitter section moved to top (after Schedule)
+  - New order: Language → Schedule → Twitter → RSS → URL Sources → Email → Monitor → Glossary
+  - Emphasizes Twitter as primary news source
+
+- **Removed Reset Quota Date**: Eliminated manual quota date picker
+  - Previous: User had to manually set next reset date
+  - New: Automatic error flag system handles quota issues
+  - Simpler workflow: Just click "Clear Error & Retry"
+
+- **Twitter Table Enhancement**: Added "Last Fetch" column
+  - Shows ISO timestamp of last successful fetch
+  - Displays "Never" for accounts not yet fetched
+  - Helps diagnose stale accounts
+
+### Additional Files Changed
+- `agents/tweet_feed.py` — Error flags + removed 15-min wait
+- `agents/agents_controller.py` — Check error flag before Twitter agent
+- `admin/app.py` — Clear error route + pass flag to template
+- `admin/templates/profile.html` — Reorder sections + error banner + table fixes
+
+---
+
+## v2.10 — 2026-04-20
+### Twitter Error Flag System
+- **Persistent Error Tracking**: Added error flag system to prevent repeated Twitter API failures
+  - `set_twitter_error_flag(profile_id, error_msg, conn)` — Stores error state in settings table
+  - `get_twitter_error_flag(profile_id, conn)` — Returns (error_msg, timestamp) tuple
+  - `clear_twitter_error_flag(profile_id, conn)` — Clears error state (manual recovery)
+  - Stored as JSON in settings table with key `twitter_error_flag`
+
+- **Smart Pipeline Skip**: Agents controller checks error flag before running Twitter agent
+  - If flag set: Skips Twitter fetch entirely, logs reason
+  - Prevents wasted API calls when credentials are invalid
+  - User must manually clear flag via Admin UI after fixing issue
+
+- **Admin UI Error Banner**: Visual error status on profile page
+  - Red banner: Shows error message + "Clear Error & Retry" button
+  - Green banner: "Twitter API Status: OK" when no errors
+  - POST route: `/admin/profiles/<id>/tweets/clear_error` to reset flag
+
+### Files Changed
+- `agents/tweet_feed.py` — Error flag functions + integration in search_tweets_multi_account()
+- `agents/agents_controller.py` — Check error flag before Twitter agent execution
+- `admin/app.py` — Clear error route + pass twitter_error_flag to template
+- `admin/templates/profile.html` — Error banner UI component
+
+---
+
+## v2.9 — 2026-04-18
+### Per-Source Date Tracking
+- **Max Lookback Days**: Added `max_lookback_days` column to `rss_feeds` and `tweet_accounts` tables
+  - Default: 7 days (configurable per source)
+  - Acts as safety cap to prevent excessive backdating
+  - Used by date filter to skip items older than lookback window
+
+- **Last Fetch Date**: Added `last_fetch_date` column to track incremental fetching
+  - Stored as ISO 8601 timestamp (e.g., "2026-04-18T14:30:00Z")
+  - Updated after each successful fetch
+  - First run: Fetches full lookback window
+  - Subsequent runs: Fetches only items since last fetch (delta mode)
+
+- **API Changes**: `list_rss_feeds()` and `list_tweet_accounts()` now return `List[Dict]`
+  - Before: `List[str]` (just URLs/handles)
+  - After: `List[Dict]` with keys: `{url/handle, max_lookback_days, last_fetch_date}`
+  - Allows agents to make date-aware fetching decisions
+
+- **Database Functions**: Added timestamp update functions
+  - `update_rss_feed_last_fetch(profile_id, url, timestamp, conn)`
+  - `update_tweet_account_last_fetch(profile_id, handle, timestamp, conn)`
+  - Exported via `config_loader.py` for use by agents
+
+### Twitter Improvements
+- **Token Validation**: Added `validate_twitter_token()` pre-flight check
+  - Tests bearer token before attempting fetches
+  - Returns validation status message
+  - Prevents wasted API calls with invalid credentials
+
+- **402 Payment Required Handling**: Detects Twitter API credit depletion
+  - Captures "Monthly credits depleted" error
+  - Sets error flag to skip subsequent Twitter fetches
+  - Displays error message in Admin UI
+
+- **Rate Limit Awareness**: Enhanced rate limit detection
+  - Logs `x-rate-limit-*` headers when 429 encountered
+  - Shows remaining requests and reset time
+  - Helps diagnose quota issues
+
+### Files Changed
+- `configurations/db.py` — Schema changes + new functions
+- `configurations/config_loader.py` — Export timestamp update functions
+- `agents/agents_controller.py` — Handle Dict format from RSS/tweet loaders
+- `agents/tweet_feed.py` — Token validation + 402 handling + error flags
+- `agents/date_filter.py` — Use max_lookback_days for filtering
 
 ---
 

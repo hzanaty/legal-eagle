@@ -28,6 +28,8 @@ from configurations.config_loader import (
     get_reviewed_baseline,
     parse_date_scope,
     update_url_source_fetch_timestamp,
+    update_rss_feed_last_fetch_timestamp,
+    update_tweet_account_last_fetch_timestamp,
 )
 print("✅ Config and creds imported")
 from configurations.db import get_connection, create_schema_if_needed, insert_filtered_news
@@ -135,6 +137,14 @@ def run_controller():
             feed_url = feed["url"] if isinstance(feed, dict) else feed
             rss_items.extend(parse_rss_feed(feed_url))
         print(f"✅ Total RSS items collected: {len(rss_items)}")
+        # Update last_fetch_date for each RSS feed
+        now_ts = datetime.utcnow().isoformat()
+        for feed in RSS_FEED_URLS:
+            try:
+                feed_url = feed["url"] if isinstance(feed, dict) else feed
+                update_rss_feed_last_fetch_timestamp(profile_id, feed_url, now_ts)
+            except Exception:
+                pass
 
         # 2. Tweet Feed Agent (timeline-only, iterate all accounts; no throttle)
         disable_tweets = os.environ.get("DISABLE_TWEETS")
@@ -155,13 +165,21 @@ def run_controller():
             print(f"\n🐦 Tweet Agent disabled until {reset_str}. Skipping.")
         elif TWEET_ACCOUNTS:
             _tw_handles = [a["handle"].lstrip("@") if isinstance(a, dict) else str(a).lstrip("@") for a in TWEET_ACCOUNTS]
+            tw_days = max((a.get('max_lookback_days', 7) if isinstance(a, dict) else 7 for a in TWEET_ACCOUNTS), default=7)
             print("")
             print(f"Tweet Feed Agent (Search API): {len(_tw_handles)} account(s)")
             _conn_tw2 = get_connection()
             create_schema_if_needed(_conn_tw2)
-            tweet_items = search_tweets_multi_account(_tw_handles, X_BEARER_TOKEN, profile_id, _conn_tw2, days=7)
+            tweet_items = search_tweets_multi_account(_tw_handles, X_BEARER_TOKEN, profile_id, _conn_tw2, days=tw_days)
             _conn_tw2.close()
             print(f"Total tweets collected from all accounts: {len(tweet_items)}")
+            # Update last_fetch_date for each Twitter account
+            for account in TWEET_ACCOUNTS:
+                try:
+                    handle = account["handle"] if isinstance(account, dict) else str(account)
+                    update_tweet_account_last_fetch_timestamp(profile_id, handle, now_ts)
+                except Exception:
+                    pass
         else:
             print("⚠️ No tweet accounts configured for this profile.")
 

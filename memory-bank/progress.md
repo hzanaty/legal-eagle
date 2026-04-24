@@ -1,3 +1,44 @@
+## v2.12 (2026-04-24) — Server Stability & Auto-Reload
+
+**Changes**:
+- **Fixed Flask Reloader Crashes**: Disabled Flask's built-in reloader (`use_reloader=False`) to prevent orphan processes
+  - Issue: Flask reloader creates parent + child processes; crashes leave orphans blocking port 8080
+  - Solution: Disabled reloader in `admin/app.py` for stability
+  - Trade-off: Manual restart needed after code changes (but more reliable)
+
+- **Auto-Reload with Watchdog**: Added smart file-watching script for development
+  - New script: `scripts/start_admin_with_autoreload.sh`
+  - Uses `watchdog` package (v6.0.0) to monitor all Python files
+  - Automatically restarts server when any `.py` file changes
+  - Cleans up old processes before restart (no port conflicts)
+  - Watches recursively: `admin/`, `agents/`, `configurations/`
+  - Ignores: test files, `__pycache__`, hidden files
+
+- **Fixed Admin UI Dict Error**: Resolved crash on run page
+  - Error: `AttributeError: 'dict' object has no attribute 'lstrip'` on line 330
+  - Cause: `load_tweet_accounts()` returns `List[Dict]` but code expected `List[str]`
+  - Fix: Updated to handle both formats: `a['handle'] if isinstance(a, dict) else a`
+  - Impact: Run page now displays Twitter account list correctly
+
+**Development Workflow**:
+- **Best of Both Worlds**: Auto-reload during development + auto-start after restart
+  - Development: Use `start_admin_with_autoreload.sh` for instant code reload
+  - Production: Add same script to Login Items for auto-start on login
+  - No need to choose between features anymore
+
+**Files Changed**:
+- `admin/app.py` — Set `use_reloader=False`, fixed Dict handling on line 330
+- `scripts/start_admin_with_autoreload.sh` — New auto-reload script with watchdog
+- `requirements.txt` — Added watchdog==6.0.0
+
+**Documentation Updated**:
+- `CHANGELOG.md` — Added v2.10 (missing), v2.12 entries
+- `SPEC.md` — Updated version header from v2.7 to v2.12
+- `memory-bank/activeContext.md` — Updated to v2.12
+- `memory-bank/progress.md` — This entry
+
+---
+
 ## v2.11 (2026-04-22) — Bilingual Email Body
 
 **Changes**:
