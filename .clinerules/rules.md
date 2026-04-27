@@ -225,3 +225,96 @@ Failure to update memory-bank files leads to:
 - Documentation drift
 
 **Always check and update memory-bank files - no exceptions.**
+
+---
+
+## Git Workflow Rules (MANDATORY)
+
+### One-Way Flow: Local → GitHub Only
+
+**Default Behavior:**
+- Git operations are **ALWAYS one-way**: Local → GitHub
+- **NEVER** use `git pull` unless explicitly requested
+- **NEVER** use `git fetch` unless explicitly requested
+- **NEVER** sync changes back from GitHub automatically
+- **ONLY** push changes: `git push origin main`
+
+### When User Says "Push to GitHub"
+
+Execute these commands in order:
+
+```bash
+# 1. Stage ALL changes (never selective staging)
+git add .
+
+# 2. Commit with latest version number (even if some files are from older versions)
+git commit -m "vX.Y: Brief description of changes"
+
+# 3. Push to GitHub (no pull before push)
+git push origin main
+```
+
+### Key Principles
+
+1. **Stage Everything**: Always use `git add .` to stage all modified files
+   - Don't selectively stage files based on which "version" they belong to
+   - All changes go into one commit with the latest version number
+   
+2. **Single Commit Per Version**: One commit per version release
+   - Don't create separate commits for files from "older" work
+   - Example: If pushing v2.16, ALL files go into the v2.16 commit
+   
+3. **No Pull Before Push**: Local is the source of truth
+   - GitHub is just a backup/archive
+   - No merge conflicts from pulling
+   - No surprise changes from remote
+   - Clean, linear history
+
+4. **Ignore Generated Files**: Never commit runtime/generated files
+   - `outputs/*.json` - Generated data files
+   - `outputs/*.pid` - PID files
+   - `outputs/cache/` - Cache directories
+   - These should be in `.gitignore`
+
+### Exception: Explicit Sync Request
+
+Only pull from GitHub when user explicitly says:
+- "Pull from GitHub"
+- "Sync with GitHub"  
+- "Get latest from remote"
+- "Fetch changes"
+
+Otherwise, **NEVER** use `git pull` or `git fetch`.
+
+### Example Workflow
+
+```bash
+# User: "push to github"
+
+# Step 1: Stage everything
+git add .
+
+# Step 2: Commit with latest version
+git commit -m "v2.16: Admin UI fixes & enhancements"
+
+# Step 3: Push (no pull!)
+git push origin main
+
+# Done - working tree should be clean
+```
+
+### What This Prevents
+
+- ❌ Messy commit history with multiple commits per version
+- ❌ Selective staging leaving files uncommitted
+- ❌ Merge conflicts from pulling remote changes
+- ❌ Confusion about which files belong to which version
+- ❌ Uncommitted changes lingering in working directory
+
+### What This Ensures
+
+- ✅ Clean, linear git history
+- ✅ All changes committed together
+- ✅ Local is always source of truth
+- ✅ No surprises from remote
+- ✅ Simple, predictable workflow
