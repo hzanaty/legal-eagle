@@ -15,20 +15,22 @@ This guide walks through deploying Legal Eagle to SAP BTP Cloud Foundry environm
 ┌─────────────────────────────────────────────────────────┐
 │                BTP Cloud Foundry (prod)                  │
 ├─────────────────────────────────────────────────────────┤
-│  ┌──────────────────┐    ┌──────────────────────────┐  │
-│  │  legal-eagle-ui  │    │  Job Scheduler Service   │  │
-│  │  (Flask Admin)   │    │  (SAP Job Scheduler)     │  │
-│  │  - Gunicorn      │    │  - Daily triggers        │  │
-│  │  - Playwright    │    │  - Calls /api/run        │  │
-│  │  - 1GB Memory    │    │                          │  │
-│  └──────────────────┘    └──────────────────────────┘  │
-│           │                         │                    │
-│           └─────────┬───────────────┘                    │
-│                     │                                    │
-│           ┌─────────▼─────────┐                         │
-│           │   SQLite DB       │                         │
-│           │ (persistent disk) │                         │
-│           └───────────────────┘                         │
+│  ┌──────────────────┐                                   │
+│  │  legal-eagle-ui  │                                   │
+│  │  (Flask Admin)   │                                   │
+│  │  - Gunicorn      │                                   │
+│  │  - Playwright    │                                   │
+│  │  - 1GB Memory    │                                   │
+│  └────────┬─────────┘                                   │
+│           │                                              │
+│           │                                              │
+│  ┌────────▼─────────┐                                   │
+│  │   SQLite DB      │                                   │
+│  │(persistent disk) │                                   │
+│  └──────────────────┘                                   │
+│                                                          │
+│  Note: Use external schedulers (BTP Job Scheduler,      │
+│        cron, etc.) to trigger runs via Admin UI or API  │
 └─────────────────────────────────────────────────────────┘
 ```
 

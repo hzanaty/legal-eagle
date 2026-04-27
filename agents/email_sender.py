@@ -265,8 +265,8 @@ def build_email_body(grouped_summary: list, lang: str, monitor_updates: dict = N
             html.append(
                 "<table width=" + chr(39) + "100%" + chr(39) +
                 " style=" + chr(39) + "margin-bottom:12px;border-radius:8px;overflow:hidden;border:1px solid #e2e8f0;" + chr(39) + ">"
-                "<tr><td style=" + chr(39) + "padding:12px 16px 10px;background:" + nbg + ";border-left:4px solid " + nb + ";" + chr(39) + ">"
-                "<small style=" + chr(39) + "font-weight:700;color:" + nb + ";font-size:10px;" + chr(39) + ">" + badge + "</small>"
+                "<tr><td style=" + chr(39) + "padding:12px 16px 10px;background:" + native_bg + ";border-left:4px solid " + native_border + ";" + chr(39) + ">"
+                "<small style=" + chr(39) + "font-weight:700;color:" + native_border + ";font-size:10px;" + chr(39) + ">" + native_badge + "</small>"
                 "<p style=" + chr(39) + "margin:4px 0 0;font-size:14px;font-weight:700;color:#1a202c;" + chr(39) + ">" + title + "</p>"
                 + _nc +
                 "</td></tr>"

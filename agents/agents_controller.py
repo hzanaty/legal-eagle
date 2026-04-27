@@ -1,4 +1,6 @@
 from datetime import datetime, timedelta
+from typing import Optional, List
+
 dubai_time = datetime.utcnow() + timedelta(hours=4)
 
 print("✅ Agent controller is starting...")
@@ -254,7 +256,15 @@ def run_controller():
     print("✅ All active profiles processed.\n")
 
 
-def run_profile_once(profile_id: int, force_run: bool = False, skip_email: bool = False, skip_comparison: bool = False) -> bool:
+def run_profile_once(
+    profile_id: int, 
+    force_run: bool = False, 
+    skip_email: bool = False, 
+    skip_comparison: bool = False,
+    selected_rss_urls: Optional[List[str]] = None,
+    selected_twitter_handles: Optional[List[str]] = None,
+    selected_url_sources: Optional[List[str]] = None
+) -> bool:
     """
     Run the full workflow for a single profile id (even if inactive).
     Used by the Admin UI 'Run' button. Logs progress and sends the email.
@@ -264,6 +274,9 @@ def run_profile_once(profile_id: int, force_run: bool = False, skip_email: bool 
         force_run: If True, force FULL fetch mode (ignore delta timestamps)
         skip_email: If True, run pipeline but don't send emails (test mode)
         skip_comparison: If True, bypass duplicate detection (treat all as new)
+        selected_rss_urls: Optional list of RSS URLs to fetch (None = all)
+        selected_twitter_handles: Optional list of Twitter handles to fetch (None = all)
+        selected_url_sources: Optional list of URL sources to fetch (None = all)
     
     Returns True on success, False on error.
     """
@@ -309,6 +322,19 @@ def run_profile_once(profile_id: int, force_run: bool = False, skip_email: bool 
         glossary_flat = load_glossary(profile_id)
         GLOSSARY = _build_category_glossary_text(glossary_flat, lob)
         URL_SOURCES = load_url_sources(profile_id)
+        
+        # Filter sources based on selections (if provided)
+        if selected_rss_urls is not None:
+            RSS_FEED_URLS = [feed for feed in RSS_FEED_URLS if feed.get("url") in selected_rss_urls]
+            print(f"📰 Filtered RSS feeds: {len(RSS_FEED_URLS)} selected out of {len(load_rss_feeds(profile_id))}")
+        
+        if selected_twitter_handles is not None:
+            TWEET_ACCOUNTS = [acc for acc in TWEET_ACCOUNTS if acc.get("handle") in selected_twitter_handles]
+            print(f"🐦 Filtered Twitter accounts: {len(TWEET_ACCOUNTS)} selected out of {len(load_tweet_accounts(profile_id))}")
+        
+        if selected_url_sources is not None:
+            URL_SOURCES = [src for src in URL_SOURCES if src.get("url") in selected_url_sources]
+            print(f"🕵️ Filtered URL sources: {len(URL_SOURCES)} selected out of {len(load_url_sources(profile_id))}")
 
         # Credentials
         # SAP AI Core credentials are loaded directly by agents via config_loader
@@ -376,8 +402,11 @@ def run_profile_once(profile_id: int, force_run: bool = False, skip_email: bool 
                 print("\n🐦 Running Tweet Feed Agent (Search API)...")
                 print(f"   ↳ Fetching from {len(TWEET_ACCOUNTS)} accounts: {', '.join('@' + (a['handle'].lstrip('@') if isinstance(a, dict) else str(a).lstrip('@')) for a in TWEET_ACCOUNTS)}")
                 
+                # Extract just the handles (search_tweets_multi_account expects List[str])
+                handles_only = [a['handle'] if isinstance(a, dict) else str(a) for a in TWEET_ACCOUNTS]
+                
                 tweet_items = search_tweets_multi_account(
-                    TWEET_ACCOUNTS, 
+                    handles_only, 
                     X_BEARER_TOKEN, 
                     profile_id, 
                     conn, 

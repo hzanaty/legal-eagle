@@ -321,7 +321,7 @@ legal-eagle/
 ├── agents/                   # Processing pipeline (collect, filter, group, email)
 ├── admin/                    # Flask Admin UI + templates
 ├── configurations/           # Database, config loader, environment variables
-├── scripts/                  # Utilities, schedulers, migrations
+├── scripts/                  # Utilities, migrations, admin launchers
 ├── outputs/                  # Generated artifacts (JSON, HTML, logs)
 ├── memory-bank/              # Project memory and documentation
 ├── Big_Picture.md            # Strategic evolution roadmap

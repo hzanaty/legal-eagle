@@ -1,7 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
 
-
 <style>
   /* Status Card Styles (matching review page) */
   .sapStatCard {
@@ -210,7 +209,62 @@
           </button>
         </form>
 
-        <form method="post" action="{{ url_for('admin_start_run', profile_id=profile.id) }}">
+        <form method="post" action="{{ url_for('admin_start_run', profile_id=profile.id) }}" id="runForm">
+          <!-- Source Selection -->
+          <div style="margin-bottom: var(--sapSpacingM); padding: var(--sapSpacingS); background: var(--sapNeutralBackground); border-radius: 0.25rem;">
+            <div style="font-weight: 600; margin-bottom: var(--sapSpacingS); font-size: var(--sapFontSmallSize); color: var(--sapNeutralColor);">
+              Select Sources:
+            </div>
+            
+            <!-- RSS Feeds -->
+            <div class="source-category" style="margin-bottom: var(--sapSpacingS);">
+              <div style="display: flex; align-items: center; gap: var(--sapSpacingXS); margin-bottom: var(--sapSpacingXS);">
+                <input type="checkbox" id="rss_all" class="category-all" data-category="rss" checked style="cursor: pointer;">
+                <label for="rss_all" style="font-weight: 600; font-size: var(--sapFontSmallSize); cursor: pointer;">
+                  📰 RSS Feeds (<span id="rss_count">0</span>)
+                </label>
+                <button type="button" class="collapse-btn" data-target="rss_list" style="margin-left: auto; background: none; border: none; cursor: pointer; font-size: var(--sapFontSmallSize); color: var(--sapLinkColor);">
+                  ▼
+                </button>
+              </div>
+              <div id="rss_list" class="source-list" style="margin-left: var(--sapSpacingM); font-size: var(--sapFontSmallSize);">
+                <!-- Will be populated by JavaScript -->
+              </div>
+            </div>
+            
+            <!-- Twitter Accounts -->
+            <div class="source-category" style="margin-bottom: var(--sapSpacingS);">
+              <div style="display: flex; align-items: center; gap: var(--sapSpacingXS); margin-bottom: var(--sapSpacingXS);">
+                <input type="checkbox" id="twitter_all" class="category-all" data-category="twitter" checked style="cursor: pointer;">
+                <label for="twitter_all" style="font-weight: 600; font-size: var(--sapFontSmallSize); cursor: pointer;">
+                  🐦 Twitter Accounts (<span id="twitter_count">0</span>)
+                </label>
+                <button type="button" class="collapse-btn" data-target="twitter_list" style="margin-left: auto; background: none; border: none; cursor: pointer; font-size: var(--sapFontSmallSize); color: var(--sapLinkColor);">
+                  ▼
+                </button>
+              </div>
+              <div id="twitter_list" class="source-list" style="margin-left: var(--sapSpacingM); font-size: var(--sapFontSmallSize);">
+                <!-- Will be populated by JavaScript -->
+              </div>
+            </div>
+            
+            <!-- URL Sources -->
+            <div class="source-category" style="margin-bottom: var(--sapSpacingS);">
+              <div style="display: flex; align-items: center; gap: var(--sapSpacingXS); margin-bottom: var(--sapSpacingXS);">
+                <input type="checkbox" id="urls_all" class="category-all" data-category="urls" checked style="cursor: pointer;">
+                <label for="urls_all" style="font-weight: 600; font-size: var(--sapFontSmallSize); cursor: pointer;">
+                  🕵️ URL Sources (<span id="urls_count">0</span>)
+                </label>
+                <button type="button" class="collapse-btn" data-target="urls_list" style="margin-left: auto; background: none; border: none; cursor: pointer; font-size: var(--sapFontSmallSize); color: var(--sapLinkColor);">
+                  ▼
+                </button>
+              </div>
+              <div id="urls_list" class="source-list" style="margin-left: var(--sapSpacingM); font-size: var(--sapFontSmallSize);">
+                <!-- Will be populated by JavaScript -->
+              </div>
+            </div>
+          </div>
+          
           <!-- Run Options -->
           <div style="margin-bottom: var(--sapSpacingM); padding: var(--sapSpacingS); background: var(--sapNeutralBackground); border-radius: 0.25rem;">
             <div style="font-weight: 600; margin-bottom: var(--sapSpacingS); font-size: var(--sapFontSmallSize); color: var(--sapNeutralColor);">
@@ -387,15 +441,15 @@
 </div>
 
 <script>
+// Pass sources data from backend to JavaScript
+const SOURCES_DATA = {{ sources_json|safe }};
+const PROFILE_ID = {{ profile.id }};
+
 // Global functions for dialog control
 function showClearDialog() {
-  console.log('showClearDialog called');
   const modal = document.getElementById('clearNewsModal');
   if (modal) {
     modal.classList.add('show');
-    console.log('Modal shown');
-  } else {
-    console.error('clearNewsModal not found');
   }
 }
 
@@ -408,7 +462,6 @@ function hideClearDialog() {
 
 // Handle clear form submission with auto-reload
 function handleClearSubmit(event) {
-  // Let the form submit normally, but reload page after response
   const form = event.target;
   event.preventDefault();
   
@@ -418,10 +471,8 @@ function handleClearSubmit(event) {
   })
   .then(response => {
     if (response.ok) {
-      // Success - reload page to refresh baseline
       window.location.reload();
     } else {
-      // Error - show message and close dialog
       alert('Failed to clear news items. Please try again.');
       hideClearDialog();
     }
@@ -437,7 +488,6 @@ function handleClearSubmit(event) {
 document.addEventListener('DOMContentLoaded', function() {
   const modal = document.getElementById('clearNewsModal');
   if (modal) {
-    // Close dialog on overlay click
     modal.addEventListener('click', function(e) {
       if (e.target === this) {
         hideClearDialog();
@@ -446,51 +496,176 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 });
 
+// Source Selection Management
+(function() {
+  const storageKey = 'legal_eagle_sources_profile_' + PROFILE_ID;
+  
+  // Load saved selections from localStorage
+  function loadSelections() {
+    try {
+      const saved = localStorage.getItem(storageKey);
+      return saved ? JSON.parse(saved) : null;
+    } catch (error) {
+      console.error('Failed to load selections:', error);
+      return null;
+    }
+  }
+  
+  // Save selections to localStorage
+  function saveSelections(selections) {
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(selections));
+    } catch (error) {
+      console.error('Failed to save selections:', error);
+    }
+  }
+  
+  // Render source checkboxes
+  function renderSources(category, sources, savedSelections) {
+    const container = document.getElementById(category + '_list');
+    const countSpan = document.getElementById(category + '_count');
+    
+    if (!container || !countSpan) return;
+    
+    countSpan.textContent = sources.length;
+    container.innerHTML = '';
+    
+    if (sources.length === 0) {
+      container.innerHTML = '<div style="color: var(--sapNeutralColor); font-style: italic;">No sources configured</div>';
+      return;
+    }
+    
+    sources.forEach(function(source) {
+      const isChecked = savedSelections ? savedSelections.includes(source) : true;
+      const displayName = source.length > 40 ? source.substring(0, 37) + '...' : source;
+      
+      const label = document.createElement('label');
+      label.style.cssText = 'display: flex; align-items: center; gap: var(--sapSpacingXS); margin-bottom: var(--sapSpacingXXS); cursor: pointer;';
+      
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.name = 'selected_' + category;
+      checkbox.value = source;
+      checkbox.checked = isChecked;
+      checkbox.className = 'source-checkbox';
+      checkbox.dataset.category = category;
+      checkbox.style.cursor = 'pointer';
+      
+      const span = document.createElement('span');
+      span.textContent = displayName;
+      span.title = source;
+      
+      label.appendChild(checkbox);
+      label.appendChild(span);
+      container.appendChild(label);
+    });
+    
+    updateCategoryCheckbox(category);
+  }
+  
+  // Update "All" checkbox state based on individual checkboxes
+  function updateCategoryCheckbox(category) {
+    const allCheckbox = document.getElementById(category + '_all');
+    const checkboxes = document.querySelectorAll('input[name="selected_' + category + '"]');
+    
+    if (!allCheckbox || checkboxes.length === 0) return;
+    
+    const checkedCount = Array.from(checkboxes).filter(function(cb) { return cb.checked; }).length;
+    
+    if (checkedCount === 0) {
+      allCheckbox.checked = false;
+      allCheckbox.indeterminate = false;
+    } else if (checkedCount === checkboxes.length) {
+      allCheckbox.checked = true;
+      allCheckbox.indeterminate = false;
+    } else {
+      allCheckbox.checked = false;
+      allCheckbox.indeterminate = true;
+    }
+  }
+  
+  // Handle "All" checkbox toggle
+  function handleCategoryAllToggle(category, checked) {
+    const checkboxes = document.querySelectorAll('input[name="selected_' + category + '"]');
+    checkboxes.forEach(function(cb) {
+      cb.checked = checked;
+    });
+  }
+  
+  // Handle collapse/expand
+  function handleCollapseToggle(button) {
+    const targetId = button.dataset.target;
+    const target = document.getElementById(targetId);
+    
+    if (!target) return;
+    
+    if (target.style.display === 'none') {
+      target.style.display = 'block';
+      button.textContent = '▼';
+    } else {
+      target.style.display = 'none';
+      button.textContent = '▶';
+    }
+  }
+  
+  // Save selections on form submit
+  function handleFormSubmit() {
+    const selections = {
+      rss: Array.from(document.querySelectorAll('input[name="selected_rss"]:checked')).map(function(cb) { return cb.value; }),
+      twitter: Array.from(document.querySelectorAll('input[name="selected_twitter"]:checked')).map(function(cb) { return cb.value; }),
+      urls: Array.from(document.querySelectorAll('input[name="selected_urls"]:checked')).map(function(cb) { return cb.value; })
+    };
+    
+    saveSelections(selections);
+  }
+  
+  // Initialize
+  function init() {
+    const savedSelections = loadSelections();
+    
+    renderSources('rss', SOURCES_DATA.rss, savedSelections ? savedSelections.rss : null);
+    renderSources('twitter', SOURCES_DATA.twitter, savedSelections ? savedSelections.twitter : null);
+    renderSources('urls', SOURCES_DATA.urls, savedSelections ? savedSelections.urls : null);
+    
+    // Event listeners
+    document.querySelectorAll('.category-all').forEach(function(checkbox) {
+      checkbox.addEventListener('change', function() {
+        handleCategoryAllToggle(this.dataset.category, this.checked);
+      });
+    });
+    
+    document.querySelectorAll('.source-checkbox').forEach(function(checkbox) {
+      checkbox.addEventListener('change', function() {
+        updateCategoryCheckbox(this.dataset.category);
+      });
+    });
+    
+    document.querySelectorAll('.collapse-btn').forEach(function(button) {
+      button.addEventListener('click', function() {
+        handleCollapseToggle(this);
+      });
+    });
+    
+    const form = document.getElementById('runForm');
+    if (form) {
+      form.addEventListener('submit', handleFormSubmit);
+    }
+  }
+  
+  // Run on DOM ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+
 // Log streaming (IIFE for scoping)
 (function() {
   const logEl = document.getElementById('log');
   const statusEl = document.getElementById('run-status');
   
   {% if selected_run %}
-  // Check for email preview after run completes
-  function checkEmailPreview() {
-    fetch("{{ url_for('serve_email_preview', profile_id=profile.id) }}", { method: 'HEAD' })
-      .then(response => {
-        if (response.ok) {
-          showEmailPreviewBanner();
-        }
-      })
-      .catch(() => {
-        // Preview not available
-      });
-  }
-  
-  function showEmailPreviewBanner() {
-    const logViewer = document.querySelector('.sapLogViewer');
-    if (!logViewer) return;
-    
-    // Check if banner already exists
-    if (document.getElementById('emailPreviewBanner')) return;
-    
-    const banner = document.createElement('div');
-    banner.id = 'emailPreviewBanner';
-    banner.style.cssText = 'margin-top: var(--sapSpacingM); padding: var(--sapSpacingM); background: #e5f5ff; border: 1px solid #0070f2; border-radius: 0.25rem; display: flex; align-items: center; justify-content: space-between;';
-    banner.innerHTML = `
-      <div style="display: flex; align-items: center; gap: var(--sapSpacingS);">
-        <span style="font-size: 1.5rem;">📧</span>
-        <div>
-          <div style="font-weight: 600; margin-bottom: var(--sapSpacingXS);">Email Preview Available</div>
-          <div style="font-size: var(--sapFontSmallSize); color: var(--sapNeutralColor);">Generated in test mode</div>
-        </div>
-      </div>
-      <a href="{{ url_for('serve_email_preview', profile_id=profile.id) }}" target="_blank" class="sapBtn sapBtn-emphasized" style="text-decoration: none;">
-        View Preview →
-      </a>
-    `;
-    
-    logViewer.parentElement.appendChild(banner);
-  }
-  
   // Log streaming
   const es = new EventSource("{{ url_for('stream_run_logs', run_id=selected_run.id) }}");
   
