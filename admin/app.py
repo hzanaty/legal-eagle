@@ -67,6 +67,7 @@ from configurations.db import (
 # Flask app
 app = Flask(__name__)
 app.secret_key = os.environ.get("LEGAL_EAGLE_ADMIN_SECRET", "local-only-admin")
+app.config['TEMPLATES_AUTO_RELOAD'] = True  # Auto-reload templates without server restart
 
 # Timestamp formatting (UTC -> local) filter for Jinja
 from zoneinfo import ZoneInfo
@@ -381,6 +382,27 @@ def admin_profile_runs(profile_id: int):
         selected_run = get_run(conn, int(run_id))
         conn.close()
 
+    # Load sources for the profile (for source selection UI)
+    import json
+    rss_feeds = load_rss_feeds(profile_id)
+    twitter_accounts = load_tweet_accounts(profile_id)
+    url_sources = load_url_sources(profile_id)
+    
+    # Convert to simple lists for JavaScript
+    rss_urls = [feed["url"] if isinstance(feed, dict) else feed for feed in rss_feeds]
+    twitter_handles = [acc["handle"] if isinstance(acc, dict) else acc for acc in twitter_accounts]
+    url_source_urls = [src["url"] for src in url_sources]
+    
+    sources_json = json.dumps({
+        "rss": rss_urls,
+        "twitter": twitter_handles,
+        "urls": url_source_urls
+    })
+    
+    # Calculate total history count and disable_clear flag
+    total_history = news_count + filtered_news_count
+    disable_clear = run_active or total_history == 0
+    
     return render_template(
         "run_status.html",
         profile=profile,
@@ -388,9 +410,12 @@ def admin_profile_runs(profile_id: int):
         selected_run=selected_run,
         news_count=news_count,
         filtered_news_count=filtered_news_count,
+        total_history=total_history,
+        disable_clear=disable_clear,
         run_active=run_active,
         twitter_status=twitter_status,
         resource_status=resource_status,
+        sources_json=sources_json,
     )
 
 
@@ -404,16 +429,26 @@ def admin_start_run(profile_id: int):
     skip_comparison = request.form.get('skip_comparison') == '1'
     skip_email = request.form.get('skip_email') == '1'
     
+    # Get source selections from form (getlist returns [] if not present)
+    selected_rss = request.form.getlist('selected_rss')
+    selected_twitter = request.form.getlist('selected_twitter')
+    selected_urls = request.form.getlist('selected_urls')
+    
+    # Convert empty lists to None (means "run all")
+    selected_rss = selected_rss if selected_rss else None
+    selected_twitter = selected_twitter if selected_twitter else None
+    selected_urls = selected_urls if selected_urls else None
+    
     conn = get_connection()
     create_schema_if_needed(conn)
     # Audit request with options
-    run_details = f"manual run from run page (force_run={force_run}, skip_comparison={skip_comparison}, skip_email={skip_email})"
+    run_details = f"manual run from run page (force_run={force_run}, skip_comparison={skip_comparison}, skip_email={skip_email}, rss={len(selected_rss) if selected_rss else 'all'}, twitter={len(selected_twitter) if selected_twitter else 'all'}, urls={len(selected_urls) if selected_urls else 'all'})"
     add_audit_log(conn, entity="profiles", action="run_requested", details=run_details, profile_id=profile_id)
     run_id = create_run(conn, profile_id, origin="manual")
     conn.close()
 
     # Background worker
-    def _worker(pid: int, rid: int, force: bool, skip_comp: bool, skip_mail: bool):
+    def _worker(pid: int, rid: int, force: bool, skip_comp: bool, skip_mail: bool, sel_rss, sel_twitter, sel_urls):
         # hook stdout to DB logs with line buffering
         class _DBLogger:
             def __init__(self, run_id: int):
@@ -470,7 +505,9 @@ def admin_start_run(profile_id: int):
                 cconn.close()
                 return flag
 
-            ok = run_profile_once(pid, force_run=force, skip_comparison=skip_comp, skip_email=skip_mail)
+            ok = run_profile_once(pid, force_run=force, skip_comparison=skip_comp, skip_email=skip_mail,
+                                selected_rss_urls=sel_rss, selected_twitter_handles=sel_twitter, 
+                                selected_url_sources=sel_urls)
             status_final = "Success" if ok else "Failed"
             email_status = "Sent" if ok else "Failed"
             
@@ -500,7 +537,7 @@ def admin_start_run(profile_id: int):
             append_run_log(fconn, rid, "INFO", f"🏁 Run {rid} finished with status {status_mark}")
             fconn.close()
 
-    threading.Thread(target=_worker, args=(profile_id, run_id, force_run, skip_comparison, skip_email), daemon=True).start()
+    threading.Thread(target=_worker, args=(profile_id, run_id, force_run, skip_comparison, skip_email, selected_rss, selected_twitter, selected_urls), daemon=True).start()
     return redirect(url_for("admin_profile_runs", profile_id=profile_id, run_id=run_id))
 
 

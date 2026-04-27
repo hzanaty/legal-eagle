@@ -1,9 +1,9 @@
-# Legal Eagle 2.12 — Technical Specification
+# Legal Eagle 2.16 — Technical Specification
 
-**Version:** 2.12 (Server Stability & Auto-Reload)  
-**Last Updated:** 2026-04-24
+**Version:** 2.16 (Admin UI Fixes & Enhancements)  
+**Last Updated:** 2026-04-28
 
-This document provides the technical specification for Legal Eagle, an AI-powered regulatory compliance monitoring system for SAP Localization.
+This document provides the technical specification for Legal Eagle, an AI-powered regulatory compliance mr onitoring system for SAP Localization.
 
 ---
 
@@ -115,7 +115,6 @@ Legal Eagle monitors government sources for legal updates in chosen countries an
 - **Framework**: Flask 3.0+ (Admin UI)
 - **Database**: SQLite 3 (configuration storage)
 - **AI/LLM**: SAP AI Core (gpt-4o, text-embedding-ada-002)
-- **Scheduling**: APScheduler or cron
 
 ### 3.2 Frontend (Current)
 
@@ -306,7 +305,7 @@ CREATE TABLE settings (
 **Columns:**
 - `id`: Auto-increment primary key
 - `profile_id`: Foreign key to profiles table
-- `key`: Setting key (e.g., 'schedule', 'monitor_updates')
+- `key`: Setting key (e.g., 'monitor_updates', 'twitter_error_flag')
 - `value`: Setting value (JSON string or plain text)
 
 #### Table: `news_items`
@@ -789,24 +788,52 @@ def get_embeddings(
 
 **Key Functions**:
 ```python
-def run_profile_once(profile_id: int) -> Dict
+def run_profile_once(
+    profile_id: int,
+    force_run: bool = False,
+    skip_comparison: bool = False,
+    skip_email: bool = False,
+    selected_rss_urls: Optional[List[str]] = None,
+    selected_twitter_handles: Optional[List[str]] = None,
+    selected_url_sources: Optional[List[str]] = None
+) -> Dict
 ```
+
+**Parameters**:
+- `profile_id`: Profile to run
+- `force_run`: Force execution even if no new items
+- `skip_comparison`: Skip baseline comparison (force all items as new)
+- `skip_email`: Skip email sending (dry run)
+- `selected_rss_urls`: Optional list of RSS feed URLs to fetch (None = all)
+- `selected_twitter_handles`: Optional list of Twitter handles to fetch (None = all)
+- `selected_url_sources`: Optional list of URL sources to crawl (None = all)
 
 **Execution Flow**:
 1. **Load Configuration**: Profile, sources, receivers, glossary
-2. **Validate Twitter**: Pre-flight check, skip if error flag set
-3. **Collect Data**: RSS feeds, tweets, URL sources, email inbox
-4. **Filter**: AI-powered relevance filtering
-5. **Compare**: Deduplicate and detect updates against baseline
-6. **Group**: AI clustering of related items
-7. **Email**: Send digest to receivers (if new/updated items found)
-8. **Update Baseline**: Store new items in database
-9. **Log**: Record execution metrics and logs
+2. **Filter Sources** (v2.14): Apply source selection filters if provided
+   - Filter RSS feeds to selected URLs only
+   - Filter Twitter accounts to selected handles only
+   - Filter URL sources to selected URLs only
+   - Log filtered counts: "📰 Filtered RSS feeds: 1 selected out of 3"
+3. **Validate Twitter**: Pre-flight check, skip if error flag set
+4. **Collect Data**: RSS feeds, tweets, URL sources, email inbox
+5. **Filter**: AI-powered relevance filtering
+6. **Compare**: Deduplicate and detect updates against baseline
+7. **Group**: AI clustering of related items
+8. **Email**: Send digest to receivers (if new/updated items found)
+9. **Update Baseline**: Store new items in database
+10. **Log**: Record execution metrics and logs
 
 **Skip Flags**:
 - `skip_comparison`: Skip baseline comparison (force all items as new)
 - `force_run`: Force execution even if no new items
 - `skip_email`: Skip email sending (dry run)
+
+**Source Selection** (v2.14):
+- When selection parameters are `None`, all sources are fetched (default behavior)
+- When selection parameters are provided as lists, only those sources are fetched
+- Empty list `[]` is converted to `None` by the Admin UI (meaning "run all")
+- Useful for testing single sources or excluding problematic sources
 
 **Cooperative Cancellation**:
 - Checks `is_cancel_requested(run_id)` after each step
@@ -819,6 +846,16 @@ def run_profile_once(profile_id: int) -> Dict
 ## 7. Admin UI
 
 ### 7.1 Flask Application (`admin/app.py`)
+
+**Server Configuration**:
+- **Default Port**: 8080
+- **Host**: 0.0.0.0 (accepts connections from any interface)
+- **Port Configuration**: Configurable via `PORT` environment variable
+  - Example: `PORT=5000 python admin/app.py` runs on port 5000
+  - BTP-compatible: Cloud Foundry sets `PORT` automatically
+- **Debug Mode**: Enabled when `FLASK_ENV != "production"`
+- **Reloader**: Disabled (`use_reloader=False`) to prevent orphan processes
+- **Access URL**: `http://localhost:8080/admin` (local development)
 
 **Routes**:
 
@@ -860,9 +897,6 @@ def run_profile_once(profile_id: int) -> Dict
 - `POST /admin/profiles/<id>/glossary/delete` - Delete glossary term
 - `POST /admin/profiles/<id>/glossary/bulk_delete` - Bulk delete glossary terms
 
-#### Schedule
-- `POST /admin/profiles/<id>/schedule/update` - Update run schedule
-
 #### Monitor Updates
 - `POST /admin/profiles/<id>/monitor/toggle` - Toggle email inbox monitoring
 
@@ -895,6 +929,41 @@ def run_profile_once(profile_id: int) -> Dict
 - Object page pattern for profile navigation
 - Card-based layout
 - Semantic button styles (Emphasized, Accept, Reject, etc.)
+
+### 7.3 UI Enhancements (v2.16)
+
+**Table Consistency Improvements**:
+- **RSS Feeds Table**: Added "Lookback Days" column showing max_lookback_days per feed
+- **Twitter Accounts Table**: Added "Lookback Days" column showing max_lookback_days per account
+- **URL Sources Table**: Added "Lookback Days", "Sample Link", and "Read More Label" columns
+- All tables now display complete configuration at a glance without requiring Edit mode
+
+**Form Field Ordering**:
+- **Add Form**: Fields reordered to match table column sequence
+  - Order: Lookback Days → Sample Link → Read More Label → Crawl Type
+- **Edit Form**: Fields reordered to match table column sequence (same order as Add form)
+- Consistent left-to-right flow improves usability and reduces cognitive load
+
+**Section Reordering**:
+Profile page sections now follow pipeline execution order:
+1. Profile Language (analysis language for AI)
+2. RSS Feeds (first data source)
+3. Twitter Accounts (second data source)
+4. URL Sources (third data source)
+5. Email Receivers (output configuration)
+6. Monitor Notifications (Law-to-Spec integration)
+7. Glossary (filtering context)
+
+**Recursive Fields Toggle**:
+- **Add Form**: Recursive fields now show/hide correctly when selecting "Recursive" mode
+- **Edit Form**: Added recursive fields toggle for non-recursive sources
+  - Dynamic IDs per row: `edit1UrlMode`, `edit2UrlMode`, etc.
+  - JavaScript function `toggleRecursiveFields(prefix)` handles both Add and Edit contexts
+- Both forms now have identical behavior and field structure
+
+**Developer Experience**:
+- Flask `TEMPLATES_AUTO_RELOAD = True` enabled for faster template iteration
+- Templates reload automatically without server restart during development
 
 ---
 
@@ -975,7 +1044,7 @@ def load_global_credentials() -> Dict[str, str]
 │                        DAILY DIGEST FLOW                         │
 └─────────────────────────────────────────────────────────────────┘
 
-1. SCHEDULER TRIGGER (Cron/APScheduler)
+1. TRIGGER (Manual or External Scheduler)
    └─> agents_controller.run_profile_once(profile_id)
 
 2. LOAD CONFIGURATION
@@ -1297,8 +1366,6 @@ legal-eagle/
 │   └── requirements.txt             # Config dependencies
 │
 ├── scripts/                         # Utility scripts
-│   ├── schedule_runner.py           # APScheduler daemon
-│   ├── scheduler_entry.sh           # Cron entry point
 │   ├── launch_admin.py              # Admin UI launcher
 │   ├── start_admin.sh               # Admin UI startup
 │   ├── start_admin_nohup.sh         # Background admin
@@ -1310,8 +1377,7 @@ legal-eagle/
 │   ├── setup_*.py                   # Profile setup scripts
 │   ├── resend_email_from_html.py    # Email resend utility
 │   ├── launchd/                     # macOS launchd configs
-│   │   ├── com.legaleagle.admin.plist
-│   │   └── legal.eagle.scheduler.plist
+│   │   └── com.legaleagle.admin.plist
 │   └── systemd/                     # Linux systemd configs
 │       ├── legal-eagle.service
 │       └── legal-eagle.timer

@@ -131,38 +131,78 @@
   </div>
 </div>
 
-<!-- Schedule Section -->
+<!-- RSS Feeds -->
 <div class="sapCard">
   <div class="sapCard-header">
-    <span>🗓️ Schedule</span>
+    <span>📡 RSS Feeds</span>
     <span style="color: var(--sapNeutralColor); font-weight: 400; font-size: var(--sapFontSmallSize);">
-      Timezone: Asia/Dubai
+      {{ rss|length if rss else 0 }} feed{% if (rss|length if rss else 0) != 1 %}s{% endif %}
     </span>
   </div>
+  
+  {% if rss and rss|length > 0 %}
+  <div class="sapTable-toolbar">
+    <button type="submit" form="bulk_rss_form" class="sapBtn sapBtn-reject sapBtn-sm">Delete Selected</button>
+  </div>
+  
+  <div class="sapCard-content" style="padding: 0;">
+    <div style="overflow-x: auto;">
+      <table class="sapTable-compact">
+        <thead>
+          <tr>
+            <th style="width: 40px;"><input type="checkbox" onclick="toggleAllCheckboxes(this, 'bulk_rss_form')"></th>
+            <th>URL</th>
+            <th style="width: 120px;">Lookback Days</th>
+            <th style="width: 180px;">Last Fetch</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in rss %}
+          <tr>
+            <td style="text-align: center;"><input type="checkbox" name="urls" value="{{ u.url if u is mapping else u }}" form="bulk_rss_form"></td>
+            <td style="font-family: monospace; font-size: var(--sapFontSmallSize);">{{ u.url if u is mapping else u }}</td>
+            <td style="font-size: var(--sapFontSmallSize); text-align: center;">
+              {% if u is mapping %}
+                {{ u.max_lookback_days if u.max_lookback_days else 7 }}
+              {% else %}
+                7
+              {% endif %}
+            </td>
+            <td style="font-size: var(--sapFontSmallSize); color: var(--sapNeutralColor);">
+              {% if u is mapping and u.last_fetch_date %}
+                {{ u.last_fetch_date }}
+              {% else %}
+                <span style="font-style: italic;">Never</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+  
   <div class="sapCard-content">
-    <form method="post" action="{{ url_for('update_profile_schedule_day', profile_id=profile.id) }}">
+    {% if not rss or rss|length == 0 %}
+    <div style="text-align: center; color: var(--sapNeutralColor); padding: var(--sapSpacingL) 0;">
+      <div style="font-size: 2rem; margin-bottom: var(--sapSpacingS);">📡</div>
+      <p style="margin: 0;">No RSS feeds yet</p>
+    </div>
+    {% endif %}
+    
+    <form method="post" action="{{ url_for('add_rss', profile_id=profile.id) }}">
       <div class="sapForm-row">
-        <div class="sapForm-group" style="margin-bottom: 0;">
-          <label class="sapForm-label">Scheduled Day</label>
-          <select class="sapForm-select" name="schedule_day">
-            <option value="" {% if not profile.schedule_day %}selected{% endif %}>Unset</option>
-            <option value="Sunday" {% if profile.schedule_day == 'Sunday' %}selected{% endif %}>Sunday</option>
-            <option value="Monday" {% if profile.schedule_day == 'Monday' %}selected{% endif %}>Monday</option>
-            <option value="Tuesday" {% if profile.schedule_day == 'Tuesday' %}selected{% endif %}>Tuesday</option>
-            <option value="Wednesday" {% if profile.schedule_day == 'Wednesday' %}selected{% endif %}>Wednesday</option>
-            <option value="Thursday" {% if profile.schedule_day == 'Thursday' %}selected{% endif %}>Thursday</option>
-            <option value="Friday" {% if profile.schedule_day == 'Friday' %}selected{% endif %}>Friday</option>
-            <option value="Saturday" {% if profile.schedule_day == 'Saturday' %}selected{% endif %}>Saturday</option>
-          </select>
-          <span class="sapForm-help">Profiles with Unset are skipped by the controller</span>
-        </div>
-        <button type="submit" class="sapBtn sapBtn-emphasized">Save Schedule</button>
+        <input class="sapForm-input" name="url" placeholder="https://example.gov/news/feed" required>
+        <button type="submit" class="sapBtn sapBtn-accept">Add RSS</button>
       </div>
     </form>
+    
+    <form id="bulk_rss_form" method="post" action="{{ url_for('bulk_delete_rss', profile_id=profile.id) }}" style="display:none;"></form>
   </div>
 </div>
 
-<!-- Twitter Accounts (MOVED TO TOP) -->
+<!-- Twitter Accounts -->
 <div class="sapCard">
   <div class="sapCard-header">
     <span>🐦 Twitter Accounts</span>
@@ -206,6 +246,7 @@
           <tr>
             <th style="width: 40px;"><input type="checkbox" onclick="toggleAllCheckboxes(this, 'bulk_tweets_form')"></th>
             <th>Handle</th>
+            <th style="width: 120px;">Lookback Days</th>
             <th style="width: 180px;">Last Fetch</th>
           </tr>
         </thead>
@@ -214,6 +255,13 @@
           <tr>
             <td style="text-align: center;"><input type="checkbox" name="handles" value="{{ h.handle if h is mapping else h }}" form="bulk_tweets_form"></td>
             <td style="font-family: monospace; font-size: var(--sapFontSmallSize);">@{{ h.handle if h is mapping else h }}</td>
+            <td style="font-size: var(--sapFontSmallSize); text-align: center;">
+              {% if h is mapping %}
+                {{ h.max_lookback_days if h.max_lookback_days else 7 }}
+              {% else %}
+                7
+              {% endif %}
+            </td>
             <td style="font-size: var(--sapFontSmallSize); color: var(--sapNeutralColor);">
               {% if h is mapping and h.last_fetch_date %}
                 {{ h.last_fetch_date }}
@@ -245,61 +293,6 @@
     </form>
 
     <form id="bulk_tweets_form" method="post" action="{{ url_for('bulk_delete_tweet_accounts', profile_id=profile.id) }}" style="display:none;"></form>
-  </div>
-</div>
-
-<!-- RSS Feeds -->
-<div class="sapCard">
-  <div class="sapCard-header">
-    <span>📡 RSS Feeds</span>
-    <span style="color: var(--sapNeutralColor); font-weight: 400; font-size: var(--sapFontSmallSize);">
-      {{ rss|length if rss else 0 }} feed{% if (rss|length if rss else 0) != 1 %}s{% endif %}
-    </span>
-  </div>
-  
-  {% if rss and rss|length > 0 %}
-  <div class="sapTable-toolbar">
-    <button type="submit" form="bulk_rss_form" class="sapBtn sapBtn-reject sapBtn-sm">Delete Selected</button>
-  </div>
-  
-  <div class="sapCard-content" style="padding: 0;">
-    <div style="overflow-x: auto;">
-      <table class="sapTable-compact">
-        <thead>
-          <tr>
-            <th style="width: 40px;"><input type="checkbox" onclick="toggleAllCheckboxes(this, 'bulk_rss_form')"></th>
-            <th>URL</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for u in rss %}
-          <tr>
-            <td style="text-align: center;"><input type="checkbox" name="urls" value="{{ u.url if u is mapping else u }}" form="bulk_rss_form"></td>
-            <td style="font-family: monospace; font-size: var(--sapFontSmallSize);">{{ u.url if u is mapping else u }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-  {% endif %}
-  
-  <div class="sapCard-content">
-    {% if not rss or rss|length == 0 %}
-    <div style="text-align: center; color: var(--sapNeutralColor); padding: var(--sapSpacingL) 0;">
-      <div style="font-size: 2rem; margin-bottom: var(--sapSpacingS);">📡</div>
-      <p style="margin: 0;">No RSS feeds yet</p>
-    </div>
-    {% endif %}
-    
-    <form method="post" action="{{ url_for('add_rss', profile_id=profile.id) }}">
-      <div class="sapForm-row">
-        <input class="sapForm-input" name="url" placeholder="https://example.gov/news/feed" required>
-        <button type="submit" class="sapBtn sapBtn-accept">Add RSS</button>
-      </div>
-    </form>
-    
-    <form id="bulk_rss_form" method="post" action="{{ url_for('bulk_delete_rss', profile_id=profile.id) }}" style="display:none;"></form>
   </div>
 </div>
 
@@ -335,10 +328,11 @@
           <tr>
             <th style="width: 40px;"><input type="checkbox" onclick="toggleAllCheckboxes(this, 'bulk_urls_form')"></th>
             <th>URL</th>
+            <th style="width: 120px;">Lookback Days</th>
             <th style="width: 120px;">Last Fetch</th>
-            <th style="width: 100px;">Fetch Mode</th>
-            <th style="width: 120px;">Max Lookback</th>
-            <th style="width: 140px;">Crawl Type</th>
+            <th style="width: 200px;">Sample Link</th>
+            <th style="width: 150px;">Read More Label</th>
+            <th style="width: 120px;">Crawl Type</th>
             <th style="width: 180px;">Recursive Settings</th>
             <th style="width: 150px;">Actions</th>
           </tr>
@@ -349,25 +343,32 @@
             <td style="text-align: center;"><input type="checkbox" name="urls" value="{{ s.url }}" form="bulk_urls_form"></td>
             <td style="font-family: monospace; font-size: var(--sapFontSmallSize);">{{ s.url }}</td>
             <td style="font-size: var(--sapFontSmallSize); text-align: center;">
+              {% if s.date_scope and s.date_scope != 'all' %}
+                {% if s.date_scope == 'last_7_days' %}7
+                {% elif s.date_scope == 'last_30_days' %}30
+                {% else %}{{ s.date_scope }}
+                {% endif %}
+              {% else %}
+                <span style="color: var(--sapNeutralColor);">—</span>
+              {% endif %}
+            </td>
+            <td style="font-size: var(--sapFontSmallSize); text-align: center;">
               {% if s.last_successful_fetch_relative %}
                 <span title="{{ s.last_successful_fetch_formatted }}">{{ s.last_successful_fetch_relative }}</span>
               {% else %}
                 <span style="color: var(--sapNeutralColor);">Never</span>
               {% endif %}
             </td>
-            <td style="font-size: var(--sapFontSmallSize); text-align: center;">
-              {% if s.last_successful_fetch %}
-                <span style="padding: 0.125rem 0.5rem; background: #e5f5ff; color: #0070f2; border-radius: 0.25rem; font-weight: 600;">DELTA</span>
+            <td style="font-family: monospace; font-size: var(--sapFontSmallSize);">
+              {% if s.sample_link %}
+                <a href="{{ s.sample_link }}" target="_blank" style="color: var(--sapBrandColor); text-decoration: none;">{{ s.sample_link[:50] }}{% if s.sample_link|length > 50 %}...{% endif %}</a>
               {% else %}
-                <span style="padding: 0.125rem 0.5rem; background: #fff4e5; color: #e76500; border-radius: 0.25rem; font-weight: 600;">FULL</span>
+                <span style="color: var(--sapNeutralColor);">—</span>
               {% endif %}
             </td>
             <td style="font-size: var(--sapFontSmallSize);">
-              {% if s.date_scope and s.date_scope != 'all' %}
-                {% if s.date_scope == 'last_7_days' %}7 days
-                {% elif s.date_scope == 'last_30_days' %}30 days
-                {% else %}{{ s.date_scope }}
-                {% endif %}
+              {% if s.read_more_label %}
+                {{ s.read_more_label }}
               {% else %}
                 <span style="color: var(--sapNeutralColor);">—</span>
               {% endif %}
@@ -408,25 +409,22 @@
             </td>
           </tr>
           <tr id="edit-{{ loop.index }}" style="display: none;">
-            <td colspan="8" style="padding: var(--sapSpacingM); background: var(--sapNeutralBackground);">
+            <td colspan="9" style="padding: var(--sapSpacingM); background: var(--sapNeutralBackground);">
               {% if s.mode == 'recursive' %}
               <form method="post" action="{{ url_for('update_url_source_route', profile_id=profile.id) }}">
                 <input type="hidden" name="url" value="{{ s.url }}">
                 
                 <h4 style="margin: 0 0 var(--sapSpacingM) 0; color: var(--sapBrandColor);">Edit URL Source</h4>
                 
-                <div style="margin-bottom: var(--sapSpacingM);">
-                  <label class="sapForm-label">Crawl Type</label>
-                  <select class="sapForm-select" name="mode">
-                    <option value="auto" {% if s.mode == 'auto' %}selected{% endif %}>Auto-detect (static/dynamic)</option>
-                    <option value="force_static" {% if s.mode == 'force_static' %}selected{% endif %}>Force Static HTML</option>
-                    <option value="force_dynamic" {% if s.mode == 'force_dynamic' %}selected{% endif %}>Force Browser Rendering</option>
-                    <option value="recursive" {% if s.mode == 'recursive' %}selected{% endif %}>Recursive (deep links)</option>
-                  </select>
-                  <span class="sapForm-help">How to crawl this URL source</span>
-                </div>
-                
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--sapSpacingM); margin-bottom: var(--sapSpacingM);">
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: var(--sapSpacingM); margin-bottom: var(--sapSpacingM);">
+                  <div>
+                    <label class="sapForm-label">Lookback Days</label>
+                    <select class="sapForm-select" name="date_scope">
+                      <option value="all" {% if (s.date_scope or 'all') == 'all' %}selected{% endif %}>N/A</option>
+                      <option value="last_7_days" {% if s.date_scope == 'last_7_days' %}selected{% endif %}>7 days</option>
+                      <option value="last_30_days" {% if s.date_scope == 'last_30_days' %}selected{% endif %}>30 days</option>
+                    </select>
+                  </div>
                   <div>
                     <label class="sapForm-label">Sample Link (optional)</label>
                     <input class="sapForm-input" name="sample_link" value="{{ s.sample_link or '' }}" placeholder="https://example.gov/news/12345">
@@ -436,13 +434,13 @@
                     <input class="sapForm-input" name="read_more_label" value="{{ s.read_more_label or '' }}" placeholder="e.g., اقرأ المزيد">
                   </div>
                   <div>
-                    <label class="sapForm-label">Max Lookback</label>
-                    <select class="sapForm-select" name="date_scope">
-                      <option value="all" {% if (s.date_scope or 'all') == 'all' %}selected{% endif %}>N/A</option>
-                      <option value="last_7_days" {% if s.date_scope == 'last_7_days' %}selected{% endif %}>Last 7 days</option>
-                      <option value="last_30_days" {% if s.date_scope == 'last_30_days' %}selected{% endif %}>Last 30 days</option>
+                    <label class="sapForm-label">Crawl Type</label>
+                    <select class="sapForm-select" name="mode">
+                      <option value="auto" {% if s.mode == 'auto' %}selected{% endif %}>Auto-detect</option>
+                      <option value="force_static" {% if s.mode == 'force_static' %}selected{% endif %}>Static HTML</option>
+                      <option value="force_dynamic" {% if s.mode == 'force_dynamic' %}selected{% endif %}>Dynamic</option>
+                      <option value="recursive" {% if s.mode == 'recursive' %}selected{% endif %}>Recursive</option>
                     </select>
-                    <span class="sapForm-help">Maximum time window (safety cap for incremental fetching)</span>
                   </div>
                 </div>
                 
@@ -482,18 +480,15 @@
                 
                 <h4 style="margin: 0 0 var(--sapSpacingM) 0; color: var(--sapBrandColor);">Edit URL Source Settings</h4>
                 
-                <div style="margin-bottom: var(--sapSpacingM);">
-                  <label class="sapForm-label">Crawl Type</label>
-                  <select class="sapForm-select" name="mode">
-                    <option value="auto" {% if s.mode == 'auto' %}selected{% endif %}>Auto-detect (static/dynamic)</option>
-                    <option value="force_static" {% if s.mode == 'force_static' %}selected{% endif %}>Force Static HTML</option>
-                    <option value="force_dynamic" {% if s.mode == 'force_dynamic' %}selected{% endif %}>Force Browser Rendering</option>
-                    <option value="recursive" {% if s.mode == 'recursive' %}selected{% endif %}>Recursive (deep links)</option>
-                  </select>
-                  <span class="sapForm-help">How to crawl this URL source</span>
-                </div>
-                
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--sapSpacingM); margin-bottom: var(--sapSpacingM);">
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: var(--sapSpacingM); margin-bottom: var(--sapSpacingM);">
+                  <div>
+                    <label class="sapForm-label">Lookback Days</label>
+                    <select class="sapForm-select" name="date_scope">
+                      <option value="all" {% if (s.date_scope or 'all') == 'all' %}selected{% endif %}>N/A</option>
+                      <option value="last_7_days" {% if s.date_scope == 'last_7_days' %}selected{% endif %}>7 days</option>
+                      <option value="last_30_days" {% if s.date_scope == 'last_30_days' %}selected{% endif %}>30 days</option>
+                    </select>
+                  </div>
                   <div>
                     <label class="sapForm-label">Sample Link (optional)</label>
                     <input class="sapForm-input" name="sample_link" value="{{ s.sample_link or '' }}" placeholder="https://example.gov/news/12345">
@@ -502,16 +497,46 @@
                     <label class="sapForm-label">Read More Label (optional)</label>
                     <input class="sapForm-input" name="read_more_label" value="{{ s.read_more_label or '' }}" placeholder="e.g., اقرأ المزيد">
                   </div>
+                  <div>
+                    <label class="sapForm-label">Crawl Type</label>
+                    <select class="sapForm-select" name="mode" id="edit{{ loop.index }}UrlMode" onchange="toggleRecursiveFields('edit{{ loop.index }}')">
+                      <option value="auto" {% if s.mode == 'auto' %}selected{% endif %}>Auto-detect</option>
+                      <option value="force_static" {% if s.mode == 'force_static' %}selected{% endif %}>Static HTML</option>
+                      <option value="force_dynamic" {% if s.mode == 'force_dynamic' %}selected{% endif %}>Dynamic</option>
+                      <option value="recursive" {% if s.mode == 'recursive' %}selected{% endif %}>Recursive</option>
+                    </select>
+                  </div>
                 </div>
                 
-                <div style="margin-bottom: var(--sapSpacingM);">
-                  <label class="sapForm-label">Max Lookback</label>
-                  <select class="sapForm-select" name="date_scope">
-                    <option value="all" {% if (s.date_scope or 'all') == 'all' %}selected{% endif %}>N/A</option>
-                    <option value="last_7_days" {% if s.date_scope == 'last_7_days' %}selected{% endif %}>Last 7 days</option>
-                    <option value="last_30_days" {% if s.date_scope == 'last_30_days' %}selected{% endif %}>Last 30 days</option>
-                  </select>
-                  <span class="sapForm-help">Maximum time window (safety cap for incremental fetching)</span>
+                <!-- Recursive Mode Fields (hidden by default) -->
+                <div id="edit{{ loop.index }}RecursiveFields" style="display: none;">
+                  <hr style="margin: var(--sapSpacingL) 0; border: 0; border-top: 1px solid var(--sapGroup_ContentBorderColor);">
+                  <h4 style="margin-bottom: var(--sapSpacingM); color: var(--sapBrandColor);">Recursive Crawl Settings</h4>
+                  
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--sapSpacingM);">
+                    <div class="sapForm-group">
+                      <label class="sapForm-label">Max Depth</label>
+                      <input class="sapForm-input" type="number" name="max_depth" value="{{ s.max_depth or 3 }}" min="1" max="5">
+                      <span class="sapForm-help">How many levels to follow links (1-5)</span>
+                    </div>
+                    <div class="sapForm-group">
+                      <label class="sapForm-label">Max Results</label>
+                      <input class="sapForm-input" type="number" name="max_results" value="{{ s.max_results or 20 }}" min="1" max="100">
+                      <span class="sapForm-help">Stop after finding N articles</span>
+                    </div>
+                  </div>
+                  
+                  <div class="sapForm-group">
+                    <label class="sapForm-label">Allowed Domains (one per line)</label>
+                    <textarea class="sapForm-textarea" name="allowed_domains" rows="3" placeholder="sede.agenciatributaria.gob.es&#10;www2.agenciatributaria.gob.es">{{ s.allowed_domains or '' }}</textarea>
+                    <span class="sapForm-help">Only follow links to these domains</span>
+                  </div>
+                  
+                  <div class="sapForm-group">
+                    <label class="sapForm-label">Path Filter (optional)</label>
+                    <input class="sapForm-input" name="path_filter" value="{{ s.path_filter or '' }}" placeholder="e.g., /novedades/ or news">
+                    <span class="sapForm-help">Only follow links containing this text in the path</span>
+                  </div>
                 </div>
                 
                 <div style="display: flex; gap: var(--sapSpacingS);">
@@ -542,17 +567,16 @@
         <label class="sapForm-label">URL</label>
         <input class="sapForm-input" name="url" placeholder="https://example.gov/news" required>
       </div>
-      <div class="sapForm-group">
-        <label class="sapForm-label">Crawl Type</label>
-        <select class="sapForm-select" name="mode" id="addUrlMode" onchange="toggleRecursiveFields('add')">
-          <option value="auto" selected>Auto-detect (static/dynamic)</option>
-          <option value="force_static">Force Static HTML</option>
-          <option value="force_dynamic">Force Browser Rendering</option>
-          <option value="recursive">Recursive (deep links)</option>
-        </select>
-        <span class="sapForm-help">How to crawl this URL source</span>
-      </div>
-      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--sapSpacingM);">
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: var(--sapSpacingM);">
+        <div class="sapForm-group">
+          <label class="sapForm-label">Lookback Days</label>
+          <select class="sapForm-select" name="date_scope">
+            <option value="all" selected>N/A</option>
+            <option value="last_7_days">7 days</option>
+            <option value="last_30_days">30 days</option>
+          </select>
+          <span class="sapForm-help">Max time window</span>
+        </div>
         <div class="sapForm-group">
           <label class="sapForm-label">Sample Link (optional)</label>
           <input class="sapForm-input" name="sample_link" placeholder="https://example.gov/news/12345">
@@ -562,13 +586,13 @@
           <input class="sapForm-input" name="read_more_label" placeholder="e.g., اقرأ المزيد">
         </div>
         <div class="sapForm-group">
-          <label class="sapForm-label">Max Lookback</label>
-          <select class="sapForm-select" name="date_scope">
-            <option value="all" selected>N/A</option>
-            <option value="last_7_days">Last 7 days</option>
-            <option value="last_30_days">Last 30 days</option>
+          <label class="sapForm-label">Crawl Type</label>
+          <select class="sapForm-select" name="mode" id="addUrlMode" onchange="toggleRecursiveFields('add')">
+            <option value="auto" selected>Auto-detect</option>
+            <option value="force_static">Static HTML</option>
+            <option value="force_dynamic">Dynamic</option>
+            <option value="recursive">Recursive</option>
           </select>
-          <span class="sapForm-help">Maximum time window (safety cap for incremental fetching)</span>
         </div>
       </div>
       
@@ -785,15 +809,24 @@ function toggleMonitorUpdates(profileId, enabled) {
 }
 
 function toggleRecursiveFields(prefix) {
+  console.log('toggleRecursiveFields called with prefix:', prefix);
   const modeSelect = document.getElementById(prefix + 'UrlMode');
   const recursiveFields = document.getElementById(prefix + 'RecursiveFields');
   
+  console.log('modeSelect:', modeSelect);
+  console.log('recursiveFields:', recursiveFields);
+  
   if (modeSelect && recursiveFields) {
+    console.log('modeSelect.value:', modeSelect.value);
     if (modeSelect.value === 'recursive') {
+      console.log('Setting display to block');
       recursiveFields.style.display = 'block';
     } else {
+      console.log('Setting display to none');
       recursiveFields.style.display = 'none';
     }
+  } else {
+    console.error('Elements not found! modeSelect:', modeSelect, 'recursiveFields:', recursiveFields);
   }
 }
 

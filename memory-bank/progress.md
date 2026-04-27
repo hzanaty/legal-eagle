@@ -1,3 +1,172 @@
+## v2.16 (2026-04-28) — Admin UI Fixes & Enhancements
+
+**Changes**:
+- **Table Consistency Improvements**:
+  - Added "Lookback Days" column to RSS Feeds table
+  - Added "Lookback Days" column to Twitter Accounts table
+  - Added "Lookback Days", "Sample Link", and "Read More Label" columns to URL Sources table
+  - All tables now show complete configuration at a glance
+  
+- **Form Field Ordering**:
+  - Reordered Add form fields to match table column order
+  - Reordered Edit form fields to match table column order
+  - Consistent left-to-right flow: Lookback Days → Sample Link → Read More Label → Crawl Type
+  
+- **Section Reordering**:
+  - Reordered profile page sections to match pipeline execution order:
+    1. Profile Language
+    2. RSS Feeds
+    3. Twitter Accounts
+    4. URL Sources
+    5. Email Receivers
+    6. Monitor Notifications
+    7. Glossary
+  
+- **Recursive Fields Toggle**:
+  - Fixed recursive fields toggle in Add form (now shows/hides correctly)
+  - Added recursive fields toggle to Edit form for non-recursive sources
+  - Both Add and Edit forms now have identical behavior when selecting "Recursive" mode
+  - Dynamic IDs for each edit form (edit1UrlMode, edit2UrlMode, etc.)
+  - JavaScript function `toggleRecursiveFields(prefix)` handles both contexts
+  
+- **Developer Experience**:
+  - Enabled Flask `TEMPLATES_AUTO_RELOAD = True` for faster template iteration
+  - Templates now reload automatically without server restart during development
+
+**Rationale**:
+- Improved UI consistency across all source types
+- Better user experience with logical field ordering
+- Sections ordered to match actual pipeline execution flow
+- Edit forms now have same functionality as Add forms
+- Faster development cycle with auto-reloading templates
+
+**Files Changed**:
+- `admin/templates/profile.html` — Table columns, form field ordering, section reordering, recursive fields toggle
+- `admin/app.py` — Added `TEMPLATES_AUTO_RELOAD = True` configuration
+- `SPEC.md` — Updated Section 9 (Admin UI) documentation
+- `CHANGELOG.md` — Added v2.16 entry
+- `memory-bank/activeContext.md` — Updated to v2.16
+- `memory-bank/progress.md` — This entry
+
+---
+
+## v2.15 (2026-04-28) — Scheduler Removal & Cleanup
+
+**Changes**:
+- **Removed Built-in Scheduler**: Eliminated incomplete scheduler implementation
+  - Deleted `scripts/schedule_runner.py` (194 lines) — APScheduler daemon
+  - Deleted `scripts/scheduler_entry.sh` (34 lines) — Shell wrapper for cron/launchd
+  - Deleted `scripts/launchd/legal.eagle.scheduler.plist` (63 lines) — macOS launchd config
+  - Total: 291 lines of unused code removed
+  
+- **UI Cleanup**: Removed Schedule section from Admin UI
+  - Eliminated misleading day-of-week dropdown from profile page
+  - Removed "Save Schedule" button and help text
+  - Section order now: Language → Twitter → RSS → URL Sources → Email → Monitor → Glossary
+  
+- **Documentation Updates**: Clarified scheduling approach
+  - Updated SPEC.md: Removed scheduler from tech stack, updated data flow, cleaned file structure
+  - Updated README.md: Changed scripts/ description from "schedulers" to "migrations, admin launchers"
+  - Updated BTP_DEPLOYMENT.md: Simplified architecture diagram
+  - Updated CHANGELOG.md: Added v2.15 entry with external scheduling guidance
+
+**Rationale**:
+- Built-in scheduler was incomplete and non-functional
+- Schedule UI was misleading (showed settings that didn't work)
+- Prefer external scheduling for better flexibility and platform integration
+- Cleaner codebase with one less system to maintain
+- Eliminates confusion about how scheduling actually works
+
+**External Scheduling Options**:
+- **BTP Job Scheduler** (cloud) — Configure HTTP endpoint in BTP Cockpit
+- **Cron** (Linux/macOS) — `0 9 * * * cd /path && python3 agents/agents_controller.py --profile-id 1`
+- **Windows Task Scheduler** — Create scheduled task to run Python script
+- **Manual runs** — Always available via Admin UI (no cooldown restrictions)
+
+**Files Changed**:
+- `scripts/schedule_runner.py` — Deleted
+- `scripts/scheduler_entry.sh` — Deleted
+- `scripts/launchd/legal.eagle.scheduler.plist` — Deleted
+- `admin/templates/profile.html` — Removed Schedule section
+- `SPEC.md` — Removed scheduler references throughout
+- `README.md` — Updated scripts/ description
+- `BTP_DEPLOYMENT.md` — Updated architecture diagram
+- `CHANGELOG.md` — Added v2.15 entry
+- `memory-bank/activeContext.md` — Updated to v2.15
+- `memory-bank/progress.md` — This entry
+
+---
+
+## v2.14 (2026-04-28) — Selective Source Execution & Bug Fixes
+
+**Changes**:
+- **Selective Source Execution**: Users can now choose which sources to run
+  - Added source selection panel to Run page with checkboxes
+  - RSS Feeds, Twitter Accounts, and URL Sources sections
+  - Collapsible sections with source counts in headers
+  - Selection state persisted in localStorage (remembers last selection)
+  - Default behavior: all sources selected (opt-out model)
+  - Backend filters sources before fetching based on user selection
+  
+- **Backend Implementation**:
+  - Enhanced `run_profile_once()` with optional source filtering parameters
+  - Updated `admin_start_run()` route to extract and pass selected sources
+  - Logs show filtered counts: "📰 Filtered RSS feeds: 1 selected out of 1"
+  
+- **Critical Bug Fixes**:
+  1. **Missing Python imports** — Added `from typing import Optional, List` to `agents_controller.py`
+  2. **Twitter dict/string handling** — Extract handles before passing to API (was passing dict objects instead of strings)
+  3. **Email sender variable typos** — Fixed `nbg`→`native_bg`, `nb`→`native_border`, `badge`→`native_badge`
+  4. **Missing template variables** — Added `total_history` and `disable_clear` to render_template
+  5. **Stale run detection** — Fixed Run #19 stuck in "Running" status causing disabled buttons
+
+**Rationale**:
+- Users needed control over which sources to fetch (e.g., test single source, skip problematic sources)
+- Multiple runtime errors were blocking successful pipeline execution
+- Stale database records from interrupted runs were disabling UI buttons
+
+**Files Changed**:
+- `agents/agents_controller.py` — Added imports, source filtering, handle extraction
+- `admin/app.py` — Added template variables, source selection extraction
+- `agents/email_sender.py` — Fixed variable typos
+- `admin/templates/run_status.html` — Added source selection UI
+- `memory-bank/activeContext.md` — Updated to v2.14
+- `memory-bank/progress.md` — This entry
+- `SPEC.md` — Updated with selective source execution documentation
+- `CHANGELOG.md` — Added v2.14 user-facing changes
+
+---
+
+## v2.13 (2026-04-27) — Admin UI Stability Fix
+
+**Changes**:
+- **Admin UI Crash Recovery**: Fixed stale PID file issue
+  - Enhanced `scripts/start_admin.sh` with automatic stale PID detection
+  - Checks if PID file exists and process is actually running
+  - Removes stale PID file before starting new instance
+  - Prevents "already running" errors after crashes
+  
+- **Documentation Update**: Clarified Admin UI port configuration
+  - Default port: 8080 (not 5001 as might be assumed)
+  - Configurable via `PORT` environment variable
+  - BTP-compatible design (Cloud Foundry sets PORT automatically)
+  - Updated SPEC.md Section 7.1 with server configuration details
+  - Updated memory-bank/techContext.md with port information
+
+**Rationale**:
+- Stale PID files from crashed processes prevented server restart
+- Port documentation was missing from SPEC.md
+- Startup script now handles crash recovery automatically
+
+**Files Changed**:
+- `scripts/start_admin.sh` — Added stale PID file cleanup logic
+- `SPEC.md` — Added server configuration section to 7.1
+- `memory-bank/techContext.md` — Added Admin UI server configuration
+- `memory-bank/progress.md` — This entry
+- `memory-bank/activeContext.md` — Updated to v2.13.1
+
+---
+
 ## v2.13 (2026-04-24) — Strategic Roadmap Update & AI4GPM Submission
 
 **Changes**:
