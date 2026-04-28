@@ -1,5 +1,30 @@
 # CHANGELOG
 
+## v2.19 — 2026-04-28
+### Source Selection Fix (Empty Selection = Run None)
+- **Problem**: Unchecking all URL sources ran ALL sources instead of none
+  - Root cause: Empty list `[]` was converted to `None` (meaning "run all")
+  - Violated user intent: unchecked boxes should mean "run none"
+
+- **Solution**: Smart detection with hidden UI flags
+  - Added `has_rss_sources`, `has_twitter_sources`, `has_url_sources` flags
+  - Backend distinguishes between:
+    - Empty list `[]` (UI shown, user wants none) → Run **0 sources** ✅
+    - `None` (no UI, API call) → Run **all sources** ✅ (backward compatible)
+
+- **Result**: 
+  - Uncheck all sources → Runs 0 sources (respects user choice)
+  - API calls without form data → Runs all sources (backward compatible)
+  - No breaking changes to existing automation
+
+### Files Changed
+- `admin/app.py` — Added smart detection logic
+- `admin/templates/run_status.html` — Added hidden flags
+- `memory-bank/` — Updated documentation
+- `CHANGELOG.md` — This entry
+
+---
+
 ## v2.18 — 2026-04-28
 ### Twitter Status Card Compact Design
 - **Error-Only Display**: Twitter status card now only appears when there's an error

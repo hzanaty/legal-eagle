@@ -1,9 +1,27 @@
-## Current State: v2.18 — Twitter Status Compact Design (2026-04-28)
+## Current State: v2.19 — Source Selection Fix (2026-04-28)
 
-### ✅ v2.18 COMPLETE - Twitter Status Card Compact Design
+### ✅ v2.19 COMPLETE - Source Selection Fix (Empty Selection = Run None)
+**Status**: Smart detection implemented, unchecked sources now correctly run none instead of all.
+
+**Completion Date**: 2026-04-28 13:39 UTC+3
+
+### Key Changes:
+1. **Problem Fixed**: Unchecking all URL sources now runs 0 sources (not all 4)
+   - Root cause: Empty list `[]` was converted to `None` (meaning "run all")
+   - Violated user intent: unchecked boxes should mean "run none"
+
+2. **Solution**: Smart detection with hidden UI flags
+   - Added `has_rss_sources`, `has_twitter_sources`, `has_url_sources` hidden inputs
+   - Backend distinguishes between:
+     - Empty list `[]` (UI shown, user wants none) → Run **0 sources** ✅
+     - `None` (no UI, API call) → Run **all sources** ✅ (backward compatible)
+
+3. **Backward Compatibility**: API calls without form data still run all sources
+   - Scripts calling the endpoint without selections continue to work
+   - No breaking changes to existing automation
+
+### ✅ v2.18 COMPLETE - Twitter Status Card Compact Design (2026-04-28 03:23)
 **Status**: Error-only Twitter status implemented, saves vertical space on Run page.
-
-**Completion Date**: 2026-04-28 03:23 UTC+3
 
 ### Key Changes:
 1. **Error-Only Display**: Twitter status card removed when everything is working

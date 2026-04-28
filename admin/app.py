@@ -445,10 +445,32 @@ def admin_start_run(profile_id: int):
     selected_twitter = request.form.getlist('selected_twitter')
     selected_urls = request.form.getlist('selected_urls')
     
-    # Convert empty lists to None (means "run all")
-    selected_rss = selected_rss if selected_rss else None
-    selected_twitter = selected_twitter if selected_twitter else None
-    selected_urls = selected_urls if selected_urls else None
+    # Smart detection: check if UI sections were rendered (hidden flags)
+    # If flag exists but list is empty → user wants none (explicit empty selection)
+    # If flag doesn't exist → user wants all (backward compatibility for API calls)
+    has_rss_ui = request.form.get('has_rss_sources') == '1'
+    has_twitter_ui = request.form.get('has_twitter_sources') == '1'
+    has_urls_ui = request.form.get('has_url_sources') == '1'
+    
+    # Apply smart logic: empty list means "none" if UI was shown, "all" if no UI
+    # None = run all (backward compatibility), [] = run none (explicit), [items] = run selected
+    if has_rss_ui and not selected_rss:
+        selected_rss = []  # Explicit empty selection
+    elif not has_rss_ui:
+        selected_rss = None  # No UI shown, run all
+    # else: keep selected_rss as-is (has items)
+    
+    if has_twitter_ui and not selected_twitter:
+        selected_twitter = []  # Explicit empty selection
+    elif not has_twitter_ui:
+        selected_twitter = None  # No UI shown, run all
+    # else: keep selected_twitter as-is (has items)
+    
+    if has_urls_ui and not selected_urls:
+        selected_urls = []  # Explicit empty selection
+    elif not has_urls_ui:
+        selected_urls = None  # No UI shown, run all
+    # else: keep selected_urls as-is (has items)
     
     conn = get_connection()
     create_schema_if_needed(conn)
