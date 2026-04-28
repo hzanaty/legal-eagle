@@ -1,5 +1,33 @@
 # CHANGELOG
 
+## v2.17 — 2026-04-28
+### Review UI Simplification & Cleanup
+- **Review Page UI Improvements**:
+  - Removed redundant tab buttons (Accepted/Filtered/Reviewed)
+  - Made stat cards clickable for direct navigation
+  - Added hover effects and active state styling
+  - Cleaner, more intuitive card-based interface
+
+- **Run Page Cleanup**:
+  - Removed "Clear Historical News" button (redundant with Review page controls)
+  - Users now manage history from Review page with granular options:
+    - "Clear All" button (clears everything)
+    - "Clear Reviewed" button (clears only scored items)
+
+- **Scoring Integration**:
+  - Confirmed scoring is integrated into filtering pipeline
+  - High-score rescue mechanism: items scored ≥ 4 are used as baseline
+  - Filtering priority: Age Gate → LLM/Glossary Check → High-Score Rescue
+  - Your scores teach the system to recognize relevant patterns
+
+### Files Changed
+- `admin/templates/review_news.html` — Removed tab buttons, made cards clickable
+- `admin/templates/run_status.html` — Removed Clear button and dialog
+- `memory-bank/` — Updated all documentation files
+- `CHANGELOG.md` — This entry
+
+---
+
 ## v2.16 — 2026-04-28
 ### Admin UI Fixes & Enhancements
 - **Table Consistency Improvements**:

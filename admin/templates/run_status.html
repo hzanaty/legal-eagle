@@ -185,19 +185,6 @@
         <span>▶️ Run Workflow</span>
       </div>
       <div class="sapCard-content">
-        {% set total_history = (news_count or 0) + (filtered_news_count or 0) %}
-        {% set disable_clear = run_active or (total_history == 0) %}
-        
-        <button 
-          type="button" 
-          class="sapBtn sapBtn-reject sapBtn-sm" 
-          style="width: 100%; margin-bottom: var(--sapSpacingS);"
-          onclick="showClearDialog()"
-          {% if disable_clear %}disabled{% endif %}
-          title="Clear {{ news_count or 0 }} baseline + {{ filtered_news_count or 0 }} filtered items">
-          Clear Historical News ({{ total_history }})
-        </button>
-        
         <form method="post" action="{{ url_for('resend_email_from_preview', profile_id=profile.id) }}" style="margin-bottom: var(--sapSpacingS);">
           <button 
             type="submit" 
@@ -422,79 +409,10 @@
   </div>
 </div>
 
-<!-- Clear News Confirmation Dialog -->
-<div id="clearNewsModal" class="sapDialog-overlay">
-  <div class="sapDialog">
-    <div class="sapDialog-header">
-      ⚠️ Confirm Clear
-    </div>
-    <div class="sapDialog-content">
-      Are you sure you want to delete all news items for this profile? This action cannot be undone.
-    </div>
-    <div class="sapDialog-footer">
-      <button type="button" class="sapBtn sapBtn-default" onclick="hideClearDialog()">Cancel</button>
-      <form method="post" action="{{ url_for('clear_profile_news', profile_id=profile.id) }}" style="display: inline;" onsubmit="handleClearSubmit(event)">
-        <button type="submit" class="sapBtn sapBtn-reject">Delete All</button>
-      </form>
-    </div>
-  </div>
-</div>
-
 <script>
 // Pass sources data from backend to JavaScript
 const SOURCES_DATA = {{ sources_json|safe }};
 const PROFILE_ID = {{ profile.id }};
-
-// Global functions for dialog control
-function showClearDialog() {
-  const modal = document.getElementById('clearNewsModal');
-  if (modal) {
-    modal.classList.add('show');
-  }
-}
-
-function hideClearDialog() {
-  const modal = document.getElementById('clearNewsModal');
-  if (modal) {
-    modal.classList.remove('show');
-  }
-}
-
-// Handle clear form submission with auto-reload
-function handleClearSubmit(event) {
-  const form = event.target;
-  event.preventDefault();
-  
-  fetch(form.action, {
-    method: 'POST',
-    body: new FormData(form)
-  })
-  .then(response => {
-    if (response.ok) {
-      window.location.reload();
-    } else {
-      alert('Failed to clear news items. Please try again.');
-      hideClearDialog();
-    }
-  })
-  .catch(error => {
-    console.error('Clear failed:', error);
-    alert('Failed to clear news items. Please try again.');
-    hideClearDialog();
-  });
-}
-
-// Setup dialog after DOM loads
-document.addEventListener('DOMContentLoaded', function() {
-  const modal = document.getElementById('clearNewsModal');
-  if (modal) {
-    modal.addEventListener('click', function(e) {
-      if (e.target === this) {
-        hideClearDialog();
-      }
-    });
-  }
-});
 
 // Source Selection Management
 (function() {

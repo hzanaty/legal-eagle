@@ -62,6 +62,11 @@ from configurations.db import (
     delete_filtered_news,
     clear_filtered_news,
     prune_old_filtered_news,
+    # combined news review (baseline + filtered)
+    list_all_news_for_review,
+    count_all_news_for_review,
+    update_news_item_score,
+    delete_news_item,
 )
 
 # Flask app
@@ -1313,7 +1318,7 @@ def admin_migrate_urls():
 @app.route("/admin/profiles/<int:profile_id>/review")
 def admin_review_news(profile_id: int):
     """
-    Review filtered news items for a profile.
+    Review ALL news items (accepted + filtered) for a profile.
     Allows manual scoring to improve glossary/filtering accuracy.
     """
     _ensure_schema()
@@ -1342,28 +1347,42 @@ def admin_review_news(profile_id: int):
     }
     
     # Filter parameters
-    filter_reviewed = request.args.get("reviewed")
+    filter_source = request.args.get("source")  # 'accepted', 'filtered', or None (all)
+    filter_reviewed = request.args.get("reviewed")  # 'yes', 'no', or None (all)
     page = int(request.args.get("page", 1))
     per_page = 50
     offset = (page - 1) * per_page
     
+    # Parse filters - enforce unscored for Accepted/Filtered tabs
+    source = None
     reviewed = None
+    
+    if filter_source == "accepted":
+        source = "accepted"
+        # Force unscored for Accepted tab (unless explicitly viewing reviewed)
+        if filter_reviewed != "yes":
+            reviewed = False
+    elif filter_source == "filtered":
+        source = "filtered"
+        # Force unscored for Filtered tab (unless explicitly viewing reviewed)
+        if filter_reviewed != "yes":
+            reviewed = False
+    
     if filter_reviewed == "yes":
         reviewed = True
-    elif filter_reviewed == "no":
-        reviewed = False
+        source = None  # Reviewed tab shows all sources
     
-    # Get counts
-    total_count = count_filtered_news(conn, profile_id, reviewed=None)
-    pending_count = count_filtered_news(conn, profile_id, reviewed=False)
-    reviewed_count = count_filtered_news(conn, profile_id, reviewed=True)
+    # Get counts for the 3 stats cards
+    accepted_unscored_count = count_all_news_for_review(conn, profile_id, source="accepted", reviewed=False)
+    filtered_unscored_count = count_all_news_for_review(conn, profile_id, source="filtered", reviewed=False)
+    reviewed_count = count_all_news_for_review(conn, profile_id, source=None, reviewed=True)
     
-    # Get filtered news items
-    items = list_filtered_news(conn, profile_id, reviewed=reviewed, limit=per_page, offset=offset)
+    # Get news items with combined view
+    items = list_all_news_for_review(conn, profile_id, source=source, reviewed=reviewed, limit=per_page, offset=offset)
     
     # Calculate pagination
-    filtered_count = count_filtered_news(conn, profile_id, reviewed=reviewed)
-    total_pages = (filtered_count + per_page - 1) // per_page
+    filtered_count_for_pagination = count_all_news_for_review(conn, profile_id, source=source, reviewed=reviewed)
+    total_pages = (filtered_count_for_pagination + per_page - 1) // per_page
     
     conn.close()
     
@@ -1371,9 +1390,10 @@ def admin_review_news(profile_id: int):
         "review_news.html",
         profile=profile,
         items=items,
-        total_count=total_count,
-        pending_count=pending_count,
+        accepted_unscored_count=accepted_unscored_count,
+        filtered_unscored_count=filtered_unscored_count,
         reviewed_count=reviewed_count,
+        filter_source=filter_source,
         filter_reviewed=filter_reviewed,
         page=page,
         total_pages=total_pages,
@@ -1384,11 +1404,24 @@ def admin_review_news(profile_id: int):
 @app.route("/admin/profiles/<int:profile_id>/review/score", methods=["POST"])
 def score_filtered_news(profile_id: int):
     """
-    Update the relevance score for a filtered news item.
+    Update the relevance score for a news item (accepted or filtered).
     Score scale: 1 (not relevant) to 5 (highly relevant)
+    Format: item_id can be "123" (legacy) or "123:source" (new format)
     """
-    item_id = request.form.get("item_id", "").strip()
+    item_id_str = request.form.get("item_id", "").strip()
+    item_source = request.form.get("item_source", "").strip()  # Optional explicit source
     score = request.form.get("score", "").strip()
+    
+    # Parse item_id:source format
+    if ":" in item_id_str:
+        parts = item_id_str.split(":", 1)
+        item_id = parts[0]
+        item_source = parts[1]
+    else:
+        item_id = item_id_str
+        # Default to filtered for backwards compatibility
+        if not item_source:
+            item_source = "filtered"
     
     if not item_id.isdigit():
         flash("Invalid item ID.", "error")
@@ -1400,8 +1433,9 @@ def score_filtered_news(profile_id: int):
     
     conn = get_connection()
     create_schema_if_needed(conn)
-    update_filtered_news_score(conn, int(item_id), int(score))
-    add_audit_log(conn, entity="filtered_news", action="score", details=f"item_id={item_id} score={score}", profile_id=profile_id)
+    update_news_item_score(conn, int(item_id), item_source, int(score))
+    add_audit_log(conn, entity="news_review", action="score", 
+                  details=f"item_id={item_id} source={item_source} score={score}", profile_id=profile_id)
     conn.close()
     
     flash(f"Score updated to {score}.", "success")
@@ -1411,9 +1445,22 @@ def score_filtered_news(profile_id: int):
 @app.route("/admin/profiles/<int:profile_id>/review/delete", methods=["POST"])
 def delete_filtered_news_item(profile_id: int):
     """
-    Delete a single filtered news item.
+    Delete a single news item (accepted or filtered).
+    Format: item_id can be "123" (legacy) or "123:source" (new format)
     """
-    item_id = request.form.get("item_id", "").strip()
+    item_id_str = request.form.get("item_id", "").strip()
+    item_source = request.form.get("item_source", "").strip()  # Optional explicit source
+    
+    # Parse item_id:source format
+    if ":" in item_id_str:
+        parts = item_id_str.split(":", 1)
+        item_id = parts[0]
+        item_source = parts[1]
+    else:
+        item_id = item_id_str
+        # Default to filtered for backwards compatibility
+        if not item_source:
+            item_source = "filtered"
     
     if not item_id.isdigit():
         flash("Invalid item ID.", "error")
@@ -1421,8 +1468,9 @@ def delete_filtered_news_item(profile_id: int):
     
     conn = get_connection()
     create_schema_if_needed(conn)
-    delete_filtered_news(conn, int(item_id))
-    add_audit_log(conn, entity="filtered_news", action="delete", details=f"item_id={item_id}", profile_id=profile_id)
+    delete_news_item(conn, int(item_id), item_source)
+    add_audit_log(conn, entity="news_review", action="delete", 
+                  details=f"item_id={item_id} source={item_source}", profile_id=profile_id)
     conn.close()
     
     flash("Item deleted.", "success")
@@ -1457,7 +1505,8 @@ def clear_filtered_news_route(profile_id: int):
 @app.route("/admin/profiles/<int:profile_id>/review/bulk_score", methods=["POST"])
 def bulk_score_filtered_news(profile_id: int):
     """
-    Bulk score multiple filtered news items.
+    Bulk score multiple news items (accepted or filtered).
+    Format: item_ids can be ["123", "456"] (legacy) or ["123:accepted", "456:filtered"] (new)
     """
     item_ids = request.form.getlist("item_ids")
     score = request.form.get("bulk_score", "").strip()
@@ -1473,12 +1522,21 @@ def bulk_score_filtered_news(profile_id: int):
     conn = get_connection()
     create_schema_if_needed(conn)
     count = 0
-    for item_id in item_ids:
+    for item_id_str in item_ids:
+        # Parse "id:source" format
+        if ":" in item_id_str:
+            parts = item_id_str.split(":", 1)
+            item_id = parts[0]
+            item_source = parts[1]
+        else:
+            item_id = item_id_str
+            item_source = "filtered"  # Backwards compatibility
+        
         if item_id.isdigit():
-            update_filtered_news_score(conn, int(item_id), int(score))
+            update_news_item_score(conn, int(item_id), item_source, int(score))
             count += 1
     
-    add_audit_log(conn, entity="filtered_news", action="bulk_score", details=f"count={count} score={score}", profile_id=profile_id)
+    add_audit_log(conn, entity="news_review", action="bulk_score", details=f"count={count} score={score}", profile_id=profile_id)
     conn.close()
     
     flash(f"Updated {count} items with score {score}.", "success")
@@ -1488,7 +1546,8 @@ def bulk_score_filtered_news(profile_id: int):
 @app.route("/admin/profiles/<int:profile_id>/review/bulk_delete", methods=["POST"])
 def bulk_delete_filtered_news(profile_id: int):
     """
-    Bulk delete multiple filtered news items.
+    Bulk delete multiple news items (accepted or filtered).
+    Format: item_ids can be ["123", "456"] (legacy) or ["123:accepted", "456:filtered"] (new)
     """
     item_ids = request.form.getlist("item_ids")
     
@@ -1499,12 +1558,21 @@ def bulk_delete_filtered_news(profile_id: int):
     conn = get_connection()
     create_schema_if_needed(conn)
     count = 0
-    for item_id in item_ids:
+    for item_id_str in item_ids:
+        # Parse "id:source" format
+        if ":" in item_id_str:
+            parts = item_id_str.split(":", 1)
+            item_id = parts[0]
+            item_source = parts[1]
+        else:
+            item_id = item_id_str
+            item_source = "filtered"  # Backwards compatibility
+        
         if item_id.isdigit():
-            delete_filtered_news(conn, int(item_id))
+            delete_news_item(conn, int(item_id), item_source)
             count += 1
     
-    add_audit_log(conn, entity="filtered_news", action="bulk_delete", details=f"count={count}", profile_id=profile_id)
+    add_audit_log(conn, entity="news_review", action="bulk_delete", details=f"count={count}", profile_id=profile_id)
     conn.close()
     
     flash(f"Deleted {count} items.", "success")

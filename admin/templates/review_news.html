@@ -9,6 +9,19 @@
     padding: var(--sapSpacingL);
     text-align: center;
     box-shadow: var(--sapTileShadow);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: block;
+  }
+  
+  .sapStatCard:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  }
+  
+  .sapStatCard-active {
+    border: 2px solid var(--sapBrandColor);
+    box-shadow: 0 4px 12px rgba(0, 112, 242, 0.2);
   }
   
   .sapStatCard-value {
@@ -27,6 +40,7 @@
   .sapStatCard-neutral { border-left: 4px solid var(--sapNeutralColor); }
   .sapStatCard-warning { border-left: 4px solid var(--sapCriticalColor); }
   .sapStatCard-positive { border-left: 4px solid var(--sapPositiveColor); }
+  .sapStatCard-info { border-left: 4px solid var(--sapInformativeColor); }
   
   .sapSegmentedButton {
     display: inline-flex;
@@ -131,35 +145,25 @@
   }
 </style>
 
-<!-- Stats Cards -->
+<!-- Stats Cards (Clickable) -->
 <div class="sapGrid-stats">
-  <div class="sapStatCard sapStatCard-neutral">
-    <div class="sapStatCard-label">Total</div>
-    <div class="sapStatCard-value">{{ total_count }}</div>
-  </div>
-  <div class="sapStatCard sapStatCard-warning">
-    <div class="sapStatCard-label">Pending Review</div>
-    <div class="sapStatCard-value">{{ pending_count }}</div>
-  </div>
-  <div class="sapStatCard sapStatCard-positive">
-    <div class="sapStatCard-label">Reviewed</div>
+  <a href="{{ url_for('admin_review_news', profile_id=profile.id, source='accepted', reviewed='no') }}" 
+     class="sapStatCard sapStatCard-info {% if filter_source == 'accepted' and filter_reviewed == 'no' %}sapStatCard-active{% endif %}" 
+     style="text-decoration: none; color: inherit;">
+    <div class="sapStatCard-label">Accepted (Unscored)</div>
+    <div class="sapStatCard-value">{{ accepted_unscored_count }}</div>
+  </a>
+  <a href="{{ url_for('admin_review_news', profile_id=profile.id, source='filtered', reviewed='no') }}" 
+     class="sapStatCard sapStatCard-warning {% if filter_source == 'filtered' and filter_reviewed == 'no' %}sapStatCard-active{% endif %}" 
+     style="text-decoration: none; color: inherit;">
+    <div class="sapStatCard-label">Filtered (Unscored)</div>
+    <div class="sapStatCard-value">{{ filtered_unscored_count }}</div>
+  </a>
+  <a href="{{ url_for('admin_review_news', profile_id=profile.id, reviewed='yes') }}" 
+     class="sapStatCard sapStatCard-positive {% if filter_reviewed == 'yes' %}sapStatCard-active{% endif %}" 
+     style="text-decoration: none; color: inherit;">
+    <div class="sapStatCard-label">Reviewed (All)</div>
     <div class="sapStatCard-value">{{ reviewed_count }}</div>
-  </div>
-</div>
-
-<!-- Filter Tabs -->
-<div class="sapSegmentedButton">
-  <a class="sapSegmentedButton-item {% if not filter_reviewed %}active{% endif %}" 
-     href="{{ url_for('admin_review_news', profile_id=profile.id) }}">
-    All
-  </a>
-  <a class="sapSegmentedButton-item {% if filter_reviewed == 'no' %}active{% endif %}" 
-     href="{{ url_for('admin_review_news', profile_id=profile.id, reviewed='no') }}">
-    Pending
-  </a>
-  <a class="sapSegmentedButton-item {% if filter_reviewed == 'yes' %}active{% endif %}" 
-     href="{{ url_for('admin_review_news', profile_id=profile.id, reviewed='yes') }}">
-    Reviewed
   </a>
 </div>
 
@@ -202,7 +206,7 @@
 {% if items %}
 <div class="sapCard">
   <div class="sapCard-header">
-    <span>📰 Filtered News Items</span>
+    <span>📰 News Items for Review</span>
     <span style="color: var(--sapNeutralColor); font-weight: 400; font-size: var(--sapFontSmallSize);">
       Page {{ page }} of {{ total_pages }}
     </span>
@@ -215,6 +219,7 @@
             <th style="width: 40px;">
               <input type="checkbox" id="selectAllCheckbox" onclick="toggleSelectAll()">
             </th>
+            <th style="width: 90px;">Status</th>
             <th style="width: 80px;">Source</th>
             <th>Title / Content</th>
             <th style="width: 100px;">Filter Reason</th>
@@ -227,7 +232,14 @@
           {% for item in items %}
           <tr>
             <td style="text-align: center;">
-              <input type="checkbox" name="item_ids" value="{{ item.id }}" form="bulkScoreForm" class="item-checkbox bulk-checkbox">
+              <input type="checkbox" name="item_ids" value="{{ item.id }}:{{ item.item_source }}" form="bulkScoreForm" class="item-checkbox bulk-checkbox">
+            </td>
+            <td>
+              {% if item.item_source == 'accepted' %}
+              <span class="sapBadge sapBadge-positive" title="Accepted into baseline">✅ Accepted</span>
+              {% else %}
+              <span class="sapBadge sapBadge-critical" title="Filtered out">⚠️ Filtered</span>
+              {% endif %}
             </td>
             <td>
               <span class="sapBadge sapBadge-neutral">{{ item.source_type or 'unknown' }}</span>
@@ -246,7 +258,9 @@
               {% endif %}
             </td>
             <td>
-              {% if item.filter_reason == 'domain_country' %}
+              {% if item.item_source == 'accepted' %}
+              <span class="sapBadge sapBadge-positive" title="Passed all filters">✓ Passed</span>
+              {% elif item.filter_reason == 'domain_country' %}
               <span class="sapBadge sapBadge-neutral" title="Domain not whitelisted and no country mention">Domain</span>
               {% elif item.filter_reason == 'glossary' %}
               <span class="sapBadge sapBadge-critical" title="No glossary term match">Glossary</span>
@@ -281,7 +295,7 @@
             </td>
             <td>
               <form method="POST" action="{{ url_for('score_filtered_news', profile_id=profile.id) }}" style="display: flex; gap: var(--sapSpacingXS); align-items: center;">
-                <input type="hidden" name="item_id" value="{{ item.id }}">
+                <input type="hidden" name="item_id" value="{{ item.id }}:{{ item.item_source }}">
                 <select name="score" class="sapForm-select" style="width: 60px; padding: 0.25rem; font-size: var(--sapFontSmallSize);">
                   <option value="1" {% if item.relevance_score == 1 %}selected{% endif %}>1</option>
                   <option value="2" {% if item.relevance_score == 2 %}selected{% endif %}>2</option>
@@ -292,7 +306,7 @@
                 <button type="submit" class="sapBtn sapBtn-emphasized sapBtn-sm" style="padding: 0.25rem 0.5rem;">Save</button>
               </form>
               <form method="POST" action="{{ url_for('delete_filtered_news_item', profile_id=profile.id) }}" onsubmit="return confirm('Delete this item?');" style="margin-top: var(--sapSpacingXS);">
-                <input type="hidden" name="item_id" value="{{ item.id }}">
+                <input type="hidden" name="item_id" value="{{ item.id }}:{{ item.item_source }}">
                 <button type="submit" class="sapBtn sapBtn-reject sapBtn-sm" style="padding: 0.25rem 0.5rem; width: 100%;" title="Delete">Delete</button>
               </form>
             </td>
@@ -308,7 +322,7 @@
 {% if total_pages > 1 %}
 <div class="sapPagination">
   <a class="sapPagination-item {% if page == 1 %}disabled{% endif %}" 
-     href="{{ url_for('admin_review_news', profile_id=profile.id, reviewed=filter_reviewed, page=page-1) if page > 1 else '#' }}">
+     href="{{ url_for('admin_review_news', profile_id=profile.id, source=filter_source, reviewed=filter_reviewed, page=page-1) if page > 1 else '#' }}">
     ‹ Previous
   </a>
   
@@ -316,14 +330,14 @@
     {% if p == page %}
       <span class="sapPagination-item active">{{ p }}</span>
     {% elif p == 1 or p == total_pages or (p >= page - 2 and p <= page + 2) %}
-      <a class="sapPagination-item" href="{{ url_for('admin_review_news', profile_id=profile.id, reviewed=filter_reviewed, page=p) }}">{{ p }}</a>
+      <a class="sapPagination-item" href="{{ url_for('admin_review_news', profile_id=profile.id, source=filter_source, reviewed=filter_reviewed, page=p) }}">{{ p }}</a>
     {% elif p == page - 3 or p == page + 3 %}
       <span class="sapPagination-item disabled">...</span>
     {% endif %}
   {% endfor %}
   
   <a class="sapPagination-item {% if page == total_pages %}disabled{% endif %}" 
-     href="{{ url_for('admin_review_news', profile_id=profile.id, reviewed=filter_reviewed, page=page+1) if page < total_pages else '#' }}">
+     href="{{ url_for('admin_review_news', profile_id=profile.id, source=filter_source, reviewed=filter_reviewed, page=page+1) if page < total_pages else '#' }}">
     Next ›
   </a>
 </div>
@@ -333,8 +347,8 @@
 <div class="sapCard">
   <div class="sapCard-content" style="text-align: center; padding: var(--sapSpacingXL);">
     <div style="font-size: 3rem; margin-bottom: var(--sapSpacingM); color: var(--sapNeutralColor);">📰</div>
-    <h3 style="font-size: var(--sapFontHeader3Size); margin-bottom: var(--sapSpacingS);">No filtered news items found</h3>
-    <p style="color: var(--sapNeutralColor); margin: 0;">Run a profile to collect news. Filtered items will appear here for review.</p>
+    <h3 style="font-size: var(--sapFontHeader3Size); margin-bottom: var(--sapSpacingS);">No news items found</h3>
+    <p style="color: var(--sapNeutralColor); margin: 0;">Run a profile to collect news. Items will appear here for review.</p>
   </div>
 </div>
 {% endif %}
@@ -354,8 +368,15 @@
       <li><strong>5 - Very Relevant:</strong> This should have been included! Add missing terms to the glossary immediately.</li>
     </ul>
     
+    <h3 style="font-size: var(--sapFontLargeSize); margin: var(--sapSpacingM) 0 var(--sapSpacingS) 0;">Status Badges</h3>
+    <ul style="margin: 0; padding-left: var(--sapSpacingL); line-height: 1.8;">
+      <li><strong>✅ Accepted:</strong> Item passed all filters and was accepted into baseline. Review to confirm AI didn't let through irrelevant content.</li>
+      <li><strong>⚠️ Filtered:</strong> Item was filtered out. Review to check if AI was too strict and missed relevant content.</li>
+    </ul>
+    
     <h3 style="font-size: var(--sapFontLargeSize); margin: var(--sapSpacingM) 0 var(--sapSpacingS) 0;">Filter Reasons</h3>
     <ul style="margin: 0; padding-left: var(--sapSpacingL); line-height: 1.8;">
+      <li><strong>✓ Passed:</strong> Item passed all filters (accepted items).</li>
       <li><strong>Domain/Country:</strong> The news source domain wasn't whitelisted and no country mention was found.</li>
       <li><strong>Glossary:</strong> No glossary terms matched in the content. Consider adding relevant terms.</li>
       <li><strong>LLM:</strong> The AI classified this as not relevant to the LoB. Review the content to verify.</li>
@@ -363,8 +384,8 @@
     
     <div class="sapMessageStrip sapMessageStrip-info" style="margin-top: var(--sapSpacingM);">
       <span>
-        <strong>💡 Tip:</strong> High scores (4-5) on glossary-filtered items indicate missing terms. 
-        <a href="{{ url_for('admin_profile_detail', profile_id=profile.id) }}" style="color: var(--sapLinkColor); font-weight: 600;">Add them to the glossary</a> to improve future filtering.
+        <strong>💡 Tip:</strong> High scores (4-5) on filtered items indicate missing glossary terms. Low scores (1-2) on accepted items indicate AI is letting through irrelevant content. 
+        <a href="{{ url_for('admin_profile_detail', profile_id=profile.id) }}" style="color: var(--sapLinkColor); font-weight: 600;">Update the glossary</a> to improve future filtering.
       </span>
     </div>
   </div>

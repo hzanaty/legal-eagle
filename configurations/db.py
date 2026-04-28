@@ -1160,6 +1160,178 @@ def prune_old_filtered_news(conn: sqlite3.Connection, days: int = 30) -> None:
         )
 
 
+def list_all_news_for_review(
+    conn: sqlite3.Connection, 
+    profile_id: int, 
+    source: Optional[str] = None,
+    reviewed: Optional[bool] = None,
+    limit: int = 50,
+    offset: int = 0
+) -> List[Dict[str, Any]]:
+    """
+    Fetch news items from BOTH news_items (accepted/baseline) and filtered_news tables.
+    Returns combined list with 'item_source' field to distinguish origin.
+    
+    Args:
+        profile_id: Profile to fetch news for
+        source: Filter by source - 'accepted', 'filtered', or None for all
+        reviewed: Filter by review status - True (reviewed), False (pending), None (all)
+        limit: Max items to return
+        offset: Pagination offset
+    
+    Returns:
+        List of dicts with 'item_source' field ('accepted' or 'filtered')
+    """
+    results: List[Dict[str, Any]] = []
+    
+    # Fetch from news_items (accepted/baseline) if requested
+    if source is None or source == 'accepted':
+        sql_accepted = """
+            SELECT id, profile_id, source_type, source_id, url, domain, title, content, 
+                   published_at, first_seen_at, last_seen_at, hash_signature, 
+                   relevance_score, reviewed_at
+            FROM news_items 
+            WHERE profile_id = ?
+        """
+        params_accepted: List[Any] = [profile_id]
+        
+        if reviewed is True:
+            sql_accepted += " AND relevance_score IS NOT NULL"
+        elif reviewed is False:
+            sql_accepted += " AND relevance_score IS NULL"
+        
+        sql_accepted += " ORDER BY COALESCE(published_at, last_seen_at) DESC"
+        
+        rows_accepted = conn.execute(sql_accepted, params_accepted).fetchall()
+        for r in rows_accepted:
+            item = {k: r[k] for k in r.keys()}
+            item['item_source'] = 'accepted'
+            item['created_at'] = r['first_seen_at']  # Map to common field
+            results.append(item)
+    
+    # Fetch from filtered_news if requested
+    if source is None or source == 'filtered':
+        sql_filtered = """
+            SELECT id, profile_id, source_type, url, title, content, filter_reason,
+                   created_at, relevance_score, reviewed_at
+            FROM filtered_news 
+            WHERE profile_id = ?
+        """
+        params_filtered: List[Any] = [profile_id]
+        
+        if reviewed is True:
+            sql_filtered += " AND relevance_score IS NOT NULL"
+        elif reviewed is False:
+            sql_filtered += " AND relevance_score IS NULL"
+        
+        sql_filtered += " ORDER BY created_at DESC"
+        
+        rows_filtered = conn.execute(sql_filtered, params_filtered).fetchall()
+        for r in rows_filtered:
+            item = {k: r[k] for k in r.keys()}
+            item['item_source'] = 'filtered'
+            # Add missing fields for consistency
+            item['source_id'] = None
+            item['domain'] = None
+            item['published_at'] = None
+            item['first_seen_at'] = r['created_at']
+            item['last_seen_at'] = r['created_at']
+            item['hash_signature'] = None
+            results.append(item)
+    
+    # Sort combined results by date (most recent first)
+    results.sort(key=lambda x: x.get('created_at') or x.get('last_seen_at') or '', reverse=True)
+    
+    # Apply pagination
+    return results[offset:offset + limit]
+
+
+def count_all_news_for_review(
+    conn: sqlite3.Connection,
+    profile_id: int,
+    source: Optional[str] = None,
+    reviewed: Optional[bool] = None
+) -> int:
+    """
+    Count news items from BOTH news_items and filtered_news tables.
+    
+    Args:
+        profile_id: Profile to count news for
+        source: Filter by source - 'accepted', 'filtered', or None for all
+        reviewed: Filter by review status - True (reviewed), False (pending), None (all)
+    
+    Returns:
+        Total count across both tables
+    """
+    total = 0
+    
+    # Count from news_items (accepted/baseline)
+    if source is None or source == 'accepted':
+        sql_accepted = "SELECT COUNT(*) AS cnt FROM news_items WHERE profile_id = ?"
+        params_accepted: List[Any] = [profile_id]
+        
+        if reviewed is True:
+            sql_accepted += " AND relevance_score IS NOT NULL"
+        elif reviewed is False:
+            sql_accepted += " AND relevance_score IS NULL"
+        
+        row = conn.execute(sql_accepted, params_accepted).fetchone()
+        total += int(row["cnt"]) if row else 0
+    
+    # Count from filtered_news
+    if source is None or source == 'filtered':
+        sql_filtered = "SELECT COUNT(*) AS cnt FROM filtered_news WHERE profile_id = ?"
+        params_filtered: List[Any] = [profile_id]
+        
+        if reviewed is True:
+            sql_filtered += " AND relevance_score IS NOT NULL"
+        elif reviewed is False:
+            sql_filtered += " AND relevance_score IS NULL"
+        
+        row = conn.execute(sql_filtered, params_filtered).fetchone()
+        total += int(row["cnt"]) if row else 0
+    
+    return total
+
+
+def update_news_item_score(conn: sqlite3.Connection, item_id: int, item_source: str, relevance_score: int) -> None:
+    """
+    Update the relevance score for a news item from EITHER table.
+    
+    Args:
+        item_id: Item ID
+        item_source: 'accepted' (news_items table) or 'filtered' (filtered_news table)
+        relevance_score: Score 1-5
+    """
+    now_iso = datetime.utcnow().isoformat()
+    with conn:
+        if item_source == 'accepted':
+            conn.execute(
+                "UPDATE news_items SET relevance_score = ?, reviewed_at = ? WHERE id = ?",
+                (relevance_score, now_iso, item_id),
+            )
+        elif item_source == 'filtered':
+            conn.execute(
+                "UPDATE filtered_news SET relevance_score = ?, reviewed_at = ? WHERE id = ?",
+                (relevance_score, now_iso, item_id),
+            )
+
+
+def delete_news_item(conn: sqlite3.Connection, item_id: int, item_source: str) -> None:
+    """
+    Delete a news item from EITHER table.
+    
+    Args:
+        item_id: Item ID
+        item_source: 'accepted' (news_items table) or 'filtered' (filtered_news table)
+    """
+    with conn:
+        if item_source == 'accepted':
+            conn.execute("DELETE FROM news_items WHERE id = ?", (item_id,))
+        elif item_source == 'filtered':
+            conn.execute("DELETE FROM filtered_news WHERE id = ?", (item_id,))
+
+
 def get_reviewed_news_baseline(conn: sqlite3.Connection, profile_id: int, min_score: int = 4) -> List[Dict[str, Any]]:
     """
     Retrieve filtered news items that have been manually reviewed with a high relevance score.

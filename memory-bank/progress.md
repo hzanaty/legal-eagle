@@ -1,3 +1,45 @@
+## v2.17 (2026-04-28) — Review UI Simplification & Cleanup
+
+**Changes**:
+- **Review Page UI Improvements**:
+  - Removed redundant tab buttons (Accepted/Filtered/Reviewed tabs below stat cards)
+  - Made stat cards clickable for direct navigation
+  - Added hover effects (card lifts up with shadow)
+  - Added active state styling (blue border + shadow glow on selected card)
+  - Cleaner, more intuitive interface following card-based UI patterns
+  
+- **Run Page Cleanup**:
+  - Removed "Clear Historical News (71)" button from Run Workflow page
+  - Removed associated confirmation dialog modal
+  - Removed JavaScript functions: `showClearDialog()`, `hideClearDialog()`, `handleClearSubmit()`
+  - Users now manage history exclusively from Review page with granular controls:
+    - "Clear All" button (clears everything)
+    - "Clear Reviewed" button (clears only scored items)
+  
+- **Scoring Integration Documentation**:
+  - Confirmed scoring is already integrated into `news_filter.py`
+  - High-score rescue mechanism: items with `relevance_score >= 4` are used as baseline
+  - Filtering pipeline priority documented:
+    1. **Age Gate** (hard block, no rescue)
+    2. **LLM Semantic Check** (uses glossary terms as context)
+    3. **High-Score Rescue** (if LLM filtered out, check similarity to high-scored items)
+  - When user scores filtered item 4-5, similar items get rescued in future runs
+  - Glossary wins first, high scores provide safety net for false negatives
+
+**Rationale**:
+- Stat cards serve dual purpose (stats + navigation) - no need for separate buttons
+- Run page cleanup eliminates redundancy (Review page has better controls)
+- Scoring integration clarification helps users understand the feedback loop
+- Cleaner UI with fewer redundant controls
+
+**Files Changed**:
+- `admin/templates/review_news.html` — Removed tab buttons, made cards clickable, added CSS
+- `admin/templates/run_status.html` — Removed Clear button, dialog modal, and JS functions
+- `memory-bank/activeContext.md` — Updated to v2.17
+- `memory-bank/progress.md` — This entry
+
+---
+
 ## v2.16 (2026-04-28) — Admin UI Fixes & Enhancements
 
 **Changes**:

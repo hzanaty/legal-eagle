@@ -1,9 +1,29 @@
-## Current State: v2.16 — Admin UI Fixes & Enhancements (2026-04-28)
+## Current State: v2.17 — Review UI Simplification (2026-04-28)
 
-### ✅ v2.16 COMPLETE - Admin UI Fixes & Enhancements
+### ✅ v2.17 COMPLETE - Review UI Simplification & Cleanup
+**Status**: Clickable stat cards implemented, redundant buttons removed, scoring integration documented.
+
+**Completion Date**: 2026-04-28 03:11 UTC+3
+
+### Key Changes:
+1. **Review Page UI Improvements**:
+   - Removed redundant tab buttons (Accepted/Filtered/Reviewed)
+   - Made stat cards clickable for navigation
+   - Added hover effects and active state styling
+   - Cleaner, more intuitive interface
+
+2. **Run Page Cleanup**:
+   - Removed "Clear Historical News" button (redundant)
+   - Users now manage history from Review page with granular controls
+   - Removed associated dialog modal and JavaScript functions
+
+3. **Scoring Integration Documentation**:
+   - Confirmed scoring is integrated into news_filter.py
+   - High-score rescue mechanism (score ≥ 4) saves filtered items
+   - Documented filtering pipeline priority: Age Gate → LLM/Glossary → High-Score Rescue
+
+### ✅ v2.16 COMPLETE - Admin UI Fixes & Enhancements (2026-04-28 02:19)
 **Status**: All UI consistency improvements complete. Tables, forms, and recursive fields working correctly.
-
-**Completion Date**: 2026-04-28 02:19 UTC+3
 
 ### Scheduler Removal (v2.15):
 
