@@ -1,4 +1,25 @@
-## Current State: v2.19 — Source Selection Fix (2026-04-28)
+## Current State: v2.20 — Skip Filtering + Run Options Persistence (2026-04-28)
+
+### ✅ v2.20 COMPLETE - Skip Filtering + Run Options Persistence
+**Status**: Skip filtering feature and localStorage persistence implemented and tested.
+
+**Completion Date**: 2026-04-28 15:50 UTC+3
+
+### Key Features:
+1. **Skip Filtering Checkbox**: New option to bypass LLM relevance check
+   - Useful for testing: see all collected items without filtering
+   - Shows warning in logs when enabled
+   - All collected items treated as relevant
+
+2. **Run Options Persistence**: All 4 checkboxes now remember selections
+   - Saved to localStorage per profile
+   - Auto-restores on page load
+   - Auto-saves on checkbox change
+   - Options persisted:
+     - Force full fetch
+     - Skip comparison (treat all as new)
+     - Skip filtering (accept all as relevant) ← NEW
+     - Test mode (skip emails)
 
 ### ✅ v2.19 COMPLETE - Source Selection Fix (Empty Selection = Run None)
 **Status**: Smart detection implemented, unchecked sources now correctly run none instead of all.

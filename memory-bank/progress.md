@@ -1,3 +1,77 @@
+## v2.20 (2026-04-28) — Skip Filtering + Run Options Persistence
+
+**New Features**:
+1. **Skip Filtering Checkbox**: Added option to bypass LLM relevance check for testing purposes
+2. **Run Options Persistence**: All 4 run option checkboxes now persist across sessions using localStorage
+
+**Problem Solved**:
+- Users had to re-select run options (force fetch, skip comparison, test mode) every time
+- No way to bypass filtering for testing/debugging collected items
+
+**Solution**:
+1. **Skip Filtering Feature**:
+   - Added new checkbox: "Skip filtering (accept all as relevant)"
+   - When enabled, bypasses `news_filter.py` LLM relevance check
+   - All collected items treated as relevant (useful for testing data collection)
+   - Shows warning in logs: "⚠️ Skip filtering enabled: treating all items as relevant"
+
+2. **localStorage Persistence**:
+   - All 4 run options automatically saved to browser localStorage on change
+   - Restored on page load (per profile ID)
+   - Key format: `legal_eagle_run_options_profile_{id}`
+   - Persisted options:
+     - Force full fetch
+     - Skip comparison (treat all as new)
+     - Skip filtering (accept all as relevant) ← NEW
+     - Test mode (skip emails)
+
+**Files Changed**:
+- `admin/templates/run_status.html`:
+  - Added skip filtering checkbox in Run Options section
+  - Added localStorage persistence JavaScript for all 4 checkboxes
+  - Auto-saves on checkbox change, auto-restores on page load
+- `admin/app.py`:
+  - Captures `skip_filtering` form parameter (line 436)
+  - Passes to worker thread as `skip_filt` (line 489)
+  - Logs in audit trail (line 475)
+- `agents/agents_controller.py`:
+  - Added `skip_filter` parameter to `run_profile_once()` (line 264)
+  - Added to mode indicators display (line 308)
+  - Conditionally bypasses filtering when `skip_filter=True` (lines 482-502)
+  - Shows warning log when filtering is skipped
+
+**User Experience**:
+- **Before**: Had to re-check "Test mode" every single run
+- **After**: Checkbox states remembered automatically ✅
+- **Before**: No way to see all collected items without filtering
+- **After**: Can toggle "Skip filtering" for testing ✅
+
+**Technical Implementation**:
+```javascript
+// localStorage persistence (per profile)
+const optionsKey = 'legal_eagle_run_options_profile_' + PROFILE_ID;
+localStorage.setItem(optionsKey, JSON.stringify({
+  force_run: true/false,
+  skip_comparison: true/false,
+  skip_filtering: true/false,  // NEW
+  skip_email: true/false
+}));
+```
+
+```python
+# Backend skip filtering logic
+if skip_filter:
+    print(f"\n⚠️ Skip filtering enabled: treating all items as relevant")
+    filtered_items = all_news_items
+    filtered_count = 0
+else:
+    # Normal filtering with LLM
+    filter_result = get_relevant_news(...)
+    filtered_items = filter_result.get("items", [])
+```
+
+---
+
 ## v2.19 (2026-04-28) — Source Selection Fix (Empty Selection = Run None)
 
 **Problem**:

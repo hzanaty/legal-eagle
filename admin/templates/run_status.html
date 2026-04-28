@@ -272,6 +272,17 @@
               </span>
             </label>
             
+            <label style="display: flex; align-items: center; gap: var(--sapSpacingS); margin-bottom: var(--sapSpacingXS); cursor: pointer;">
+              <input type="checkbox" name="skip_filtering" value="1" style="cursor: pointer;">
+              <span style="font-size: var(--sapFontSmallSize);">
+                <strong>Skip filtering (accept all as relevant)</strong>
+                <br>
+                <span style="color: var(--sapNeutralColor); font-size: 11px;">
+                  Bypass LLM relevance check, useful for testing
+                </span>
+              </span>
+            </label>
+            
             <label style="display: flex; align-items: center; gap: var(--sapSpacingS); cursor: pointer;">
               <input type="checkbox" name="skip_email" value="1" style="cursor: pointer;">
               <span style="font-size: var(--sapFontSmallSize);">
@@ -405,6 +416,68 @@
 // Pass sources data from backend to JavaScript
 const SOURCES_DATA = {{ sources_json|safe }};
 const PROFILE_ID = {{ profile.id }};
+
+// Run Options Persistence
+(function() {
+  const optionsKey = 'legal_eagle_run_options_profile_' + PROFILE_ID;
+  
+  // Load saved run options
+  function loadRunOptions() {
+    try {
+      const saved = localStorage.getItem(optionsKey);
+      return saved ? JSON.parse(saved) : null;
+    } catch (error) {
+      console.error('Failed to load run options:', error);
+      return null;
+    }
+  }
+  
+  // Save run options
+  function saveRunOptions() {
+    try {
+      const options = {
+        force_run: document.querySelector('input[name="force_run"]').checked,
+        skip_comparison: document.querySelector('input[name="skip_comparison"]').checked,
+        skip_filtering: document.querySelector('input[name="skip_filtering"]').checked,
+        skip_email: document.querySelector('input[name="skip_email"]').checked
+      };
+      localStorage.setItem(optionsKey, JSON.stringify(options));
+    } catch (error) {
+      console.error('Failed to save run options:', error);
+    }
+  }
+  
+  // Restore run options on page load
+  function restoreRunOptions() {
+    const saved = loadRunOptions();
+    if (saved) {
+      if (saved.force_run !== undefined) {
+        document.querySelector('input[name="force_run"]').checked = saved.force_run;
+      }
+      if (saved.skip_comparison !== undefined) {
+        document.querySelector('input[name="skip_comparison"]').checked = saved.skip_comparison;
+      }
+      if (saved.skip_filtering !== undefined) {
+        document.querySelector('input[name="skip_filtering"]').checked = saved.skip_filtering;
+      }
+      if (saved.skip_email !== undefined) {
+        document.querySelector('input[name="skip_email"]').checked = saved.skip_email;
+      }
+    }
+  }
+  
+  // Initialize on page load
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', restoreRunOptions);
+  } else {
+    restoreRunOptions();
+  }
+  
+  // Save on checkbox change
+  document.querySelectorAll('input[name="force_run"], input[name="skip_comparison"], input[name="skip_filtering"], input[name="skip_email"]').forEach(function(checkbox) {
+    checkbox.addEventListener('change', saveRunOptions);
+  });
+})();
 
 // Source Selection Management
 (function() {

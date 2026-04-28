@@ -438,6 +438,7 @@ def admin_start_run(profile_id: int):
     # Get run options from form
     force_run = request.form.get('force_run') == '1'
     skip_comparison = request.form.get('skip_comparison') == '1'
+    skip_filtering = request.form.get('skip_filtering') == '1'
     skip_email = request.form.get('skip_email') == '1'
     
     # Get source selections from form (getlist returns [] if not present)
@@ -475,13 +476,13 @@ def admin_start_run(profile_id: int):
     conn = get_connection()
     create_schema_if_needed(conn)
     # Audit request with options
-    run_details = f"manual run from run page (force_run={force_run}, skip_comparison={skip_comparison}, skip_email={skip_email}, rss={len(selected_rss) if selected_rss else 'all'}, twitter={len(selected_twitter) if selected_twitter else 'all'}, urls={len(selected_urls) if selected_urls else 'all'})"
+    run_details = f"manual run from run page (force_run={force_run}, skip_comparison={skip_comparison}, skip_filtering={skip_filtering}, skip_email={skip_email}, rss={len(selected_rss) if selected_rss else 'all'}, twitter={len(selected_twitter) if selected_twitter else 'all'}, urls={len(selected_urls) if selected_urls else 'all'})"
     add_audit_log(conn, entity="profiles", action="run_requested", details=run_details, profile_id=profile_id)
     run_id = create_run(conn, profile_id, origin="manual")
     conn.close()
 
     # Background worker
-    def _worker(pid: int, rid: int, force: bool, skip_comp: bool, skip_mail: bool, sel_rss, sel_twitter, sel_urls):
+    def _worker(pid: int, rid: int, force: bool, skip_comp: bool, skip_filt: bool, skip_mail: bool, sel_rss, sel_twitter, sel_urls):
         # hook stdout to DB logs with line buffering
         class _DBLogger:
             def __init__(self, run_id: int):
@@ -538,7 +539,7 @@ def admin_start_run(profile_id: int):
                 cconn.close()
                 return flag
 
-            ok = run_profile_once(pid, force_run=force, skip_comparison=skip_comp, skip_email=skip_mail,
+            ok = run_profile_once(pid, force_run=force, skip_comparison=skip_comp, skip_filter=skip_filt, skip_email=skip_mail,
                                 selected_rss_urls=sel_rss, selected_twitter_handles=sel_twitter, 
                                 selected_url_sources=sel_urls)
             status_final = "Success" if ok else "Failed"
@@ -570,7 +571,7 @@ def admin_start_run(profile_id: int):
             append_run_log(fconn, rid, "INFO", f"🏁 Run {rid} finished with status {status_mark}")
             fconn.close()
 
-    threading.Thread(target=_worker, args=(profile_id, run_id, force_run, skip_comparison, skip_email, selected_rss, selected_twitter, selected_urls), daemon=True).start()
+    threading.Thread(target=_worker, args=(profile_id, run_id, force_run, skip_comparison, skip_filtering, skip_email, selected_rss, selected_twitter, selected_urls), daemon=True).start()
     return redirect(url_for("admin_profile_runs", profile_id=profile_id, run_id=run_id))
 
 

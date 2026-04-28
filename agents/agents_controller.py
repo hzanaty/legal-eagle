@@ -261,6 +261,7 @@ def run_profile_once(
     force_run: bool = False, 
     skip_email: bool = False, 
     skip_comparison: bool = False,
+    skip_filter: bool = False,
     selected_rss_urls: Optional[List[str]] = None,
     selected_twitter_handles: Optional[List[str]] = None,
     selected_url_sources: Optional[List[str]] = None
@@ -274,6 +275,7 @@ def run_profile_once(
         force_run: If True, force FULL fetch mode (ignore delta timestamps)
         skip_email: If True, run pipeline but don't send emails (test mode)
         skip_comparison: If True, bypass duplicate detection (treat all as new)
+        skip_filter: If True, bypass LLM relevance check (accept all as relevant)
         selected_rss_urls: Optional list of RSS URLs to fetch (None = all)
         selected_twitter_handles: Optional list of Twitter handles to fetch (None = all)
         selected_url_sources: Optional list of URL sources to fetch (None = all)
@@ -301,6 +303,8 @@ def run_profile_once(
             mode_indicators.append("FORCE RUN")
         if skip_comparison:
             mode_indicators.append("SKIP COMPARISON")
+        if skip_filter:
+            mode_indicators.append("SKIP FILTERING")
         if skip_email:
             mode_indicators.append("TEST MODE")
         
@@ -475,27 +479,32 @@ def run_profile_once(
         # Filter FIRST (optimization: reduces items before expensive comparison)
         # Load high-score baseline for "second chance" rescue in filter
         # Save filtered items to DB for manual review
-        high_score_baseline = get_reviewed_baseline(profile_id, min_score=4)
-        print(f"\n🧹 Filtering for relevance (before comparison)... (high-score baseline: {len(high_score_baseline)} items)")
-        
-        def _save_filtered_item(item, reason):
-            """Callback to save filtered items to DB for manual review."""
-            try:
-                conn_f = get_connection()
-                create_schema_if_needed(conn_f)
-                insert_filtered_news(conn_f, profile_id, item, reason)
-                conn_f.close()
-            except Exception as e:
-                print(f"   ⚠️ Failed to save filtered item: {e}")
-        
-        filter_result = get_relevant_news(
-            all_news_items, "", GLOSSARY, LANGUAGE_PREFERENCE, lob,
-            high_score_baseline=high_score_baseline, on_filtered=_save_filtered_item
-        )
-        filtered_items = filter_result.get("items", [])
-        filtered_count = len(filter_result.get("filtered", []))
-        print(f"✅ Relevant items after filtering: {len(filtered_items)}")
-        print(f"📋 Saved {filtered_count} filtered items for manual review")
+        if skip_filter:
+            print(f"\n⚠️ Skip filtering enabled: treating all items as relevant")
+            filtered_items = all_news_items
+            filtered_count = 0
+        else:
+            high_score_baseline = get_reviewed_baseline(profile_id, min_score=4)
+            print(f"\n🧹 Filtering for relevance (before comparison)... (high-score baseline: {len(high_score_baseline)} items)")
+            
+            def _save_filtered_item(item, reason):
+                """Callback to save filtered items to DB for manual review."""
+                try:
+                    conn_f = get_connection()
+                    create_schema_if_needed(conn_f)
+                    insert_filtered_news(conn_f, profile_id, item, reason)
+                    conn_f.close()
+                except Exception as e:
+                    print(f"   ⚠️ Failed to save filtered item: {e}")
+            
+            filter_result = get_relevant_news(
+                all_news_items, "", GLOSSARY, LANGUAGE_PREFERENCE, lob,
+                high_score_baseline=high_score_baseline, on_filtered=_save_filtered_item
+            )
+            filtered_items = filter_result.get("items", [])
+            filtered_count = len(filter_result.get("filtered", []))
+            print(f"✅ Relevant items after filtering: {len(filtered_items)}")
+            print(f"📋 Saved {filtered_count} filtered items for manual review")
 
         # Compare AFTER filtering (only relevant items are processed)
         # CRITICAL: Attach profile_id to all items so compare_news loads the correct baseline

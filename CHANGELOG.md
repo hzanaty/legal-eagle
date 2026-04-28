@@ -1,5 +1,40 @@
 # CHANGELOG
 
+## v2.20 — 2026-04-28
+### Skip Filtering + Run Options Persistence
+
+**New Features:**
+1. **Skip Filtering Checkbox**
+   - New option to bypass LLM relevance check for testing
+   - Useful for debugging: see all collected items without filtering
+   - Shows warning in logs when enabled
+   - All collected items treated as relevant
+
+2. **Run Options Persistence**
+   - All 4 run option checkboxes now remember your selections
+   - Saved to browser localStorage per profile
+   - Auto-restores on page load, auto-saves on change
+   - Persisted options:
+     - Force full fetch
+     - Skip comparison (treat all as new)
+     - Skip filtering (accept all as relevant) ← NEW
+     - Test mode (skip emails)
+
+**User Experience:**
+- **Before**: Had to re-check options every run (e.g., "Test mode")
+- **After**: Checkbox states remembered automatically ✅
+- **Before**: No way to see all collected items without filtering
+- **After**: Can toggle "Skip filtering" for testing ✅
+
+**Files Changed:**
+- `admin/templates/run_status.html` — Added skip filtering checkbox + localStorage persistence
+- `admin/app.py` — Captures and passes skip_filtering parameter
+- `agents/agents_controller.py` — Implements skip_filter logic
+- `memory-bank/` — Updated documentation
+- `CHANGELOG.md` — This entry
+
+---
+
 ## v2.19 — 2026-04-28
 ### Source Selection Fix (Empty Selection = Run None)
 - **Problem**: Unchecking all URL sources ran ALL sources instead of none
