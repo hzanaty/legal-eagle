@@ -1,9 +1,25 @@
-## Current State: v2.17 — Review UI Simplification (2026-04-28)
+## Current State: v2.18 — Twitter Status Compact Design (2026-04-28)
 
-### ✅ v2.17 COMPLETE - Review UI Simplification & Cleanup
+### ✅ v2.18 COMPLETE - Twitter Status Card Compact Design
+**Status**: Error-only Twitter status implemented, saves vertical space on Run page.
+
+**Completion Date**: 2026-04-28 03:23 UTC+3
+
+### Key Changes:
+1. **Error-Only Display**: Twitter status card removed when everything is working
+   - No card shown in normal operation (saves ~100px vertical space)
+   - Red error banner appears only when Twitter API has issues
+   - Shows error message with "Clear Error & Retry" button
+   - Consistent with profile page error flag system
+
+2. **Rationale**:
+   - Reduces visual clutter on Run page
+   - "Show errors, hide success" design pattern
+   - Users only see status when action is needed
+   - Saves significant vertical space per profile
+
+### ✅ v2.17 COMPLETE - Review UI Simplification & Cleanup (2026-04-28 03:11)
 **Status**: Clickable stat cards implemented, redundant buttons removed, scoring integration documented.
-
-**Completion Date**: 2026-04-28 03:11 UTC+3
 
 ### Key Changes:
 1. **Review Page UI Improvements**:

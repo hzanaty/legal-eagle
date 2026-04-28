@@ -1,3 +1,27 @@
+## v2.18 (2026-04-28) — Twitter Status Compact Design
+
+**Changes**:
+- **Error-Only Display**: Twitter status card now only appears when there's an error
+  - Removed large Twitter status card from Run page (saves ~100px vertical space)
+  - Red error banner appears only when Twitter API has issues
+  - Shows error message with "Clear Error & Retry" button
+  - Consistent with profile page error flag system
+  
+**Rationale**:
+- Reduces visual clutter on Run page
+- "Show errors, hide success" design pattern
+- Users only see Twitter status when action is needed
+- Saves significant vertical space per profile
+
+**Files Changed**:
+- `admin/templates/run_status.html` — Replaced large card with compact error-only banner
+- `admin/app.py` — Added twitter_error_flag to run_status template context
+- `CHANGELOG.md` — Added v2.18 entry
+- `memory-bank/activeContext.md` — Updated to v2.18
+- `memory-bank/progress.md` — This entry
+
+---
+
 ## v2.17 (2026-04-28) — Review UI Simplification & Cleanup
 
 **Changes**:

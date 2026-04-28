@@ -154,28 +154,14 @@
 <div class="sapSplitPanel">
   <!-- Left Panel: Controls & History -->
   <div>
-    <!-- Twitter Status Card (Compact) -->
-    {% if twitter_status %}
-    <div class="sapCard" style="margin-bottom: var(--sapSpacingM);">
-      <div class="sapCard-header" style="text-align: center;">
-        <span style="font-size: 1.25rem;">🐦 Twitter</span>
-      </div>
-      <div class="sapCard-content" style="text-align: center; padding: var(--sapSpacingM);">
-        <div style="font-size: 1.5rem; font-weight: 300; margin-bottom: var(--sapSpacingS); color: {% if twitter_status.can_fetch %}var(--sapPositiveColor){% else %}var(--sapCriticalColor){% endif %};">
-          {% if twitter_status.can_fetch %}
-            ✓ Ready
-          {% else %}
-            ⏰ Wait {{ twitter_status.minutes_to_wait }} min
-          {% endif %}
-        </div>
-        <div style="font-size: var(--sapFontSmallSize); color: var(--sapNeutralColor);">
-          {% if twitter_status.can_fetch %}
-            Last: {{ twitter_status.time_ago }}
-          {% else %}
-            Next: {{ twitter_status.next_available_time|format_ts('Asia/Dubai', '%I:%M %p') }}
-          {% endif %}
-        </div>
-      </div>
+    <!-- Twitter Error Banner (Only shown when there's an error) -->
+    {% if twitter_error_flag %}
+    <div class="sapMessageStrip sapMessageStrip-error" style="margin-bottom: var(--sapSpacingM);">
+      <strong>🐦 Twitter API Error</strong>
+      <p style="margin: var(--sapSpacingXS) 0; font-size: var(--sapFontSmallSize);">{{ twitter_error_flag }}</p>
+      <form method="post" action="{{ url_for('clear_twitter_error_flag_route', profile_id=profile.id) }}" style="margin-top: var(--sapSpacingS);">
+        <button type="submit" class="sapBtn sapBtn-emphasized sapBtn-sm">Clear Error & Retry</button>
+      </form>
     </div>
     {% endif %}
     

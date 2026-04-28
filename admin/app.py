@@ -408,6 +408,11 @@ def admin_profile_runs(profile_id: int):
     total_history = news_count + filtered_news_count
     disable_clear = run_active or total_history == 0
     
+    # Get Twitter error flag (if any)
+    conn = get_connection()
+    twitter_error_flag = db_get_setting(conn, profile_id, 'twitter_error_flag')
+    conn.close()
+    
     return render_template(
         "run_status.html",
         profile=profile,
@@ -419,6 +424,7 @@ def admin_profile_runs(profile_id: int):
         disable_clear=disable_clear,
         run_active=run_active,
         twitter_status=twitter_status,
+        twitter_error_flag=twitter_error_flag,
         resource_status=resource_status,
         sources_json=sources_json,
     )
