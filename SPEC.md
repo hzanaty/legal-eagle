@@ -1,6 +1,6 @@
-# Legal Eagle 2.16 — Technical Specification
+# Legal Eagle 2.20 — Technical Specification
 
-**Version:** 2.16 (Admin UI Fixes & Enhancements)  
+**Version:** 2.20 (Skip Filtering + Run Options Persistence)  
 **Last Updated:** 2026-04-28
 
 This document provides the technical specification for Legal Eagle, an AI-powered regulatory compliance mr onitoring system for SAP Localization.

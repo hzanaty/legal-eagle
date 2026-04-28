@@ -333,7 +333,7 @@ def admin_profile_runs(profile_id: int):
                 pass
         
         # Format account list for display
-        account_list = ", ".join([f"@{(a['handle'] if isinstance(a, dict) else a).lstrip('@')}" for a in twitter_accounts])
+        account_list = ", ".join([f"@{(a['handle'] if isinstance(a, dict) else str(a)).lstrip('@')}" for a in twitter_accounts])
         
         twitter_status = {
             'can_fetch': can_fetch,
