@@ -328,23 +328,49 @@ def load_url_sources(profile_id: int) -> List[Dict[str, Any]]:
     return list_url_sources(conn, profile_id)
 
 
-def parse_date_scope(date_scope: str) -> int:
+def parse_date_scope(date_scope: str) -> int | None:
     """
     Convert date_scope string to number of days (max lookback window).
-    
-    Args:
-        date_scope: One of 'all', 'last_7_days', 'last_30_days'
-    
+
     Returns:
-        Number of days (7 for last_7_days, 30 for last_30_days, 7 for 'all' or unknown)
+        None  — no date limit ('force_full', 'delta', or 'all' for backward compat)
+        0     — today only
+        7     — last 7 days
+        30    — last 30 days
+
+    Note: 'force_full' vs 'delta' both return None here.
+    The caller (agents_controller) checks PROFILE_DATE_SCOPE directly to
+    decide whether to bypass delta (force_full) or use it (delta).
     """
-    if date_scope == 'last_7_days':
+    if not date_scope or date_scope.strip() == "":
+        return 0
+    ds = date_scope.strip().lower()
+    if ds in ("all", "force_full", "delta"):
+        return None
+    elif ds == "today":
+        return 0
+    elif ds == "last_7_days":
         return 7
-    elif date_scope == 'last_30_days':
+    elif ds == "last_30_days":
         return 30
     else:
-        # Default to 7 days for 'all' or unknown values
-        return 7
+        return 0
+
+
+def load_profile_date_scope(profile_id: int) -> str:
+    """Return the profile-level date_scope string (defaults to 'all' if not set)."""
+    conn = _get_conn()
+    row = conn.execute("SELECT date_scope FROM profiles WHERE id = ?", (profile_id,)).fetchone()
+    if row and row[0]:
+        return row[0]
+    return "all"
+
+
+def save_profile_date_scope(profile_id: int, date_scope: str) -> None:
+    """Persist profile-level date_scope to the profiles table."""
+    conn = _get_conn()
+    with conn:
+        conn.execute("UPDATE profiles SET date_scope = ? WHERE id = ?", (date_scope, profile_id))
 
 
 def update_url_source_fetch_timestamp(profile_id: int, url: str, timestamp: str) -> None:

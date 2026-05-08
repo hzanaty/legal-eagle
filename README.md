@@ -56,7 +56,7 @@ Legal Eagle automatically:
 
 **Current Deployments**: Saudi Arabia, Turkey, Spain, UAE (more countries being added)
 
-📋 **Technical Details**: See [SPEC.md](SPEC.md) for complete v2.12 architecture
+📋 **Technical Details**: See [SPEC.md](SPEC.md) for complete v2.24 architecture
 
 ---
 
@@ -225,13 +225,14 @@ LEGAL_EAGLE_GMAIL_APP_PASSWORD=<app-password>
 ### Profile Configuration
 Each profile allows you to configure:
 - **Data Sources**: RSS feeds, Twitter accounts, government websites
+- **Default Lookback Window**: How far back to collect per run (Delta / Today / 7 days / 30 days)
 - **Email Recipients**: LPMs who receive daily digests
 - **Glossary**: Domain-specific terms for relevance filtering
-- **Schedule**: Which day(s) to run automatic monitoring
 - **Monitor Settings**: Email inbox monitoring for Law-to-Spec updates
 
 ### Run Execution
 - Manual execution with live log streaming
+- **Run Options**: Per-run overrides for lookback window, skip comparison/filtering/grouping, test mode
 - View run history and metrics
 - Cancel running executions cooperatively
 
@@ -284,7 +285,7 @@ Each profile allows you to configure:
 - **[UI5_MIGRATION_ROADMAP.md](UI5_MIGRATION_ROADMAP.md)** — UI5/Fiori migration detailed plan
 
 ### Technical & Operations
-- **[SPEC.md](SPEC.md)** — Technical specification (v2.12 current architecture)
+- **[SPEC.md](SPEC.md)** — Technical specification (v2.24 current architecture)
 - **[CHANGELOG.md](CHANGELOG.md)** — Version history and release notes
 - **[BTP_DEPLOYMENT.md](BTP_DEPLOYMENT.md)** — SAP BTP Cloud Foundry deployment guide
 

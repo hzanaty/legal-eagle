@@ -1,9 +1,9 @@
-# Legal Eagle 2.20 — Technical Specification
+# Legal Eagle 2.24 — Technical Specification
 
-**Version:** 2.20 (Skip Filtering + Run Options Persistence)  
-**Last Updated:** 2026-04-28
+**Version:** 2.24 (Skip Grouping + Run-Level Lookback Override + Profile-Level Date Scope + URL Delta Tracking)  
+**Last Updated:** 2026-05-08
 
-This document provides the technical specification for Legal Eagle, an AI-powered regulatory compliance mr onitoring system for SAP Localization.
+This document provides the technical specification for Legal Eagle, an AI-powered regulatory compliance monitoring system for SAP Localization.
 
 ---
 
@@ -153,6 +153,7 @@ CREATE TABLE profiles (
     name TEXT,
     active INTEGER DEFAULT 1,
     language TEXT DEFAULT 'en',
+    date_scope TEXT DEFAULT 'delta',
     created_at TEXT DEFAULT (datetime('now')),
     UNIQUE(country_code, lob)
 );
@@ -165,6 +166,7 @@ CREATE TABLE profiles (
 - `name`: Optional human-readable name
 - `active`: 1 = active, 0 = inactive
 - `language`: Analysis language (default: 'en')
+- `date_scope`: Default lookback window for all sources ('delta', 'today', 'last_7_days', 'last_30_days')
 - `created_at`: ISO 8601 timestamp
 
 #### Table: `rss_feeds`
@@ -187,7 +189,7 @@ CREATE TABLE rss_feeds (
 - `id`: Auto-increment primary key
 - `profile_id`: Foreign key to profiles table
 - `url`: RSS feed URL
-- `max_lookback_days`: Maximum days to look back for articles (default: 7)
+- `max_lookback_days`: Legacy — kept in schema, superseded by `profiles.date_scope` (v2.22)
 - `last_fetch_date`: ISO 8601 timestamp of last successful fetch
 
 #### Table: `tweet_accounts`
@@ -210,7 +212,7 @@ CREATE TABLE tweet_accounts (
 - `id`: Auto-increment primary key
 - `profile_id`: Foreign key to profiles table
 - `handle`: Twitter handle (without @)
-- `max_lookback_days`: Maximum days to look back for tweets (default: 7)
+- `max_lookback_days`: Legacy — kept in schema, superseded by `profiles.date_scope` (v2.22)
 - `last_fetch_date`: ISO 8601 timestamp of last successful fetch
 
 #### Table: `url_sources`
@@ -238,13 +240,13 @@ CREATE TABLE url_sources (
 - `id`: Auto-increment primary key
 - `profile_id`: Foreign key to profiles table
 - `url`: Website URL
-- `mode`: Crawl mode ('auto', 'force_static', 'force_dynamic')
-- `date_scope`: Date filtering ('last_7_days', 'last_30_days', 'all')
+- `mode`: Crawl mode ('auto', 'force_static', 'force_dynamic', 'recursive')
+- `date_scope`: Legacy per-source date filter — superseded by `profiles.date_scope` (v2.22); kept for backward compat
 - `sample_link`: Optional sample link for pattern detection
 - `read_more_label`: Optional "read more" button text
 - `recursive_crawl`: 1 = crawl subpages, 0 = single page only
 - `crawl_version`: Crawl engine version ('v1' or 'v2')
-- `last_successful_fetch`: ISO 8601 timestamp of last successful fetch
+- `last_successful_fetch`: ISO 8601 timestamp of last successful fetch (used for delta mode)
 - `use_proxy`: 1 = use BrightData proxy, 0 = direct connection
 
 #### Table: `email_receivers`
@@ -793,10 +795,13 @@ def run_profile_once(
     force_run: bool = False,
     skip_comparison: bool = False,
     skip_email: bool = False,
+    skip_filter: bool = False,
+    skip_grouping: bool = False,
     selected_rss_urls: Optional[List[str]] = None,
     selected_twitter_handles: Optional[List[str]] = None,
-    selected_url_sources: Optional[List[str]] = None
-) -> Dict
+    selected_url_sources: Optional[List[str]] = None,
+    lookback_override: Optional[str] = None,
+) -> bool
 ```
 
 **Parameters**:
@@ -804,35 +809,52 @@ def run_profile_once(
 - `force_run`: Force execution even if no new items
 - `skip_comparison`: Skip baseline comparison (force all items as new)
 - `skip_email`: Skip email sending (dry run)
+- `skip_filter`: Skip AI relevance filtering (treat all collected items as relevant)
+- `skip_grouping`: Skip AI grouping (each item becomes its own email entry)
 - `selected_rss_urls`: Optional list of RSS feed URLs to fetch (None = all)
 - `selected_twitter_handles`: Optional list of Twitter handles to fetch (None = all)
 - `selected_url_sources`: Optional list of URL sources to crawl (None = all)
+- `lookback_override`: Per-run date_scope override ('force_full', 'delta', 'today', 'last_7_days', 'last_30_days')
 
 **Execution Flow**:
 1. **Load Configuration**: Profile, sources, receivers, glossary
-2. **Filter Sources** (v2.14): Apply source selection filters if provided
+2. **Load Date Scope**: Read `profiles.date_scope`; apply `lookback_override` if provided
+3. **Filter Sources** (v2.14): Apply source selection filters if provided
    - Filter RSS feeds to selected URLs only
    - Filter Twitter accounts to selected handles only
    - Filter URL sources to selected URLs only
-   - Log filtered counts: "📰 Filtered RSS feeds: 1 selected out of 3"
-3. **Validate Twitter**: Pre-flight check, skip if error flag set
-4. **Collect Data**: RSS feeds, tweets, URL sources, email inbox
-5. **Filter**: AI-powered relevance filtering
-6. **Compare**: Deduplicate and detect updates against baseline
-7. **Group**: AI clustering of related items
-8. **Email**: Send digest to receivers (if new/updated items found)
-9. **Update Baseline**: Store new items in database
-10. **Log**: Record execution metrics and logs
+4. **Validate Twitter**: Pre-flight check, skip if error flag set
+5. **Collect Data**: RSS feeds, tweets, URL sources (with delta/full mode per source), email inbox
+6. **Apply Date Filter**: RSS and Twitter items filtered by profile date_scope
+7. **Filter** (optional): AI-powered relevance filtering; skip if `skip_filter=True`
+8. **Compare** (optional): Deduplicate and detect updates against baseline; skip if `skip_comparison=True`
+9. **Group** (optional): AI clustering of related items; skip if `skip_grouping=True` (each item wrapped as single-item group)
+10. **Email**: Send digest to receivers (if new/updated items found and not `skip_email`)
+11. **Update Baseline**: Store new items in database
+12. **Log**: Record execution metrics and logs
 
 **Skip Flags**:
-- `skip_comparison`: Skip baseline comparison (force all items as new)
-- `force_run`: Force execution even if no new items
-- `skip_email`: Skip email sending (dry run)
+- `skip_filter`: Bypass LLM relevance check — all collected items treated as relevant
+- `skip_comparison`: Skip baseline comparison — force all items as new
+- `skip_grouping`: Bypass LLM grouping — each item becomes its own email entry
+- `skip_email`: Skip email sending — dry run only
+- `force_run`: Force execution even if no new items found
 
-**Source Selection** (v2.14):
+**Lookback Modes** (controlled by `profiles.date_scope` or `lookback_override`):
+- `delta`: Fetch only items since `last_successful_fetch` (full window on first run)
+- `today`: Items from UTC midnight today only
+- `last_7_days` / `last_30_days`: Fixed rolling window
+- `force_full`: Bypass delta tracking — always fetch full window
+
+**URL Sources Delta Logic**:
+- Per source: compare current time with `last_successful_fetch`
+- DELTA mode: `since_date = last_successful_fetch` (injected into runner)
+- FULL mode: `days = max_lookback_days` (injected into runner)
+- Triggers FULL mode when: first run, `force_full` date_scope, `force_run=True`, or `lookback_override='force_full'`
+
+**Source Selection** (v2.14+):
 - When selection parameters are `None`, all sources are fetched (default behavior)
 - When selection parameters are provided as lists, only those sources are fetched
-- Empty list `[]` is converted to `None` by the Admin UI (meaning "run all")
 - Useful for testing single sources or excluding problematic sources
 
 **Cooperative Cancellation**:
@@ -867,6 +889,7 @@ def run_profile_once(
 - `POST /admin/create` - Submit new profile
 - `GET /admin/profiles/<id>` - Profile configuration page
 - `POST /admin/profiles/<id>/language/update` - Update profile language
+- `POST /admin/profiles/<id>/date-scope/update` - Update profile default lookback window (v2.22)
 - `POST /admin/profiles/<id>/delete` - Delete profile
 
 #### RSS Feeds
@@ -930,40 +953,59 @@ def run_profile_once(
 - Card-based layout
 - Semantic button styles (Emphasized, Accept, Reject, etc.)
 
-### 7.3 UI Enhancements (v2.16)
+### 7.3 Run Options (v2.24)
 
-**Table Consistency Improvements**:
-- **RSS Feeds Table**: Added "Lookback Days" column showing max_lookback_days per feed
-- **Twitter Accounts Table**: Added "Lookback Days" column showing max_lookback_days per account
-- **URL Sources Table**: Added "Lookback Days", "Sample Link", and "Read More Label" columns
-- All tables now display complete configuration at a glance without requiring Edit mode
+The Run modal exposes the following per-run controls:
 
-**Form Field Ordering**:
-- **Add Form**: Fields reordered to match table column sequence
-  - Order: Lookback Days → Sample Link → Read More Label → Crawl Type
-- **Edit Form**: Fields reordered to match table column sequence (same order as Add form)
-- Consistent left-to-right flow improves usability and reduces cognitive load
+**Lookback (dropdown)** — Override the profile's default lookback window for this run only:
+- `(empty)` — Use profile default (no override)
+- `force_full` — Force full re-fetch, ignoring `last_successful_fetch` timestamps
+- `delta` — Delta since last fetch
+- `today` — Today only (UTC midnight anchor)
+- `last_7_days` / `last_30_days` — Fixed rolling window
 
-**Section Reordering**:
-Profile page sections now follow pipeline execution order:
-1. Profile Language (analysis language for AI)
-2. RSS Feeds (first data source)
-3. Twitter Accounts (second data source)
-4. URL Sources (third data source)
-5. Email Receivers (output configuration)
-6. Monitor Notifications (Law-to-Spec integration)
-7. Glossary (filtering context)
+**Skip comparison** — Bypass baseline deduplication; treat all items as new
 
-**Recursive Fields Toggle**:
-- **Add Form**: Recursive fields now show/hide correctly when selecting "Recursive" mode
-- **Edit Form**: Added recursive fields toggle for non-recursive sources
-  - Dynamic IDs per row: `edit1UrlMode`, `edit2UrlMode`, etc.
-  - JavaScript function `toggleRecursiveFields(prefix)` handles both Add and Edit contexts
-- Both forms now have identical behavior and field structure
+**Skip filtering** — Bypass LLM relevance check; treat all items as relevant
 
-**Developer Experience**:
-- Flask `TEMPLATES_AUTO_RELOAD = True` enabled for faster template iteration
-- Templates reload automatically without server restart during development
+**Skip grouping** — Bypass LLM clustering; each item becomes its own email entry
+
+**Test mode (skip emails)** — Run full pipeline without sending emails
+
+All checkbox states are persisted per profile in browser localStorage and restored on next page load.
+
+### 7.4 Profile Configuration — Default Lookback Window (v2.22)
+
+The "🗓 Default Lookback Window" card on the profile configuration page sets the `date_scope` for all sources in the profile:
+
+| Option | Value | Behaviour |
+|--------|-------|-----------|
+| Delta (since last fetch) | `delta` | Full window on first run; incremental since last successful fetch on subsequent runs |
+| Today only | `today` | Items from UTC midnight today |
+| Last 7 days | `last_7_days` | Rolling 7-day window |
+| Last 30 days | `last_30_days` | Rolling 30-day window |
+
+> **Note**: Per-source "Lookback Days" columns and fields were removed from RSS Feeds, Twitter Accounts, and URL Sources in v2.22. Use the profile-level Default Lookback Window instead.
+
+### 7.5 UI Enhancements History
+
+#### v2.16 — Table Consistency
+- Added "Lookback Days", "Sample Link", "Read More Label" columns to tables (later superseded by v2.22)
+- Enabled `TEMPLATES_AUTO_RELOAD` for faster template iteration during development
+
+#### v2.17 — Review UI Simplification
+- Removed redundant tab buttons; stat cards are now clickable for navigation
+- Removed "Clear Historical News" button from Run page (use Review page instead)
+
+#### v2.18 — Twitter Status Compact Design
+- Twitter status card hidden in normal operation; error-only banner shown when API has issues
+
+#### v2.19 — Source Selection Fix
+- Empty source selection (all unchecked) correctly runs 0 sources instead of all sources
+
+#### v2.20 — Skip Filtering + Run Options Persistence
+- Added "Skip filtering" checkbox to Run Options
+- All run option states persisted in localStorage per profile
 
 ---
 
@@ -1010,6 +1052,11 @@ LEGAL_EAGLE_ADMIN_SECRET=<secret-key>
 def list_active_profiles() -> List[Dict]
 def resolve_profile(country_code: str, lob: str) -> Optional[Dict]
 def load_language(profile_id: int) -> str
+
+# Date Scope (v2.22)
+def load_profile_date_scope(profile_id: int) -> str          # Returns 'delta', 'today', etc.
+def save_profile_date_scope(profile_id: int, date_scope: str) -> None
+def parse_date_scope(date_scope: str) -> Optional[int]       # 'today'→0, '7d'→7, 'delta'→None
 
 # Source Loading
 def load_rss_feeds(profile_id: int) -> List[Dict]

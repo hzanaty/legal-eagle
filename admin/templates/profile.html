@@ -131,6 +131,33 @@
   </div>
 </div>
 
+<!-- Default Lookback Window -->
+<div class="sapCard">
+  <div class="sapCard-header">
+    <span>🗓 Default Lookback Window</span>
+    <span style="color: var(--sapNeutralColor); font-weight: 400; font-size: var(--sapFontSmallSize);">
+      Applies to all URL sources in this profile
+    </span>
+  </div>
+  <div class="sapCard-content">
+    <form method="post" action="{{ url_for('update_profile_date_scope', profile_id=profile.id) }}">
+      <div class="sapForm-row">
+        <div class="sapForm-group" style="margin-bottom: 0;">
+          <label class="sapForm-label">Lookback Window</label>
+          <select class="sapForm-select" name="date_scope">
+            <option value="delta" {% if profile.date_scope in ('delta', 'all', 'force_full') or not profile.date_scope %}selected{% endif %}>Delta (since last fetch)</option>
+            <option value="today" {% if profile.date_scope == 'today' %}selected{% endif %}>Today only</option>
+            <option value="last_7_days" {% if profile.date_scope == 'last_7_days' %}selected{% endif %}>Last 7 days</option>
+            <option value="last_30_days" {% if profile.date_scope == 'last_30_days' %}selected{% endif %}>Last 30 days</option>
+          </select>
+          <span class="sapForm-help">Applies to all sources. "Delta" = fetches everything on first run, then only new items since last run. Use the run modal to force a full re-fetch on demand.</span>
+        </div>
+        <button type="submit" class="sapBtn sapBtn-emphasized">Save Lookback</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- RSS Feeds -->
 <div class="sapCard">
   <div class="sapCard-header">
@@ -152,7 +179,6 @@
           <tr>
             <th style="width: 40px;"><input type="checkbox" onclick="toggleAllCheckboxes(this, 'bulk_rss_form')"></th>
             <th>URL</th>
-            <th style="width: 120px;">Lookback Days</th>
             <th style="width: 180px;">Last Fetch</th>
           </tr>
         </thead>
@@ -161,13 +187,6 @@
           <tr>
             <td style="text-align: center;"><input type="checkbox" name="urls" value="{{ u.url if u is mapping else u }}" form="bulk_rss_form"></td>
             <td style="font-family: monospace; font-size: var(--sapFontSmallSize);">{{ u.url if u is mapping else u }}</td>
-            <td style="font-size: var(--sapFontSmallSize); text-align: center;">
-              {% if u is mapping %}
-                {{ u.max_lookback_days if u.max_lookback_days else 7 }}
-              {% else %}
-                7
-              {% endif %}
-            </td>
             <td style="font-size: var(--sapFontSmallSize); color: var(--sapNeutralColor);">
               {% if u is mapping and u.last_fetch_date %}
                 {{ u.last_fetch_date }}
@@ -246,7 +265,6 @@
           <tr>
             <th style="width: 40px;"><input type="checkbox" onclick="toggleAllCheckboxes(this, 'bulk_tweets_form')"></th>
             <th>Handle</th>
-            <th style="width: 120px;">Lookback Days</th>
             <th style="width: 180px;">Last Fetch</th>
           </tr>
         </thead>
@@ -255,13 +273,6 @@
           <tr>
             <td style="text-align: center;"><input type="checkbox" name="handles" value="{{ h.handle if h is mapping else h }}" form="bulk_tweets_form"></td>
             <td style="font-family: monospace; font-size: var(--sapFontSmallSize);">@{{ h.handle if h is mapping else h }}</td>
-            <td style="font-size: var(--sapFontSmallSize); text-align: center;">
-              {% if h is mapping %}
-                {{ h.max_lookback_days if h.max_lookback_days else 7 }}
-              {% else %}
-                7
-              {% endif %}
-            </td>
             <td style="font-size: var(--sapFontSmallSize); color: var(--sapNeutralColor);">
               {% if h is mapping and h.last_fetch_date %}
                 {{ h.last_fetch_date }}
@@ -328,7 +339,6 @@
           <tr>
             <th style="width: 40px;"><input type="checkbox" onclick="toggleAllCheckboxes(this, 'bulk_urls_form')"></th>
             <th>URL</th>
-            <th style="width: 120px;">Lookback Days</th>
             <th style="width: 120px;">Last Fetch</th>
             <th style="width: 200px;">Sample Link</th>
             <th style="width: 150px;">Read More Label</th>
@@ -342,16 +352,6 @@
           <tr>
             <td style="text-align: center;"><input type="checkbox" name="urls" value="{{ s.url }}" form="bulk_urls_form"></td>
             <td style="font-family: monospace; font-size: var(--sapFontSmallSize);">{{ s.url }}</td>
-            <td style="font-size: var(--sapFontSmallSize); text-align: center;">
-              {% if s.date_scope and s.date_scope != 'all' %}
-                {% if s.date_scope == 'last_7_days' %}7
-                {% elif s.date_scope == 'last_30_days' %}30
-                {% else %}{{ s.date_scope }}
-                {% endif %}
-              {% else %}
-                <span style="color: var(--sapNeutralColor);">—</span>
-              {% endif %}
-            </td>
             <td style="font-size: var(--sapFontSmallSize); text-align: center;">
               {% if s.last_successful_fetch_relative %}
                 <span title="{{ s.last_successful_fetch_formatted }}">{{ s.last_successful_fetch_relative }}</span>
@@ -416,15 +416,7 @@
                 
                 <h4 style="margin: 0 0 var(--sapSpacingM) 0; color: var(--sapBrandColor);">Edit URL Source</h4>
                 
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: var(--sapSpacingM); margin-bottom: var(--sapSpacingM);">
-                  <div>
-                    <label class="sapForm-label">Lookback Days</label>
-                    <select class="sapForm-select" name="date_scope">
-                      <option value="all" {% if (s.date_scope or 'all') == 'all' %}selected{% endif %}>N/A</option>
-                      <option value="last_7_days" {% if s.date_scope == 'last_7_days' %}selected{% endif %}>7 days</option>
-                      <option value="last_30_days" {% if s.date_scope == 'last_30_days' %}selected{% endif %}>30 days</option>
-                    </select>
-                  </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--sapSpacingM); margin-bottom: var(--sapSpacingM);">
                   <div>
                     <label class="sapForm-label">Sample Link (optional)</label>
                     <input class="sapForm-input" name="sample_link" value="{{ s.sample_link or '' }}" placeholder="https://example.gov/news/12345">
@@ -442,6 +434,11 @@
                       <option value="recursive" {% if s.mode == 'recursive' %}selected{% endif %}>Recursive</option>
                     </select>
                   </div>
+                </div>
+                <div style="margin-bottom: var(--sapSpacingM);">
+                  <label class="sapForm-label">URL Date Template (optional)</label>
+                  <input class="sapForm-input" name="url_date_template" value="{{ s.url_date_template or '' }}" placeholder="https://example.com/{DD}.{MM}.{YYYY}" style="width: 100%;">
+                  <span class="sapForm-help">For sites where each day has its own URL. Leave blank for normal scraping. Use {DD}, {MM}, {YYYY} as date placeholders.</span>
                 </div>
                 
                 <hr style="margin: var(--sapSpacingL) 0; border: 0; border-top: 1px solid var(--sapGroup_ContentBorderColor);">
@@ -480,15 +477,7 @@
                 
                 <h4 style="margin: 0 0 var(--sapSpacingM) 0; color: var(--sapBrandColor);">Edit URL Source Settings</h4>
                 
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: var(--sapSpacingM); margin-bottom: var(--sapSpacingM);">
-                  <div>
-                    <label class="sapForm-label">Lookback Days</label>
-                    <select class="sapForm-select" name="date_scope">
-                      <option value="all" {% if (s.date_scope or 'all') == 'all' %}selected{% endif %}>N/A</option>
-                      <option value="last_7_days" {% if s.date_scope == 'last_7_days' %}selected{% endif %}>7 days</option>
-                      <option value="last_30_days" {% if s.date_scope == 'last_30_days' %}selected{% endif %}>30 days</option>
-                    </select>
-                  </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--sapSpacingM); margin-bottom: var(--sapSpacingM);">
                   <div>
                     <label class="sapForm-label">Sample Link (optional)</label>
                     <input class="sapForm-input" name="sample_link" value="{{ s.sample_link or '' }}" placeholder="https://example.gov/news/12345">
@@ -506,6 +495,11 @@
                       <option value="recursive" {% if s.mode == 'recursive' %}selected{% endif %}>Recursive</option>
                     </select>
                   </div>
+                </div>
+                <div style="margin-bottom: var(--sapSpacingM);">
+                  <label class="sapForm-label">URL Date Template (optional)</label>
+                  <input class="sapForm-input" name="url_date_template" value="{{ s.url_date_template or '' }}" placeholder="https://example.com/{DD}.{MM}.{YYYY}" style="width: 100%;">
+                  <span class="sapForm-help">For sites where each day has its own URL. Leave blank for normal scraping. Use {DD}, {MM}, {YYYY} as date placeholders.</span>
                 </div>
                 
                 <!-- Recursive Mode Fields (hidden by default) -->
@@ -567,16 +561,7 @@
         <label class="sapForm-label">URL</label>
         <input class="sapForm-input" name="url" placeholder="https://example.gov/news" required>
       </div>
-      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: var(--sapSpacingM);">
-        <div class="sapForm-group">
-          <label class="sapForm-label">Lookback Days</label>
-          <select class="sapForm-select" name="date_scope">
-            <option value="all" selected>N/A</option>
-            <option value="last_7_days">7 days</option>
-            <option value="last_30_days">30 days</option>
-          </select>
-          <span class="sapForm-help">Max time window</span>
-        </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--sapSpacingM);">
         <div class="sapForm-group">
           <label class="sapForm-label">Sample Link (optional)</label>
           <input class="sapForm-input" name="sample_link" placeholder="https://example.gov/news/12345">
@@ -594,6 +579,11 @@
             <option value="recursive">Recursive</option>
           </select>
         </div>
+      </div>
+      <div class="sapForm-group" style="margin-top: var(--sapSpacingM);">
+        <label class="sapForm-label">URL Date Template (optional)</label>
+        <input class="sapForm-input" name="url_date_template" placeholder="https://example.com/{DD}.{MM}.{YYYY}" style="width: 100%;">
+        <span class="sapForm-help">For sites where each day has its own URL. Leave blank for normal scraping. Use {DD}, {MM}, {YYYY} as date placeholders.</span>
       </div>
       
       <!-- Recursive Mode Fields (hidden by default) -->

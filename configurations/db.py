@@ -45,6 +45,11 @@ def create_schema_if_needed(conn: sqlite3.Connection) -> None:
             conn.execute("ALTER TABLE profiles ADD COLUMN schedule_day TEXT")
         except Exception:
             pass
+        # Add profile-level date_scope (lookback window) — replaces per-source date_scope
+        try:
+            conn.execute("ALTER TABLE profiles ADD COLUMN date_scope TEXT DEFAULT 'all'")
+        except Exception:
+            pass
 
         # Settings (per profile key/value)
         conn.execute(
@@ -344,6 +349,11 @@ def create_schema_if_needed(conn: sqlite3.Connection) -> None:
         # Default existing NULL/empty crawl_version values to 'v1'
         try:
             conn.execute("UPDATE url_sources SET crawl_version = 'v1' WHERE crawl_version IS NULL OR crawl_version = ''")
+        except Exception:
+            pass
+        # Add url_date_template column for Mechanism B (URL-per-day generation)
+        try:
+            conn.execute("ALTER TABLE url_sources ADD COLUMN url_date_template TEXT")
         except Exception:
             pass
 
@@ -814,12 +824,12 @@ def list_url_sources(conn: sqlite3.Connection, profile_id: int) -> List[Dict[str
     """
     Return a list of URL sources with mode and sample_link for the given profile.
     Shape:
-      [{"url": str, "mode": "auto|force_static|force_dynamic|recursive", "sample_link": Optional[str], "read_more_label": Optional[str], 
-        "crawl_version": str, "max_depth": int, "allowed_domains": str, "path_filter": str, "max_results": int, "date_scope": str, 
-        "last_successful_fetch": Optional[str], "created_at": str}]
+      [{"url": str, "mode": "auto|force_static|force_dynamic|recursive", "sample_link": Optional[str], "read_more_label": Optional[str],
+        "crawl_version": str, "max_depth": int, "allowed_domains": str, "path_filter": str, "max_results": int, "date_scope": str,
+        "url_date_template": Optional[str], "last_successful_fetch": Optional[str], "created_at": str}]
     """
     rows = conn.execute(
-        "SELECT url, mode, sample_link, read_more_label, crawl_version, max_depth, allowed_domains, path_filter, max_results, date_scope, last_successful_fetch, created_at FROM url_sources WHERE profile_id = ? ORDER BY url",
+        "SELECT url, mode, sample_link, read_more_label, crawl_version, max_depth, allowed_domains, path_filter, max_results, date_scope, url_date_template, last_successful_fetch, created_at FROM url_sources WHERE profile_id = ? ORDER BY url",
         (profile_id,)
     ).fetchall()
     return [
@@ -834,6 +844,7 @@ def list_url_sources(conn: sqlite3.Connection, profile_id: int) -> List[Dict[str
             "path_filter": r["path_filter"],
             "max_results": r["max_results"],
             "date_scope": r["date_scope"],
+            "url_date_template": r["url_date_template"],
             "last_successful_fetch": r["last_successful_fetch"],
             "created_at": r["created_at"],
         }
@@ -842,18 +853,19 @@ def list_url_sources(conn: sqlite3.Connection, profile_id: int) -> List[Dict[str
 
 
 def upsert_url_source(
-    conn: sqlite3.Connection, 
-    profile_id: int, 
-    url: str, 
-    mode: str = "auto", 
-    sample_link: Optional[str] = None, 
-    read_more_label: Optional[str] = None, 
+    conn: sqlite3.Connection,
+    profile_id: int,
+    url: str,
+    mode: str = "auto",
+    sample_link: Optional[str] = None,
+    read_more_label: Optional[str] = None,
     crawl_version: str = "v1",
     max_depth: int = 2,
     allowed_domains: Optional[str] = None,
     path_filter: Optional[str] = None,
     max_results: int = 20,
-    date_scope: str = "all"
+    date_scope: str = "all",
+    url_date_template: Optional[str] = None,
 ) -> None:
     """
     Insert a new url_source or update existing with all parameters including recursive options.
@@ -862,9 +874,9 @@ def upsert_url_source(
     with conn:
         conn.execute(
             """
-            INSERT INTO url_sources(profile_id, url, mode, sample_link, read_more_label, crawl_version, 
-                                   max_depth, allowed_domains, path_filter, max_results, date_scope, created_at)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
+            INSERT INTO url_sources(profile_id, url, mode, sample_link, read_more_label, crawl_version,
+                                   max_depth, allowed_domains, path_filter, max_results, date_scope, url_date_template, created_at)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
             ON CONFLICT(profile_id, url) DO UPDATE SET
               mode=excluded.mode,
               sample_link=excluded.sample_link,
@@ -874,10 +886,11 @@ def upsert_url_source(
               allowed_domains=excluded.allowed_domains,
               path_filter=excluded.path_filter,
               max_results=excluded.max_results,
-              date_scope=excluded.date_scope
+              date_scope=excluded.date_scope,
+              url_date_template=excluded.url_date_template
             """,
-            (profile_id, url, mode, sample_link, read_more_label, crawl_version, 
-             max_depth, allowed_domains, path_filter, max_results, date_scope, now_iso)
+            (profile_id, url, mode, sample_link, read_more_label, crawl_version,
+             max_depth, allowed_domains, path_filter, max_results, date_scope, url_date_template, now_iso)
         )
 
 

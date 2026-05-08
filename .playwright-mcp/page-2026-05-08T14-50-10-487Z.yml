@@ -1,0 +1,494 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]:
+        - button "☰" [ref=e5] [cursor=pointer]
+        - generic [ref=e6]: SAP
+      - textbox "Search profiles..." [ref=e9]
+      - generic [ref=e10]:
+        - button "🔔" [ref=e11] [cursor=pointer]
+        - button "👤" [ref=e12] [cursor=pointer]
+        - button "⚙️" [ref=e13] [cursor=pointer]
+    - generic [ref=e14]: Legal Eagle - Compliance Management
+  - generic [ref=e16]:
+    - heading "SA/HCM - Default SA/HCM ● Active" [level=1] [ref=e17]:
+      - generic [ref=e18]: SA/HCM
+      - generic [ref=e19]: "- Default SA/HCM"
+      - generic [ref=e20]: ● Active
+    - navigation [ref=e21]:
+      - link "Configure" [ref=e22] [cursor=pointer]:
+        - /url: /admin/profiles/1
+      - link "Run" [ref=e23] [cursor=pointer]:
+        - /url: /admin/profiles/1/runs
+      - link "Review" [ref=e24] [cursor=pointer]:
+        - /url: /admin/profiles/1/review
+  - main [ref=e25]:
+    - generic [ref=e26]:
+      - generic [ref=e27]:
+        - generic [ref=e28]:
+          - generic [ref=e29]: 🌍 Profile Language
+          - generic [ref=e30]: Language for AI news analysis
+        - generic [ref=e33]:
+          - generic [ref=e34]:
+            - generic [ref=e35]: Analysis Language
+            - combobox [ref=e36]:
+              - option "English (en)"
+              - option "Arabic (ar)" [selected]
+              - option "Spanish (es)"
+              - option "German (de)"
+              - option "French (fr)"
+              - option "Italian (it)"
+              - option "Portuguese (pt)"
+              - option "Chinese (zh)"
+              - option "Japanese (ja)"
+              - option "Korean (ko)"
+              - option "Hindi (hi)"
+              - option "Thai (th)"
+              - option "Vietnamese (vi)"
+              - option "Russian (ru)"
+              - option "Turkish (tr)"
+              - option "Polish (pl)"
+              - option "Dutch (nl)"
+              - option "Swedish (sv)"
+              - option "Norwegian (no)"
+              - option "Danish (da)"
+              - option "Finnish (fi)"
+            - generic [ref=e37]: Language used by AI to read and analyze news sources (e.g., Arabic for Saudi Arabia news)
+          - button "Save Language" [ref=e38] [cursor=pointer]
+      - generic [ref=e39]:
+        - generic [ref=e40]:
+          - generic [ref=e41]: 🗓 Default Lookback Window
+          - generic [ref=e42]: Applies to all URL sources in this profile
+        - generic [ref=e45]:
+          - generic [ref=e46]:
+            - generic [ref=e47]: Lookback Window
+            - combobox [ref=e48]:
+              - option "N/A (no limit)" [selected]
+              - option "Last 7 days"
+              - option "Last 30 days"
+            - generic [ref=e49]: How far back to look for news items across all URL sources. "N/A" means no date limit.
+          - button "Save Lookback" [ref=e50] [cursor=pointer]
+      - generic [ref=e51]:
+        - generic [ref=e52]:
+          - generic [ref=e53]: 📡 RSS Feeds
+          - generic [ref=e54]: 1 feed
+        - button "Delete Selected" [ref=e56] [cursor=pointer]
+        - table [ref=e59]:
+          - rowgroup [ref=e60]:
+            - row "URL Lookback Days Last Fetch" [ref=e61]:
+              - columnheader [ref=e62]:
+                - checkbox [ref=e63] [cursor=pointer]
+              - columnheader "URL" [ref=e64]
+              - columnheader "Lookback Days" [ref=e65]
+              - columnheader "Last Fetch" [ref=e66]
+          - rowgroup [ref=e67]:
+            - row "https://saudigazette.com.sa/rssFeed/74 7 Never" [ref=e68]:
+              - cell [ref=e69]:
+                - checkbox [ref=e70] [cursor=pointer]
+              - cell "https://saudigazette.com.sa/rssFeed/74" [ref=e71]
+              - cell "7" [ref=e72]
+              - cell "Never" [ref=e73]
+        - generic [ref=e76]:
+          - textbox "https://example.gov/news/feed" [ref=e77]
+          - button "Add RSS" [ref=e78] [cursor=pointer]
+      - generic [ref=e79]:
+        - generic [ref=e80]:
+          - generic [ref=e81]: 🐦 Twitter Accounts
+          - generic [ref=e82]: 2 accounts
+        - generic [ref=e84]:
+          - generic [ref=e85]: ✅
+          - generic [ref=e86]: "Twitter API Status: OK"
+        - button "Delete Selected" [ref=e88] [cursor=pointer]
+        - table [ref=e91]:
+          - rowgroup [ref=e92]:
+            - row "Handle Lookback Days Last Fetch" [ref=e93]:
+              - columnheader [ref=e94]:
+                - checkbox [ref=e95] [cursor=pointer]
+              - columnheader "Handle" [ref=e96]
+              - columnheader "Lookback Days" [ref=e97]
+              - columnheader "Last Fetch" [ref=e98]
+          - rowgroup [ref=e99]:
+            - row "@HRSD_SA 7 Never" [ref=e100]:
+              - cell [ref=e101]:
+                - checkbox [ref=e102] [cursor=pointer]
+              - cell "@HRSD_SA" [ref=e103]
+              - cell "7" [ref=e104]
+              - cell "Never" [ref=e105]
+            - row "@SaudiGOSI 7 Never" [ref=e106]:
+              - cell [ref=e107]:
+                - checkbox [ref=e108] [cursor=pointer]
+              - cell "@SaudiGOSI" [ref=e109]
+              - cell "7" [ref=e110]
+              - cell "Never" [ref=e111]
+        - generic [ref=e114]:
+          - textbox "e.g., GOSI_SA" [ref=e115]
+          - button "Add Account" [ref=e116] [cursor=pointer]
+      - generic [ref=e117]:
+        - generic [ref=e118]:
+          - generic [ref=e119]: 🌐 URL Sources
+          - generic [ref=e120]: Incremental Fetching Enabled
+        - generic [ref=e122]:
+          - generic [ref=e123]: ℹ️
+          - generic [ref=e124]:
+            - strong [ref=e125]: "Incremental Fetching:"
+            - text: First run fetches full max lookback window. Subsequent runs fetch only new items since last successful run (delta mode).
+            - strong [ref=e126]: Max Lookback
+            - text: acts as safety cap to prevent excessive backdating.
+        - button "Delete Selected" [ref=e128] [cursor=pointer]
+        - table [ref=e131]:
+          - rowgroup [ref=e132]:
+            - row "URL Last Fetch Sample Link Read More Label Crawl Type Recursive Settings Actions" [ref=e133]:
+              - columnheader [ref=e134]:
+                - checkbox [ref=e135] [cursor=pointer]
+              - columnheader "URL" [ref=e136]
+              - columnheader "Last Fetch" [ref=e137]
+              - columnheader "Sample Link" [ref=e138]
+              - columnheader "Read More Label" [ref=e139]
+              - columnheader "Crawl Type" [ref=e140]
+              - columnheader "Recursive Settings" [ref=e141]
+              - columnheader "Actions" [ref=e142]
+          - rowgroup [ref=e143]:
+            - row "https://uqn.gov.sa/category?cat=10 Never https://uqn.gov.sa/details?p=28771 — Auto — Edit Delete" [ref=e144]:
+              - cell [ref=e145]:
+                - checkbox [ref=e146] [cursor=pointer]
+              - cell "https://uqn.gov.sa/category?cat=10" [ref=e147]
+              - cell "Never" [ref=e148]
+              - cell "https://uqn.gov.sa/details?p=28771" [ref=e149]:
+                - link "https://uqn.gov.sa/details?p=28771" [ref=e150] [cursor=pointer]:
+                  - /url: https://uqn.gov.sa/details?p=28771
+              - cell "—" [ref=e151]
+              - cell "Auto" [ref=e152]:
+                - combobox [disabled] [ref=e153]:
+                  - option "Auto" [selected]
+                  - option "Static"
+                  - option "Dynamic"
+                  - option "Recursive"
+              - cell "—" [ref=e154]
+              - cell "Edit Delete" [ref=e155]:
+                - button "Edit" [ref=e156] [cursor=pointer]
+                - button "Delete" [ref=e158] [cursor=pointer]
+            - row "https://uqn.gov.sa/category?cat=11 Never https://uqn.gov.sa/details?p=28771 — Auto — Edit Delete" [ref=e159]:
+              - cell [ref=e160]:
+                - checkbox [ref=e161] [cursor=pointer]
+              - cell "https://uqn.gov.sa/category?cat=11" [ref=e162]
+              - cell "Never" [ref=e163]
+              - cell "https://uqn.gov.sa/details?p=28771" [ref=e164]:
+                - link "https://uqn.gov.sa/details?p=28771" [ref=e165] [cursor=pointer]:
+                  - /url: https://uqn.gov.sa/details?p=28771
+              - cell "—" [ref=e166]
+              - cell "Auto" [ref=e167]:
+                - combobox [disabled] [ref=e168]:
+                  - option "Auto" [selected]
+                  - option "Static"
+                  - option "Dynamic"
+                  - option "Recursive"
+              - cell "—" [ref=e169]
+              - cell "Edit Delete" [ref=e170]:
+                - button "Edit" [ref=e171] [cursor=pointer]
+                - button "Delete" [ref=e173] [cursor=pointer]
+            - row "https://uqn.gov.sa/category?cat=12 Never https://uqn.gov.sa/details?p=28771 — Auto — Edit Delete" [ref=e174]:
+              - cell [ref=e175]:
+                - checkbox [ref=e176] [cursor=pointer]
+              - cell "https://uqn.gov.sa/category?cat=12" [ref=e177]
+              - cell "Never" [ref=e178]
+              - cell "https://uqn.gov.sa/details?p=28771" [ref=e179]:
+                - link "https://uqn.gov.sa/details?p=28771" [ref=e180] [cursor=pointer]:
+                  - /url: https://uqn.gov.sa/details?p=28771
+              - cell "—" [ref=e181]
+              - cell "Auto" [ref=e182]:
+                - combobox [disabled] [ref=e183]:
+                  - option "Auto" [selected]
+                  - option "Static"
+                  - option "Dynamic"
+                  - option "Recursive"
+              - cell "—" [ref=e184]
+              - cell "Edit Delete" [ref=e185]:
+                - button "Edit" [ref=e186] [cursor=pointer]
+                - button "Delete" [ref=e188] [cursor=pointer]
+            - row "https://uqn.gov.sa/category?cat=4 Never https://uqn.gov.sa/details?p=28771 — Auto — Edit Delete" [ref=e189]:
+              - cell [ref=e190]:
+                - checkbox [ref=e191] [cursor=pointer]
+              - cell "https://uqn.gov.sa/category?cat=4" [ref=e192]
+              - cell "Never" [ref=e193]
+              - cell "https://uqn.gov.sa/details?p=28771" [ref=e194]:
+                - link "https://uqn.gov.sa/details?p=28771" [ref=e195] [cursor=pointer]:
+                  - /url: https://uqn.gov.sa/details?p=28771
+              - cell "—" [ref=e196]
+              - cell "Auto" [ref=e197]:
+                - combobox [disabled] [ref=e198]:
+                  - option "Auto" [selected]
+                  - option "Static"
+                  - option "Dynamic"
+                  - option "Recursive"
+              - cell "—" [ref=e199]
+              - cell "Edit Delete" [ref=e200]:
+                - button "Edit" [ref=e201] [cursor=pointer]
+                - button "Delete" [ref=e203] [cursor=pointer]
+            - row "https://uqn.gov.sa/category?cat=6 Never https://uqn.gov.sa/details?p=28771 — Auto — Edit Delete" [ref=e204]:
+              - cell [ref=e205]:
+                - checkbox [ref=e206] [cursor=pointer]
+              - cell "https://uqn.gov.sa/category?cat=6" [ref=e207]
+              - cell "Never" [ref=e208]
+              - cell "https://uqn.gov.sa/details?p=28771" [ref=e209]:
+                - link "https://uqn.gov.sa/details?p=28771" [ref=e210] [cursor=pointer]:
+                  - /url: https://uqn.gov.sa/details?p=28771
+              - cell "—" [ref=e211]
+              - cell "Auto" [ref=e212]:
+                - combobox [disabled] [ref=e213]:
+                  - option "Auto" [selected]
+                  - option "Static"
+                  - option "Dynamic"
+                  - option "Recursive"
+              - cell "—" [ref=e214]
+              - cell "Edit Delete" [ref=e215]:
+                - button "Edit" [ref=e216] [cursor=pointer]
+                - button "Delete" [ref=e218] [cursor=pointer]
+            - row "https://uqn.gov.sa/category?cat=7 Never https://uqn.gov.sa/details?p=28771 — Auto — Edit Delete" [ref=e219]:
+              - cell [ref=e220]:
+                - checkbox [ref=e221] [cursor=pointer]
+              - cell "https://uqn.gov.sa/category?cat=7" [ref=e222]
+              - cell "Never" [ref=e223]
+              - cell "https://uqn.gov.sa/details?p=28771" [ref=e224]:
+                - link "https://uqn.gov.sa/details?p=28771" [ref=e225] [cursor=pointer]:
+                  - /url: https://uqn.gov.sa/details?p=28771
+              - cell "—" [ref=e226]
+              - cell "Auto" [ref=e227]:
+                - combobox [disabled] [ref=e228]:
+                  - option "Auto" [selected]
+                  - option "Static"
+                  - option "Dynamic"
+                  - option "Recursive"
+              - cell "—" [ref=e229]
+              - cell "Edit Delete" [ref=e230]:
+                - button "Edit" [ref=e231] [cursor=pointer]
+                - button "Delete" [ref=e233] [cursor=pointer]
+            - row "https://uqn.gov.sa/category?cat=8 Never https://uqn.gov.sa/details?p=28771 — Auto — Edit Delete" [ref=e234]:
+              - cell [ref=e235]:
+                - checkbox [ref=e236] [cursor=pointer]
+              - cell "https://uqn.gov.sa/category?cat=8" [ref=e237]
+              - cell "Never" [ref=e238]
+              - cell "https://uqn.gov.sa/details?p=28771" [ref=e239]:
+                - link "https://uqn.gov.sa/details?p=28771" [ref=e240] [cursor=pointer]:
+                  - /url: https://uqn.gov.sa/details?p=28771
+              - cell "—" [ref=e241]
+              - cell "Auto" [ref=e242]:
+                - combobox [disabled] [ref=e243]:
+                  - option "Auto" [selected]
+                  - option "Static"
+                  - option "Dynamic"
+                  - option "Recursive"
+              - cell "—" [ref=e244]
+              - cell "Edit Delete" [ref=e245]:
+                - button "Edit" [ref=e246] [cursor=pointer]
+                - button "Delete" [ref=e248] [cursor=pointer]
+            - row "https://uqn.gov.sa/category?cat=9 Never https://uqn.gov.sa/details?p=28771 — Auto — Edit Delete" [ref=e249]:
+              - cell [ref=e250]:
+                - checkbox [ref=e251] [cursor=pointer]
+              - cell "https://uqn.gov.sa/category?cat=9" [ref=e252]
+              - cell "Never" [ref=e253]
+              - cell "https://uqn.gov.sa/details?p=28771" [ref=e254]:
+                - link "https://uqn.gov.sa/details?p=28771" [ref=e255] [cursor=pointer]:
+                  - /url: https://uqn.gov.sa/details?p=28771
+              - cell "—" [ref=e256]
+              - cell "Auto" [ref=e257]:
+                - combobox [disabled] [ref=e258]:
+                  - option "Auto" [selected]
+                  - option "Static"
+                  - option "Dynamic"
+                  - option "Recursive"
+              - cell "—" [ref=e259]
+              - cell "Edit Delete" [ref=e260]:
+                - button "Edit" [ref=e261] [cursor=pointer]
+                - button "Delete" [ref=e263] [cursor=pointer]
+            - row "https://www.gosi.gov.sa/ar/MediaCenter/News Never https://www.gosi.gov.sa/ar/MediaCenter/News/NewsDe... اقرأ المزيد Auto — Edit Delete" [ref=e264]:
+              - cell [ref=e265]:
+                - checkbox [ref=e266] [cursor=pointer]
+              - cell "https://www.gosi.gov.sa/ar/MediaCenter/News" [ref=e267]
+              - cell "Never" [ref=e268]
+              - cell "https://www.gosi.gov.sa/ar/MediaCenter/News/NewsDe..." [ref=e269]:
+                - link "https://www.gosi.gov.sa/ar/MediaCenter/News/NewsDe..." [ref=e270] [cursor=pointer]:
+                  - /url: https://www.gosi.gov.sa/ar/MediaCenter/News/NewsDetails/1/18122025
+              - cell "اقرأ المزيد" [ref=e271]
+              - cell "Auto" [ref=e272]:
+                - combobox [disabled] [ref=e273]:
+                  - option "Auto" [selected]
+                  - option "Static"
+                  - option "Dynamic"
+                  - option "Recursive"
+              - cell "—" [ref=e274]
+              - cell "Edit Delete" [ref=e275]:
+                - button "Edit" [ref=e276] [cursor=pointer]
+                - button "Delete" [ref=e278] [cursor=pointer]
+            - row "https://www.hrsd.gov.sa/media-center/news 10d ago — — Auto — Edit 🔄 Reset Delete" [ref=e279]:
+              - cell [ref=e280]:
+                - checkbox [ref=e281] [cursor=pointer]
+              - cell "https://www.hrsd.gov.sa/media-center/news" [ref=e282]
+              - cell "10d ago" [ref=e283]
+              - cell "—" [ref=e284]
+              - cell "—" [ref=e285]
+              - cell "Auto" [ref=e286]:
+                - combobox [disabled] [ref=e287]:
+                  - option "Auto" [selected]
+                  - option "Static"
+                  - option "Dynamic"
+                  - option "Recursive"
+              - cell "—" [ref=e288]
+              - cell "Edit 🔄 Reset Delete" [ref=e289]:
+                - button "Edit" [ref=e290] [cursor=pointer]
+                - button "🔄 Reset" [ref=e292] [cursor=pointer]
+                - button "Delete" [ref=e294] [cursor=pointer]
+        - generic [ref=e296]:
+          - generic [ref=e297]:
+            - generic [ref=e298]: URL
+            - textbox "https://example.gov/news" [ref=e299]
+          - generic [ref=e300]:
+            - generic [ref=e301]:
+              - generic [ref=e302]: Sample Link (optional)
+              - textbox "https://example.gov/news/12345" [ref=e303]
+            - generic [ref=e304]:
+              - generic [ref=e305]: Read More Label (optional)
+              - textbox "e.g., اقرأ المزيد" [ref=e306]
+            - generic [ref=e307]:
+              - generic [ref=e308]: Crawl Type
+              - combobox [ref=e309]:
+                - option "Auto-detect" [selected]
+                - option "Static HTML"
+                - option "Dynamic"
+                - option "Recursive"
+          - generic [ref=e310]:
+            - generic [ref=e311]: URL Date Template (optional)
+            - 'textbox "https://example.com/{DD}.{MM}.{YYYY}" [ref=e312]'
+            - generic [ref=e313]: "For sites where each day has its own URL. Leave blank for normal scraping. Use {DD}, {MM}, {YYYY} as date placeholders."
+          - button "Add URL Source" [ref=e314] [cursor=pointer]
+      - generic [ref=e315]:
+        - generic [ref=e316]:
+          - generic [ref=e317]: 📧 Email Receivers
+          - generic [ref=e318]: 2 receivers
+        - generic [ref=e319]:
+          - generic [ref=e321]:
+            - textbox "user@example.com" [ref=e322]
+            - button "Add Email" [ref=e323] [cursor=pointer]
+          - generic [ref=e324]:
+            - button "Delete Selected" [ref=e326] [cursor=pointer]
+            - table [ref=e328]:
+              - rowgroup [ref=e329]:
+                - row "Email Action" [ref=e330]:
+                  - columnheader [ref=e331]:
+                    - checkbox [ref=e332] [cursor=pointer]
+                  - columnheader "Email" [ref=e333]
+                  - columnheader "Action" [ref=e334]
+              - rowgroup [ref=e335]:
+                - row "alanoud.alsaud@sap.com Delete" [ref=e336]:
+                  - cell [ref=e337]:
+                    - checkbox [ref=e338] [cursor=pointer]
+                  - cell "alanoud.alsaud@sap.com" [ref=e339]
+                  - cell "Delete" [ref=e340]:
+                    - button "Delete" [ref=e342] [cursor=pointer]
+                - row "hany.zanaty@sap.com Delete" [ref=e343]:
+                  - cell [ref=e344]:
+                    - checkbox [ref=e345] [cursor=pointer]
+                  - cell "hany.zanaty@sap.com" [ref=e346]
+                  - cell "Delete" [ref=e347]:
+                    - button "Delete" [ref=e349] [cursor=pointer]
+      - generic [ref=e350]:
+        - generic [ref=e351]:
+          - generic [ref=e352]: 📧 Monitor Notifications
+          - generic [ref=e353]: Law-to-Specification Integration
+        - generic [ref=e354]:
+          - generic [ref=e356] [cursor=pointer]:
+            - checkbox "Enable Law-to-Specification email notifications" [checked] [ref=e357]
+            - generic [ref=e358]: Enable Law-to-Specification email notifications
+          - generic [ref=e359]:
+            - paragraph [ref=e360]:
+              - strong [ref=e361]: "How it works:"
+            - list [ref=e362]:
+              - listitem [ref=e363]: Law-to-Specification sends "Monitor updates" emails to the first email receiver above
+              - listitem [ref=e364]: That person forwards the email to Legal Eagle's Gmail inbox
+              - listitem [ref=e365]: Legal Eagle scans the inbox and includes changes in the daily digest
+              - listitem [ref=e366]: Changes appear in a separate "Website Change Alerts" section
+            - paragraph [ref=e367]:
+              - strong [ref=e368]: "Note:"
+              - text: Requires at least one email receiver configured above.
+      - generic [ref=e369]:
+        - generic [ref=e370]:
+          - generic [ref=e371]: 📖 Glossary
+          - generic [ref=e372]: 21 terms
+        - button "Delete Selected" [ref=e374] [cursor=pointer]
+        - generic [ref=e375]:
+          - generic [ref=e377]:
+            - checkbox [ref=e378]
+            - generic [ref=e379]: Labor contracts
+          - generic [ref=e381]:
+            - checkbox [ref=e382]
+            - generic [ref=e383]: Saudization (Nitaqat)
+          - generic [ref=e385]:
+            - checkbox [ref=e386]
+            - generic [ref=e387]: Wage Protection
+          - generic [ref=e389]:
+            - checkbox [ref=e390]
+            - generic [ref=e391]: calendar
+          - generic [ref=e393]:
+            - checkbox [ref=e394]
+            - generic [ref=e395]: currency
+          - generic [ref=e397]:
+            - checkbox [ref=e398]
+            - generic [ref=e399]: dependent workers (المرافقين/المرافقات)
+          - generic [ref=e401]:
+            - checkbox [ref=e402]
+            - generic [ref=e403]: end of service
+          - generic [ref=e405]:
+            - checkbox [ref=e406]
+            - generic [ref=e407]: expatriate labor policies
+          - generic [ref=e409]:
+            - checkbox [ref=e410]
+            - generic [ref=e411]: health insurance
+          - generic [ref=e413]:
+            - checkbox [ref=e414]
+            - generic [ref=e415]: iqama and visa
+          - generic [ref=e417]:
+            - checkbox [ref=e418]
+            - generic [ref=e419]: labor courts
+          - generic [ref=e421]:
+            - checkbox [ref=e422]
+            - generic [ref=e423]: labor disciplinary and violations
+          - generic [ref=e425]:
+            - checkbox [ref=e426]
+            - generic [ref=e427]: labor law
+          - generic [ref=e429]:
+            - checkbox [ref=e430]
+            - generic [ref=e431]: leaves
+          - generic [ref=e433]:
+            - checkbox [ref=e434]
+            - generic [ref=e435]: ministerial decrees (قرارات وزارية) from HRSD
+          - generic [ref=e437]:
+            - checkbox [ref=e438]
+            - generic [ref=e439]: part-time
+          - generic [ref=e441]:
+            - checkbox [ref=e442]
+            - generic [ref=e443]: payroll
+          - generic [ref=e445]:
+            - checkbox [ref=e446]
+            - generic [ref=e447]: remote work
+          - generic [ref=e449]:
+            - checkbox [ref=e450]
+            - generic [ref=e451]: service duration
+          - generic [ref=e453]:
+            - checkbox [ref=e454]
+            - generic [ref=e455]: social insurance (GOSI)
+          - generic [ref=e457]:
+            - checkbox [ref=e458]
+            - generic [ref=e459]: working hours
+        - generic [ref=e460]:
+          - separator [ref=e461]
+          - heading "Add Term" [level=3] [ref=e462]
+          - generic [ref=e464]:
+            - textbox "e.g., Saudization (Nitaqat)" [ref=e465]
+            - button "Add" [ref=e466] [cursor=pointer]
+          - generic [ref=e467]:
+            - heading "Bulk Add" [level=3] [ref=e468]
+            - generic [ref=e469]:
+              - generic [ref=e470]:
+                - generic [ref=e471]: One term per line
+                - textbox "Labor contracts iqama and visa dependent workers (المرافقين/المرافقات) expatriate labor policies Wage Protection" [ref=e472]:
+                  - /placeholder: "Labor contracts\niqama and visa\ndependent workers (المرافقين/المرافقات)\nexpatriate labor policies\nWage Protection"
+              - button "Add All Terms" [ref=e473] [cursor=pointer]

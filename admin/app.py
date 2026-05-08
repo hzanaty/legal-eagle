@@ -11,6 +11,14 @@ from flask import Flask, render_template, request, redirect, url_for, flash
 
 # Ensure project root is on sys.path for module imports (configurations, agents)
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+# Load .env from project root so credentials are available when launched via
+# launchd (which doesn't inherit the shell environment).
+try:
+    from dotenv import load_dotenv
+    load_dotenv(os.path.join(BASE_DIR, ".env"), override=False)
+except ImportError:
+    pass
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
@@ -31,6 +39,8 @@ from configurations.config_loader import (
     load_url_sources,
     load_global_credentials,
     migrate_urls_to_unified,
+    load_profile_date_scope,
+    save_profile_date_scope,
     LANGUAGE_NAMES,
 )
 from configurations.db import (
@@ -436,10 +446,12 @@ def admin_start_run(profile_id: int):
     _ensure_schema()
     
     # Get run options from form
-    force_run = request.form.get('force_run') == '1'
+    lookback_override = request.form.get('lookback_override', '').strip() or None
+    force_run = (lookback_override == 'force_full')  # map force_full override → force_run flag
     skip_comparison = request.form.get('skip_comparison') == '1'
     skip_filtering = request.form.get('skip_filtering') == '1'
     skip_email = request.form.get('skip_email') == '1'
+    skip_grouping = request.form.get('skip_grouping') == '1'
     
     # Get source selections from form (getlist returns [] if not present)
     selected_rss = request.form.getlist('selected_rss')
@@ -476,13 +488,13 @@ def admin_start_run(profile_id: int):
     conn = get_connection()
     create_schema_if_needed(conn)
     # Audit request with options
-    run_details = f"manual run from run page (force_run={force_run}, skip_comparison={skip_comparison}, skip_filtering={skip_filtering}, skip_email={skip_email}, rss={len(selected_rss) if selected_rss else 'all'}, twitter={len(selected_twitter) if selected_twitter else 'all'}, urls={len(selected_urls) if selected_urls else 'all'})"
+    run_details = f"manual run from run page (force_run={force_run}, skip_comparison={skip_comparison}, skip_filtering={skip_filtering}, skip_email={skip_email}, skip_grouping={skip_grouping}, rss={len(selected_rss) if selected_rss else 'all'}, twitter={len(selected_twitter) if selected_twitter else 'all'}, urls={len(selected_urls) if selected_urls else 'all'})"
     add_audit_log(conn, entity="profiles", action="run_requested", details=run_details, profile_id=profile_id)
     run_id = create_run(conn, profile_id, origin="manual")
     conn.close()
 
     # Background worker
-    def _worker(pid: int, rid: int, force: bool, skip_comp: bool, skip_filt: bool, skip_mail: bool, sel_rss, sel_twitter, sel_urls):
+    def _worker(pid: int, rid: int, force: bool, skip_comp: bool, skip_filt: bool, skip_mail: bool, skip_grp: bool, sel_rss, sel_twitter, sel_urls):
         # hook stdout to DB logs with line buffering
         class _DBLogger:
             def __init__(self, run_id: int):
@@ -540,8 +552,10 @@ def admin_start_run(profile_id: int):
                 return flag
 
             ok = run_profile_once(pid, force_run=force, skip_comparison=skip_comp, skip_filter=skip_filt, skip_email=skip_mail,
-                                selected_rss_urls=sel_rss, selected_twitter_handles=sel_twitter, 
-                                selected_url_sources=sel_urls)
+                                selected_rss_urls=sel_rss, selected_twitter_handles=sel_twitter,
+                                selected_url_sources=sel_urls,
+                                lookback_override=lookback_override if lookback_override != 'force_full' else None,
+                                skip_grouping=skip_grp)
             status_final = "Success" if ok else "Failed"
             email_status = "Sent" if ok else "Failed"
             
@@ -571,7 +585,7 @@ def admin_start_run(profile_id: int):
             append_run_log(fconn, rid, "INFO", f"🏁 Run {rid} finished with status {status_mark}")
             fconn.close()
 
-    threading.Thread(target=_worker, args=(profile_id, run_id, force_run, skip_comparison, skip_filtering, skip_email, selected_rss, selected_twitter, selected_urls), daemon=True).start()
+    threading.Thread(target=_worker, args=(profile_id, run_id, force_run, skip_comparison, skip_filtering, skip_email, skip_grouping, selected_rss, selected_twitter, selected_urls), daemon=True).start()
     return redirect(url_for("admin_profile_runs", profile_id=profile_id, run_id=run_id))
 
 
@@ -635,6 +649,7 @@ def admin_profile_detail(profile_id: int):
         "language": prof["language"],
         "active": int(prof["active"] or 0),
         "schedule_day": prof["schedule_day"],
+        "date_scope": prof["date_scope"] if "date_scope" in prof.keys() else "all",
     }
     conn.close()
 
@@ -712,6 +727,26 @@ def update_profile_language(profile_id: int):
     
     lang_name = LANGUAGE_NAMES.get(language, language)
     flash(f"Profile language updated to {lang_name}.", "success")
+    return redirect(url_for("admin_profile_detail", profile_id=profile_id))
+
+
+@app.route("/admin/profiles/<int:profile_id>/date-scope/update", methods=["POST"])
+def update_profile_date_scope(profile_id: int):
+    """Update the default lookback window for a profile."""
+    date_scope = (request.form.get("date_scope", "") or "").strip()
+    allowed = ("all", "delta", "last_7_days", "last_30_days", "today", "")
+    if date_scope not in allowed:
+        flash("Invalid lookback window value.", "error")
+        return redirect(url_for("admin_profile_detail", profile_id=profile_id))
+
+    save_profile_date_scope(profile_id, date_scope or "all")
+    conn = get_connection()
+    create_schema_if_needed(conn)
+    add_audit_log(conn, entity="profiles", action="update_date_scope", details=f"date_scope={date_scope or 'all'}", profile_id=profile_id)
+    conn.close()
+
+    label_map = {"all": "N/A (no limit)", "last_7_days": "Last 7 days", "last_30_days": "Last 30 days"}
+    flash(f"Default lookback window updated to: {label_map.get(date_scope or 'all', date_scope)}.", "success")
     return redirect(url_for("admin_profile_detail", profile_id=profile_id))
 
 
@@ -827,8 +862,8 @@ def add_url_source_route(profile_id: int):
     allowed_domains = request.form.get("allowed_domains", "").strip() or None
     path_filter = request.form.get("path_filter", "").strip() or None
     max_results = int(request.form.get("max_results", "20") or "20")
-    date_scope = request.form.get("date_scope", "all").strip() or "all"
-    
+    url_date_template = request.form.get("url_date_template", "").strip() or None
+
     if not url:
         flash("URL is required.", "error")
         return redirect(url_for("admin_profile_detail", profile_id=profile_id))
@@ -838,9 +873,10 @@ def add_url_source_route(profile_id: int):
 
     conn = get_connection()
     create_schema_if_needed(conn)
-    upsert_url_source(conn, profile_id, url=url, mode=mode, sample_link=sample_link, read_more_label=read_more_label, 
-                     crawl_version=crawl_version, max_depth=max_depth, allowed_domains=allowed_domains, 
-                     path_filter=path_filter, max_results=max_results, date_scope=date_scope)
+    upsert_url_source(conn, profile_id, url=url, mode=mode, sample_link=sample_link, read_more_label=read_more_label,
+                     crawl_version=crawl_version, max_depth=max_depth, allowed_domains=allowed_domains,
+                     path_filter=path_filter, max_results=max_results,
+                     url_date_template=url_date_template)
     add_audit_log(conn, entity="url_sources", action="add", details=f"url={url} mode={mode}", profile_id=profile_id)
     conn.close()
     flash("URL source added.", "success")
@@ -862,8 +898,8 @@ def update_url_source_route(profile_id: int):
     allowed_domains = request.form.get("allowed_domains", "").strip() or None
     path_filter = request.form.get("path_filter", "").strip() or None
     max_results = int(request.form.get("max_results", "20") or "20")
-    date_scope = request.form.get("date_scope", "all").strip() or "all"
-    
+    url_date_template = request.form.get("url_date_template", "").strip() or None
+
     if not url:
         flash("URL is required.", "error")
         return redirect(url_for("admin_profile_detail", profile_id=profile_id))
@@ -874,9 +910,10 @@ def update_url_source_route(profile_id: int):
     conn = get_connection()
     create_schema_if_needed(conn)
     # Use upsert to update all fields
-    upsert_url_source(conn, profile_id, url=url, mode=mode or "auto", sample_link=sample_link, read_more_label=read_more_label, 
-                     crawl_version=(crawl_version or "v1"), max_depth=max_depth, allowed_domains=allowed_domains, 
-                     path_filter=path_filter, max_results=max_results, date_scope=date_scope)
+    upsert_url_source(conn, profile_id, url=url, mode=mode or "auto", sample_link=sample_link, read_more_label=read_more_label,
+                     crawl_version=(crawl_version or "v1"), max_depth=max_depth, allowed_domains=allowed_domains,
+                     path_filter=path_filter, max_results=max_results,
+                     url_date_template=url_date_template)
     add_audit_log(conn, entity="url_sources", action="update", details=f"url={url} mode={mode}", profile_id=profile_id)
     conn.close()
     flash("URL source updated.", "success")

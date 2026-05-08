@@ -29,6 +29,7 @@ from configurations.config_loader import (
     load_url_sources,
     get_reviewed_baseline,
     parse_date_scope,
+    load_profile_date_scope,
     update_url_source_fetch_timestamp,
     update_rss_feed_last_fetch_timestamp,
     update_tweet_account_last_fetch_timestamp,
@@ -128,6 +129,7 @@ def run_controller():
         EMAIL_RECEIVERS = load_email_receivers(profile_id)
         glossary_flat = load_glossary(profile_id)
         GLOSSARY = _build_category_glossary_text(glossary_flat, lob)
+        PROFILE_DATE_SCOPE = load_profile_date_scope(profile_id)
 
         # Unified URL sources (auto/force_static/force_dynamic)
         URL_SOURCES = load_url_sources(profile_id)
@@ -139,6 +141,13 @@ def run_controller():
             feed_url = feed["url"] if isinstance(feed, dict) else feed
             rss_items.extend(parse_rss_feed(feed_url))
         print(f"✅ Total RSS items collected: {len(rss_items)}")
+        # Apply profile-level date filter to RSS
+        _rss_days = parse_date_scope(PROFILE_DATE_SCOPE)
+        if _rss_days == 0:
+            _rss_since = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+            rss_items = filter_items_by_date(rss_items, since_date=_rss_since)
+        elif _rss_days is not None:
+            rss_items = filter_items_by_date(rss_items, days=_rss_days)
         # Update last_fetch_date for each RSS feed
         now_ts = datetime.utcnow().isoformat()
         for feed in RSS_FEED_URLS:
@@ -167,7 +176,8 @@ def run_controller():
             print(f"\n🐦 Tweet Agent disabled until {reset_str}. Skipping.")
         elif TWEET_ACCOUNTS:
             _tw_handles = [a["handle"].lstrip("@") if isinstance(a, dict) else str(a).lstrip("@") for a in TWEET_ACCOUNTS]
-            tw_days = max((a.get('max_lookback_days', 7) if isinstance(a, dict) else 7 for a in TWEET_ACCOUNTS), default=7)
+            _tw_profile_days = parse_date_scope(PROFILE_DATE_SCOPE)
+            tw_days = max(_tw_profile_days, 1) if _tw_profile_days is not None else 7
             print("")
             print(f"Tweet Feed Agent (Search API): {len(_tw_handles)} account(s)")
             _conn_tw2 = get_connection()
@@ -257,14 +267,16 @@ def run_controller():
 
 
 def run_profile_once(
-    profile_id: int, 
-    force_run: bool = False, 
-    skip_email: bool = False, 
+    profile_id: int,
+    force_run: bool = False,
+    skip_email: bool = False,
     skip_comparison: bool = False,
     skip_filter: bool = False,
     selected_rss_urls: Optional[List[str]] = None,
     selected_twitter_handles: Optional[List[str]] = None,
-    selected_url_sources: Optional[List[str]] = None
+    selected_url_sources: Optional[List[str]] = None,
+    lookback_override: Optional[str] = None,
+    skip_grouping: bool = False,
 ) -> bool:
     """
     Run the full workflow for a single profile id (even if inactive).
@@ -326,7 +338,11 @@ def run_profile_once(
         glossary_flat = load_glossary(profile_id)
         GLOSSARY = _build_category_glossary_text(glossary_flat, lob)
         URL_SOURCES = load_url_sources(profile_id)
-        
+        PROFILE_DATE_SCOPE = load_profile_date_scope(profile_id)
+        if lookback_override:
+            print(f"⚡ Lookback override: {lookback_override} (profile default: {PROFILE_DATE_SCOPE})")
+            PROFILE_DATE_SCOPE = lookback_override
+
         # Filter sources based on selections (if provided)
         if selected_rss_urls is not None:
             RSS_FEED_URLS = [feed for feed in RSS_FEED_URLS if feed.get("url") in selected_rss_urls]
@@ -345,9 +361,9 @@ def run_profile_once(
         X_BEARER_TOKEN = creds["twitter"]["x_bearer_token"]
         GMAIL_CREDS = creds["gmail"]
 
-        # Load lookback window (default: 7 days)
-        lookback_days = int(get_setting_value(profile_id, 'news_lookback_days', '7'))
-        print(f"📅 News lookback window: {lookback_days} days")
+        # Load lookback window from profile date_scope
+        _profile_days = parse_date_scope(PROFILE_DATE_SCOPE)
+        print(f"📅 News lookback window: {PROFILE_DATE_SCOPE} → {_profile_days} days")
 
         conn = get_connection()
         create_schema_if_needed(conn)
@@ -360,7 +376,12 @@ def run_profile_once(
             rss_items.extend(parse_rss_feed(feed_url))
         print(f"✅ Total RSS items collected: {len(rss_items)}")
         # Apply date filter
-        rss_items = filter_items_by_date(rss_items, days=lookback_days)
+        if _profile_days == 0:
+            _rss_since = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+            rss_items = filter_items_by_date(rss_items, since_date=_rss_since)
+        elif _profile_days is not None:
+            rss_items = filter_items_by_date(rss_items, days=_profile_days)
+        # _profile_days is None = no filter (all time)
 
         # 2) Tweets (with 15-minute rate limit, Search API for all accounts)
         disable_tweets = os.environ.get("DISABLE_TWEETS")
@@ -414,7 +435,7 @@ def run_profile_once(
                     X_BEARER_TOKEN, 
                     profile_id, 
                     conn, 
-                    days=lookback_days
+                    days=max(_profile_days, 1) if _profile_days is not None else 7
                 )
                 print(f"✅ Total tweets collected from all accounts: {len(tweet_items)}")
 
@@ -422,33 +443,43 @@ def run_profile_once(
         url_items = []
         print("\n🕵️‍♂️ Running URL Sources Runner...")
         
-        # Calculate delta window for each URL source (max lookback acts as safety cap)
+        # Calculate delta window for each URL source (max lookback from profile date_scope)
         url_sources_with_delta = []
+        max_lookback_days = parse_date_scope(PROFILE_DATE_SCOPE)
         for source in URL_SOURCES:
             source_copy = source.copy()
             last_fetch = source.get('last_successful_fetch')
-            date_scope = source.get('date_scope', 'all')
-            max_lookback_days = parse_date_scope(date_scope)
-            
-            if force_run or not last_fetch:
-                # FULL mode: force run OR first run OR after reset
+
+            if max_lookback_days == 0:
+                # "Today only" — anchor to start of UTC day regardless of last fetch
+                start_of_today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+                source_copy['since_date'] = start_of_today
+                print(f"   ↳ {source['url']}: TODAY mode (since {start_of_today.strftime('%Y-%m-%d %H:%M')} UTC)")
+            elif PROFILE_DATE_SCOPE in ("force_full", "all") or force_run or not last_fetch:
+                # FULL mode: profile set to force full, or forced run, or first run
                 source_copy['days'] = max_lookback_days
-                mode_reason = "force run" if force_run else "first run"
+                if PROFILE_DATE_SCOPE in ("force_full", "all"):
+                    mode_reason = "force full (profile)"
+                elif force_run:
+                    mode_reason = "force run"
+                else:
+                    mode_reason = "first run"
                 print(f"   ↳ {source['url']}: FULL mode ({mode_reason}, max lookback: {max_lookback_days} days)")
             else:
                 # DELTA mode: fetch since last successful run
                 try:
                     since_date = datetime.fromisoformat(last_fetch)
-                    # Apply safety cap: don't exceed max lookback window
-                    max_lookback = datetime.utcnow() - timedelta(days=max_lookback_days)
-                    since_date = max(since_date, max_lookback)
+                    # Apply safety cap only when max_lookback_days is set (not None = unlimited)
+                    if max_lookback_days is not None:
+                        max_lookback = datetime.utcnow() - timedelta(days=max_lookback_days)
+                        since_date = max(since_date, max_lookback)
                     source_copy['since_date'] = since_date
                     print(f"   ↳ {source['url']}: DELTA mode (since {since_date.strftime('%Y-%m-%d %H:%M')})")
                 except Exception as e:
                     # Fallback to full window on parse error
                     source_copy['days'] = max_lookback_days
                     print(f"   ↳ {source['url']}: FULL mode (parse error: {e})")
-            
+
             url_sources_with_delta.append(source_copy)
         
         # Run unified sources with delta information
@@ -527,9 +558,27 @@ def run_profile_once(
         final_items = new_items + update_items
 
         # Group
-        print("\n🧠 Grouping similar news items...")
-        grouped_summary = group_and_summarize_news(final_items, "", LANGUAGE_PREFERENCE)
-        print(f"✅ Grouped summary ready with {len(grouped_summary)} entries.")
+        if skip_grouping:
+            print("⏭ Skipping grouping — each item treated as its own group")
+            grouped_summary = [
+                {
+                    "title": it.get("title", ""),
+                    "summary": it.get("content", it.get("summary", "")),
+                    "category": it.get("category", ""),
+                    "titles": [it.get("title", "")],
+                    "links": [it.get("link", it.get("url", ""))],
+                    "items": [it],
+                    "group_size": 1,
+                    "date_grouped": datetime.utcnow().strftime("%Y-%m-%d %H:%M"),
+                    "is_update_section": it.get("is_update", False),
+                    "delta": it.get("delta", None),
+                }
+                for it in final_items
+            ]
+        else:
+            print("\n🧠 Grouping similar news items...")
+            grouped_summary = group_and_summarize_news(final_items, "", LANGUAGE_PREFERENCE)
+            print(f"✅ Grouped summary ready with {len(grouped_summary)} entries.")
 
         # Monitor Updates (Law-to-Specification email integration)
         monitor_updates_data = None

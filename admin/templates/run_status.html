@@ -244,23 +244,24 @@
             </div>
           </div>
           
-          <!-- Run Options -->
+            <!-- Run Options -->
           <div style="margin-bottom: var(--sapSpacingM); padding: var(--sapSpacingS); background: var(--sapNeutralBackground); border-radius: 0.25rem;">
             <div style="font-weight: 600; margin-bottom: var(--sapSpacingS); font-size: var(--sapFontSmallSize); color: var(--sapNeutralColor);">
               Run Options:
             </div>
-            
-            <label style="display: flex; align-items: center; gap: var(--sapSpacingS); margin-bottom: var(--sapSpacingXS); cursor: pointer;">
-              <input type="checkbox" name="force_run" value="1" style="cursor: pointer;">
-              <span style="font-size: var(--sapFontSmallSize);">
-                <strong>Force full fetch</strong>
-                <br>
-                <span style="color: var(--sapNeutralColor); font-size: 11px;">
-                  Fetch full lookback window (ignore delta timestamps)
-                </span>
-              </span>
-            </label>
-            
+
+            <div style="margin-bottom: var(--sapSpacingS);">
+              <label style="font-size: var(--sapFontSmallSize); font-weight: 600; display: block; margin-bottom: 4px;">Lookback</label>
+              <select class="sapForm-select" name="lookback_override" style="font-size: var(--sapFontSmallSize); width: 100%;">
+                <option value="">Use profile default</option>
+                <option value="force_full">Force full (re-fetch all, ignore last run)</option>
+                <option value="delta">Delta (since last fetch)</option>
+                <option value="today">Today only</option>
+                <option value="last_7_days">Last 7 days</option>
+                <option value="last_30_days">Last 30 days</option>
+              </select>
+            </div>
+
             <label style="display: flex; align-items: center; gap: var(--sapSpacingS); margin-bottom: var(--sapSpacingXS); cursor: pointer;">
               <input type="checkbox" name="skip_comparison" value="1" style="cursor: pointer;">
               <span style="font-size: var(--sapFontSmallSize);">
@@ -282,7 +283,18 @@
                 </span>
               </span>
             </label>
-            
+
+            <label style="display: flex; align-items: center; gap: var(--sapSpacingS); margin-bottom: var(--sapSpacingXS); cursor: pointer;">
+              <input type="checkbox" name="skip_grouping" value="1" style="cursor: pointer;">
+              <span style="font-size: var(--sapFontSmallSize);">
+                <strong>Skip grouping (one item per email entry)</strong>
+                <br>
+                <span style="color: var(--sapNeutralColor); font-size: 11px;">
+                  Bypass LLM grouping, useful for testing layout
+                </span>
+              </span>
+            </label>
+
             <label style="display: flex; align-items: center; gap: var(--sapSpacingS); cursor: pointer;">
               <input type="checkbox" name="skip_email" value="1" style="cursor: pointer;">
               <span style="font-size: var(--sapFontSmallSize);">
@@ -436,9 +448,10 @@ const PROFILE_ID = {{ profile.id }};
   function saveRunOptions() {
     try {
       const options = {
-        force_run: document.querySelector('input[name="force_run"]').checked,
+        force_run: document.querySelector('input[name="force_run"]') ? document.querySelector('input[name="force_run"]').checked : false,
         skip_comparison: document.querySelector('input[name="skip_comparison"]').checked,
         skip_filtering: document.querySelector('input[name="skip_filtering"]').checked,
+        skip_grouping: document.querySelector('input[name="skip_grouping"]').checked,
         skip_email: document.querySelector('input[name="skip_email"]').checked
       };
       localStorage.setItem(optionsKey, JSON.stringify(options));
@@ -446,12 +459,12 @@ const PROFILE_ID = {{ profile.id }};
       console.error('Failed to save run options:', error);
     }
   }
-  
+
   // Restore run options on page load
   function restoreRunOptions() {
     const saved = loadRunOptions();
     if (saved) {
-      if (saved.force_run !== undefined) {
+      if (saved.force_run !== undefined && document.querySelector('input[name="force_run"]')) {
         document.querySelector('input[name="force_run"]').checked = saved.force_run;
       }
       if (saved.skip_comparison !== undefined) {
@@ -459,6 +472,9 @@ const PROFILE_ID = {{ profile.id }};
       }
       if (saved.skip_filtering !== undefined) {
         document.querySelector('input[name="skip_filtering"]').checked = saved.skip_filtering;
+      }
+      if (saved.skip_grouping !== undefined) {
+        document.querySelector('input[name="skip_grouping"]').checked = saved.skip_grouping;
       }
       if (saved.skip_email !== undefined) {
         document.querySelector('input[name="skip_email"]').checked = saved.skip_email;
@@ -474,7 +490,7 @@ const PROFILE_ID = {{ profile.id }};
   }
   
   // Save on checkbox change
-  document.querySelectorAll('input[name="force_run"], input[name="skip_comparison"], input[name="skip_filtering"], input[name="skip_email"]').forEach(function(checkbox) {
+  document.querySelectorAll('input[name="force_run"], input[name="skip_comparison"], input[name="skip_filtering"], input[name="skip_grouping"], input[name="skip_email"]').forEach(function(checkbox) {
     checkbox.addEventListener('change', saveRunOptions);
   });
 })();

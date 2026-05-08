@@ -1,5 +1,112 @@
 # CHANGELOG
 
+## v2.24 — 2026-05-08
+### Skip Grouping Run Option
+
+**New Feature:**
+- **Skip Grouping Checkbox**: New run option to bypass the AI news grouping stage
+  - Located in Run Options between "Skip filtering" and "Test mode"
+  - When checked: each collected item appears as its own separate email entry (no AI clustering)
+  - When unchecked: normal AI grouping behaviour (items clustered by regulatory theme)
+  - State persisted in browser localStorage (remembered across sessions)
+  - Useful for: testing email layout, bypassing slow LLM grouping, debugging
+
+**How it works:**
+- Backend wraps each item into a single-item group compatible with the email sender
+- Uses the item's raw `content` field as the email summary (no AI-generated summary)
+- All items retain their original category, links, and update status
+- Produces longer emails with more granular per-article entries
+
+**Files Changed:**
+- `agents/agents_controller.py` — Added `skip_grouping: bool = False` parameter to `run_profile_once()`; bypass/wrap logic in grouping stage
+- `admin/app.py` — Reads `skip_grouping` from form, passes through `_worker` to `run_profile_once()`
+- `admin/templates/run_status.html` — Added checkbox + localStorage persistence
+
+---
+
+## v2.23 — 2026-05-08
+### Run-Level Lookback Override
+
+**New Feature:**
+- **Lookback Dropdown in Run Modal**: Per-run override of the profile-level lookback window
+  - Replaces the old "Force full fetch" checkbox
+  - Options: Use profile default / Force full (re-fetch all) / Delta (since last fetch) / Today only / Last 7 days / Last 30 days
+  - "Use profile default" = no override; profile's configured date_scope applies
+  - "Force full (re-fetch all)" = bypass delta tracking for this run only
+  - Override is one-time: profile setting is unchanged after the run
+
+**Design rationale:**
+- "Force full re-fetch" is now a per-run option rather than a permanent profile setting
+- `force_full` removed from the profile Default Lookback Window dropdown (profile now has 4 clean options)
+- Existing profiles with `force_full` or `all` in the DB are backward compatible (treated as "Delta")
+
+**Files Changed:**
+- `agents/agents_controller.py` — Added `lookback_override: Optional[str] = None` param; injects over `PROFILE_DATE_SCOPE` when set
+- `admin/app.py` — Replaced `force_run` form field with `lookback_override`; maps `force_full` → `force_run=True` for backward compat
+- `admin/templates/run_status.html` — Replaced "Force full fetch" checkbox with "Lookback" select dropdown
+- `admin/templates/profile.html` — Removed `force_full` option from Default Lookback Window; updated help text
+
+---
+
+## v2.22 — 2026-05-08
+### Profile-Level Lookback Window
+
+**New Feature:**
+- **Unified Lookback at Profile Level**: Single `date_scope` setting on the profile drives all sources
+  - Applies to: RSS feeds, Twitter accounts, and URL sources
+  - Removes the need to set lookback days individually per RSS feed, Twitter account, or URL source
+  - "🗓 Default Lookback Window" card added to the profile configuration page (above RSS Feeds)
+
+**Lookback options:**
+| Value | Meaning |
+|-------|---------|
+| `delta` | Fetch everything on first run; only new items since last run afterwards |
+| `today` | Today only (UTC midnight as anchor) |
+| `last_7_days` | Last 7 calendar days |
+| `last_30_days` | Last 30 calendar days |
+
+**Profile UI changes:**
+- Per-source "Lookback Days" columns removed from RSS Feeds, Twitter Accounts, and URL Sources tables
+- Per-source lookback fields removed from all Add/Edit forms
+- New "Default Lookback Window" card with 4-option dropdown and Save button
+
+**Bug fixes:**
+- Fixed `PROFILE_DATE_SCOPE` NameError in `run_profile_once()` — was referenced but never defined, causing URL sources to crash on every manual run
+- Fixed `days=0` (today only) bug — `filter_items_by_date(days=0)` silently defaulted to 7 days; fixed by injecting `since_date = start_of_UTC_midnight` instead
+
+**Database:**
+- Added `date_scope TEXT DEFAULT 'delta'` column to `profiles` table (auto-migrated)
+- `max_lookback_days` columns on `rss_feeds` and `tweet_accounts` kept in DB but no longer shown in UI
+
+**Files Changed:**
+- `configurations/db.py` — `ALTER TABLE profiles ADD COLUMN date_scope` (idempotent)
+- `configurations/config_loader.py` — `parse_date_scope()` updated; added `load_profile_date_scope()`, `save_profile_date_scope()`
+- `agents/agents_controller.py` — Both `run_controller()` and `run_profile_once()` read `PROFILE_DATE_SCOPE`; apply to RSS, Twitter, and URL sources
+- `admin/app.py` — New `POST /admin/profiles/<id>/date-scope/update` route; removed `date_scope` from URL source add/update
+- `admin/templates/profile.html` — New Default Lookback Window card; removed per-source Lookback Days from all tables and forms
+
+---
+
+## v2.21 — 2026-05-08
+### URL Date Control (Mechanism A + Delta Tracking)
+
+**New Feature — Mechanism A (Post-Scrape Date Filter):**
+- URL sources now apply a post-scrape date filter after content is collected
+- Controller injects `since_date` (for delta/today) or `days` (for fixed windows) into each URL source run
+- Correctly handles "today only" by using UTC midnight as the anchor (not current time)
+
+**New Feature — Delta Tracking:**
+- `last_successful_fetch` timestamp per URL source tracked and updated after each successful fetch
+- DELTA mode: fetches items published since last run (incremental)
+- FULL mode: fetches entire lookback window (first run, force_full override, or `force_run`)
+- Mode printed in logs: e.g. `DELTA mode: since 2026-05-07T09:30:00 (max lookback: 7 days)`
+
+**Files Changed:**
+- `agents/url_sources_runner.py` — Mechanism A post-scrape filter using injected `since_dt`/`days`
+- `agents/agents_controller.py` — Per-source delta/full mode calculation; injects correct params into runner
+
+---
+
 ## v2.20 — 2026-04-28
 ### Skip Filtering + Run Options Persistence
 

@@ -999,42 +999,28 @@ def gosi_click_discover(url: str, detail_pattern: Optional[str] = None, timeout_
         return []
 
 # -------------------------------
-# Resmi Gazete (Turkish Official Gazette) specialized scraping
+# Date-template URL generation (Mechanism B)
 # -------------------------------
 
-def _generate_gazette_date_urls(base_url: str, start_date: str, days_count: int = 7) -> List[Tuple[str, str]]:
+def _generate_dated_urls(template: str, days: int | None) -> List[Tuple[str, str]]:
     """
-    Generate Resmi Gazete URLs starting from a specific date going forward.
-    
-    Format: https://www.resmigazete.gov.tr/DD.MM.YYYY
-    Example: https://www.resmigazete.gov.tr/01.08.2024
-    
-    Args:
-        base_url: Base gazette URL (e.g., https://www.resmigazete.gov.tr/)
-        start_date: Starting date in DD.MM.YYYY format (e.g., "01.08.2024")
-        days_count: How many days to process going forward (default: 7)
-    
-    Returns:
-        List of (url, date_str) tuples
+    Generate one URL per day by substituting {DD}, {MM}, {YYYY} in template.
+
+    days=None or days=0 → today only (1 URL).
+    days=N → last N days starting from today (most recent first).
+    Returns list of (url, date_str) tuples where date_str is YYYY-MM-DD.
     """
-    urls = []
-    
-    try:
-        # Parse start date (DD.MM.YYYY)
-        day, month, year = start_date.split('.')
-        start = datetime(int(year), int(month), int(day))
-        
-        # Generate URLs for each day
-        for i in range(days_count):
-            date = start + timedelta(days=i)
-            date_str = date.strftime("%d.%m.%Y")
-            url = f"{base_url.rstrip('/')}/{date_str}"
-            urls.append((url, date_str))
-    except Exception as e:
-        print(f"[Resmi Gazete] Error generating date URLs: {e}")
-        return []
-    
-    return urls
+    days_count = max(1, days) if days else 1
+    today = datetime.now()
+    result = []
+    for i in range(days_count):
+        d = today - timedelta(days=i)
+        url = (template
+               .replace("{DD}", d.strftime("%d"))
+               .replace("{MM}", d.strftime("%m"))
+               .replace("{YYYY}", d.strftime("%Y")))
+        result.append((url, d.strftime("%Y-%m-%d")))
+    return result
 
 
 def _extract_gazette_items(url: str, html: str, date_str: str) -> List[Dict]:
@@ -1249,7 +1235,7 @@ def _largest_text_block(soup: BeautifulSoup) -> str:
     return soup.get_text("\n", strip=True)[:8000]
 
 
-def extract_listing_links(base_url: str, html: str) -> List[str]:
+def extract_listing_links(base_url: str, html: str, max_results: int = 10) -> List[str]:
     soup = BeautifulSoup(html, "html.parser")
     # Try to find a container with many anchors
     candidates: List[Tuple[int, str]] = []  # (count, css_id)
@@ -1298,7 +1284,7 @@ def extract_listing_links(base_url: str, html: str) -> List[str]:
         same_domain_alt = [u for u in alt_anchors if urlparse(u).netloc == domain]
         anchors = same_domain_alt or alt_anchors
 
-    return anchors[:10]
+    return anchors[:max_results]
 
 
 def extract_article(base_url: str, url: str, html: str) -> Dict:
@@ -1680,7 +1666,7 @@ def extract_listing_cards(base_url: str, listing_html: str, max_items: int = 20,
     return items
 
 
-def static_collect_with_hints(base_url: str, listing_html: str, detail_pattern: Optional[str] = None, read_more_label: Optional[str] = None) -> Tuple[List[Dict], List[Dict]]:
+def static_collect_with_hints(base_url: str, listing_html: str, detail_pattern: Optional[str] = None, read_more_label: Optional[str] = None, max_results: int = 10) -> Tuple[List[Dict], List[Dict]]:
     items: List[Dict] = []
     errors: List[Dict] = []
 
@@ -1741,14 +1727,14 @@ def static_collect_with_hints(base_url: str, listing_html: str, detail_pattern: 
 
     # 3) Fallback to heuristic extraction if no anchors found
     if not anchors:
-        anchors = extract_listing_links(base_url, listing_html)
+        anchors = extract_listing_links(base_url, listing_html, max_results=max_results)
 
     if not anchors:
         errors.append({"url": base_url, "error": "no anchors found on listing"})
         return items, errors
 
     # 4) Fetch details and extract articles
-    for href in anchors[:10]:
+    for href in anchors[:max_results]:
         status, html = http_get(href, timeout=25)
         if status != 200:
             errors.append({"url": href, "error": f"detail fetch status {status}"})
@@ -1979,17 +1965,17 @@ def run_unified_sources(url_sources: List[Dict[str, str]], profile_slug: Optiona
     items: List[Dict] = []
     errors: List[Dict] = []
 
-    def _static_path(u: str, detail_pattern: Optional[str], read_label: Optional[str]) -> Tuple[List[Dict], List[Dict]]:
+    def _static_path(u: str, detail_pattern: Optional[str], read_label: Optional[str], max_results: int = 10) -> Tuple[List[Dict], List[Dict]]:
         print(f"  [static] Fetch listing: {u}")
         st, html = http_get(u, timeout=30)
         print(f"  [static] listing status={st}")
         if st != 200:
             return [], [{"url": u, "error": f"listing fetch status {st}"}]
-        items_s, errors_s = static_collect_with_hints(u, html, detail_pattern=detail_pattern, read_more_label=read_label)
+        items_s, errors_s = static_collect_with_hints(u, html, detail_pattern=detail_pattern, read_more_label=read_label, max_results=max_results)
         print(f"  [static] items={len(items_s)} errors={len(errors_s)}")
         return items_s, errors_s
 
-    def _dynamic_path(u: str, detail_pattern: Optional[str], read_label: Optional[str]) -> Tuple[List[Dict], List[Dict]]:
+    def _dynamic_path(u: str, detail_pattern: Optional[str], read_label: Optional[str], max_results: int = 10) -> Tuple[List[Dict], List[Dict]]:
         """
         Generic dynamic collector:
         - Render with Playwright (keep stylesheets).
@@ -2167,7 +2153,7 @@ def run_unified_sources(url_sources: List[Dict[str, str]], profile_slug: Optiona
             pass
         print(f"  [dynamic] detail targets={len(link_list)}")
         if link_list:
-            for href in link_list[:10]:
+            for href in link_list[:max_results]:
                 status, dhtml = http_get(href, timeout=25)
                 try:
                     print(f"    [detail] status={status} url={href}")
@@ -2218,7 +2204,7 @@ def run_unified_sources(url_sources: List[Dict[str, str]], profile_slug: Optiona
             try:
                 if len(items_collected) < 10:
                     prev_count = len(items_collected)
-                    more_items, more_errors = static_collect_with_hints(u, html, detail_pattern=detail_pattern, read_more_label=read_label)
+                    more_items, more_errors = static_collect_with_hints(u, html, detail_pattern=detail_pattern, read_more_label=read_label, max_results=max_results)
                     # Filter to detail_pattern links when provided
                     try:
                         if detail_pattern:
@@ -2299,7 +2285,7 @@ def run_unified_sources(url_sources: List[Dict[str, str]], profile_slug: Optiona
             return cards, []
 
         # Else fallback to existing static logic on the rendered HTML (anchor-based)
-        its, errs = static_collect_with_hints(u, html, detail_pattern=detail_pattern, read_more_label=read_label)
+        its, errs = static_collect_with_hints(u, html, detail_pattern=detail_pattern, read_more_label=read_label, max_results=max_results)
         # Items gathered as part of dynamic fallback should be marked URL_Dynamic
         try:
             for it in its:
@@ -2315,104 +2301,71 @@ def run_unified_sources(url_sources: List[Dict[str, str]], profile_slug: Optiona
         sample = src.get("sample_link")
         detail_pattern = derive_detail_pattern(sample) if sample else None
         read_label = src.get("read_more_label")
-        date_scope = src.get("date_scope", "all")
-        
+        max_results = int(src.get("max_results") or 10)
+        url_date_template = (src.get("url_date_template") or "").strip()
+        # days / since_date are injected by agents_controller from profile-level date_scope
+        days = src.get("days")
+        since_dt = src.get("since_date")
+
         try:
-            print(f"[Source {idx+1}/{len(url_sources)}] url={u} mode={mode} detail_prefix={detail_pattern or '-'} read_more_label={read_label or '-'} date_scope={date_scope}")
+            print(f"[Source {idx+1}/{len(url_sources)}] url={u} mode={mode} detail_prefix={detail_pattern or '-'} read_more_label={read_label or '-'} days={days} max_results={max_results} url_date_template={url_date_template or '-'}")
         except Exception:
             pass
 
         if not u:
             errors.append({"url": u, "error": "missing url"})
             continue
-        
-        # Special handling for Resmi Gazete (Turkish Official Gazette)
-        if "resmigazete.gov.tr" in u.lower():
+
+        # Mechanism B: URL-per-day generation via template
+        if url_date_template:
             try:
-                print(f"[Source {idx+1}] Detected Resmi Gazete - using inline scraper")
-                
-                # Determine start date and days count from date_scope
-                start_date = src.get("start_date")  # Optional: explicit start date in DD.MM.YYYY format
-                days_count = 7
-                
-                if date_scope == "last_7_days":
-                    days_count = 7
-                elif date_scope == "last_30_days":
-                    days_count = 30
-                
-                # Default to today if no start date provided
-                if not start_date:
-                    start_date = datetime.now().strftime("%d.%m.%Y")
-                
-                print(f"[Resmi Gazete] Starting from {start_date}, processing {days_count} days")
-                
-                # Generate date URLs
-                date_urls = _generate_gazette_date_urls(u, start_date, days_count)
-                
-                if not date_urls:
-                    errors.append({"url": u, "error": f"Failed to generate date URLs from {start_date}"})
-                    continue
-                
-                print(f"[Resmi Gazete] Generated {len(date_urls)} date URLs")
-                
-                # Fetch and extract items from each date
-                gazette_items: List[Dict] = []
-                for date_url, date_str in date_urls:
-                    print(f"[Resmi Gazete] Fetching: {date_url}")
-                    
-                    status, html = http_get(date_url, timeout=20)
-                    
-                    if status != 200:
-                        errors.append({
-                            "url": date_url,
-                            "error": f"HTTP status {status}",
-                            "date": date_str
-                        })
-                        print(f"[Resmi Gazete] Failed to fetch {date_url}: status {status}")
-                        continue
-                    
-                    # Extract items from this day's gazette
-                    day_items = _extract_gazette_items(date_url, html, date_str)
-                    
-                    print(f"[Resmi Gazete] Extracted {len(day_items)} items from {date_str}")
-                    
-                    gazette_items.extend(day_items)
-                
-                print(f"[Resmi Gazete] Total items: {len(gazette_items)}, Errors: {len(errors)}")
-                
-                items.extend(gazette_items)
-                continue  # Skip normal processing
+                dated_urls = _generate_dated_urls(url_date_template, days)
+                print(f"[Source {idx+1}] Mechanism B: {len(dated_urls)} dated URL(s) to fetch")
+                template_items: List[Dict] = []
+                for dated_url, date_str in dated_urls:
+                    print(f"  [dated] Fetching {dated_url}")
+                    day_its, day_errs = _static_path(dated_url, detail_pattern, read_label, max_results=max_results)
+                    if not day_its:
+                        day_its, day_errs = _dynamic_path(dated_url, detail_pattern, read_label, max_results=max_results)
+                    for it in day_its:
+                        if isinstance(it, dict) and not it.get("date"):
+                            it["date"] = date_str
+                    template_items.extend(day_its)
+                    errors.extend(day_errs)
+                print(f"[Source {idx+1}] Mechanism B total: {len(template_items)} items")
+                items.extend(template_items)
+                continue
             except Exception as e:
-                errors.append({"url": u, "error": f"Resmi Gazete scraper failed: {e}"})
+                errors.append({"url": u, "error": f"url_date_template scraper failed: {e}"})
                 continue
 
+        src_items: List[Dict] = []
         try:
             if mode == "force_static":
-                its, errs = _static_path(u, detail_pattern, read_label)
+                its, errs = _static_path(u, detail_pattern, read_label, max_results=max_results)
                 try:
                     print(f"[source] static path items={len(its)} errors={len(errs)}")
                 except Exception:
                     pass
-                items.extend(its); errors.extend(errs)
+                src_items.extend(its); errors.extend(errs)
             elif mode == "force_dynamic":
                 # Optional validation using sample_link
                 if sample:
                     ok, sample_html = render_html(sample, wait_selector=None, timeout_ms=40000)
                     if not ok or not sample_html or sample_html.startswith("__ERROR__"):
                         errors.append({"url": sample, "error": "sample_link dynamic validation failed"})
-                its, errs = _dynamic_path(u, detail_pattern, read_label)
+                its, errs = _dynamic_path(u, detail_pattern, read_label, max_results=max_results)
                 try:
                     print(f"[source] dynamic path items={len(its)} errors={len(errs)}")
                 except Exception:
                     pass
-                items.extend(its); errors.extend(errs)
+                src_items.extend(its); errors.extend(errs)
             elif mode == "recursive":
                 # Recursive crawling for multi-level hierarchies
                 max_depth = src.get("max_depth", 3)
                 allowed_domains_raw = src.get("allowed_domains") or ""
                 path_filter = src.get("path_filter")
-                max_results = src.get("max_results", 20)
-                
+
                 # Parse allowed_domains (newline-separated or JSON array)
                 allowed_domains = []
                 if allowed_domains_raw:
@@ -2422,7 +2375,7 @@ def run_unified_sources(url_sources: List[Dict[str, str]], profile_slug: Optiona
                     except Exception:
                         # Fallback: newline-separated
                         allowed_domains = [d.strip() for d in allowed_domains_raw.split("\n") if d.strip()]
-                
+
                 # Auto-add sample_link domain if not in allowed_domains
                 if sample and allowed_domains:
                     try:
@@ -2431,7 +2384,7 @@ def run_unified_sources(url_sources: List[Dict[str, str]], profile_slug: Optiona
                             allowed_domains.append(sample_domain)
                     except Exception:
                         pass
-                
+
                 its, errs = recursive_crawl(
                     entry_url=u,
                     detail_pattern=detail_pattern,
@@ -2444,29 +2397,44 @@ def run_unified_sources(url_sources: List[Dict[str, str]], profile_slug: Optiona
                     print(f"[source] recursive path items={len(its)} errors={len(errs)}")
                 except Exception:
                     pass
-                items.extend(its); errors.extend(errs)
+                src_items.extend(its); errors.extend(errs)
             else:
                 # auto: try static then fallback to dynamic if too few
-                its, errs = _static_path(u, detail_pattern, read_label)
+                its, errs = _static_path(u, detail_pattern, read_label, max_results=max_results)
                 try:
                     print(f"[source] static path items={len(its)} errors={len(errs)}")
                 except Exception:
                     pass
                 if len(its) >= 1:
-                    items.extend(its); errors.extend(errs)
+                    src_items.extend(its); errors.extend(errs)
                 else:
                     print("[source] static path yielded none, trying dynamic ...")
-                    its2, errs2 = _dynamic_path(u, detail_pattern, read_label)
+                    its2, errs2 = _dynamic_path(u, detail_pattern, read_label, max_results=max_results)
                     try:
                         print(f"[source] dynamic path items={len(its2)} errors={len(errs2)}")
                     except Exception:
                         pass
-                    items.extend(its2)
+                    src_items.extend(its2)
                     if its2:
-                        # Dynamic succeeded; suppress static-path errors to avoid misleading “no anchors found”
+                        # Dynamic succeeded; suppress static-path errors to avoid misleading "no anchors found"
                         errors.extend(errs2)
                     else:
                         errors.extend(errs + errs2)
+
+            # Mechanism A: post-scrape date filter (skipped for recursive — it manages its own pagination)
+            if mode != "recursive":
+                from agents.date_filter import filter_items_by_date
+                before = len(src_items)
+                if since_dt is not None:
+                    src_items = filter_items_by_date(src_items, since_date=since_dt)
+                elif days is not None:
+                    src_items = filter_items_by_date(src_items, days=days)
+                try:
+                    print(f"[source] date filter: {before} → {len(src_items)} items (days={days}, since={since_dt})")
+                except Exception:
+                    pass
+
+            items.extend(src_items)
         except Exception as e:
             errors.append({"url": u, "error": f"runner exception: {e}"})
             continue

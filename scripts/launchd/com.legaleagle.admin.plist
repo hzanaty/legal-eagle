@@ -4,19 +4,24 @@
 Legal Eagle Admin Server (user LaunchAgent)
 Runs the Flask admin web interface on http://127.0.0.1:8080
 
-Installation:
+Installation (IMPORTANT: copy as real file, do NOT symlink):
   cp scripts/launchd/com.legaleagle.admin.plist ~/Library/LaunchAgents/
-  launchctl load -w ~/Library/LaunchAgents/com.legaleagle.admin.plist
+  launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.legaleagle.admin.plist
 
 Unload:
-  launchctl unload ~/Library/LaunchAgents/com.legaleagle.admin.plist
+  launchctl bootout gui/$(id -u)/com.legaleagle.admin
 
 Check status:
-  launchctl list | grep legaleagle
+  launchctl print gui/$(id -u)/com.legaleagle.admin
 
 View logs:
-  tail -f /Users/i077750/Documents/GitHub/legal-eagle/outputs/admin-stdout.log
-  tail -f /Users/i077750/Documents/GitHub/legal-eagle/outputs/admin-stderr.log
+  tail -f outputs/admin-stdout.log
+  tail -f outputs/admin-stderr.log
+
+Troubleshooting (macOS Sequoia+):
+  If exit code 78 / spawn scheduled loop:
+  - Delete old log files: rm outputs/admin-stdout.log outputs/admin-stderr.log
+  - Bootout, then bootstrap again
 -->
 <plist version="1.0">
   <dict>
@@ -26,17 +31,30 @@ View logs:
     <key>WorkingDirectory</key>
     <string>/Users/i077750/Documents/GitHub/legal-eagle</string>
 
+    <!-- Call Python directly — bash script wrappers are blocked by macOS Sequoia+ -->
     <key>ProgramArguments</key>
     <array>
-      <string>/bin/bash</string>
-      <string>/Users/i077750/Documents/GitHub/legal-eagle/scripts/start_admin_launchd.sh</string>
+      <string>/Library/Frameworks/Python.framework/Versions/3.13/bin/python3</string>
+      <string>/Users/i077750/Documents/GitHub/legal-eagle/admin/app.py</string>
     </array>
 
-    <!-- Keep the server running always -->
+    <key>EnvironmentVariables</key>
+    <dict>
+      <key>PYTHONPATH</key>
+      <string>/Users/i077750/Documents/GitHub/legal-eagle</string>
+      <key>PYTHONUNBUFFERED</key>
+      <string>1</string>
+      <key>FLASK_ENV</key>
+      <string>production</string>
+      <key>HOME</key>
+      <string>/Users/i077750</string>
+    </dict>
+
+    <!-- Keep the server running always; restart automatically after crash -->
     <key>KeepAlive</key>
     <true/>
 
-    <!-- Start when user logs in -->
+    <!-- Start on login -->
     <key>RunAtLoad</key>
     <true/>
 
@@ -46,7 +64,7 @@ View logs:
     <key>StandardErrorPath</key>
     <string>/Users/i077750/Documents/GitHub/legal-eagle/outputs/admin-stderr.log</string>
 
-    <!-- Restart if it crashes (throttle to prevent rapid restarts) -->
+    <!-- Throttle rapid restarts to 10 seconds -->
     <key>ThrottleInterval</key>
     <integer>10</integer>
   </dict>

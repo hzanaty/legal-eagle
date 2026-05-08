@@ -1,16 +1,18 @@
 #!/bin/bash
-# Wrapper script for launchd to start admin server
-# This ensures all environment variables are properly set
-
+# Wrapper for launchd (kept for reference; the active plist calls Python directly)
 cd /Users/i077750/Documents/GitHub/legal-eagle || exit 1
 
-# Set Python path
+if [ -f .env ]; then
+  while IFS= read -r line || [ -n "$line" ]; do
+    [[ "$line" =~ ^[[:space:]]*# ]] && continue
+    [[ -z "${line// }" ]] && continue
+    export "$line" 2>/dev/null
+  done < .env
+fi
+
 export PYTHONPATH=/Users/i077750/Documents/GitHub/legal-eagle
 export PYTHONUNBUFFERED=1
 export FLASK_ENV=production
+export HOME=/Users/i077750
 
-# Log startup
-echo "[$(date)] Starting admin server via launchd..." >&2
-
-# Start the admin server (Flask will use debug=True from app.py but without reloader in production)
 exec /Library/Frameworks/Python.framework/Versions/3.13/bin/python3 admin/app.py
