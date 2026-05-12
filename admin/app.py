@@ -510,7 +510,7 @@ def admin_start_run(profile_id: int):
                         create_schema_if_needed(conn_i)
                         append_run_log(conn_i, self.run_id, "INFO", line)
                         conn_i.close()
-                        self.orig.write(line + "\n")
+                        self.orig.write(f"[RUN-{self.run_id}] {line}\n")
                 except Exception as e:
                     self.orig.write(f"[log error] {e}\n")
             def flush(self):
@@ -520,7 +520,7 @@ def admin_start_run(profile_id: int):
                         create_schema_if_needed(conn_i)
                         append_run_log(conn_i, self.run_id, "INFO", self.buf)
                         conn_i.close()
-                        self.orig.write(self.buf)
+                        self.orig.write(f"[RUN-{self.run_id}] {self.buf}")
                         self.buf = ""
                     self.orig.flush()
                 except Exception:
@@ -594,7 +594,8 @@ def admin_start_run(profile_id: int):
 def stream_run_logs(run_id: int):
     _ensure_schema()
     def _event_stream():
-        last_seq = None
+        last_seq = request.headers.get("Last-Event-ID")
+        last_seq = int(last_seq) if last_seq else None
         finished = False
         while not finished:
             conn = get_connection()
@@ -605,7 +606,7 @@ def stream_run_logs(run_id: int):
             for entry in logs:
                 last_seq = entry["seq"]
                 payload = f"{entry['ts']} [{entry['level']}] {entry['line']}"
-                yield f"data: {payload}\n\n"
+                yield f"id: {last_seq}\ndata: {payload}\n\n"
             # check status
             if run_row and run_row.get("status") in ("Success", "Failed", "Canceled"):
                 # send terminal event

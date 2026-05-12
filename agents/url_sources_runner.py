@@ -38,7 +38,16 @@ def http_get(url: str, timeout: int = 20, retries: int = 3, backoff_sec: float =
     for attempt in range(retries):
         try:
             r = requests.get(url, headers=DEFAULT_HEADERS, timeout=timeout)
+            if r.status_code >= 500 and attempt < retries - 1:
+                try:
+                    import time as _t
+                    _t.sleep(backoff_sec)
+                except Exception:
+                    pass
+                continue
             return r.status_code, r.text
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+            return -1, f"HTTP error: {e}"
         except Exception as e:
             last_err = e
             if attempt < retries - 1:
@@ -1965,15 +1974,15 @@ def run_unified_sources(url_sources: List[Dict[str, str]], profile_slug: Optiona
     items: List[Dict] = []
     errors: List[Dict] = []
 
-    def _static_path(u: str, detail_pattern: Optional[str], read_label: Optional[str], max_results: int = 10) -> Tuple[List[Dict], List[Dict]]:
+    def _static_path(u: str, detail_pattern: Optional[str], read_label: Optional[str], max_results: int = 10) -> Tuple[List[Dict], List[Dict], int]:
         print(f"  [static] Fetch listing: {u}")
         st, html = http_get(u, timeout=30)
         print(f"  [static] listing status={st}")
         if st != 200:
-            return [], [{"url": u, "error": f"listing fetch status {st}"}]
+            return [], [{"url": u, "error": f"listing fetch status {st}"}], st
         items_s, errors_s = static_collect_with_hints(u, html, detail_pattern=detail_pattern, read_more_label=read_label, max_results=max_results)
         print(f"  [static] items={len(items_s)} errors={len(errors_s)}")
-        return items_s, errors_s
+        return items_s, errors_s, st
 
     def _dynamic_path(u: str, detail_pattern: Optional[str], read_label: Optional[str], max_results: int = 10) -> Tuple[List[Dict], List[Dict]]:
         """
@@ -1986,7 +1995,7 @@ def run_unified_sources(url_sources: List[Dict[str, str]], profile_slug: Optiona
         errors: List[Dict] = []
 
         print(f"  [dynamic] Render listing: {u}")
-        ok, html, links = render_and_collect_links(u, read_label=read_label, detail_pattern=detail_pattern, timeout_ms=60000)
+        ok, html, links = render_and_collect_links(u, read_label=read_label, detail_pattern=detail_pattern, timeout_ms=30000)
         if not ok:
             print(f"  [dynamic] render failed: {html}")
             return [], [{"url": u, "error": html}]
@@ -2324,7 +2333,7 @@ def run_unified_sources(url_sources: List[Dict[str, str]], profile_slug: Optiona
                 template_items: List[Dict] = []
                 for dated_url, date_str in dated_urls:
                     print(f"  [dated] Fetching {dated_url}")
-                    day_its, day_errs = _static_path(dated_url, detail_pattern, read_label, max_results=max_results)
+                    day_its, day_errs, _day_st = _static_path(dated_url, detail_pattern, read_label, max_results=max_results)
                     if not day_its:
                         day_its, day_errs = _dynamic_path(dated_url, detail_pattern, read_label, max_results=max_results)
                     for it in day_its:
@@ -2342,7 +2351,7 @@ def run_unified_sources(url_sources: List[Dict[str, str]], profile_slug: Optiona
         src_items: List[Dict] = []
         try:
             if mode == "force_static":
-                its, errs = _static_path(u, detail_pattern, read_label, max_results=max_results)
+                its, errs, _st = _static_path(u, detail_pattern, read_label, max_results=max_results)
                 try:
                     print(f"[source] static path items={len(its)} errors={len(errs)}")
                 except Exception:
@@ -2400,13 +2409,16 @@ def run_unified_sources(url_sources: List[Dict[str, str]], profile_slug: Optiona
                 src_items.extend(its); errors.extend(errs)
             else:
                 # auto: try static then fallback to dynamic if too few
-                its, errs = _static_path(u, detail_pattern, read_label, max_results=max_results)
+                its, errs, static_st = _static_path(u, detail_pattern, read_label, max_results=max_results)
                 try:
                     print(f"[source] static path items={len(its)} errors={len(errs)}")
                 except Exception:
                     pass
                 if len(its) >= 1:
                     src_items.extend(its); errors.extend(errs)
+                elif static_st == -1:
+                    print("[source] skipping dynamic: static reported connection failure")
+                    errors.extend(errs)
                 else:
                     print("[source] static path yielded none, trying dynamic ...")
                     its2, errs2 = _dynamic_path(u, detail_pattern, read_label, max_results=max_results)

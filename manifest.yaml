@@ -7,7 +7,7 @@ applications:
   buildpacks:
     - https://github.com/cloudfoundry/apt-buildpack
     - python_buildpack
-  command: gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 120 admin.app:app
+  command: gunicorn --bind 0.0.0.0:$PORT --worker-class gevent --workers 4 --timeout 120 admin.app:app
   env:
     FLASK_ENV: production
     PYTHONUNBUFFERED: true

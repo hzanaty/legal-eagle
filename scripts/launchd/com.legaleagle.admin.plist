@@ -31,11 +31,11 @@ Troubleshooting (macOS Sequoia+):
     <key>WorkingDirectory</key>
     <string>/Users/i077750/Documents/GitHub/legal-eagle</string>
 
-    <!-- Call Python directly — bash script wrappers are blocked by macOS Sequoia+ -->
+    <!-- Use Python launcher wrapper — truncates logs on each start to prevent exit code 78 on macOS Sequoia+ -->
     <key>ProgramArguments</key>
     <array>
       <string>/Library/Frameworks/Python.framework/Versions/3.13/bin/python3</string>
-      <string>/Users/i077750/Documents/GitHub/legal-eagle/admin/app.py</string>
+      <string>/Users/i077750/Documents/GitHub/legal-eagle/scripts/admin_launcher.py</string>
     </array>
 
     <key>EnvironmentVariables</key>
