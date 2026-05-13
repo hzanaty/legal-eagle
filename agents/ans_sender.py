@@ -4,9 +4,8 @@ SAP BTP Alert Notification Service (ANS) email sender.
 Used on BTP when VCAP_SERVICES contains an ANS service binding.
 Falls back gracefully to None when no binding is present (local dev).
 
-Mirrors the RSS app reference implementation: provisions one
-Action + Condition + Subscription per recipient (idempotent), then
-sends one resource-event per recipient per digest run.
+Provisions one Action + Condition + Subscription per recipient (idempotent),
+then sends one resource-event per recipient per digest run.
 """
 
 import hashlib
@@ -42,13 +41,11 @@ def _get_ans_credentials() -> Optional[dict]:
     except Exception:
         return None
 
-    # Managed service binding (label: alert-notification)
     for entry in vcap.get("alert-notification", []):
         creds = entry.get("credentials", {})
         if creds.get("url") and creds.get("client_id"):
             return creds
 
-    # User-provided service (e.g. cf cups legal-eagle-ans)
     for entry in vcap.get("user-provided", []):
         c = entry.get("credentials", {})
         if c.get("url") and c.get("client_id"):
@@ -65,7 +62,6 @@ class ANSSender:
 
     def __init__(self, url: str, oauth_url: str, client_id: str, client_secret: str):
         self._url = url.rstrip("/")
-        # oauth_url already contains ?grant_type=client_credentials
         self._oauth_url = oauth_url
         self._client_id = client_id
         self._client_secret = client_secret
@@ -104,16 +100,16 @@ class ANSSender:
             timeout=30,
         )
         if resp.status_code == 409:
-            return  # already exists — idempotent
+            return  # already exists, fine
         if not resp.ok:
             raise RuntimeError(
-                f"ANS {path} → {resp.status_code}: {resp.text[:400]}"
+                f"ANS {path} -> {resp.status_code}: {resp.text[:400]}"
             )
 
     def ensure_provisioned(self, recipient_email: str) -> None:
         """
         Idempotently provision Action + Condition + Subscription for one recipient.
-        Uses individual CRUD endpoints; 409 Conflict means already exists — safe to ignore.
+        Uses individual CRUD endpoints; 409 Conflict means already exists, safe to ignore.
         """
         sid = _sanitize(recipient_email)
         action = f"le-email-{sid}"
@@ -171,11 +167,13 @@ class ANSSender:
             },
             timeout=30,
         )
-        resp.raise_for_status()
         if not resp.ok:
             raise RuntimeError(
-                f"ANS sendEvent → {resp.status_code}: {resp.text[:400]}"
-            ) — initialised once on first use
+                f"ANS sendEvent -> {resp.status_code}: {resp.text[:400]}"
+            )
+
+
+# Module-level singleton, initialised once on first use
 _ans_sender: Optional[ANSSender] = None
 _ans_checked = False
 
@@ -183,7 +181,7 @@ _ans_checked = False
 def get_ans_sender() -> Optional[ANSSender]:
     """
     Returns a ready ANSSender if ANS is bound, else None.
-    Result is cached — safe to call repeatedly.
+    Result is cached - safe to call repeatedly.
     """
     global _ans_sender, _ans_checked
     if _ans_checked:
@@ -212,8 +210,8 @@ def send_digest_via_ans(
 ) -> bool:
     """
     Send digest to all recipients via ANS.
-    Returns True if all sends succeeded, False if ANS is unavailable or any send failed.
-    Caller should fall back to Gmail SMTP on False.
+    Returns True if all sends succeeded, False if ANS unavailable or any send failed.
+    Caller falls back to Gmail SMTP on False.
     """
     sender = get_ans_sender()
     if not sender:
