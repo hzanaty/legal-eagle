@@ -1112,6 +1112,14 @@ def add_email_receiver_route(profile_id: int):
     upsert_email_receiver(conn, profile_id, email=email)
     add_audit_log(conn, entity="email_receivers", action="add", details=email, profile_id=profile_id)
     conn.close()
+    from agents.ans_sender import get_ans_sender
+    sender = get_ans_sender()
+    if sender:
+        try:
+            sender.ensure_provisioned(email)
+        except Exception as e:
+            flash(f"Email added, but ANS provisioning failed: {str(e)[:120]}", "error")
+            return redirect(url_for("admin_profile_detail", profile_id=profile_id))
     flash("Email receiver added.", "success")
     return redirect(url_for("admin_profile_detail", profile_id=profile_id))
 
@@ -1133,7 +1141,18 @@ def save_email_receivers_route(profile_id: int):
         upsert_email_receiver(conn, profile_id, email=e)
     add_audit_log(conn, entity="email_receivers", action="save", details=f"count={len(emails)}", profile_id=profile_id)
     conn.close()
-
+    from agents.ans_sender import get_ans_sender
+    sender = get_ans_sender()
+    if sender:
+        ans_errors = []
+        for e in emails:
+            try:
+                sender.ensure_provisioned(e)
+            except Exception as ex:
+                ans_errors.append(f"{e}: {str(ex)[:80]}")
+        if ans_errors:
+            flash("Emails saved, but ANS provisioning failed for: " + ", ".join(ans_errors), "error")
+            return redirect(url_for("admin_profile_detail", profile_id=profile_id))
     flash("Email receivers saved.", "success")
     return redirect(url_for("admin_profile_detail", profile_id=profile_id))
 

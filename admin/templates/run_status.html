@@ -247,73 +247,20 @@
     </div>
     {% endif %}
     
-    <!-- ANS Email Routing Setup -->
-    {% if ans_entities %}
+    <!-- ANS Email Routing (compact status) -->
+    {% if ans_available and ans_entities %}
     <div class="sapCard" style="margin-bottom: var(--sapSpacingM);">
       <div class="sapCard-header">
         <span>🔔 ANS Email Routing</span>
-        <span style="font-weight: 400; font-size: var(--sapFontSmallSize); color: var(--sapNeutralColor);">
-          {% if ans_available %}
-            <span class="sapBadge sapBadge-positive">Bound ✓</span>
-          {% else %}
-            <span class="sapBadge sapBadge-neutral">Not bound</span>
-          {% endif %}
-        </span>
+        <span class="sapBadge sapBadge-positive" style="font-weight: 400; font-size: var(--sapFontSmallSize);">Bound ✓</span>
       </div>
       <div class="sapCard-content">
-        {% if ans_available %}
-          <table class="sapTable-compact" style="width: 100%; margin-bottom: var(--sapSpacingS);">
-            <thead>
-              <tr>
-                <th style="font-size: 11px;">Recipient</th>
-                <th style="font-size: 11px;">ANS Action name</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for e in ans_entities %}
-              <tr>
-                <td style="font-size: var(--sapFontSmallSize);">{{ e.email }}</td>
-                <td><code style="font-size: 11px; background: var(--sapNeutralBackground); padding: 1px 4px; border-radius: 3px;">{{ e.action }}</code></td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-          <form method="post" action="{{ url_for('admin_ans_provision', profile_id=profile.id) }}" style="margin-bottom: var(--sapSpacingS);">
-            <button type="submit" class="sapBtn sapBtn-emphasized sapBtn-sm">⚡ Provision Automatically</button>
-          </form>
-          <details>
-            <summary style="font-size: var(--sapFontSmallSize); cursor: pointer; color: var(--sapLinkColor); margin-bottom: var(--sapSpacingXS);">
-              Manual setup instructions (ANS Cockpit)
-            </summary>
-            <div style="margin-top: var(--sapSpacingS); font-size: var(--sapFontSmallSize);">
-              {% for e in ans_entities %}
-              <div style="background: var(--sapNeutralBackground); border-radius: 0.25rem; padding: var(--sapSpacingXS) var(--sapSpacingS); margin-bottom: var(--sapSpacingXS);">
-                <div style="font-weight: 600; margin-bottom: 4px;">{{ e.email }}</div>
-                <div style="margin-bottom: 2px;">
-                  <strong>Step 1 — Action</strong>&nbsp;
-                  <code style="font-size: 11px;">{{ e.action }}</code>
-                  → EMAIL → <code style="font-size: 11px;">{{ e.email }}</code>
-                </div>
-                <div style="margin-bottom: 2px;">
-                  <strong>Step 2 — Condition</strong>&nbsp;
-                  <code style="font-size: 11px;">{{ e.condition }}</code>
-                  → subject CONTAINS <code style="font-size: 11px;">{{ e.sid }}</code>
-                </div>
-                <div>
-                  <strong>Step 3 — Subscription</strong>&nbsp;
-                  <code style="font-size: 11px;">{{ e.sub }}</code>
-                  → action: <code style="font-size: 11px;">{{ e.action }}</code>,
-                  condition: <code style="font-size: 11px;">{{ e.condition }}</code>
-                </div>
-              </div>
-              {% endfor %}
-            </div>
-          </details>
-        {% else %}
-          <p style="font-size: var(--sapFontSmallSize); color: var(--sapNeutralColor); margin: 0;">
-            ℹ️ ANS not bound — Gmail SMTP will be used for email delivery.
-          </p>
-        {% endif %}
+        <p style="font-size: var(--sapFontSmallSize); margin: 0 0 var(--sapSpacingS) 0; color: var(--sapNeutralColor);">
+          {{ ans_entities | map(attribute='email') | join(', ') }}
+        </p>
+        <form method="post" action="{{ url_for('admin_ans_provision', profile_id=profile.id) }}">
+          <button type="submit" class="sapBtn sapBtn-default sapBtn-sm">↺ Re-provision all</button>
+        </form>
       </div>
     </div>
     {% endif %}
