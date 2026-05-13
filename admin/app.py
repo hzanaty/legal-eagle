@@ -449,7 +449,7 @@ def admin_ans_provision(profile_id: int):
     sender = get_ans_sender()
     if not sender:
         flash("ANS not bound — cannot provision.", "error")
-        return redirect(url_for("admin_profile_runs", profile_id=profile_id))
+        return redirect(url_for("admin_profile_detail", profile_id=profile_id))
     errors = []
     ok_count = 0
     for email in emails:
@@ -462,7 +462,7 @@ def admin_ans_provision(profile_id: int):
         flash("ANS provision errors: " + " | ".join(errors), "error")
     else:
         flash(f"ANS: {ok_count} recipient(s) provisioned successfully.", "success")
-    return redirect(url_for("admin_profile_runs", profile_id=profile_id))
+    return redirect(url_for("admin_profile_detail", profile_id=profile_id))
 
 
 # Confirm run → create, start, redirect to same page with run_id so right pane streams logs
