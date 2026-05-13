@@ -1,6 +1,41 @@
 # CHANGELOG
 
-## v2.24 — 2026-05-08
+## v2.26 — 2026-05-13
+### Run Log Visualization + ANS Email Integration + Per-Feed RSS Tracking
+
+**Run Log Visualization (run_status.html — major redesign):**
+- Replaced raw terminal log with a two-panel layout: vertical stage checklist (left) + per-stage log panel (right)
+- 7 pipeline stages (Starting, Collecting, Filtering, Comparing, Grouping, Sending, Done) with live state icons (idle · / active ⟳ / done ✓ / skipped ⏭ / failed ✗)
+- Per-stage status summaries extracted from log lines (e.g. "55 collected", "4 relevant", "0 new · 0 updated", "sent ✓")
+- Collecting stage expands to show individual source sub-items:
+  - **RSS feeds**: one row per feed URL (`↳ RSS: {url}: fetching...` / `↳ RSS: {url}: N items`)
+  - **Twitter accounts**: one row per `@handle` (parsed from `↳ Fetching from N accounts: @h1, @h2, …`)
+  - **URL sources**: registered idle from `↳ {url}: MODE mode`, activated by `[Source N/M] url={url}`
+- Clicking any sub-item or stage switches the right panel to show only that source's log lines
+- Log lines auto-follow the active source during a live run; full log retained for debugging
+
+**ANS Email Integration (agents/ans_sender.py — new file):**
+- Added SAP BTP Alert Notification Service (ANS) as the primary email transport on BTP
+- Gmail App Passwords are rejected from cloud IPs; ANS handles outbound digest emails
+- Auto-provisions one Action + Condition + Subscription per recipient (idempotent)
+- Fallback chain in `email_sender.py`: ANS first → Gmail SMTP on failure
+- Gmail IMAP credentials still required for reading monitor-update emails via IMAP
+- BTP_DEPLOYMENT.md updated with ANS setup instructions
+
+**Per-Feed RSS Tracking (agents/agents_controller.py):**
+- Added `↳ RSS: {url}: fetching...` / `↳ RSS: {url}: N items` print statements to the RSS loop in `run_single_profile()`
+- Enables the visualization to show individual RSS feed progress as sub-items
+
+**Files Changed:**
+- `admin/templates/run_status.html` — Complete run log visualization redesign
+- `agents/ans_sender.py` — New ANS email sender module
+- `agents/email_sender.py` — ANS-first fallback chain; Gmail as secondary
+- `agents/agents_controller.py` — Per-feed RSS print statements
+- `BTP_DEPLOYMENT.md` — ANS service binding and setup instructions
+
+---
+
+## v2.25 — 2026-05-12
 ### Skip Grouping Run Option
 
 **New Feature:**

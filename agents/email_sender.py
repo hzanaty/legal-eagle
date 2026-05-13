@@ -384,7 +384,7 @@ def send_email(
     country: str,
     lob: str,
     openai_api_key: str = "",
-    monitor_updates: dict = None
+    monitor_updates: dict = None,
 ) -> bool:
     """
     Send the daily digest email.
@@ -434,6 +434,15 @@ def send_email(
     msg["To"] = ", ".join(all_emails)
     msg["Subject"] = subject
     msg.attach(MIMEText(body, "html"))
+
+    # Try ANS (BTP Alert Notification Service) first; fall back to Gmail SMTP
+    from agents.ans_sender import get_ans_sender, send_digest_via_ans
+    if get_ans_sender():
+        profile_slug = f"{country}_{lob}"
+        ok = send_digest_via_ans(profile_slug, subject, body, all_emails)
+        if ok:
+            return True
+        print("[ANS] Send failed, falling back to Gmail SMTP...")
 
     # Send with retries
     sent = False

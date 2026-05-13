@@ -1,3 +1,33 @@
+## v2.26 (2026-05-13) — Run Log Visualization + ANS Email + Per-Feed RSS Tracking
+
+**Run Log Visualization** (`admin/templates/run_status.html` — major redesign):
+- Two-panel layout: vertical 7-stage checklist (left) + per-stage log (right)
+- Live state icons per stage + status summary (e.g. "55 collected", "4 relevant")
+- Collecting stage breaks down into individual sub-items: RSS feed URLs, Twitter @handles, URL sources
+- Clicking sub-items or stages filters the log panel to that source's lines
+- All driven by SSE stream; no server changes required beyond per-feed RSS prints
+
+**ANS Email** (`agents/ans_sender.py` — new):
+- SAP BTP Alert Notification Service sender; Gmail SMTP fallback for local dev
+- Auto-provisions ANS Action + Condition + Subscription per recipient (idempotent)
+- `email_sender.py` updated: try ANS → fall back to Gmail SMTP on failure
+
+**Per-Feed RSS Tracking** (`agents/agents_controller.py`):
+- `↳ RSS: {url}: fetching...` / `↳ RSS: {url}: N items` prints in `run_single_profile()` RSS loop
+
+**Files Changed**:
+- `admin/templates/run_status.html`
+- `agents/ans_sender.py` (new)
+- `agents/email_sender.py`
+- `agents/agents_controller.py`
+- `BTP_DEPLOYMENT.md`
+
+---
+
+## v2.25 (2026-05-12) — BTP Stability + macOS Launcher
+
+---
+
 ## v2.24 (2026-05-08) — Skip Grouping Run Option
 
 **New Feature**: Skip grouping checkbox added to Run Options

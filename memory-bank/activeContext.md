@@ -1,38 +1,39 @@
-## Current State: v2.24 — Skip Grouping + Run-Level Lookback + Profile Date Scope (2026-05-08)
+## Current State: v2.26 — Run Log Visualization + ANS Email + Per-Feed RSS Tracking (2026-05-13)
 
-### ✅ v2.24 COMPLETE - Skip Grouping Run Option
-**Status**: Skip grouping feature implemented and tested.
+### ✅ v2.26 COMPLETE
+**Completion Date**: 2026-05-13
 
-**Completion Date**: 2026-05-08
+### Key Features (v2.25–v2.26):
 
-### Key Features (v2.21–v2.24):
+#### v2.25: BTP Stability + macOS Launcher
+- BTP stability fixes
+- macOS launcher improvements
 
-#### 1. URL Delta Tracking (v2.21)
-- `last_successful_fetch` per URL source used for DELTA vs FULL mode decisions
-- Mechanism A: post-scrape date filter injected by controller (`since_date` or `days`)
-- DELTA mode: items since `last_successful_fetch`; FULL mode: full lookback window
+#### v2.26: Run Log Visualization + ANS Email + Per-Feed RSS Tracking
 
-#### 2. Profile-Level Lookback Window (v2.22)
-- `profiles.date_scope` column drives lookback for ALL sources (RSS, Twitter, URL sources)
-- Values: `delta` (incremental), `today` (UTC midnight), `last_7_days`, `last_30_days`
-- Per-source Lookback Days removed from UI (RSS, Twitter, URL source tables and forms)
-- New "🗓 Default Lookback Window" card on profile config page
-- Fixed: `PROFILE_DATE_SCOPE` NameError in `run_profile_once()` (was never defined, caused URL sources to crash on every manual run)
-- Fixed: `days=0` bug in date filter (injecting `since_date=start_of_UTC_midnight` instead)
+**Run Log Visualization (`admin/templates/run_status.html` — major redesign)**:
+- Two-panel layout: vertical 7-stage checklist (left) + per-stage log panel (right)
+- Stages: Starting 🚀, Collecting 📰, Filtering 🧹, Comparing 🔍, Grouping 🧠, Sending 📧, Done ✅
+- Live state icons per stage: idle `·` / active `⟳` / done `✓` / skipped `⏭` / failed `✗`
+- Per-stage status summary beside icon (e.g. "55 collected", "4 relevant", "0 new · 0 updated")
+- Collecting stage expands to per-source sub-items:
+  - **RSS feeds**: one row per URL (`↳ RSS: {url}: fetching...` / `↳ RSS: {url}: N items`)
+  - **Twitter**: one row per `@handle` (from `↳ Fetching from N accounts: @h1, @h2, …`)
+  - **URL sources**: idle from `↳ {url}: MODE mode`; activated by `[Source N/M] url={url}`
+- Clicking sub-item or stage filters right panel to that source's log lines
+- All log lines retained in full for debugging; auto-follows active source during live run
 
-#### 3. Run-Level Lookback Override (v2.23)
-- "Lookback" dropdown in Run modal replaces "Force full fetch" checkbox
-- Options: Use profile default / Force full / Delta / Today / Last 7 / Last 30 days
-- `lookback_override: Optional[str]` parameter on `run_profile_once()`
-- `force_full` removed from profile Default Lookback Window (per-run only now)
+**ANS Email Integration**:
+- New file: `agents/ans_sender.py` — SAP BTP Alert Notification Service sender
+- Gmail App Passwords rejected from cloud IPs; ANS handles outbound email on BTP
+- Fallback chain: ANS first → Gmail SMTP on failure
+- Gmail IMAP still required for monitor-update email reading
+- `agents/email_sender.py` — wraps the ANS-first call
 
-#### 4. Skip Grouping (v2.24)
-- "Skip grouping" checkbox in Run Options (between Skip filtering and Test mode)
-- `skip_grouping: bool = False` parameter on `run_profile_once()`
-- Each item wrapped as single-item group (compatible with email_sender)
-- State persisted in localStorage
+**Per-Feed RSS Tracking**:
+- `agents/agents_controller.py` — `↳ RSS: {url}: fetching...` / `↳ RSS: {url}: N items` per feed in `run_single_profile()` loop
 
-### Run Options (current — v2.24):
+### Run Options (current — v2.26):
 1. **Lookback** dropdown: Use profile default / Force full / Delta / Today / Last 7 / Last 30
 2. **Skip comparison** checkbox: treat all as new
 3. **Skip filtering** checkbox: accept all as relevant
@@ -41,7 +42,7 @@
 
 ### Profile Config Sections (current order):
 1. Profile Language
-2. 🗓 Default Lookback Window ← NEW (v2.22)
+2. 🗓 Default Lookback Window
 3. RSS Feeds
 4. Twitter Accounts
 5. URL Sources
@@ -49,13 +50,13 @@
 7. Monitor Notifications
 8. Glossary
 
-### Current Architecture (v2.24):
+### Current Architecture (v2.26):
 - RSS/Twitter: filtered by profile `date_scope` after collection
 - URL Sources: delta/full mode per source based on `last_successful_fetch`; profile `date_scope` = max lookback cap
 - All run skip flags: `skip_filter`, `skip_comparison`, `skip_grouping`, `skip_email`
 - Lookback control: profile-level default + per-run override via `lookback_override`
-- Email: Bilingual single-send model (profile lang + English translation)
-- Documentation: SPEC.md v2.24, CHANGELOG.md up-to-date
+- Email: ANS (BTP) → Gmail SMTP fallback; bilingual single-send model (profile lang + English)
+- Documentation: SPEC.md v2.26, CHANGELOG.md up-to-date
 
 ### Key Rules (from project conventions):
 - **NEVER use X.Y.Z versions** — always X.Y only

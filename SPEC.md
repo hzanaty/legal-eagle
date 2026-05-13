@@ -1,7 +1,7 @@
-# Legal Eagle 2.24 — Technical Specification
+# Legal Eagle 2.26 — Technical Specification
 
-**Version:** 2.24 (Skip Grouping + Run-Level Lookback Override + Profile-Level Date Scope + URL Delta Tracking)  
-**Last Updated:** 2026-05-08
+**Version:** 2.26 (Run Log Visualization + ANS Email Integration + Per-Feed RSS Tracking)  
+**Last Updated:** 2026-05-13
 
 This document provides the technical specification for Legal Eagle, an AI-powered regulatory compliance monitoring system for SAP Localization.
 
@@ -50,7 +50,7 @@ Legal Eagle monitors government sources for legal updates in chosen countries an
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                           LEGAL EAGLE 2.2 ARCHITECTURE                       │
+│                           LEGAL EAGLE 2.26 ARCHITECTURE                      │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
@@ -987,7 +987,60 @@ The "🗓 Default Lookback Window" card on the profile configuration page sets t
 
 > **Note**: Per-source "Lookback Days" columns and fields were removed from RSS Feeds, Twitter Accounts, and URL Sources in v2.22. Use the profile-level Default Lookback Window instead.
 
-### 7.5 UI Enhancements History
+### 7.5 Run Log Visualization (v2.26)
+
+`run_status.html` replaces the raw terminal log with a two-panel layout:
+
+**Left panel — Stage checklist** (7 pipeline stages):
+
+| Stage | Icon | Trigger pattern |
+|-------|------|-----------------|
+| Starting | 🚀 | `Running single profile` |
+| Collecting | 📰 | `Running RSS Parser Agent \| Tweet Feed Agent \| URL Sources Runner` |
+| Filtering | 🧹 | `Filtering for relevance \| Skip filtering enabled` |
+| Comparing | 🔍 | `Relevant items after filtering` |
+| Grouping | 🧠 | `Grouping similar news items \| Skipping grouping` |
+| Sending | 📧 | `Sending summary email \| Generating email preview` |
+| Done | ✅ | `event: done` (SSE terminal event) |
+
+Each stage shows a status icon (idle `·` / active `⟳` / done `✓` / skipped `⏭` / failed `✗`) and a summary extracted from the log (e.g. `55 collected`, `4 relevant`, `0 new · 0 updated`).
+
+**Collecting sub-items** — the Collecting stage expands to show individual source rows:
+
+- **RSS feeds**: one row per feed URL, detected from `↳ RSS: {url}: fetching...` / `↳ RSS: {url}: N items`
+- **Twitter accounts**: one row per `@handle`, detected from `↳ Fetching from N accounts: @h1, @h2, …`
+- **URL sources**: one row per URL, detected from `↳ {url}: TODAY|FULL|DELTA mode` (pre-register) then `[Source N/M] url={url}` (activate)
+
+Each sub-item shows its own state icon and item count when complete. Clicking any sub-item or stage switches the right panel to that source's log lines.
+
+**Right panel — Log lines**: filtered to the selected stage or sub-source; auto-follows the active source during a live run.
+
+**Implementation**: entirely in `admin/templates/run_status.html` (inline CSS + JS). Log lines stream via SSE from `/admin/profiles/<id>/run/<run_id>/logs`. Each line is routed to the owning stage bucket and optionally to a sub-source slice.
+
+### 7.6 ANS Email Integration (v2.26)
+
+On SAP BTP, Gmail App Passwords are blocked by Google from cloud IPs. Legal Eagle uses **SAP BTP Alert Notification Service (ANS)** as the primary email transport, with Gmail SMTP as a local fallback.
+
+**File**: `agents/ans_sender.py`
+
+**Detection**: `get_ans_sender()` reads `VCAP_SERVICES` for an ANS binding. Returns `None` when absent (local dev → Gmail SMTP used directly).
+
+**Provisioning** (idempotent per recipient):
+1. Creates one ANS **Action** (SMTP endpoint) per email address
+2. Creates one ANS **Condition** (filter matching the profile slug label)
+3. Creates one ANS **Subscription** linking Action ↔ Condition
+
+**Sending**: `send_digest_via_ans(profile_slug, subject, body, emails)` fires one resource event per recipient per digest run.
+
+**Fallback chain** in `agents/email_sender.py`:
+```
+Try ANS → success → return True
+         → failure → log warning → fall through to Gmail SMTP
+```
+
+Gmail IMAP credentials (`LEGAL_EAGLE_GMAIL_*`) remain required on BTP for reading monitor-update emails, even when ANS handles outbound sending.
+
+### 7.7 UI Enhancements History
 
 #### v2.16 — Table Consistency
 - Added "Lookback Days", "Sample Link", "Read More Label" columns to tables (later superseded by v2.22)

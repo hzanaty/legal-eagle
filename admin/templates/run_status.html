@@ -65,24 +65,106 @@
     text-decoration: underline;
   }
   
-  /* Terminal/Log Viewer */
-  .sapLogViewer {
+  /* Stage Pipeline Viewer */
+  .sapStagePanel {
+    display: flex;
+    height: 520px;
+  }
+
+  .sapStageList {
+    width: 164px;
+    border-right: 1px solid var(--sapGroup_ContentBorderColor);
+    overflow-y: auto;
+    padding: 8px 0;
+    flex-shrink: 0;
+    background: var(--sapNeutralBackground);
+  }
+
+  .stage-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 7px 12px;
+    cursor: pointer;
+    transition: background 0.15s;
+    font-size: 12px;
+    line-height: 1.4;
+    border-left: 3px solid transparent;
+    user-select: none;
+  }
+
+  .stage-item:hover { background: var(--sapList_Hover_Background); }
+  .stage-item.selected { background: var(--sapList_SelectionBackgroundColor); border-left-color: var(--sapSelectedColor); }
+
+  .stage-icon { font-style: normal; font-size: 13px; flex-shrink: 0; min-width: 14px; }
+  .stage-label { font-size: 12px; }
+
+  .stage-idle .stage-icon,
+  .stage-idle .stage-label { color: var(--sapNeutralColor); }
+
+  .stage-active { background: rgba(0,112,242,0.05); }
+  .stage-active .stage-icon { color: var(--sapInformativeColor); animation: stagePulse 1.2s ease-in-out infinite; }
+  .stage-active .stage-label { color: var(--sapTextColor); font-weight: 600; }
+
+  .stage-done .stage-icon  { color: var(--sapPositiveColor); }
+  .stage-done .stage-label { color: var(--sapTextColor); }
+
+  .stage-skipped .stage-icon,
+  .stage-skipped .stage-label { color: var(--sapNeutralColor); }
+  .stage-skipped .stage-label { text-decoration: line-through; }
+
+  .stage-failed .stage-icon,
+  .stage-failed .stage-label { color: var(--sapNegativeColor); }
+
+  .stage-connector {
+    width: 2px;
+    height: 6px;
+    background: var(--sapGroup_ContentBorderColor);
+    margin-left: 18px;
+  }
+
+  @keyframes stagePulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+
+  .sapStageLog {
+    flex: 1;
+    overflow: auto;
     background: #0b0f19;
-    color: #d3d7de;
+    padding: 12px 14px;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
     font-size: 12px;
-    height: 500px;
-    overflow: auto;
-    padding: var(--sapSpacingM);
-    border-radius: 0.25rem;
-    box-shadow: inset 0 1px 3px rgba(0,0,0,0.3);
+    color: #d3d7de;
   }
-  
-  .sapLogViewer pre {
-    margin: 0;
-    white-space: pre-wrap;
-    word-wrap: break-word;
+
+  .sapStageLog pre { margin: 0; white-space: pre-wrap; word-wrap: break-word; }
+  .log-warn  { color: #f0ad4e; }
+  .log-error { color: #ff6b6b; }
+
+  .stage-body { display: flex; flex-direction: column; min-width: 0; }
+  .stage-summary { font-size: 10px; color: var(--sapNeutralColor); display: none; margin-top: 1px; }
+  .stage-summary.visible { display: block; }
+  .stage-summary.s-error { color: var(--sapCriticalColor); }
+
+  .stage-sub-item {
+    display: flex; align-items: flex-start; gap: 6px;
+    padding: 4px 8px 4px 26px; cursor: pointer;
+    font-size: 11px; line-height: 1.3;
+    border-left: 3px solid transparent; user-select: none;
+    transition: background 0.15s;
   }
+  .stage-sub-item:hover { background: var(--sapList_Hover_Background); }
+  .stage-sub-item.selected { background: var(--sapList_SelectionBackgroundColor); border-left-color: var(--sapSelectedColor); }
+  .sub-icon { font-size: 12px; flex-shrink: 0; min-width: 14px; }
+  .sub-idle .sub-icon, .sub-idle .sub-label { color: var(--sapNeutralColor); }
+  .sub-active { background: rgba(0,112,242,0.03); }
+  .sub-active .sub-icon { color: var(--sapInformativeColor); animation: stagePulse 1.2s ease-in-out infinite; }
+  .sub-active .sub-label { color: var(--sapTextColor); font-weight: 600; }
+  .sub-done .sub-icon  { color: var(--sapPositiveColor); }
+  .sub-done .sub-label { color: var(--sapTextColor); }
+  .sub-failed .sub-icon, .sub-failed .sub-label { color: var(--sapNegativeColor); }
+  .sub-skipped .sub-label { color: var(--sapNeutralColor); text-decoration: line-through; }
+  .sub-count { font-size: 10px; color: var(--sapNeutralColor); display: none; margin-top: 1px; }
+  .sub-count.visible { display: block; }
+  .sub-count.s-error { color: var(--sapCriticalColor); }
   
   /* Split Layout */
   .sapSplitPanel {
@@ -416,8 +498,11 @@
         </div>
       </div>
       <div class="sapCard-content" style="padding: 0;">
-        <div class="sapLogViewer">
-          <pre id="log"></pre>
+        <div class="sapStagePanel">
+          <div class="sapStageList" id="stage-list"></div>
+          <div class="sapStageLog" id="stage-log-panel">
+            <pre id="stage-log-pre"></pre>
+          </div>
         </div>
       </div>
     </div>
@@ -659,55 +744,312 @@ const PROFILE_ID = {{ profile.id }};
   }
 })();
 
-// Log streaming (IIFE for scoping)
+// Stage Pipeline Viewer (IIFE for scoping)
 (function() {
-  const logEl = document.getElementById('log');
-  const statusEl = document.getElementById('run-status');
-  
-  {% if selected_run %}
-  // Log streaming
-  const es = new EventSource("{{ url_for('stream_run_logs', run_id=selected_run.id) }}");
-  
-  function append(line) {
-    if (!line) return;
-    logEl.textContent += line + "\n";
-    logEl.parentElement.scrollTop = logEl.parentElement.scrollHeight;
+  const statusEl    = document.getElementById('run-status');
+  const stageListEl = document.getElementById('stage-list');
+  const logPanel    = document.getElementById('stage-log-panel');
+  const logPre      = document.getElementById('stage-log-pre');
+
+  const STAGES = [
+    { id:1, icon:'🚀', label:'Starting',
+      startPatterns:[/Running single profile/], skipPatterns:[] },
+    { id:2, icon:'📰', label:'Collecting',
+      startPatterns:[/Running RSS Parser Agent|Tweet Feed Agent|URL Sources Runner/], skipPatterns:[] },
+    { id:3, icon:'🧹', label:'Filtering',
+      startPatterns:[/Filtering for relevance|Skip filtering enabled/],
+      skipPatterns:[/Skip filtering enabled/] },
+    { id:4, icon:'🔍', label:'Comparing',
+      startPatterns:[/Relevant items after filtering/], skipPatterns:[] },
+    { id:5, icon:'🧠', label:'Grouping',
+      startPatterns:[/Grouping similar news items|Skipping grouping/],
+      skipPatterns:[/Skipping grouping/] },
+    { id:6, icon:'📧', label:'Sending',
+      startPatterns:[/Sending summary email|Generating email preview/], skipPatterns:[] },
+    { id:7, icon:'✅', label:'Done', startPatterns:[], skipPatterns:[] }
+  ];
+
+  const stageStates = {};
+  const stageLogs   = {};
+  STAGES.forEach(function(s) { stageStates[s.id] = 'idle'; stageLogs[s.id] = []; });
+
+  let activeStageId    = 0;
+  let selectedId       = null; // number (stage) or string (sub-source key) or null (auto-follow)
+  let displayedId      = 0;
+
+  const subSourceLogs   = {}; // key → []
+  const subSourceStates = {}; // key → state string
+  const subKeyToNum     = {}; // key → numeric counter for DOM element IDs
+  let   subKeyCounter   = 0;
+  let   activeSubKey    = null; // key of the sub-source currently being fetched
+
+  function buildStageList() {
+    STAGES.forEach(function(stage, idx) {
+      if (idx > 0) {
+        const conn = document.createElement('div');
+        conn.className = 'stage-connector';
+        stageListEl.appendChild(conn);
+      }
+      const item = document.createElement('div');
+      item.className = 'stage-item stage-idle';
+      item.dataset.stageId = stage.id;
+      item.innerHTML = '<span class="stage-icon">·</span><div class="stage-body"><span class="stage-label">' + stage.icon + ' ' + stage.label + '</span><span class="stage-summary" id="stage-summary-' + stage.id + '"></span></div>';
+      item.addEventListener('click', function() { selectView(stage.id); });
+      stageListEl.appendChild(item);
+    });
   }
-  
-  es.onmessage = function(e) {
-    append(e.data);
-  };
-  
+
+  function getItem(id) { return stageListEl.querySelector('[data-stage-id="' + id + '"]'); }
+
+  function urlHostname(url) {
+    try { var h = new URL(url.trim()).hostname; return h.length > 18 ? h.substring(0,17)+'…' : h; }
+    catch(e) { return url.trim().substring(0, 18); }
+  }
+
+  function getSubItem(key) {
+    var items = stageListEl.querySelectorAll('[data-sub-key]');
+    for (var i = 0; i < items.length; i++) { if (items[i].dataset.subKey === key) return items[i]; }
+    return null;
+  }
+
+  function createSubSource(key, icon, label, logTarget) {
+    if (subSourceStates[key] !== undefined) return;
+    subKeyCounter++;
+    subKeyToNum[key] = subKeyCounter;
+    subSourceStates[key] = 'idle';
+    subSourceLogs[key] = [];
+    var n = subKeyCounter;
+    var item = document.createElement('div');
+    item.className = 'stage-sub-item sub-idle';
+    item.dataset.subKey = key;
+    item.innerHTML = '<span class="sub-icon">·</span><div class="stage-body"><span class="sub-label">' + icon + ' ' + label + '</span><span class="sub-count" id="sub-c-' + n + '"></span></div>';
+    // logTarget: if set, clicking shows that stage/key's logs instead of this sub-source's own logs
+    var target = (logTarget !== undefined) ? logTarget : key;
+    item.addEventListener('click', (function(t) { return function() { selectView(t); }; })(target));
+    var filterItem = getItem(3);
+    var ref = filterItem ? filterItem.previousSibling : null;
+    if (ref) stageListEl.insertBefore(item, ref);
+    else stageListEl.appendChild(item);
+  }
+
+  function updateSubSource(key, state, summary, isError) {
+    if (subSourceStates[key] === undefined) return;
+    subSourceStates[key] = state;
+    var item = getSubItem(key);
+    if (!item) return;
+    var wasSelected = item.classList.contains('selected');
+    item.className = 'stage-sub-item sub-' + state + (wasSelected ? ' selected' : '');
+    var icons = { idle:'·', active:'⟳', done:'✓', failed:'✗', skipped:'⏭' };
+    item.querySelector('.sub-icon').textContent = icons[state] || '·';
+    if (summary !== undefined) {
+      var el = document.getElementById('sub-c-' + subKeyToNum[key]);
+      if (el) { el.textContent = summary; el.className = 'sub-count visible' + (isError ? ' s-error' : ''); }
+    }
+  }
+
+  function setStageState(id, state) {
+    stageStates[id] = state;
+    const item = getItem(id);
+    if (!item) return;
+    const wasSelected = item.classList.contains('selected');
+    item.className = 'stage-item stage-' + state + (wasSelected ? ' selected' : '');
+    const icons = { idle:'·', active:'⟳', done:'✓', skipped:'⏭', failed:'✗' };
+    item.querySelector('.stage-icon').textContent = icons[state] || '·';
+  }
+
+  function advanceToStage(id) {
+    if (id <= activeStageId) return;
+    if (id > 2 && activeStageId <= 2) {
+      if (activeSubKey !== null) { updateSubSource(activeSubKey, 'done'); activeSubKey = null; }
+      Object.keys(subSourceStates).forEach(function(k) {
+        if (subSourceStates[k] === 'idle' || subSourceStates[k] === 'active') updateSubSource(k, 'done');
+      });
+    }
+    for (let i = 1; i < id; i++) {
+      if (stageStates[i] === 'active' || stageStates[i] === 'idle') {
+        setStageState(i, 'done');
+      }
+    }
+    activeStageId = id;
+    setStageState(id, 'active');
+    if (selectedId === null) {
+      stageListEl.querySelectorAll('.stage-item, .stage-sub-item').forEach(function(el) { el.classList.remove('selected'); });
+      const it = getItem(id); if (it) it.classList.add('selected');
+    }
+  }
+
+  function getAutoId() {
+    if (activeStageId === 2 && activeSubKey !== null) return activeSubKey;
+    return activeStageId > 0 ? activeStageId : 1;
+  }
+
+  function renderView(id) {
+    displayedId = id;
+    logPre.innerHTML = '';
+    var logs = (typeof id === 'string' ? subSourceLogs[id] : stageLogs[id]) || [];
+    logs.forEach(appendLineToLog);
+    logPanel.scrollTop = logPanel.scrollHeight;
+  }
+
+  function selectView(id) {
+    selectedId = id;
+    stageListEl.querySelectorAll('.stage-item, .stage-sub-item').forEach(function(el) { el.classList.remove('selected'); });
+    if (typeof id === 'number') { var it = getItem(id); if (it) it.classList.add('selected'); }
+    else                        { var it = getSubItem(id); if (it) it.classList.add('selected'); }
+    renderView(id);
+  }
+
+  function setStageSummary(id, text, isError) {
+    const el = document.getElementById('stage-summary-' + id);
+    if (!el) return;
+    el.textContent = text;
+    el.className = 'stage-summary visible' + (isError ? ' s-error' : '');
+  }
+
+  const SUMMARY_PATTERNS = [
+    { id:2, re:/Total collected items \(pre-filter\): (\d+)/,      fn:function(m){ return m[1]+' collected'; } },
+    { id:2, re:/(\d+) errors while scraping/,                      fn:function(m){ return m[1]+' scraping errors'; }, err:true },
+    { id:3, re:/Relevant items after filtering: (\d+)/,            fn:function(m){ return m[1]+' relevant'; } },
+    { id:4, re:/(\d+) new items and (\d+) updates after semantic/, fn:function(m){ return m[1]+' new · '+m[2]+' updated'; } },
+    { id:5, re:/Grouped summary ready with (\d+) entries/,         fn:function(m){ return m[1]+' groups'; } },
+    { id:6, re:/Email sent to stakeholders/,                       fn:function(){ return 'sent ✓'; } },
+    { id:6, re:/Email send failed/,                                fn:function(){ return 'failed'; }, err:true },
+  ];
+
+  function appendLineToLog(line) {
+    const span = document.createElement('span');
+    span.className = /\[ERROR\]/.test(line) ? 'log-error' : /\[WARN\]/.test(line) ? 'log-warn' : '';
+    span.textContent = line + '\n';
+    logPre.appendChild(span);
+  }
+
+  function processSubSourceLine(line) {
+    var m;
+    // RSS per-feed: start
+    if ((m = line.match(/↳ RSS: (\S+): fetching\.\.\./))) {
+      var key = 'rss:'+m[1];
+      createSubSource(key, '📰', urlHostname(m[1]));
+      updateSubSource(key, 'active');
+      activeSubKey = key; return;
+    }
+    // RSS per-feed: done
+    if ((m = line.match(/↳ RSS: (\S+): (\d+) items/))) {
+      var key = 'rss:'+m[1];
+      updateSubSource(key, 'done', m[2]+' items');
+      if (activeSubKey === key) activeSubKey = null; return;
+    }
+    // Twitter: parse accounts list (batch — all activated together, share stage-2 log)
+    if ((m = line.match(/↳ Fetching from \d+ accounts: (.+)/))) {
+      var handles = m[1].split(', ');
+      handles.forEach(function(h) {
+        var handle = h.trim();
+        createSubSource('tw:'+handle, '🐦', handle, 2); // logTarget=2: clicking shows Collecting log
+        updateSubSource('tw:'+handle, 'active');
+      });
+      return;
+    }
+    // Twitter: all done
+    if ((m = line.match(/Total tweets collected from all accounts: (\d+)/))) {
+      Object.keys(subSourceStates).forEach(function(k) {
+        if (k.startsWith('tw:') && (subSourceStates[k] === 'active' || subSourceStates[k] === 'idle')) {
+          updateSubSource(k, 'done');
+        }
+      });
+      if (activeSubKey && activeSubKey.startsWith('tw:')) activeSubKey = null; return;
+    }
+    // Twitter disabled
+    if (/Tweet.*disabled|Twitter.*disabled/i.test(line)) {
+      Object.keys(subSourceStates).forEach(function(k) {
+        if (k.startsWith('tw:')) updateSubSource(k, 'skipped');
+      }); return;
+    }
+    // URL setup (pre-register as idle)
+    if ((m = line.match(/↳\s+(\S+):\s+(TODAY|FULL|DELTA)\s+mode/))) {
+      createSubSource('url:'+m[1], '🔗', urlHostname(m[1])); return;
+    }
+    // URL activate
+    if ((m = line.match(/\[Source \d+\/\d+\] url=(\S+)/))) {
+      var key = 'url:'+m[1];
+      if (subSourceStates[key] === undefined) createSubSource(key, '🔗', urlHostname(m[1]));
+      if (activeSubKey !== null && activeSubKey !== key) updateSubSource(activeSubKey, 'done');
+      updateSubSource(key, 'active'); activeSubKey = key; return;
+    }
+    // URL done (final item count)
+    if ((m = line.match(/\[source\] date filter: \d+ → (\d+) items/))) {
+      if (activeSubKey !== null) updateSubSource(activeSubKey, 'done', m[1]+' items'); return;
+    }
+    // URL errors
+    if ((m = line.match(/\[source\] (?:static|dynamic|recursive) path items=\d+ errors=([1-9]\d*)/))) {
+      if (activeSubKey !== null) updateSubSource(activeSubKey, 'failed', m[1]+' errors', true); return;
+    }
+  }
+
+  function processLine(line) {
+    if (!line) return;
+    for (let i = 0; i < STAGES.length; i++) {
+      const stage = STAGES[i];
+      if (stage.startPatterns.length > 0 && stage.startPatterns.some(function(re) { return re.test(line); })) {
+        const isSkip = stage.skipPatterns.some(function(re) { return re.test(line); });
+        advanceToStage(stage.id);
+        if (isSkip) setStageState(stage.id, 'skipped');
+        break;
+      }
+    }
+    const bucket = activeStageId > 0 ? activeStageId : 1;
+    stageLogs[bucket].push(line);
+    if (activeSubKey !== null) subSourceLogs[activeSubKey].push(line);
+    if (activeStageId === 2) processSubSourceLine(line);
+    for (let j = 0; j < SUMMARY_PATTERNS.length; j++) {
+      const sp = SUMMARY_PATTERNS[j];
+      const m = line.match(sp.re);
+      if (m) { setStageSummary(sp.id, sp.fn(m), !!sp.err); break; }
+    }
+    var viewId = selectedId !== null ? selectedId : getAutoId();
+    var inView = (viewId === bucket) || (viewId === activeSubKey);
+    if (viewId !== displayedId) {
+      renderView(viewId);
+    } else if (inView) {
+      appendLineToLog(line);
+      logPanel.scrollTop = logPanel.scrollHeight;
+    }
+  }
+
+  buildStageList();
+
+  {% if selected_run %}
+  const es = new EventSource("{{ url_for('stream_run_logs', run_id=selected_run.id) }}");
+
+  es.onmessage = function(e) { processLine(e.data); };
+
   es.addEventListener('done', function(e) {
     const status = e.data || 'Success';
-    let badgeClass = 'sapBadge ';
-    let icon = '';
-    
-    if (status === 'Success') {
-      badgeClass += 'sapBadge-positive';
-      icon = '✓ ';
-    } else if (status === 'Failed') {
-      badgeClass += 'sapBadge-negative';
-      icon = '✗ ';
-    } else if (status === 'Canceled') {
-      badgeClass += 'sapBadge-critical';
-      icon = '⏸ ';
+    if (status === 'Failed' || status === 'Canceled') {
+      if (activeStageId > 0) setStageState(activeStageId, 'failed');
+      if (activeSubKey !== null) updateSubSource(activeSubKey, 'failed');
+      Object.keys(subSourceStates).forEach(function(k) {
+        if (subSourceStates[k] === 'active') updateSubSource(k, 'failed');
+      });
     } else {
-      badgeClass += 'sapBadge-neutral';
-      icon = '— ';
+      for (let i = 1; i <= 7; i++) {
+        if (stageStates[i] !== 'skipped') setStageState(i, 'done');
+      }
+      Object.keys(subSourceStates).forEach(function(k) {
+        if (subSourceStates[k] !== 'skipped') updateSubSource(k, 'done');
+      });
     }
-    
+    let badgeClass = 'sapBadge ', icon = '';
+    if (status === 'Success')       { badgeClass += 'sapBadge-positive'; icon = '✓ '; }
+    else if (status === 'Failed')   { badgeClass += 'sapBadge-negative'; icon = '✗ '; }
+    else if (status === 'Canceled') { badgeClass += 'sapBadge-critical'; icon = '⏸ '; }
+    else                            { badgeClass += 'sapBadge-neutral';  icon = '— '; }
     statusEl.textContent = icon + status;
     statusEl.className = badgeClass;
     es.close();
   });
-  
-  es.onerror = function() {
-    // Keep SSE alive; browser will auto-reconnect
-  };
+
+  es.onerror = function() { /* Browser auto-reconnects */ };
   {% else %}
-  // Empty state
-  logEl.textContent = '💡 Click "Start Run" to execute the profile workflow, or select a run from history to view its logs.\n\nLogs will appear here in real-time during execution.';
+  logPre.textContent = '💡 Click "Start Run" to execute the profile workflow, or select a run from history to view its logs.\n\nLogs will appear here in real-time during execution.';
   {% endif %}
 })();
 </script>

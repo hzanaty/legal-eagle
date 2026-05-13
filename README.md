@@ -56,7 +56,7 @@ Legal Eagle automatically:
 
 **Current Deployments**: Saudi Arabia, Turkey, Spain, UAE (more countries being added)
 
-📋 **Technical Details**: See [SPEC.md](SPEC.md) for complete v2.24 architecture
+📋 **Technical Details**: See [SPEC.md](SPEC.md) for complete v2.26 architecture
 
 ---
 
@@ -232,6 +232,8 @@ Each profile allows you to configure:
 
 ### Run Execution
 - Manual execution with live log streaming
+- **Stage visualization**: 7-stage checklist with live state icons and per-stage status summaries
+- **Source breakdown**: Collecting stage shows individual RSS feeds, Twitter @handles, and URL sources as clickable sub-items
 - **Run Options**: Per-run overrides for lookback window, skip comparison/filtering/grouping, test mode
 - View run history and metrics
 - Cancel running executions cooperatively

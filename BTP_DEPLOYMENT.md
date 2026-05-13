@@ -61,7 +61,7 @@ Before deploying, you need to configure environment variables for your applicati
    # Twitter/X
    cf set-env legal-eagle-ui LEGAL_EAGLE_TWITTER_BEARER_TOKEN "your-twitter-token"
    
-   # Gmail
+   # Gmail (still required for reading monitor-update emails via IMAP)
    cf set-env legal-eagle-ui LEGAL_EAGLE_GMAIL_EMAIL_SENDER "your-email@sap.com"
    cf set-env legal-eagle-ui LEGAL_EAGLE_GMAIL_APP_PASSWORD "your-gmail-app-password"
    
@@ -73,6 +73,30 @@ Before deploying, you need to configure environment variables for your applicati
    ```bash
    cf restage legal-eagle-ui
    ```
+
+## Step 1b: Bind Alert Notification Service (Email Sending)
+
+Legal Eagle uses SAP BTP **Alert Notification Service (ANS)** for outbound email on BTP.
+Gmail App Passwords are rejected by Google from cloud IPs, so ANS handles sending while
+Gmail IMAP credentials remain required for reading monitor-update emails.
+
+1. Create a user-provided service from your ANS service key:
+   ```bash
+   cf create-user-provided-service legal-eagle-ans -p \
+     '{"url":"<ans-url>","oauth_url":"<oauth_url>","client_id":"<client_id>","client_secret":"<client_secret>"}'
+   ```
+
+2. Bind it to the app:
+   ```bash
+   cf bind-service legal-eagle-ui legal-eagle-ans
+   cf restage legal-eagle-ui
+   ```
+
+3. ANS provisioning is **automatic** — on the first digest run, Legal Eagle creates an
+   Action + Condition + Subscription per recipient in ANS. No manual configuration needed.
+
+> **Note:** Gmail vars (`LEGAL_EAGLE_GMAIL_*`) must still be set — they are used for
+> reading forwarded monitor-update emails via IMAP. Only outbound digest email uses ANS.
 
 ## Step 2: Deploy Application
 

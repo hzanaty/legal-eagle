@@ -373,7 +373,10 @@ def run_profile_once(
         print("📰 Running RSS Parser Agent...")
         for feed in RSS_FEED_URLS:
             feed_url = feed["url"] if isinstance(feed, dict) else feed
-            rss_items.extend(parse_rss_feed(feed_url))
+            print(f"   ↳ RSS: {feed_url}: fetching...")
+            feed_items = parse_rss_feed(feed_url)
+            print(f"   ↳ RSS: {feed_url}: {len(feed_items)} items")
+            rss_items.extend(feed_items)
         print(f"✅ Total RSS items collected: {len(rss_items)}")
         # Apply date filter
         if _profile_days == 0:
