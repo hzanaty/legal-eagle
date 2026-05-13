@@ -95,50 +95,48 @@ class ANSSender:
             "Content-Type": "application/json",
         }
 
+    def _upsert(self, path: str, payload: dict) -> None:
+        """POST to create entity; ignore 409 Conflict (already exists)."""
+        resp = requests.post(
+            f"{self._url}{path}",
+            headers=self._headers(),
+            json=payload,
+            timeout=30,
+        )
+        if resp.status_code == 409:
+            return  # already exists — idempotent
+        resp.raise_for_status()
+
     def ensure_provisioned(self, recipient_email: str) -> None:
         """
         Idempotently provision Action + Condition + Subscription for one recipient.
-        Safe to call on every run — ANS treats duplicate names as updates.
+        Uses individual CRUD endpoints; 409 Conflict means already exists — safe to ignore.
         """
         sid = _sanitize(recipient_email)
         action = f"le-email-{sid}"
         cond = f"le-cond-{sid}"
         sub = f"le-sub-{sid}"
-        payload = {
-            "actions": [
-                {
-                    "name": action,
-                    "type": "EMAIL",
-                    "state": "ENABLED",
-                    "description": f"Legal Eagle digest for {recipient_email}",
-                    "properties": {"destination": recipient_email},
-                }
-            ],
-            "conditions": [
-                {
-                    "name": cond,
-                    "description": f"Match digests for {sid}",
-                    "propertyKey": "subject",
-                    "predicate": "CONTAINS",
-                    "propertyValue": sid,
-                }
-            ],
-            "subscriptions": [
-                {
-                    "name": sub,
-                    "state": "ENABLED",
-                    "actions": [action],
-                    "conditions": [cond],
-                }
-            ],
-        }
-        resp = requests.put(
-            f"{self._url}/cf/consumer/v1/configuration/import",
-            headers=self._headers(),
-            json=payload,
-            timeout=30,
-        )
-        resp.raise_for_status()
+
+        self._upsert("/cf/consumer/v1/actions", {
+            "name": action,
+            "type": "EMAIL",
+            "state": "ENABLED",
+            "description": f"Legal Eagle digest for {recipient_email}",
+            "properties": {"destination": recipient_email},
+        })
+        self._upsert("/cf/consumer/v1/conditions", {
+            "name": cond,
+            "description": f"Match digests for {sid}",
+            "propertyKey": "subject",
+            "predicate": "CONTAINS",
+            "propertyValue": sid,
+        })
+        self._upsert("/cf/consumer/v1/subscriptions", {
+            "name": sub,
+            "state": "ENABLED",
+            "actions": [action],
+            "conditions": [cond],
+        })
 
     def send_event(
         self,
