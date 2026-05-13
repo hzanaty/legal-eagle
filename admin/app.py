@@ -423,25 +423,6 @@ def admin_profile_runs(profile_id: int):
     twitter_error_flag = db_get_setting(conn, profile_id, 'twitter_error_flag')
     conn.close()
 
-    # ANS setup context
-    from agents.ans_sender import get_ans_sender, _sanitize
-    receivers = load_email_receivers_with_lang(profile_id)
-    ans_emails = [r["email"] for r in receivers]
-    try:
-        ans_available = bool(get_ans_sender())
-    except Exception:
-        ans_available = False
-    ans_entities = [
-        {
-            "email": e,
-            "action": "le-email-" + _sanitize(e),
-            "condition": "le-cond-" + _sanitize(e),
-            "sub": "le-sub-" + _sanitize(e),
-            "sid": _sanitize(e),
-        }
-        for e in ans_emails
-    ]
-
     return render_template(
         "run_status.html",
         profile=profile,
@@ -456,8 +437,6 @@ def admin_profile_runs(profile_id: int):
         twitter_error_flag=twitter_error_flag,
         resource_status=resource_status,
         sources_json=sources_json,
-        ans_available=ans_available,
-        ans_entities=ans_entities,
     )
 
 
@@ -734,6 +713,12 @@ def admin_profile_detail(profile_id: int):
     reset_quota_date = get_setting_value(profile_id, 'tweets_reset_quota_date')
     monitor_enabled = get_setting_value(profile_id, 'monitor_updates_enabled', 'false') == 'true'
 
+    from agents.ans_sender import get_ans_sender
+    try:
+        ans_available = bool(get_ans_sender())
+    except Exception:
+        ans_available = False
+
     return render_template(
         "profile.html",
         profile=profile,
@@ -747,6 +732,7 @@ def admin_profile_detail(profile_id: int):
         reset_quota_date=reset_quota_date,
         monitor_enabled=monitor_enabled,
         language_names=LANGUAGE_NAMES,
+        ans_available=ans_available,
     )
 
 

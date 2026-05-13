@@ -247,24 +247,6 @@
     </div>
     {% endif %}
     
-    <!-- ANS Email Routing (compact status) -->
-    {% if ans_available and ans_entities %}
-    <div class="sapCard" style="margin-bottom: var(--sapSpacingM);">
-      <div class="sapCard-header">
-        <span>🔔 ANS Email Routing</span>
-        <span class="sapBadge sapBadge-positive" style="font-weight: 400; font-size: var(--sapFontSmallSize);">Bound ✓</span>
-      </div>
-      <div class="sapCard-content">
-        <p style="font-size: var(--sapFontSmallSize); margin: 0 0 var(--sapSpacingS) 0; color: var(--sapNeutralColor);">
-          {{ ans_entities | map(attribute='email') | join(', ') }}
-        </p>
-        <form method="post" action="{{ url_for('admin_ans_provision', profile_id=profile.id) }}">
-          <button type="submit" class="sapBtn sapBtn-default sapBtn-sm">↺ Re-provision all</button>
-        </form>
-      </div>
-    </div>
-    {% endif %}
-
     <!-- Run Controls -->
     <div class="sapCard" style="margin-bottom: var(--sapSpacingM);">
       <div class="sapCard-header">

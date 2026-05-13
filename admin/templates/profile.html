@@ -674,6 +674,14 @@
       </div>
       
       <form id="bulk_emails_form" method="post" action="{{ url_for('bulk_delete_email_receivers', profile_id=profile.id) }}" style="display:none;"></form>
+      {% if ans_available %}
+      <div style="margin-top: var(--sapSpacingS); display: flex; align-items: center; gap: var(--sapSpacingS);">
+        <span class="sapBadge sapBadge-positive" style="font-size: 11px;">ANS Bound ✓</span>
+        <form method="post" action="{{ url_for('admin_ans_provision', profile_id=profile.id) }}">
+          <button type="submit" class="sapBtn sapBtn-default sapBtn-sm">↺ Re-provision all</button>
+        </form>
+      </div>
+      {% endif %}
     </div>
     {% endif %}
   </div>
