@@ -105,7 +105,10 @@ class ANSSender:
         )
         if resp.status_code == 409:
             return  # already exists — idempotent
-        resp.raise_for_status()
+        if not resp.ok:
+            raise RuntimeError(
+                f"ANS {path} → {resp.status_code}: {resp.text[:400]}"
+            )
 
     def ensure_provisioned(self, recipient_email: str) -> None:
         """
@@ -169,9 +172,10 @@ class ANSSender:
             timeout=30,
         )
         resp.raise_for_status()
-
-
-# Module-level singleton — initialised once on first use
+        if not resp.ok:
+            raise RuntimeError(
+                f"ANS sendEvent → {resp.status_code}: {resp.text[:400]}"
+            ) — initialised once on first use
 _ans_sender: Optional[ANSSender] = None
 _ans_checked = False
 
