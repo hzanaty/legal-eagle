@@ -4,27 +4,16 @@ SAP BTP Alert Notification Service (ANS) email sender.
 Used on BTP when VCAP_SERVICES contains an ANS service binding.
 Falls back gracefully to None when no binding is present (local dev).
 
-Provisions one Action + Condition + Subscription per recipient (idempotent),
-then sends one resource-event per recipient per digest run.
+Subscriptions and Actions are configured once manually in the ANS cockpit.
+This module only fires producer events; ANS routes them to all subscribed recipients.
 """
 
-import hashlib
 import json
 import os
-import re
 from datetime import datetime, timedelta
 from typing import List, Optional
 
 import requests
-
-
-def _sanitize(s: str) -> str:
-    """Produce a safe ANS entity name from an arbitrary string."""
-    clean = re.sub(r"[^a-zA-Z0-9\-]", "-", s)
-    if len(clean) <= 50:
-        return clean
-    h = hashlib.md5(s.encode()).hexdigest()[:8]
-    return clean[:50] + "-" + h
 
 
 def _get_ans_credentials() -> Optional[dict]:
@@ -91,69 +80,21 @@ class ANSSender:
             "Content-Type": "application/json",
         }
 
-    def _upsert(self, path: str, payload: dict) -> None:
-        """POST to create entity; ignore 409 Conflict (already exists)."""
-        resp = requests.post(
-            f"{self._url}{path}",
-            headers=self._headers(),
-            json=payload,
-            timeout=30,
-        )
-        if resp.status_code == 409:
-            return  # already exists, fine
-        if not resp.ok:
-            raise RuntimeError(
-                f"ANS {path} -> {resp.status_code}: {resp.text[:400]}"
-            )
-
-    def ensure_provisioned(self, recipient_email: str) -> None:
-        """
-        Idempotently provision Action + Condition + Subscription for one recipient.
-        Uses individual CRUD endpoints; 409 Conflict means already exists, safe to ignore.
-        """
-        sid = _sanitize(recipient_email)
-        action = f"le-email-{sid}"
-        cond = f"le-cond-{sid}"
-        sub = f"le-sub-{sid}"
-
-        self._upsert("/cf/consumer/v1/actions", {
-            "name": action,
-            "type": "EMAIL",
-            "state": "ENABLED",
-            "description": f"Legal Eagle digest for {recipient_email}",
-            "properties": {"destination": recipient_email},
-        })
-        self._upsert("/cf/consumer/v1/conditions", {
-            "name": cond,
-            "description": f"Match digests for {sid}",
-            "propertyKey": "subject",
-            "predicate": "CONTAINS",
-            "propertyValue": sid,
-        })
-        self._upsert("/cf/consumer/v1/subscriptions", {
-            "name": sub,
-            "state": "ENABLED",
-            "actions": [action],
-            "conditions": [cond],
-        })
-
     def send_event(
         self,
-        recipient_email: str,
         profile_slug: str,
         subject: str,
         body_html: str,
     ) -> None:
         """
-        Fire one resource-event for a single recipient.
-        The condition on their subscription matches subject CONTAINS sid.
+        Fire one resource-event per digest run.
+        The manually-configured subscription (no conditions) routes it to all recipients.
         """
-        sid = _sanitize(recipient_email)
         resp = requests.post(
             f"{self._url}/cf/producer/v1/resource-events",
             headers=self._headers(),
             json={
-                "subject": f"{subject} [{sid}]",
+                "subject": subject,
                 "eventType": "LegalEagleDigest",
                 "severity": "INFO",
                 "category": "NOTIFICATION",
@@ -209,21 +150,19 @@ def send_digest_via_ans(
     recipient_emails: List[str],
 ) -> bool:
     """
-    Send digest to all recipients via ANS.
-    Returns True if all sends succeeded, False if ANS unavailable or any send failed.
+    Send digest via ANS (one event per run).
+    The manually-configured subscription routes the event to all recipients.
+    Returns True on success, False if ANS unavailable or send failed.
     Caller falls back to Gmail SMTP on False.
     """
     sender = get_ans_sender()
     if not sender:
         return False
 
-    success = True
-    for email in recipient_emails:
-        try:
-            sender.ensure_provisioned(email)
-            sender.send_event(email, profile_slug, subject, body_html)
-            print(f"[ANS] Digest sent to {email}")
-        except Exception as e:
-            print(f"[ANS] Send failed for {email}: {e}")
-            success = False
-    return success
+    try:
+        sender.send_event(profile_slug, subject, body_html)
+        print(f"[ANS] Digest sent ({len(recipient_emails)} recipient(s) via subscription)")
+        return True
+    except Exception as e:
+        print(f"[ANS] Send failed: {e}")
+        return False
