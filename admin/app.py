@@ -422,7 +422,26 @@ def admin_profile_runs(profile_id: int):
     conn = get_connection()
     twitter_error_flag = db_get_setting(conn, profile_id, 'twitter_error_flag')
     conn.close()
-    
+
+    # ANS setup context
+    from agents.ans_sender import get_ans_sender, _sanitize
+    receivers = load_email_receivers_with_lang(profile_id)
+    ans_emails = [r["email"] for r in receivers]
+    try:
+        ans_available = bool(get_ans_sender())
+    except Exception:
+        ans_available = False
+    ans_entities = [
+        {
+            "email": e,
+            "action": "le-email-" + _sanitize(e),
+            "condition": "le-cond-" + _sanitize(e),
+            "sub": "le-sub-" + _sanitize(e),
+            "sid": _sanitize(e),
+        }
+        for e in ans_emails
+    ]
+
     return render_template(
         "run_status.html",
         profile=profile,
@@ -437,7 +456,34 @@ def admin_profile_runs(profile_id: int):
         twitter_error_flag=twitter_error_flag,
         resource_status=resource_status,
         sources_json=sources_json,
+        ans_available=ans_available,
+        ans_entities=ans_entities,
     )
+
+
+# ANS provision route — tries to create Action+Condition+Subscription per recipient
+@app.route("/admin/profiles/<int:profile_id>/ans/provision", methods=["POST"])
+def admin_ans_provision(profile_id: int):
+    from agents.ans_sender import get_ans_sender
+    receivers = load_email_receivers_with_lang(profile_id)
+    emails = [r["email"] for r in receivers]
+    sender = get_ans_sender()
+    if not sender:
+        flash("ANS not bound — cannot provision.", "error")
+        return redirect(url_for("admin_runs", profile_id=profile_id))
+    errors = []
+    ok_count = 0
+    for email in emails:
+        try:
+            sender.ensure_provisioned(email)
+            ok_count += 1
+        except Exception as e:
+            errors.append(f"{email}: {str(e)[:120]}")
+    if errors:
+        flash("ANS provision errors: " + " | ".join(errors), "error")
+    else:
+        flash(f"ANS: {ok_count} recipient(s) provisioned successfully.", "success")
+    return redirect(url_for("admin_runs", profile_id=profile_id))
 
 
 # Confirm run → create, start, redirect to same page with run_id so right pane streams logs
