@@ -4,16 +4,26 @@ SAP BTP Alert Notification Service (ANS) email sender.
 Used on BTP when VCAP_SERVICES contains an ANS service binding.
 Falls back gracefully to None when no binding is present (local dev).
 
-Subscriptions and Actions are configured once manually in the ANS cockpit.
-This module only fires producer events; ANS routes them to all subscribed recipients.
+Provisions one Action + Condition + Subscription per recipient (idempotent),
+then sends one resource-event per recipient per digest run.
 """
 
+import hashlib
 import json
 import os
+import re
 from datetime import datetime, timedelta
 from typing import List, Optional
 
 import requests
+
+
+def _sanitize(s: str) -> str:
+    clean = re.sub(r"[^a-zA-Z0-9\-]", "-", s)
+    if len(clean) <= 50:
+        return clean
+    h = hashlib.md5(s.encode()).hexdigest()[:8]
+    return clean[:41] + "-" + h
 
 
 def _get_ans_credentials() -> Optional[dict]:
@@ -80,21 +90,86 @@ class ANSSender:
             "Content-Type": "application/json",
         }
 
+    def _upsert_action(self, sid: str, recipient_email: str) -> None:
+        name = "le-email-" + sid
+        resp = requests.post(
+            self._url + "/cf/consumer/v1/actions",
+            headers=self._headers(),
+            json={
+                "name": name,
+                "type": "EMAIL",
+                "state": "ENABLED",
+                "description": "Legal Eagle digest for " + recipient_email,
+                "properties": {"destination": recipient_email},
+            },
+            timeout=30,
+        )
+        if resp.status_code == 409:
+            return
+        if not resp.ok:
+            raise RuntimeError("ANS action -> " + str(resp.status_code) + ": " + resp.text[:400])
+
+    def _upsert_condition(self, sid: str) -> None:
+        name = "le-cond-" + sid
+        resp = requests.post(
+            self._url + "/cf/consumer/v1/conditions",
+            headers=self._headers(),
+            json={
+                "name": name,
+                "description": "Match digests for " + sid,
+                "propertyKey": "subject",
+                "predicate": "CONTAINS",
+                "propertyValue": sid,
+            },
+            timeout=30,
+        )
+        if resp.status_code == 409:
+            return
+        if not resp.ok:
+            raise RuntimeError("ANS condition -> " + str(resp.status_code) + ": " + resp.text[:400])
+
+    def _upsert_subscription(self, sid: str) -> None:
+        name = "le-sub-" + sid
+        resp = requests.post(
+            self._url + "/cf/consumer/v1/subscriptions",
+            headers=self._headers(),
+            json={
+                "name": name,
+                "state": "ENABLED",
+                "actions": ["le-email-" + sid],
+                "conditions": ["le-cond-" + sid],
+            },
+            timeout=30,
+        )
+        if resp.status_code == 409:
+            return
+        if not resp.ok:
+            raise RuntimeError("ANS subscription -> " + str(resp.status_code) + ": " + resp.text[:400])
+
+    def ensure_provisioned(self, recipient_email: str) -> None:
+        """Idempotently provision Action + Condition + Subscription for one recipient."""
+        sid = _sanitize(recipient_email)
+        self._upsert_action(sid, recipient_email)
+        self._upsert_condition(sid)
+        self._upsert_subscription(sid)
+
     def send_event(
         self,
+        recipient_email: str,
         profile_slug: str,
         subject: str,
         body_html: str,
     ) -> None:
         """
-        Fire one resource-event per digest run.
-        The manually-configured subscription (no conditions) routes it to all recipients.
+        Fire one resource-event for a single recipient.
+        The condition on their subscription matches subject CONTAINS sid.
         """
+        sid = _sanitize(recipient_email)
         resp = requests.post(
-            f"{self._url}/cf/producer/v1/resource-events",
+            self._url + "/cf/producer/v1/resource-events",
             headers=self._headers(),
             json={
-                "subject": subject,
+                "subject": subject + " [" + sid + "]",
                 "eventType": "LegalEagleDigest",
                 "severity": "INFO",
                 "category": "NOTIFICATION",
@@ -110,7 +185,7 @@ class ANSSender:
         )
         if not resp.ok:
             raise RuntimeError(
-                f"ANS sendEvent -> {resp.status_code}: {resp.text[:400]}"
+                "ANS sendEvent -> " + str(resp.status_code) + ": " + resp.text[:400]
             )
 
 
@@ -150,19 +225,23 @@ def send_digest_via_ans(
     recipient_emails: List[str],
 ) -> bool:
     """
-    Send digest via ANS (one event per run).
-    The manually-configured subscription routes the event to all recipients.
-    Returns True on success, False if ANS unavailable or send failed.
+    Send digest to all recipients via ANS.
+    Provisions Action+Condition+Subscription per recipient (idempotent),
+    then fires one event per recipient so ANS routes it to that recipient only.
+    Returns True if all sends succeeded, False if ANS unavailable or any send failed.
     Caller falls back to Gmail SMTP on False.
     """
     sender = get_ans_sender()
     if not sender:
         return False
 
-    try:
-        sender.send_event(profile_slug, subject, body_html)
-        print(f"[ANS] Digest sent ({len(recipient_emails)} recipient(s) via subscription)")
-        return True
-    except Exception as e:
-        print(f"[ANS] Send failed: {e}")
-        return False
+    success = True
+    for email in recipient_emails:
+        try:
+            sender.ensure_provisioned(email)
+            sender.send_event(email, profile_slug, subject, body_html)
+            print("[ANS] Digest sent to " + email)
+        except Exception as e:
+            print("[ANS] Send failed for " + email + ": " + str(e))
+            success = False
+    return success
