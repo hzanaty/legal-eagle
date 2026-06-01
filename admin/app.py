@@ -1515,9 +1515,17 @@ def admin_review_news(profile_id: int):
     # Calculate pagination
     filtered_count_for_pagination = count_all_news_for_review(conn, profile_id, source=source, reviewed=reviewed)
     total_pages = (filtered_count_for_pagination + per_page - 1) // per_page
-    
+
+    # Build repo node map: news_id -> repo_node_id (for badge display)
+    repo_node_map = {}
+    for row in conn.execute("SELECT id, source_news_id FROM repo_nodes WHERE source_news_id IS NOT NULL").fetchall():
+        repo_node_map[row["source_news_id"]] = row["id"]
+
+    # Parent options for L2S Prompt modal dropdown
+    repo_parent_options = list_repo_nodes(conn, profile["country_code"])
+
     conn.close()
-    
+
     return render_template(
         "review_news.html",
         profile=profile,
@@ -1530,6 +1538,8 @@ def admin_review_news(profile_id: int):
         page=page,
         total_pages=total_pages,
         per_page=per_page,
+        repo_node_map=repo_node_map,
+        repo_parent_options=repo_parent_options,
     )
 
 

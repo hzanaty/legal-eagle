@@ -309,6 +309,18 @@
                 <input type="hidden" name="item_id" value="{{ item.id }}:{{ item.item_source }}">
                 <button type="submit" class="sapBtn sapBtn-reject sapBtn-sm" style="padding: 0.25rem 0.5rem; width: 100%;" title="Delete">Delete</button>
               </form>
+              {# Legal Repo badge / L2S Prompt button #}
+              {% if item.id in repo_node_map %}
+              <a href="{{ url_for('admin_legal_repo', country=profile.country_code, node_id=repo_node_map[item.id]) }}"
+                 class="sapButton sapButton--Information" style="display:block;text-align:center;font-size:11px;text-decoration:none;margin-top:var(--sapSpacingXS);padding:3px 6px;border-radius:4px;background:var(--sapInformativeColor);color:#fff">
+                📋 In Legal Repo
+              </a>
+              {% else %}
+              <button onclick="openL2SModal({{ item.id }}, '{{ item.title | replace("'", "\\'") | replace('"', '\\"') | truncate(60) }}')"
+                      class="sapButton sapButton--Transparent" style="width:100%;font-size:11px;margin-top:var(--sapSpacingXS);padding:3px 6px">
+                + L2S Prompt
+              </button>
+              {% endif %}
             </td>
           </tr>
           {% endfor %}
@@ -422,6 +434,65 @@ document.addEventListener('DOMContentLoaded', function() {
   checkboxes.forEach(function(cb) {
     cb.addEventListener('change', syncBulkDeleteForm);
   });
+});
+</script>
+
+{# ── L2S Prompt Modal ── #}
+<div id="l2sModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:8px;padding:24px;width:500px;max-width:95vw;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.2)">
+    <div style="font-size:16px;font-weight:700;color:var(--sapTitleColor);margin-bottom:4px">Generate L2S Prompt</div>
+    <div id="l2sNewsTitle" style="font-size:12px;color:var(--sapNeutralColor);margin-bottom:16px;font-style:italic"></div>
+    <form id="l2sForm" method="POST">
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Domain *</label>
+        <select name="domain" class="sapSelect" style="width:100%">
+          <option value="Labor">Labor</option>
+          <option value="Social Insurance">Social Insurance</option>
+          <option value="Taxation">Taxation</option>
+        </select>
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Subdomain / Authority *</label>
+        <input name="subdomain" class="sapInput" style="width:100%" placeholder="e.g. ERGANI, EFKA">
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Topic *</label>
+        <input name="topic" class="sapInput" style="width:100%" placeholder="e.g. Employment Relationship Modification">
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Law Reference</label>
+        <input name="law_reference" class="sapInput" style="width:100%" placeholder="e.g. Decision 32689/2025">
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Official URL</label>
+        <input name="official_url" class="sapInput" style="width:100%" type="url" placeholder="https://...">
+      </div>
+      <div style="margin-bottom:16px">
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Parent Node (optional)</label>
+        <select name="parent_node_id" class="sapSelect" style="width:100%">
+          <option value="">— none (top-level) —</option>
+          {% for p in repo_parent_options %}
+          <option value="{{ p.id }}">{{ p.domain }} › {{ p.subdomain }} › {{ p.topic }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button type="button" onclick="document.getElementById('l2sModal').style.display='none'" class="sapButton sapButton--Default">Cancel</button>
+        <button type="submit" class="sapButton sapButton--Emphasized">Create Repo Node</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openL2SModal(newsId, title) {
+  document.getElementById('l2sModal').style.display = 'flex';
+  document.getElementById('l2sNewsTitle').textContent = title;
+  document.getElementById('l2sForm').action =
+    '/admin/profiles/{{ profile.id }}/news/' + newsId + '/to-legal-repo';
+}
+document.getElementById('l2sModal').addEventListener('click', function(e) {
+  if (e.target === this) this.style.display = 'none';
 });
 </script>
 {% endblock %}
