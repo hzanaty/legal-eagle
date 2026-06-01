@@ -540,6 +540,10 @@
   </div>
   <div class="sapShellBar-subtitle">
     Legal Eagle - Compliance Management
+    <a href="{{ url_for('admin_legal_repo') }}"
+       style="margin-left: 24px; color: {% if request.path.startswith('/admin/legal-repo') %}#fff{% else %}rgba(255,255,255,0.7){% endif %}; text-decoration: none; font-size: 13px; font-weight: {% if request.path.startswith('/admin/legal-repo') %}700{% else %}400{% endif %};">
+      📚 Legal Repo
+    </a>
   </div>
 </header>
 
