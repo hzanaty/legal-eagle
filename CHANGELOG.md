@@ -1,5 +1,23 @@
 # CHANGELOG
 
+## v2.30 — 2026-06-01
+### Legal Repository + Greece Profile
+
+**Legal Repository:**
+- New global `/admin/legal-repo` page — three-column layout (countries / topic tree / node detail)
+- New DB tables: `repo_nodes` + `repo_assets`
+- Node lifecycle: NEW → SCOPING → ANALYZED → COMPLETE with maturity levels 1–4
+- Parent-child hierarchy: EPIC-level parent nodes with independent topic-level children
+- SAP Linkage: attach jira_epic, jira_req, sap_note, prd, kba, mindmap, xml_schema, analysis assets per node
+- Review page: `📋 In Legal Repo` badge + `+ L2S Prompt` button — news → repo traceability
+- `📚 Legal Repo` link added to navbar
+
+**Greece Profile:**
+- New Greece HCM profile (GR/HCM, language el) with 8 URL sources and 87 glossary terms
+- 8 seed repo nodes: ERGANI II parent (ANALYZED, Level 3) + 4 ERGANI II children + EFKA + TEKA + AADE
+- ERGANI II MindMap v2 linked as knowledge asset (mindmap type)
+- Seeding scripts: `scripts/seed_greece_profile.py`, `scripts/seed_greece_repo.py` (both idempotent)
+
 ## v2.26 — 2026-05-13
 ### Run Log Visualization + ANS Email Integration + Per-Feed RSS Tracking
 

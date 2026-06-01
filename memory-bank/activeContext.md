@@ -1,7 +1,42 @@
-## Current State: v2.26 — Run Log Visualization + ANS Email + Per-Feed RSS Tracking (2026-05-13)
+## Current State: v2.30 — Legal Repository + Greece Profile (2026-06-01)
 
-### ✅ v2.26 COMPLETE
-**Completion Date**: 2026-05-13
+### ✅ v2.30 COMPLETE
+**Completion Date**: 2026-06-01
+
+### Key Features (v2.30):
+
+#### Legal Repository
+- Two new DB tables: `repo_nodes` (parent-child hierarchy) + `repo_assets` (knowledge files + SAP delivery artifacts)
+- Global `/admin/legal-repo` page: three-column layout (countries / topic tree / node detail)
+- Node lifecycle: NEW → SCOPING → ANALYZED → COMPLETE (Levels 1–4)
+- Asset types: jira_epic, jira_req, sap_note, prd, kba, mindmap, xml_schema, analysis, other
+- Review page: `📋 In Legal Repo` badge + `+ L2S Prompt` button per news item
+- L2S Prompt creates repo node stub with `source_news_id` traceability
+- Parent-child hierarchy: EPIC-level parent nodes with independent topic-level children
+
+#### Greece Profile
+- Profile: Greece HCM (GR/HCM), language: Greek+English (el)
+- 8 URL sources: ERGANI, Ministry of Labour, EFKA, TEKA (+ eservices), AADE, FEK, Gov.gr
+- 87 glossary terms across 7 categories (seeded from Resources/Greece_Glossary.md)
+- 8 seed repo nodes: ERGANI II parent (ANALYZED, Level 3) + 4 children (SCOPING/NEW) + EFKA + TEKA + AADE
+- MindMap asset linked: Resources/ERGANI_II_MindMap_v2.html
+
+#### Seeding scripts (idempotent)
+- `scripts/seed_greece_profile.py` — Greece profile + URLs + glossary
+- `scripts/seed_greece_repo.py` — Greece repo nodes + assets
+
+### Key files added/changed (v2.30):
+- `configurations/db.py` — repo_nodes + repo_assets schema + CRUD helpers + STATUS_PROGRESSION
+- `admin/app.py` — Legal Repo routes + L2S Prompt route + repo_node_map in review route
+- `admin/templates/base.html` — Legal Repo link in navbar
+- `admin/templates/legal_repo.html` — NEW: three-column repo page
+- `admin/templates/review_news.html` — L2S Prompt button + In Legal Repo badge
+- `scripts/seed_greece_profile.py` — NEW
+- `scripts/seed_greece_repo.py` — NEW
+
+## Previous State: v2.29 — ANS Email Routing (2026-05-xx)
+
+### ✅ v2.29 COMPLETE
 
 ### Key Features (v2.25–v2.26):
 
