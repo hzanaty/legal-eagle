@@ -77,6 +77,20 @@ from configurations.db import (
     count_all_news_for_review,
     update_news_item_score,
     delete_news_item,
+    # legal repo
+    create_repo_node,
+    update_repo_node,
+    delete_repo_node,
+    get_repo_node,
+    list_repo_countries,
+    list_repo_tree,
+    list_repo_nodes,
+    get_repo_node_by_news,
+    add_repo_asset,
+    list_repo_assets,
+    delete_repo_asset,
+    advance_repo_node_status,
+    STATUS_PROGRESSION,
 )
 
 # Flask app
@@ -1780,6 +1794,237 @@ def resend_email_from_preview(profile_id: int):
         flash(f"Error: {str(e)}", "error")
     
     return redirect(url_for("admin_profile_runs", profile_id=profile_id))
+
+
+# ── Legal Repo ──────────────────────────────────────────────────────────────
+
+@app.route("/admin/legal-repo")
+def admin_legal_repo():
+    _ensure_schema()
+    conn = get_connection()
+    create_schema_if_needed(conn)
+    countries = list_repo_countries(conn)
+    country = request.args.get("country", countries[0] if countries else None)
+    domain = request.args.get("domain")
+    subdomain = request.args.get("subdomain")
+    node_id = request.args.get("node_id", type=int)
+
+    tree = list_repo_tree(conn, country) if country else []
+    nodes = list_repo_nodes(conn, country, domain, subdomain) if country else []
+
+    selected_node = None
+    assets = []
+    if node_id:
+        selected_node = get_repo_node(conn, node_id)
+        if selected_node:
+            assets = list_repo_assets(conn, node_id)
+
+    parent_options = list_repo_nodes(conn, country) if country else []
+    conn.close()
+    return render_template(
+        "legal_repo.html",
+        countries=countries,
+        selected_country=country,
+        selected_domain=domain,
+        selected_subdomain=subdomain,
+        tree=tree,
+        nodes=nodes,
+        selected_node=selected_node,
+        assets=assets,
+        parent_options=parent_options,
+        status_progression=STATUS_PROGRESSION,
+    )
+
+
+@app.route("/admin/legal-repo/nodes/create", methods=["POST"])
+def admin_legal_repo_node_create():
+    _ensure_schema()
+    from datetime import date as _date
+    country = request.form.get("country_code", "").strip().upper()
+    domain = request.form.get("domain", "").strip()
+    subdomain = request.form.get("subdomain", "").strip()
+    topic = request.form.get("topic", "").strip()
+    authority = request.form.get("authority", "").strip() or None
+    law_reference = request.form.get("law_reference", "").strip() or None
+    official_url = request.form.get("official_url", "").strip() or None
+    summary = request.form.get("summary", "").strip() or None
+    effective_date = request.form.get("effective_date", "").strip() or None
+    parent_node_id = request.form.get("parent_node_id", type=int) or None
+
+    if not all([country, domain, subdomain, topic]):
+        flash("Country, domain, subdomain, and topic are required.", "error")
+        return redirect(url_for("admin_legal_repo", country=country))
+
+    conn = get_connection()
+    create_schema_if_needed(conn)
+    nid = create_repo_node(
+        conn, country, domain, subdomain, topic,
+        authority=authority, law_reference=law_reference,
+        official_url=official_url, summary=summary,
+        effective_date=effective_date,
+        date_detected=_date.today().isoformat(),
+        parent_node_id=parent_node_id,
+    )
+    add_audit_log(conn, entity="repo_nodes", action="create",
+                  details=f"{country}/{domain}/{subdomain}/{topic}", profile_id=None)
+    conn.close()
+    flash("Node created.", "success")
+    return redirect(url_for("admin_legal_repo", country=country, node_id=nid))
+
+
+@app.route("/admin/legal-repo/nodes/<int:node_id>/update", methods=["POST"])
+def admin_legal_repo_node_update(node_id: int):
+    _ensure_schema()
+    conn = get_connection()
+    create_schema_if_needed(conn)
+    node = get_repo_node(conn, node_id)
+    if not node:
+        conn.close()
+        flash("Node not found.", "error")
+        return redirect(url_for("admin_legal_repo"))
+
+    fields = {}
+    for f in ["domain", "subdomain", "topic", "authority", "law_reference",
+              "official_url", "summary", "effective_date"]:
+        val = request.form.get(f, "").strip() or None
+        fields[f] = val
+    fields["parent_node_id"] = request.form.get("parent_node_id", type=int) or None
+
+    update_repo_node(conn, node_id, **fields)
+    add_audit_log(conn, entity="repo_nodes", action="update",
+                  details=f"node_id={node_id}", profile_id=None)
+    conn.close()
+    flash("Node updated.", "success")
+    return redirect(url_for("admin_legal_repo", country=node["country_code"], node_id=node_id))
+
+
+@app.route("/admin/legal-repo/nodes/<int:node_id>/delete", methods=["POST"])
+def admin_legal_repo_node_delete(node_id: int):
+    _ensure_schema()
+    conn = get_connection()
+    create_schema_if_needed(conn)
+    node = get_repo_node(conn, node_id)
+    if not node:
+        conn.close()
+        flash("Node not found.", "error")
+        return redirect(url_for("admin_legal_repo"))
+    country = node["country_code"]
+    delete_repo_node(conn, node_id)
+    add_audit_log(conn, entity="repo_nodes", action="delete",
+                  details=f"node_id={node_id}", profile_id=None)
+    conn.close()
+    flash("Node deleted.", "success")
+    return redirect(url_for("admin_legal_repo", country=country))
+
+
+@app.route("/admin/legal-repo/nodes/<int:node_id>/advance-status", methods=["POST"])
+def admin_legal_repo_node_advance(node_id: int):
+    _ensure_schema()
+    conn = get_connection()
+    create_schema_if_needed(conn)
+    node = get_repo_node(conn, node_id)
+    if not node:
+        conn.close()
+        flash("Node not found.", "error")
+        return redirect(url_for("admin_legal_repo"))
+    country = node["country_code"]
+    new_status = advance_repo_node_status(conn, node_id)
+    conn.close()
+    if new_status:
+        flash(f"Status advanced to {new_status}.", "success")
+    else:
+        flash("Already at final status (COMPLETE).", "info")
+    return redirect(url_for("admin_legal_repo", country=country, node_id=node_id))
+
+
+@app.route("/admin/legal-repo/nodes/<int:node_id>/assets/add", methods=["POST"])
+def admin_legal_repo_asset_add(node_id: int):
+    _ensure_schema()
+    conn = get_connection()
+    create_schema_if_needed(conn)
+    node = get_repo_node(conn, node_id)
+    if not node:
+        conn.close()
+        flash("Node not found.", "error")
+        return redirect(url_for("admin_legal_repo"))
+    asset_type = request.form.get("asset_type", "").strip()
+    title = request.form.get("title", "").strip()
+    reference = request.form.get("reference", "").strip() or None
+    url = request.form.get("url", "").strip() or None
+    if not asset_type or not title:
+        conn.close()
+        flash("Asset type and title are required.", "error")
+        return redirect(url_for("admin_legal_repo", country=node["country_code"], node_id=node_id))
+    add_repo_asset(conn, node_id, asset_type, title, reference, url)
+    add_audit_log(conn, entity="repo_assets", action="add",
+                  details=f"node_id={node_id} type={asset_type}", profile_id=None)
+    conn.close()
+    flash("Asset linked.", "success")
+    return redirect(url_for("admin_legal_repo", country=node["country_code"], node_id=node_id))
+
+
+@app.route("/admin/legal-repo/assets/<int:asset_id>/delete", methods=["POST"])
+def admin_legal_repo_asset_delete(asset_id: int):
+    _ensure_schema()
+    conn = get_connection()
+    create_schema_if_needed(conn)
+    asset = conn.execute("SELECT * FROM repo_assets WHERE id=?", (asset_id,)).fetchone()
+    if not asset:
+        conn.close()
+        flash("Asset not found.", "error")
+        return redirect(url_for("admin_legal_repo"))
+    node = get_repo_node(conn, asset["node_id"])
+    country = node["country_code"] if node else None
+    node_id = asset["node_id"]
+    delete_repo_asset(conn, asset_id)
+    conn.close()
+    flash("Asset removed.", "success")
+    return redirect(url_for("admin_legal_repo", country=country, node_id=node_id))
+
+
+# ── L2S Prompt (from Review page) ───────────────────────────────────────────
+
+@app.route("/admin/profiles/<int:profile_id>/news/<int:news_id>/to-legal-repo", methods=["POST"])
+def admin_news_to_legal_repo(profile_id: int, news_id: int):
+    _ensure_schema()
+    from datetime import date as _date
+    conn = get_connection()
+    create_schema_if_needed(conn)
+
+    existing = get_repo_node_by_news(conn, news_id)
+    if existing:
+        conn.close()
+        flash("This news item is already linked to a repo node.", "info")
+        return redirect(url_for("admin_review_news", profile_id=profile_id))
+
+    prof = conn.execute("SELECT * FROM profiles WHERE id=?", (profile_id,)).fetchone()
+    country = prof["country_code"] if prof else ""
+
+    domain = request.form.get("domain", "").strip()
+    subdomain = request.form.get("subdomain", "").strip()
+    topic = request.form.get("topic", "").strip()
+    authority = request.form.get("authority", "").strip() or None
+    law_reference = request.form.get("law_reference", "").strip() or None
+    official_url = request.form.get("official_url", "").strip() or None
+    parent_node_id = request.form.get("parent_node_id", type=int) or None
+
+    if not all([domain, subdomain, topic]):
+        conn.close()
+        flash("Domain, subdomain, and topic are required.", "error")
+        return redirect(url_for("admin_review_news", profile_id=profile_id))
+
+    nid = create_repo_node(
+        conn, country, domain, subdomain, topic,
+        authority=authority, law_reference=law_reference,
+        official_url=official_url, source_news_id=news_id,
+        date_detected=_date.today().isoformat(),
+        parent_node_id=parent_node_id,
+    )
+    add_audit_log(conn, entity="repo_nodes", action="create_from_news",
+                  details=f"news_id={news_id} node_id={nid}", profile_id=profile_id)
+    conn.close()
+    flash("Node created in Legal Repo.", "success")
+    return redirect(url_for("admin_review_news", profile_id=profile_id))
 
 
 # Run Flask
