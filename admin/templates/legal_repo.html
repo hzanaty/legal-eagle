@@ -1,0 +1,451 @@
+{% extends "base.html" %}
+{% block title %}Legal Repo{% endblock %}
+{% block content %}
+<div style="display:flex;height:calc(100vh - 96px);overflow:hidden;font-family:var(--sapFontFamily)">
+
+  {# ── Column 1: Countries ── #}
+  <div style="width:150px;border-right:1px solid var(--sapNeutralBorderColor);overflow-y:auto;background:var(--sapBackgroundColor);padding:12px 8px;flex-shrink:0">
+    <div style="font-size:11px;font-weight:700;color:var(--sapNeutralColor);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Countries</div>
+    {% for cc in countries %}
+    <a href="{{ url_for('admin_legal_repo', country=cc) }}"
+       style="display:block;padding:6px 10px;border-radius:4px;text-decoration:none;margin-bottom:3px;
+              {% if cc == selected_country %}background:var(--sapSelectedColor);color:#fff;font-weight:600;
+              {% else %}color:var(--sapTextColor);{% endif %}">
+      {{ cc }}
+    </a>
+    {% endfor %}
+    {% if not countries %}
+    <div style="color:var(--sapNeutralColor);font-size:12px">No countries yet.</div>
+    {% endif %}
+  </div>
+
+  {# ── Column 2: Topic Tree ── #}
+  <div style="width:250px;border-right:1px solid var(--sapNeutralBorderColor);overflow-y:auto;background:var(--sapBackgroundColor);padding:12px;flex-shrink:0">
+    {% if selected_country %}
+    <div style="font-size:11px;font-weight:700;color:var(--sapNeutralColor);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">{{ selected_country }} — Topics</div>
+
+    {# Group tree by domain then subdomain — only top-level nodes (no parent) #}
+    {% set top_nodes = tree | selectattr('parent_node_id', 'none') | list %}
+    {% set seen_domains = [] %}
+    {% set seen_subs = [] %}
+
+    {% for node in top_nodes %}
+      {# Domain header #}
+      {% if node.domain not in seen_domains %}
+        {% if seen_domains.append(node.domain) %}{% endif %}
+        <div style="font-weight:700;color:var(--sapTitleColor);margin:10px 0 4px;font-size:13px">
+          {% if node.domain == 'Labor' %}⚒{% elif node.domain == 'Social Insurance' %}🛡{% elif node.domain == 'Taxation' %}💰{% else %}📁{% endif %}
+          {{ node.domain }}
+        </div>
+      {% endif %}
+
+      {# Subdomain row #}
+      {% set sub_key = node.domain ~ '|' ~ node.subdomain %}
+      {% if sub_key not in seen_subs %}
+        {% if seen_subs.append(sub_key) %}{% endif %}
+        {% set sub_count = top_nodes | selectattr('subdomain','eq',node.subdomain) | selectattr('domain','eq',node.domain) | list | length %}
+        {# Count children too #}
+        {% set child_count = tree | rejectattr('parent_node_id', 'none') | selectattr('subdomain','eq',node.subdomain) | list | length %}
+        {% set total_count = sub_count + child_count %}
+        <a href="{{ url_for('admin_legal_repo', country=selected_country, domain=node.domain, subdomain=node.subdomain) }}"
+           style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px 4px 16px;border-radius:4px;text-decoration:none;margin-bottom:2px;
+                  {% if node.subdomain == selected_subdomain and node.domain == selected_domain %}background:var(--sapSelectedColor);color:#fff;font-weight:600;
+                  {% else %}color:var(--sapTextColor);{% endif %}">
+          <span style="font-size:13px">{{ node.subdomain }}</span>
+          <span style="background:var(--sapNeutralBorderColor);color:var(--sapTextColor);border-radius:10px;padding:0 7px;font-size:10px;min-width:20px;text-align:center">{{ total_count }}</span>
+        </a>
+      {% endif %}
+    {% endfor %}
+
+    <div style="margin-top:16px;border-top:1px solid var(--sapNeutralBorderColor);padding-top:10px">
+      <button onclick="document.getElementById('newNodeModal').style.display='flex'"
+              class="sapButton sapButton--Emphasized" style="width:100%;font-size:12px">+ New Node</button>
+    </div>
+    {% else %}
+    <div style="color:var(--sapNeutralColor);font-size:13px">Select a country.</div>
+    {% endif %}
+  </div>
+
+  {# ── Column 3: Node List / Detail ── #}
+  <div style="flex:1;overflow-y:auto;padding:16px;background:var(--sapPageBackgroundColor)">
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for cat, msg in messages %}
+        <div class="sapMessageStrip sapMessageStrip-{{ 'positive' if cat == 'success' else 'critical' if cat == 'error' else 'information' }}" style="margin-bottom:12px">
+          {{ msg }}
+        </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    {% if selected_node %}
+      {# ── Node Detail ── #}
+      {% set node = selected_node %}
+      {% set maturity_map = {'NEW':1,'SCOPING':2,'ANALYZED':3,'COMPLETE':4} %}
+      {% set maturity = maturity_map[node.status] %}
+
+      <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+        <div>
+          <div style="font-size:18px;font-weight:700;color:var(--sapTitleColor)">{{ node.topic }}</div>
+          <div style="color:var(--sapNeutralColor);margin-top:4px;font-size:13px">
+            🌍 {{ node.country_code }} › {{ node.domain }} › {{ node.subdomain }}
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <span class="sapBadge {% if node.status == 'COMPLETE' %}sapBadge-positive{% elif node.status == 'ANALYZED' %}sapBadge-critical{% elif node.status == 'SCOPING' %}sapBadge-information{% else %}sapBadge-neutral{% endif %}">
+            {{ node.status }} — Level {{ maturity }}
+          </span>
+          <form method="POST" action="{{ url_for('admin_legal_repo_node_advance', node_id=node.id) }}" style="display:inline">
+            <button class="sapButton sapButton--Transparent" style="font-size:12px" title="Advance to next status">▶ Advance</button>
+          </form>
+          <button onclick="document.getElementById('editNodeModal').style.display='flex'"
+                  class="sapButton sapButton--Default" style="font-size:12px">Edit</button>
+          <form method="POST" action="{{ url_for('admin_legal_repo_node_delete', node_id=node.id) }}"
+                onsubmit="return confirm('Delete this node and all its assets?')" style="display:inline">
+            <button class="sapButton sapButton--Reject" style="font-size:12px">Delete</button>
+          </form>
+        </div>
+      </div>
+
+      {# Two-column metadata #}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+
+        {# Left: Legal Metadata #}
+        <div style="background:var(--sapBackgroundColor);border-radius:6px;padding:14px;border:1px solid var(--sapNeutralBorderColor)">
+          <div style="font-size:10px;font-weight:700;color:var(--sapNeutralColor);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Legal Metadata</div>
+          <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <tr><td style="color:var(--sapNeutralColor);padding:4px 0;width:120px;vertical-align:top">Authority</td><td style="padding:4px 0"><strong>{{ node.authority or '—' }}</strong></td></tr>
+            <tr><td style="color:var(--sapNeutralColor);padding:4px 0;vertical-align:top">Law Reference</td><td style="padding:4px 0">{{ node.law_reference or '—' }}</td></tr>
+            <tr><td style="color:var(--sapNeutralColor);padding:4px 0;vertical-align:top">Official URL</td><td style="padding:4px 0">
+              {% if node.official_url %}
+              <a href="{{ node.official_url }}" target="_blank" style="color:var(--sapLinkColor)">{{ node.official_url[:40] }}{% if node.official_url|length > 40 %}…{% endif %} ↗</a>
+              {% else %}—{% endif %}
+            </td></tr>
+            <tr><td style="color:var(--sapNeutralColor);padding:4px 0;vertical-align:top">Effective Date</td><td style="padding:4px 0">{{ node.effective_date or '—' }}</td></tr>
+            <tr><td style="color:var(--sapNeutralColor);padding:4px 0;vertical-align:top">Date Detected</td><td style="padding:4px 0">{{ node.date_detected or '—' }}</td></tr>
+            <tr><td style="color:var(--sapNeutralColor);padding:4px 0;vertical-align:top">Source News</td><td style="padding:4px 0">
+              {% if node.source_news_id %}
+              <span class="sapBadge sapBadge-information">NEWS-{{ node.source_news_id }}</span>
+              {% else %}—{% endif %}
+            </td></tr>
+          </table>
+        </div>
+
+        {# Right: SAP Linkage #}
+        <div style="background:var(--sapBackgroundColor);border-radius:6px;padding:14px;border:1px solid var(--sapNeutralBorderColor)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <div style="font-size:10px;font-weight:700;color:var(--sapNeutralColor);text-transform:uppercase;letter-spacing:.5px">SAP Linkage</div>
+            <button onclick="document.getElementById('addAssetModal').style.display='flex'"
+                    class="sapButton sapButton--Transparent" style="font-size:11px">+ Link Asset</button>
+          </div>
+          {% if assets %}
+            {% set delivery_types = ['jira_epic','jira_req','sap_note','prd','kba'] %}
+            {% set delivery = [] %}
+            {% set knowledge = [] %}
+            {% for a in assets %}
+              {% if a.asset_type in delivery_types %}{% if delivery.append(a) %}{% endif %}
+              {% else %}{% if knowledge.append(a) %}{% endif %}{% endif %}
+            {% endfor %}
+
+            {% if delivery %}
+            <div style="font-size:11px;font-weight:600;color:var(--sapNeutralColor);margin-bottom:6px">SAP Delivery</div>
+            {% for a in delivery %}
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:var(--sapPageBackgroundColor);border-radius:4px;margin-bottom:4px;font-size:12px">
+              <div style="min-width:0">
+                <span class="sapBadge sapBadge-neutral" style="font-size:10px;margin-right:6px">{{ a.asset_type }}</span>
+                {% if a.url %}<a href="{{ a.url }}" target="_blank" style="color:var(--sapLinkColor)">{{ a.title }}</a>
+                {% else %}<span>{{ a.title }}</span>{% endif %}
+                {% if a.reference and a.reference != a.title %}<span style="color:var(--sapNeutralColor);margin-left:4px">({{ a.reference }})</span>{% endif %}
+              </div>
+              <form method="POST" action="{{ url_for('admin_legal_repo_asset_delete', asset_id=a.id) }}" style="display:inline;flex-shrink:0">
+                <button class="sapButton sapButton--Transparent" style="color:var(--sapNegativeColor);font-size:11px;padding:0 4px" title="Remove">✕</button>
+              </form>
+            </div>
+            {% endfor %}
+            {% endif %}
+
+            {% if knowledge %}
+            <div style="font-size:11px;font-weight:600;color:var(--sapNeutralColor);margin:10px 0 6px">Knowledge Files</div>
+            {% for a in knowledge %}
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:var(--sapPageBackgroundColor);border-radius:4px;margin-bottom:4px;font-size:12px">
+              <div style="min-width:0">
+                <span class="sapBadge sapBadge-neutral" style="font-size:10px;margin-right:6px">{{ a.asset_type }}</span>
+                {% if a.url %}<a href="{{ a.url }}" target="_blank" style="color:var(--sapLinkColor)">{{ a.title }}</a>
+                {% elif a.reference %}<a href="/{{ a.reference }}" target="_blank" style="color:var(--sapLinkColor)">{{ a.title }}</a>
+                {% else %}<span>{{ a.title }}</span>{% endif %}
+              </div>
+              <form method="POST" action="{{ url_for('admin_legal_repo_asset_delete', asset_id=a.id) }}" style="display:inline;flex-shrink:0">
+                <button class="sapButton sapButton--Transparent" style="color:var(--sapNegativeColor);font-size:11px;padding:0 4px" title="Remove">✕</button>
+              </form>
+            </div>
+            {% endfor %}
+            {% endif %}
+          {% else %}
+          <div style="color:var(--sapNeutralColor);font-size:13px">No assets linked yet.</div>
+          {% endif %}
+        </div>
+      </div>
+
+      {# Summary #}
+      <div style="background:#fffde7;border-left:4px solid #f9a825;border-radius:0 6px 6px 0;padding:14px;margin-bottom:16px">
+        <div style="font-size:10px;font-weight:700;color:#7f6000;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Summary / Analysis Notes</div>
+        <div style="color:var(--sapTextColor);font-size:13px;line-height:1.6;white-space:pre-wrap">{{ node.summary or 'No summary yet.' }}</div>
+      </div>
+
+      {# Lifecycle bar #}
+      <div style="margin-bottom:20px">
+        <div style="font-size:10px;font-weight:700;color:var(--sapNeutralColor);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Lifecycle</div>
+        <div style="display:flex;gap:4px">
+          {% for s in status_progression %}
+          {% set is_current = s == node.status %}
+          {% set is_past = status_progression.index(s) < status_progression.index(node.status) %}
+          <div style="flex:1;padding:7px 4px;border-radius:4px;text-align:center;font-size:11px;font-weight:700;
+                      {% if is_current %}background:var(--sapSelectedColor);color:#fff;
+                      {% elif is_past %}background:var(--sapPositiveColor);color:#fff;
+                      {% else %}background:var(--sapNeutralBorderColor);color:var(--sapNeutralColor);{% endif %}">
+            {{ s }}{% if is_current %} ◀{% endif %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      {# Child nodes #}
+      {% set children = [] %}
+      {% for n in tree %}{% if n.parent_node_id == node.id %}{% if children.append(n) %}{% endif %}{% endif %}{% endfor %}
+      {% if children %}
+      <div>
+        <div style="font-size:10px;font-weight:700;color:var(--sapNeutralColor);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Child Nodes ({{ children|length }})</div>
+        {% for child in children %}
+        <a href="{{ url_for('admin_legal_repo', country=selected_country, node_id=child.id) }}"
+           style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--sapBackgroundColor);border:1px solid var(--sapNeutralBorderColor);border-radius:6px;margin-bottom:6px;text-decoration:none;color:var(--sapTextColor)">
+          <div>
+            <div style="font-weight:600;font-size:13px">{{ child.topic }}</div>
+            <div style="font-size:11px;color:var(--sapNeutralColor);margin-top:2px">{{ child.law_reference or '—' }}</div>
+          </div>
+          <span class="sapBadge {% if child.status == 'COMPLETE' %}sapBadge-positive{% elif child.status == 'ANALYZED' %}sapBadge-critical{% elif child.status == 'SCOPING' %}sapBadge-information{% else %}sapBadge-neutral{% endif %}">{{ child.status }}</span>
+        </a>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+    {% elif nodes %}
+      {# ── Node List ── #}
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div style="font-size:16px;font-weight:700;color:var(--sapTitleColor)">
+          {{ selected_country }} › {{ selected_domain }} › {{ selected_subdomain }}
+        </div>
+        <button onclick="document.getElementById('newNodeModal').style.display='flex'"
+                class="sapButton sapButton--Emphasized" style="font-size:12px">+ New Node</button>
+      </div>
+      {% set maturity_map = {'NEW':1,'SCOPING':2,'ANALYZED':3,'COMPLETE':4} %}
+      {% for node in nodes %}
+      <a href="{{ url_for('admin_legal_repo', country=selected_country, node_id=node.id) }}"
+         style="display:flex;justify-content:space-between;align-items:start;padding:14px;background:var(--sapBackgroundColor);border:1px solid var(--sapNeutralBorderColor);border-radius:6px;margin-bottom:8px;text-decoration:none;color:var(--sapTextColor)">
+        <div style="min-width:0">
+          <div style="font-weight:600;font-size:14px;margin-bottom:3px">{{ node.topic }}</div>
+          <div style="font-size:12px;color:var(--sapNeutralColor)">
+            {{ node.law_reference or '—' }}
+            {% if node.effective_date %} · {{ node.effective_date }}{% endif %}
+          </div>
+        </div>
+        <div style="text-align:right;flex-shrink:0;margin-left:16px">
+          <span class="sapBadge {% if node.status == 'COMPLETE' %}sapBadge-positive{% elif node.status == 'ANALYZED' %}sapBadge-critical{% elif node.status == 'SCOPING' %}sapBadge-information{% else %}sapBadge-neutral{% endif %}">{{ node.status }}</span>
+          <div style="font-size:11px;color:var(--sapNeutralColor);margin-top:3px">Level {{ maturity_map[node.status] }}</div>
+        </div>
+      </a>
+      {% endfor %}
+
+    {% else %}
+      <div style="color:var(--sapNeutralColor);padding:48px;text-align:center;font-size:14px">
+        {% if selected_country %}
+          Select a subdomain from the topic tree, or
+          <button onclick="document.getElementById('newNodeModal').style.display='flex'"
+                  class="sapButton sapButton--Transparent" style="font-size:14px">+ add a new node</button>.
+        {% else %}
+          Select a country to begin.
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+{# ── New Node Modal ── #}
+<div id="newNodeModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:8px;padding:24px;width:500px;max-width:95vw;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.2)">
+    <div style="font-size:16px;font-weight:700;color:var(--sapTitleColor);margin-bottom:16px">New Repo Node</div>
+    <form method="POST" action="{{ url_for('admin_legal_repo_node_create') }}">
+      <input type="hidden" name="country_code" value="{{ selected_country }}">
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Domain *</label>
+        <select name="domain" class="sapSelect" style="width:100%">
+          <option value="Labor" {% if selected_domain == 'Labor' %}selected{% endif %}>Labor</option>
+          <option value="Social Insurance" {% if selected_domain == 'Social Insurance' %}selected{% endif %}>Social Insurance</option>
+          <option value="Taxation" {% if selected_domain == 'Taxation' %}selected{% endif %}>Taxation</option>
+        </select>
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Subdomain / Authority *</label>
+        <input name="subdomain" class="sapInput" style="width:100%" placeholder="e.g. ERGANI, EFKA" value="{{ selected_subdomain or '' }}">
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Topic *</label>
+        <input name="topic" class="sapInput" style="width:100%" placeholder="e.g. Employment Relationship Modification">
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Authority</label>
+        <input name="authority" class="sapInput" style="width:100%" placeholder="e.g. ERGANI">
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Law Reference</label>
+        <input name="law_reference" class="sapInput" style="width:100%" placeholder="e.g. Decision 32689/2025">
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Official URL</label>
+        <input name="official_url" class="sapInput" style="width:100%" type="url" placeholder="https://...">
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Effective Date</label>
+        <input name="effective_date" class="sapInput" style="width:100%" placeholder="e.g. 2026-02-16">
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Parent Node (optional)</label>
+        <select name="parent_node_id" class="sapSelect" style="width:100%">
+          <option value="">— none (top-level) —</option>
+          {% for p in parent_options %}
+          <option value="{{ p.id }}">{{ p.domain }} › {{ p.subdomain }} › {{ p.topic }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div style="margin-bottom:16px">
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Summary</label>
+        <textarea name="summary" class="sapInput" style="width:100%;height:80px" placeholder="Optional analysis notes"></textarea>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button type="button" onclick="document.getElementById('newNodeModal').style.display='none'" class="sapButton sapButton--Default">Cancel</button>
+        <button type="submit" class="sapButton sapButton--Emphasized">Create Node</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ── Edit Node Modal ── #}
+{% if selected_node %}
+{% set node = selected_node %}
+<div id="editNodeModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:8px;padding:24px;width:500px;max-width:95vw;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.2)">
+    <div style="font-size:16px;font-weight:700;color:var(--sapTitleColor);margin-bottom:16px">Edit Node</div>
+    <form method="POST" action="{{ url_for('admin_legal_repo_node_update', node_id=node.id) }}">
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Domain *</label>
+        <select name="domain" class="sapSelect" style="width:100%">
+          {% for d in ['Labor','Social Insurance','Taxation'] %}
+          <option value="{{ d }}" {% if node.domain == d %}selected{% endif %}>{{ d }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Subdomain *</label>
+        <input name="subdomain" class="sapInput" style="width:100%" value="{{ node.subdomain }}">
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Topic *</label>
+        <input name="topic" class="sapInput" style="width:100%" value="{{ node.topic }}">
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Authority</label>
+        <input name="authority" class="sapInput" style="width:100%" value="{{ node.authority or '' }}">
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Law Reference</label>
+        <input name="law_reference" class="sapInput" style="width:100%" value="{{ node.law_reference or '' }}">
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Official URL</label>
+        <input name="official_url" class="sapInput" style="width:100%" type="url" value="{{ node.official_url or '' }}">
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Effective Date</label>
+        <input name="effective_date" class="sapInput" style="width:100%" value="{{ node.effective_date or '' }}">
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Parent Node</label>
+        <select name="parent_node_id" class="sapSelect" style="width:100%">
+          <option value="">— none (top-level) —</option>
+          {% for p in parent_options %}
+          {% if p.id != node.id %}
+          <option value="{{ p.id }}" {% if node.parent_node_id == p.id %}selected{% endif %}>{{ p.domain }} › {{ p.subdomain }} › {{ p.topic }}</option>
+          {% endif %}
+          {% endfor %}
+        </select>
+      </div>
+      <div style="margin-bottom:16px">
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Summary</label>
+        <textarea name="summary" class="sapInput" style="width:100%;height:80px">{{ node.summary or '' }}</textarea>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button type="button" onclick="document.getElementById('editNodeModal').style.display='none'" class="sapButton sapButton--Default">Cancel</button>
+        <button type="submit" class="sapButton sapButton--Emphasized">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+{# ── Add Asset Modal ── #}
+{% if selected_node %}
+<div id="addAssetModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:8px;padding:24px;width:460px;max-width:95vw;box-shadow:0 8px 32px rgba(0,0,0,.2)">
+    <div style="font-size:16px;font-weight:700;color:var(--sapTitleColor);margin-bottom:16px">Link Asset</div>
+    <form method="POST" action="{{ url_for('admin_legal_repo_asset_add', node_id=selected_node.id) }}">
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Type *</label>
+        <select name="asset_type" class="sapSelect" style="width:100%">
+          <optgroup label="SAP Delivery">
+            <option value="jira_epic">jira_epic</option>
+            <option value="jira_req">jira_req</option>
+            <option value="sap_note">sap_note</option>
+            <option value="prd">prd</option>
+            <option value="kba">kba</option>
+          </optgroup>
+          <optgroup label="Knowledge Files">
+            <option value="mindmap">mindmap</option>
+            <option value="xml_schema">xml_schema</option>
+            <option value="analysis">analysis</option>
+            <option value="other">other</option>
+          </optgroup>
+        </select>
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Title *</label>
+        <input name="title" class="sapInput" style="width:100%" placeholder="e.g. GSREQSE-15293 or ERGANI II MindMap v2">
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Reference / ID</label>
+        <input name="reference" class="sapInput" style="width:100%" placeholder="JIRA ID, SAP Note #, or file path">
+      </div>
+      <div style="margin-bottom:16px">
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">URL (optional)</label>
+        <input name="url" class="sapInput" style="width:100%" type="url" placeholder="https://...">
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button type="button" onclick="document.getElementById('addAssetModal').style.display='none'" class="sapButton sapButton--Default">Cancel</button>
+        <button type="submit" class="sapButton sapButton--Emphasized">Link Asset</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<script>
+// Close modals on backdrop click
+['newNodeModal','editNodeModal','addAssetModal'].forEach(function(id) {
+  var el = document.getElementById(id);
+  if (el) {
+    el.addEventListener('click', function(e) {
+      if (e.target === el) el.style.display = 'none';
+    });
+  }
+});
+</script>
+{% endblock %}
