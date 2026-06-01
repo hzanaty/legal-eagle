@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## v2.31 — 2026-06-01
+### UI Fixes & Enhancements
+
+- **URL source editing**: Edit form now exposes all fields including URL rename, mode, sample link, read more label, date template, recursive depth/domains/filter
+- **Auto-translate in Review**: Non-English profiles auto-translate visible news items to English on page load via SAP AI Core (shown inline below original)
+- **Pre-run preflight checklist**: Start Run button disabled until all checks pass — sources configured, email receiver, AI Core creds, Twitter token validity
+- **Legal Repo lifecycle bar**: completed=green, current=blue, future=dark grey
+- **Resources/ served by Flask**: MindMap and other Resources/ files accessible via `/Resources/<path>`
+
 ## v2.30 — 2026-06-01
 ### Legal Repository + Greece Profile
 

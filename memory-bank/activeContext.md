@@ -1,7 +1,25 @@
-## Current State: v2.30 — Legal Repository + Greece Profile (2026-06-01)
+## Current State: v2.31 — UI Fixes & Enhancements (2026-06-01)
 
-### ✅ v2.30 COMPLETE
+### ✅ v2.31 COMPLETE
 **Completion Date**: 2026-06-01
+
+### Key Features (v2.31):
+
+- **URL Source editing**: Edit form now shows all fields including URL itself (rename), mode, sample link, read more label, date template, recursive settings
+- **Auto-translate in Review**: Non-English profiles (e.g. Greece `el`) auto-translate all visible news items to English on page load via SAP AI Core. EN translation shown inline below original text.
+- **Pre-run preflight checklist**: Before every run, a checklist card checks: at least one source, email receiver configured, AI Core creds set, Twitter token valid (if Twitter accounts). Start Run button disabled until all pass.
+- **Lifecycle bar colors**: completed=green, current=blue, future=dark grey — all clearly readable
+- **Resources/ Flask route**: `GET /Resources/<path>` serves files from project's Resources/ directory. MindMap links now work.
+
+### Key files changed (v2.31):
+- `admin/app.py` — `/preflight`, `/review/translate`, `/Resources/<path>` routes; URL rename logic in `update_url_source_route`
+- `admin/templates/profile.html` — unified URL edit form (all fields, including URL rename)
+- `admin/templates/run_status.html` — preflight checklist card + Start Run button guard
+- `admin/templates/review_news.html` — auto-translate JS for non-EN profiles
+- `admin/templates/legal_repo.html` — lifecycle bar color fix
+
+## Previous State: v2.30 — Legal Repository + Greece Profile (2026-06-01)
+
 
 ### Key Features (v2.30):
 
