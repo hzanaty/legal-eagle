@@ -201,9 +201,9 @@
           {% set is_current = s == node.status %}
           {% set is_past = status_progression.index(s) < status_progression.index(node.status) %}
           <div style="flex:1;padding:7px 4px;border-radius:4px;text-align:center;font-size:11px;font-weight:700;
-                      {% if is_current %}background:var(--sapSelectedColor);color:#fff;
-                      {% elif is_past %}background:var(--sapPositiveColor);color:#fff;
-                      {% else %}background:var(--sapNeutralBorderColor);color:var(--sapNeutralColor);{% endif %}">
+                      {% if is_current %}background:#0070f3;color:#fff;
+                      {% elif is_past %}background:#107e3e;color:#fff;
+                      {% else %}background:#888;color:#fff;{% endif %}">
             {{ s }}{% if is_current %} ◀{% endif %}
           </div>
           {% endfor %}
@@ -233,7 +233,7 @@
       {# ── Node List ── #}
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
         <div style="font-size:16px;font-weight:700;color:var(--sapTitleColor)">
-          {{ selected_country }} › {{ selected_domain }} › {{ selected_subdomain }}
+          {{ selected_country }}{% if selected_domain %} › {{ selected_domain }}{% endif %}{% if selected_subdomain %} › {{ selected_subdomain }}{% endif %}
         </div>
         <button onclick="document.getElementById('newNodeModal').style.display='flex'"
                 class="sapButton sapButton--Emphasized" style="font-size:12px">+ New Node</button>

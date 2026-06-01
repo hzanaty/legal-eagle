@@ -389,7 +389,12 @@
             </label>
           </div>
           
-          <button type="submit" class="sapBtn sapBtn-accept" style="width: 100%;">
+          <div id="preflight-checklist" style="margin-bottom: var(--sapSpacingM); padding: var(--sapSpacingS); background: var(--sapNeutralBackground); border-radius: 4px; font-size: var(--sapFontSmallSize);">
+            <div style="font-weight:600; margin-bottom: 6px; color: var(--sapTitleColor);">⚙️ Pre-run Checklist</div>
+            <div id="preflight-items" style="color: var(--sapNeutralColor);">Checking...</div>
+          </div>
+
+          <button type="submit" id="start-run-btn" class="sapBtn sapBtn-accept" style="width: 100%;" disabled>
             Start Run
           </button>
         </form>
@@ -1051,6 +1056,44 @@ const PROFILE_ID = {{ profile.id }};
   {% else %}
   logPre.textContent = '💡 Click "Start Run" to execute the profile workflow, or select a run from history to view its logs.\n\nLogs will appear here in real-time during execution.';
   {% endif %}
+})();
+
+// Pre-flight checklist
+(function() {
+  var profileId = {{ profile.id }};
+  var btn = document.getElementById('start-run-btn');
+  var itemsEl = document.getElementById('preflight-items');
+
+  function runPreflight() {
+    fetch('/admin/profiles/' + profileId + '/preflight')
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        var html = '';
+        data.checks.forEach(function(c) {
+          var icon = c.ok ? '✅' : '❌';
+          html += '<div style="margin-bottom:4px">' + icon + ' ' + c.label;
+          if (!c.ok && c.message) {
+            html += '<br><span style="margin-left:20px;color:var(--sapNegativeColor)">' + c.message + '</span>';
+          }
+          html += '</div>';
+        });
+        itemsEl.innerHTML = html;
+        if (data.ready) {
+          btn.disabled = false;
+          btn.style.opacity = '1';
+        } else {
+          btn.disabled = true;
+          btn.style.opacity = '0.5';
+        }
+      })
+      .catch(function() {
+        itemsEl.innerHTML = '<span style="color:var(--sapNeutralColor)">Could not load preflight checks.</span>';
+        btn.disabled = false;
+        btn.style.opacity = '1';
+      });
+  }
+
+  runPreflight();
 })();
 </script>
 {% endblock %}

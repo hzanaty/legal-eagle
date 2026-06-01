@@ -6,7 +6,7 @@ import time
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional, Callable
 from flask import Response, stream_with_context
-
+from flask import send_from_directory
 from flask import Flask, render_template, request, redirect, url_for, flash
 
 # Ensure project root is on sys.path for module imports (configurations, agents)
@@ -932,14 +932,15 @@ def add_url_source_route(profile_id: int):
 
 @app.route("/admin/profiles/<int:profile_id>/urls/update", methods=["POST"])
 def update_url_source_route(profile_id: int):
-    url = request.form.get("url", "").strip()
+    url = request.form.get("url", "").strip()          # original URL (identity key)
+    new_url = request.form.get("new_url", "").strip()  # updated URL (may differ)
     mode = request.form.get("mode", "").strip()
     sample_link = request.form.get("sample_link", "").strip() or None
     read_more_label = request.form.get("read_more_label", "").strip() or None
     crawl_version = (request.form.get("crawl_version", "").strip() or None)
     if crawl_version and crawl_version not in ("v1", "v2"):
         crawl_version = "v1"
-    
+
     # Recursive mode parameters
     max_depth = int(request.form.get("max_depth", "2") or "2")
     allowed_domains = request.form.get("allowed_domains", "").strip() or None
@@ -954,14 +955,21 @@ def update_url_source_route(profile_id: int):
         flash("Invalid mode.", "error")
         return redirect(url_for("admin_profile_detail", profile_id=profile_id))
 
+    # Use new_url if provided and different, otherwise keep original
+    target_url = new_url if new_url else url
+
     conn = get_connection()
     create_schema_if_needed(conn)
-    # Use upsert to update all fields
-    upsert_url_source(conn, profile_id, url=url, mode=mode or "auto", sample_link=sample_link, read_more_label=read_more_label,
-                     crawl_version=(crawl_version or "v1"), max_depth=max_depth, allowed_domains=allowed_domains,
+    # If URL was changed, delete old row first then insert new
+    if target_url != url:
+        conn.execute("DELETE FROM url_sources WHERE profile_id=? AND url=?", (profile_id, url))
+        conn.commit()
+    upsert_url_source(conn, profile_id, url=target_url, mode=mode or "auto", sample_link=sample_link,
+                     read_more_label=read_more_label, crawl_version=(crawl_version or "v1"),
+                     max_depth=max_depth, allowed_domains=allowed_domains,
                      path_filter=path_filter, max_results=max_results,
                      url_date_template=url_date_template)
-    add_audit_log(conn, entity="url_sources", action="update", details=f"url={url} mode={mode}", profile_id=profile_id)
+    add_audit_log(conn, entity="url_sources", action="update", details=f"url={target_url} mode={mode}", profile_id=profile_id)
     conn.close()
     flash("URL source updated.", "success")
     return redirect(url_for("admin_profile_detail", profile_id=profile_id))
@@ -2035,6 +2043,139 @@ def admin_news_to_legal_repo(profile_id: int, news_id: int):
     conn.close()
     flash("Node created in Legal Repo.", "success")
     return redirect(url_for("admin_review_news", profile_id=profile_id))
+
+
+@app.route("/Resources/<path:filename>")
+def serve_resource_file(filename: str):
+    resources_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "Resources")
+    return send_from_directory(resources_dir, filename)
+
+
+@app.route("/admin/profiles/<int:profile_id>/preflight")
+def admin_preflight(profile_id: int):
+    """Pre-run checklist — returns JSON {checks: [{label, ok, message}], ready: bool}."""
+    _ensure_schema()
+    import json as _json
+    conn = get_connection()
+    create_schema_if_needed(conn)
+
+    from configurations.db import list_rss_feeds, list_tweet_accounts, list_email_receivers_with_lang
+    from configurations.db import list_url_sources
+
+    rss = list_rss_feeds(conn, profile_id)
+    tweets = list_tweet_accounts(conn, profile_id)
+    urls = list_url_sources(conn, profile_id)
+    emails = list_email_receivers_with_lang(conn, profile_id)
+    has_sources = bool(rss or tweets or urls)
+
+    checks = []
+
+    # 1. At least one source
+    checks.append({
+        "label": "At least one source configured (RSS, URL, or Twitter)",
+        "ok": has_sources,
+        "message": "" if has_sources else "Add at least one RSS feed, URL source, or Twitter account in Configure.",
+    })
+
+    # 2. Email receiver
+    checks.append({
+        "label": "Email receiver configured",
+        "ok": bool(emails),
+        "message": "" if emails else "Add at least one email receiver in Configure.",
+    })
+
+    # 3. AI Core credentials
+    ai_vars = [
+        "LEGAL_EAGLE_SAP_AICORE_BASE_URL",
+        "LEGAL_EAGLE_SAP_AICORE_CLIENT_ID",
+        "LEGAL_EAGLE_SAP_AICORE_CLIENT_SECRET",
+        "LEGAL_EAGLE_SAP_AICORE_CHAT_DEPLOYMENT_ID",
+    ]
+    missing_ai = [v for v in ai_vars if not os.environ.get(v)]
+    checks.append({
+        "label": "SAP AI Core credentials set",
+        "ok": not missing_ai,
+        "message": "" if not missing_ai else f"Missing env vars: {', '.join(missing_ai)}",
+    })
+
+    # 4. Twitter token — only if profile has Twitter accounts
+    if tweets:
+        twitter_token = os.environ.get("LEGAL_EAGLE_TWITTER_BEARER_TOKEN", "")
+        try:
+            from agents.tweet_feed import get_twitter_error_flag
+            tw_error, _ = get_twitter_error_flag(profile_id, conn)
+        except Exception:
+            tw_error = None
+        twitter_ok = bool(twitter_token) and not tw_error
+        msg = ""
+        if not twitter_token:
+            msg = "LEGAL_EAGLE_TWITTER_BEARER_TOKEN env var is not set."
+        elif tw_error:
+            msg = f"Twitter API error flagged: {tw_error}"
+        checks.append({
+            "label": "Twitter API token valid",
+            "ok": twitter_ok,
+            "message": msg,
+        })
+
+    conn.close()
+    ready = all(c["ok"] for c in checks)
+    from flask import jsonify
+    return jsonify({"checks": checks, "ready": ready})
+
+
+@app.route("/admin/profiles/<int:profile_id>/review/translate", methods=["POST"])
+def admin_review_translate(profile_id: int):
+    """Batch-translate review items to English via SAP AI Core."""
+    from flask import jsonify, request as _req
+    data = _req.get_json(force=True, silent=True) or {}
+    items = data.get("items", [])
+    if not items:
+        return jsonify({"translations": {}})
+
+    # Build compact batch for the prompt (id + title + first 300 chars of content)
+    batch = []
+    for it in items:
+        batch.append({
+            "id": str(it.get("id", "")),
+            "source": str(it.get("item_source", "")),
+            "title": (it.get("title") or "")[:200],
+            "content": (it.get("content") or "")[:300],
+        })
+
+    import json as _json
+    prompt_content = _json.dumps(batch, ensure_ascii=False)
+    system_msg = (
+        "You are a professional legal translator. Translate the given items to English. "
+        "Return a JSON object with key 'translations', whose value is an array of objects, "
+        "each with: id (string), title_en (string), content_en (string). "
+        "Keep translations concise and accurate. Preserve proper nouns."
+    )
+
+    try:
+        from agents.email_sender import _get_ai_client
+        client = _get_ai_client()
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": system_msg},
+                {"role": "user", "content": prompt_content},
+            ],
+            temperature=0.2,
+            response_format={"type": "json_object"},
+        )
+        result_text = response.choices[0].message.content.strip()
+        result = _json.loads(result_text)
+        # Normalise to {id: {title_en, content_en}} dict
+        translations = {}
+        for t in result.get("translations", []):
+            translations[str(t.get("id", ""))] = {
+                "title_en": t.get("title_en", ""),
+                "content_en": t.get("content_en", ""),
+            }
+        return jsonify({"translations": translations})
+    except Exception as e:
+        return jsonify({"translations": {}, "error": str(e)}), 200
 
 
 # Run Flask

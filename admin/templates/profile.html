@@ -413,9 +413,14 @@
               {% if s.mode == 'recursive' %}
               <form method="post" action="{{ url_for('update_url_source_route', profile_id=profile.id) }}">
                 <input type="hidden" name="url" value="{{ s.url }}">
-                
+
                 <h4 style="margin: 0 0 var(--sapSpacingM) 0; color: var(--sapBrandColor);">Edit URL Source</h4>
-                
+
+                <div style="margin-bottom: var(--sapSpacingM);">
+                  <label class="sapForm-label">URL *</label>
+                  <input class="sapForm-input" name="new_url" value="{{ s.url }}" placeholder="https://..." style="width:100%" required>
+                </div>
+
                 <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--sapSpacingM); margin-bottom: var(--sapSpacingM);">
                   <div>
                     <label class="sapForm-label">Sample Link (optional)</label>
@@ -440,104 +445,37 @@
                   <input class="sapForm-input" name="url_date_template" value="{{ s.url_date_template or '' }}" placeholder="https://example.com/{DD}.{MM}.{YYYY}" style="width: 100%;">
                   <span class="sapForm-help">For sites where each day has its own URL. Leave blank for normal scraping. Use {DD}, {MM}, {YYYY} as date placeholders.</span>
                 </div>
-                
+
                 <hr style="margin: var(--sapSpacingL) 0; border: 0; border-top: 1px solid var(--sapGroup_ContentBorderColor);">
                 <h4 style="margin-bottom: var(--sapSpacingM); color: var(--sapBrandColor);">Recursive Crawl Settings</h4>
-                
+
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--sapSpacingM); margin-bottom: var(--sapSpacingM);">
                   <div>
                     <label class="sapForm-label">Max Depth (1-5)</label>
-                    <input class="sapForm-input" type="number" name="max_depth" value="{{ s.max_depth or 3 }}" min="1" max="5" required>
+                    <input class="sapForm-input" type="number" name="max_depth" value="{{ s.max_depth or 3 }}" min="1" max="5">
                   </div>
                   <div>
                     <label class="sapForm-label">Max Results (1-100)</label>
-                    <input class="sapForm-input" type="number" name="max_results" value="{{ s.max_results or 20 }}" min="1" max="100" required>
+                    <input class="sapForm-input" type="number" name="max_results" value="{{ s.max_results or 20 }}" min="1" max="100">
                   </div>
                 </div>
-                
+
                 <div style="margin-bottom: var(--sapSpacingM);">
                   <label class="sapForm-label">Allowed Domains (one per line)</label>
-                  <textarea class="sapForm-textarea" name="allowed_domains" rows="3" required>{{ s.allowed_domains or '' }}</textarea>
+                  <textarea class="sapForm-textarea" name="allowed_domains" rows="3">{{ s.allowed_domains or '' }}</textarea>
                   <span class="sapForm-help">Only follow links to these domains</span>
                 </div>
-                
+
                 <div style="margin-bottom: var(--sapSpacingM);">
                   <label class="sapForm-label">Path Filter (optional)</label>
                   <input class="sapForm-input" name="path_filter" value="{{ s.path_filter or '' }}" placeholder="e.g., /novedades/">
                   <span class="sapForm-help">Only follow links with this in path</span>
                 </div>
-                
+
                 <div style="display: flex; gap: var(--sapSpacingS);">
                   <button type="submit" class="sapBtn sapBtn-emphasized">Save Changes</button>
                   <button type="button" class="sapBtn" onclick="toggleEditRow('edit-{{ loop.index }}')">Cancel</button>
                 </div>
-              {% else %}
-              <form method="post" action="{{ url_for('update_url_source_route', profile_id=profile.id) }}">
-                <input type="hidden" name="url" value="{{ s.url }}">
-                
-                <h4 style="margin: 0 0 var(--sapSpacingM) 0; color: var(--sapBrandColor);">Edit URL Source Settings</h4>
-                
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--sapSpacingM); margin-bottom: var(--sapSpacingM);">
-                  <div>
-                    <label class="sapForm-label">Sample Link (optional)</label>
-                    <input class="sapForm-input" name="sample_link" value="{{ s.sample_link or '' }}" placeholder="https://example.gov/news/12345">
-                  </div>
-                  <div>
-                    <label class="sapForm-label">Read More Label (optional)</label>
-                    <input class="sapForm-input" name="read_more_label" value="{{ s.read_more_label or '' }}" placeholder="e.g., اقرأ المزيد">
-                  </div>
-                  <div>
-                    <label class="sapForm-label">Crawl Type</label>
-                    <select class="sapForm-select" name="mode" id="edit{{ loop.index }}UrlMode" onchange="toggleRecursiveFields('edit{{ loop.index }}')">
-                      <option value="auto" {% if s.mode == 'auto' %}selected{% endif %}>Auto-detect</option>
-                      <option value="force_static" {% if s.mode == 'force_static' %}selected{% endif %}>Static HTML</option>
-                      <option value="force_dynamic" {% if s.mode == 'force_dynamic' %}selected{% endif %}>Dynamic</option>
-                      <option value="recursive" {% if s.mode == 'recursive' %}selected{% endif %}>Recursive</option>
-                    </select>
-                  </div>
-                </div>
-                <div style="margin-bottom: var(--sapSpacingM);">
-                  <label class="sapForm-label">URL Date Template (optional)</label>
-                  <input class="sapForm-input" name="url_date_template" value="{{ s.url_date_template or '' }}" placeholder="https://example.com/{DD}.{MM}.{YYYY}" style="width: 100%;">
-                  <span class="sapForm-help">For sites where each day has its own URL. Leave blank for normal scraping. Use {DD}, {MM}, {YYYY} as date placeholders.</span>
-                </div>
-                
-                <!-- Recursive Mode Fields (hidden by default) -->
-                <div id="edit{{ loop.index }}RecursiveFields" style="display: none;">
-                  <hr style="margin: var(--sapSpacingL) 0; border: 0; border-top: 1px solid var(--sapGroup_ContentBorderColor);">
-                  <h4 style="margin-bottom: var(--sapSpacingM); color: var(--sapBrandColor);">Recursive Crawl Settings</h4>
-                  
-                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--sapSpacingM);">
-                    <div class="sapForm-group">
-                      <label class="sapForm-label">Max Depth</label>
-                      <input class="sapForm-input" type="number" name="max_depth" value="{{ s.max_depth or 3 }}" min="1" max="5">
-                      <span class="sapForm-help">How many levels to follow links (1-5)</span>
-                    </div>
-                    <div class="sapForm-group">
-                      <label class="sapForm-label">Max Results</label>
-                      <input class="sapForm-input" type="number" name="max_results" value="{{ s.max_results or 20 }}" min="1" max="100">
-                      <span class="sapForm-help">Stop after finding N articles</span>
-                    </div>
-                  </div>
-                  
-                  <div class="sapForm-group">
-                    <label class="sapForm-label">Allowed Domains (one per line)</label>
-                    <textarea class="sapForm-textarea" name="allowed_domains" rows="3" placeholder="sede.agenciatributaria.gob.es&#10;www2.agenciatributaria.gob.es">{{ s.allowed_domains or '' }}</textarea>
-                    <span class="sapForm-help">Only follow links to these domains</span>
-                  </div>
-                  
-                  <div class="sapForm-group">
-                    <label class="sapForm-label">Path Filter (optional)</label>
-                    <input class="sapForm-input" name="path_filter" value="{{ s.path_filter or '' }}" placeholder="e.g., /novedades/ or news">
-                    <span class="sapForm-help">Only follow links containing this text in the path</span>
-                  </div>
-                </div>
-                
-                <div style="display: flex; gap: var(--sapSpacingS);">
-                  <button type="submit" class="sapBtn sapBtn-emphasized">Save Changes</button>
-                  <button type="button" class="sapBtn" onclick="toggleEditRow('edit-{{ loop.index }}')">Cancel</button>
-                </div>
-              {% endif %}
               </form>
             </td>
           </tr>

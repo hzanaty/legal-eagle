@@ -244,7 +244,7 @@
             <td>
               <span class="sapBadge sapBadge-neutral">{{ item.source_type or 'unknown' }}</span>
             </td>
-            <td>
+            <td data-news-id="{{ item.id }}" data-item-source="{{ item.item_source }}">
               <div style="font-weight: 600; margin-bottom: var(--sapSpacingXS);">
                 {{ item.title or '(No title)' }}
               </div>
@@ -494,5 +494,64 @@ function openL2SModal(newsId, title) {
 document.getElementById('l2sModal').addEventListener('click', function(e) {
   if (e.target === this) this.style.display = 'none';
 });
+
+{% if profile.language and profile.language != 'en' %}
+// Auto-translate: profile language is {{ profile.language }}, fetch EN translations
+(function() {
+  var profileId = {{ profile.id }};
+  var cells = document.querySelectorAll('td[data-news-id]');
+  if (!cells.length) return;
+
+  var items = [];
+  cells.forEach(function(cell) {
+    var id = cell.getAttribute('data-news-id');
+    var source = cell.getAttribute('data-item-source');
+    var titleEl = cell.querySelector('div[style*="font-weight: 600"]');
+    var contentEl = cell.querySelectorAll('div')[1];
+    items.push({
+      id: id,
+      item_source: source,
+      title: titleEl ? titleEl.textContent.trim() : '',
+      content: contentEl ? contentEl.textContent.trim() : '',
+    });
+    // Add placeholder
+    if (!cell.querySelector('.en-translation')) {
+      var placeholder = document.createElement('div');
+      placeholder.className = 'en-translation';
+      placeholder.style.cssText = 'margin-top:6px;padding:6px 8px;background:#f0f5ff;border-left:3px solid #0070f3;border-radius:0 4px 4px 0;font-size:12px;color:#333;display:none';
+      placeholder.innerHTML = '<span style="font-size:10px;font-weight:700;color:#0070f3;text-transform:uppercase;letter-spacing:.5px">EN</span> <span class="en-text">Translating...</span>';
+      cell.appendChild(placeholder);
+      placeholder.style.display = 'block';
+    }
+  });
+
+  fetch('/admin/profiles/' + profileId + '/review/translate', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({items: items}),
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    var tr = data.translations || {};
+    cells.forEach(function(cell) {
+      var id = cell.getAttribute('data-news-id');
+      var t = tr[id];
+      var placeholder = cell.querySelector('.en-translation');
+      if (!placeholder) return;
+      if (t && (t.title_en || t.content_en)) {
+        var text = (t.title_en ? t.title_en : '') + (t.content_en ? ' — ' + t.content_en : '');
+        placeholder.querySelector('.en-text').textContent = text;
+      } else {
+        placeholder.style.display = 'none';
+      }
+    });
+  })
+  .catch(function() {
+    document.querySelectorAll('.en-translation').forEach(function(el) {
+      el.style.display = 'none';
+    });
+  });
+})();
+{% endif %}
 </script>
 {% endblock %}
