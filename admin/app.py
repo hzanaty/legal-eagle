@@ -2051,6 +2051,58 @@ def serve_resource_file(filename: str):
     return send_from_directory(resources_dir, filename)
 
 
+@app.route("/admin/import-config", methods=["POST"])
+def admin_import_config():
+    """Import BTP seed data from btp_seed_data.json. Protected by admin secret."""
+    secret = request.form.get("secret", "").strip()
+    expected = os.environ.get("LEGAL_EAGLE_ADMIN_SECRET", "")
+    if not expected or secret != expected:
+        from flask import abort
+        abort(403)
+
+    seed_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "scripts", "btp_seed_data.json")
+    if not os.path.exists(seed_file):
+        flash("btp_seed_data.json not found — run export_config.py locally and cf push first.", "error")
+        return redirect(url_for("admin_dashboard"))
+
+    import json as _json
+    with open(seed_file, "r", encoding="utf-8") as f:
+        data = _json.load(f)
+
+    tables = [
+        "profiles", "url_sources", "rss_feeds", "tweet_accounts", "email_receivers",
+        "glossary_terms", "glossary_synonyms", "glossary_patterns", "repo_nodes", "repo_assets",
+    ]
+
+    conn = get_connection()
+    create_schema_if_needed(conn)
+    conn.execute("PRAGMA foreign_keys = OFF")
+    for table in reversed(tables):
+        conn.execute(f"DELETE FROM {table}")
+    conn.commit()
+    conn.execute("PRAGMA foreign_keys = ON")
+
+    total = 0
+    for table in tables:
+        rows = data.get(table, [])
+        if not rows:
+            continue
+        cols = list(rows[0].keys())
+        placeholders = ", ".join("?" for _ in cols)
+        col_names = ", ".join(cols)
+        for row in rows:
+            conn.execute(
+                f"INSERT OR IGNORE INTO {table} ({col_names}) VALUES ({placeholders})",
+                [row[c] for c in cols],
+            )
+        conn.commit()
+        total += len(rows)
+
+    conn.close()
+    flash(f"Config imported: {total} rows across {len(tables)} tables.", "success")
+    return redirect(url_for("admin_dashboard"))
+
+
 @app.route("/admin/profiles/<int:profile_id>/preflight")
 def admin_preflight(profile_id: int):
     """Pre-run checklist — returns JSON {checks: [{label, ok, message}], ready: bool}."""
