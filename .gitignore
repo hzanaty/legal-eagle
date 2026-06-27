@@ -16,6 +16,10 @@ __pycache__/
 # Playwright/browser caches (local snapshots)
 snapshots/
 .playwright-mcp/
+
+# Superpowers local files (Claude tooling, not part of project)
+.superpowers/
+docs/superpowers/
 # Test run artifacts (ignore local test outputs written by scripts)
 scripts/test_runs/
 scripts/archive/
