@@ -73,7 +73,8 @@ class ANSSender:
                 return self._token
         resp = requests.post(
             self._oauth_url,
-            data={"client_id": self._client_id, "client_secret": self._client_secret},
+            auth=(self._client_id, self._client_secret),
+            data={"grant_type": "client_credentials"},
             timeout=30,
         )
         resp.raise_for_status()
