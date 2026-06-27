@@ -77,6 +77,10 @@ class ANSSender:
             data={"grant_type": "client_credentials"},
             timeout=30,
         )
+        print("[ANS] Token request to:", self._oauth_url)
+        print("[ANS] Token status:", resp.status_code)
+        if not resp.ok:
+            print("[ANS] Token error:", resp.text[:300])
         resp.raise_for_status()
         data = resp.json()
         self._token = data["access_token"]
@@ -93,8 +97,10 @@ class ANSSender:
 
     def _upsert_action(self, sid: str, recipient_email: str) -> None:
         name = "le-email-" + sid
+        url = self._url + "/cf/consumer/v1/actions"
+        print("[ANS] POST action URL:", url)
         resp = requests.post(
-            self._url + "/cf/consumer/v1/actions",
+            url,
             headers=self._headers(),
             json={
                 "name": name,
@@ -105,6 +111,7 @@ class ANSSender:
             },
             timeout=30,
         )
+        print("[ANS] Action status:", resp.status_code, resp.text[:200])
         if resp.status_code == 409:
             return
         if not resp.ok:
