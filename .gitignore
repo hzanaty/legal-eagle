@@ -41,5 +41,10 @@ archive/
 # MCP server (local development only, not part of this project)
 mcp/
 
+# Runtime files
+outputs/server.pid
+server.pid
+outputs/GR_HCM/
+
 # BTP seed data (contains email addresses — not for git, but deployed via cf push)
 scripts/btp_seed_data.json
