@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ERGANI II — Legal Change Map | GR</title>
+<style>
+  :root {
+    --sap-blue: #0a2e5c;
+    --sap-teal: #0070f2;
+    --sap-light: #f5f7fa;
+    --sap-border: #d1d9e6;
+    --done: #107e3e;
+    --planned: #0070f2;
+    --pending: #e76500;
+    --unknown: #8c8c8c;
+    --wto-color: #2c7873;
+    --ma-color: #6c3483;
+    --tbd-color: #7f8c8d;
+    --legal-color: #922b21;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: '72', 'Lucida Sans', Arial, sans-serif; background: var(--sap-light); color: #1a1a2e; font-size: 14px; }
+
+  /* ── Header ── */
+  .header { background: var(--sap-blue); color: #fff; padding: 24px 32px; }
+  .header h1 { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+  .header .meta { font-size: 12px; opacity: .8; display: flex; gap: 24px; flex-wrap: wrap; margin-top: 8px; }
+  .header .meta span { background: rgba(255,255,255,.12); padding: 3px 10px; border-radius: 12px; }
+
+  /* ── Summary Table ── */
+  .section { padding: 24px 32px; }
+  .section h2 { font-size: 16px; font-weight: 700; color: var(--sap-blue); margin-bottom: 16px; border-bottom: 2px solid var(--sap-teal); padding-bottom: 8px; }
+  table.master { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  table.master th { background: var(--sap-blue); color: #fff; padding: 10px 14px; text-align: left; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  table.master td { padding: 9px 14px; border-bottom: 1px solid var(--sap-border); font-size: 13px; vertical-align: top; }
+  table.master tr:last-child td { border-bottom: none; }
+  table.master tr:hover td { background: #f0f5ff; }
+
+  /* ── Status Badges ── */
+  .badge { display: inline-block; padding: 2px 9px; border-radius: 10px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .badge-done   { background: #e8f5e9; color: var(--done); border: 1px solid #a5d6a7; }
+  .badge-planned{ background: #e3f2fd; color: var(--planned); border: 1px solid #90caf9; }
+  .badge-pending{ background: #fff3e0; color: var(--pending); border: 1px solid #ffcc80; }
+  .badge-unknown{ background: #f5f5f5; color: var(--unknown); border: 1px solid #ccc; }
+  .badge-wto    { background: #e0f2f1; color: var(--wto-color); border: 1px solid #80cbc4; }
+  .badge-ma     { background: #f3e5f5; color: var(--ma-color); border: 1px solid #ce93d8; }
+  .badge-legal  { background: #fdecea; color: var(--legal-color); border: 1px solid #ef9a9a; }
+
+  /* ── Article Cards ── */
+  .cards { display: flex; flex-direction: column; gap: 16px; padding: 0 32px 32px; }
+  .card { background: #fff; border-radius: 10px; box-shadow: 0 1px 6px rgba(0,0,0,.08); overflow: hidden; border-left: 5px solid var(--sap-teal); }
+  .card.wto  { border-left-color: var(--wto-color); }
+  .card.ma   { border-left-color: var(--ma-color); }
+  .card.tbd  { border-left-color: var(--tbd-color); }
+
+  .card-header { padding: 14px 20px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none; }
+  .card-header:hover { background: #fafbff; }
+  .card-title { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .card-title .art  { font-size: 12px; font-weight: 700; color: #fff; background: var(--sap-blue); padding: 3px 10px; border-radius: 10px; }
+  .card-title .name { font-size: 15px; font-weight: 700; color: var(--sap-blue); }
+  .card-title .name-gr { font-size: 12px; color: #666; font-style: italic; }
+  .card-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chevron { font-size: 16px; color: #999; transition: transform .2s; }
+  .card-body { display: none; padding: 0 20px 20px; border-top: 1px solid var(--sap-border); }
+  .card-body.open { display: block; }
+  .card-body table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 13px; }
+  .card-body th { background: #f0f4fa; color: var(--sap-blue); padding: 7px 12px; text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; }
+  .card-body td { padding: 7px 12px; border-bottom: 1px solid #eef0f5; vertical-align: top; }
+  .card-body tr:last-child td { border-bottom: none; }
+  .card-body h4 { font-size: 12px; font-weight: 700; color: var(--sap-blue); margin: 16px 0 6px; text-transform: uppercase; letter-spacing: .5px; }
+  .it-badge { display: inline-block; background: #e8eaf6; color: #3949ab; border: 1px solid #9fa8da; border-radius: 4px; padding: 1px 7px; font-size: 11px; font-weight: 700; margin-right: 4px; white-space: nowrap; }
+  .field-code { font-family: 'Courier New', monospace; font-size: 12px; color: #555; background: #f8f8f8; padding: 1px 5px; border-radius: 3px; border: 1px solid #ddd; }
+  .file-ref { display: inline-block; background: #fff8e1; color: #f57f17; border: 1px solid #ffe082; border-radius: 4px; padding: 2px 8px; font-size: 11px; margin: 2px 2px 2px 0; }
+  .jira-ref { display: inline-block; background: #e3f2fd; color: #1565c0; border: 1px solid #90caf9; border-radius: 4px; padding: 2px 8px; font-size: 11px; font-weight: 600; margin: 2px 2px 2px 0; }
+  a.jira-ref { text-decoration: none; }
+  a.jira-ref:hover { text-decoration: underline; }
+  .badge-epic { display: inline-block; background: #1a237e; color: #fff; border: 1px solid #3949ab; border-radius: 4px; padding: 2px 8px; font-size: 11px; font-weight: 700; margin: 2px 2px 2px 0; white-space: nowrap; }
+  a.badge-epic { text-decoration: none; }
+  a.badge-epic:hover { opacity: .85; }
+  .note { background: #fffde7; border-left: 3px solid #f9a825; padding: 8px 12px; font-size: 12px; color: #555; margin-top: 12px; border-radius: 0 4px 4px 0; }
+  .default-val { font-family: monospace; background: #f0fff4; color: #2e7d32; padding: 1px 5px; border-radius: 3px; border: 1px solid #a5d6a7; font-size: 12px; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; }
+  @media (max-width: 768px) { .two-col { grid-template-columns: 1fr; } .section, .cards { padding-left: 16px; padding-right: 16px; } }
+
+  /* WTO card layout grids */
+  .wto-top { display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; }
+  .wto-mid { display: grid; grid-template-columns: 1fr 1.5fr; gap: 0 24px; }
+  @media (max-width: 768px) { .wto-top, .wto-mid { grid-template-columns: 1fr; } }
+  /* Source badge — from ERGANI official guide screenshots */
+  .src-guide { background: #e3f2fd; color: #0d47a1; border: 1px solid #90caf9; border-radius: 10px; padding: 2px 8px; font-size: 10px; font-weight: 700; white-space: nowrap; display: inline-block; margin: 1px 0; }
+
+  /* MA card layout grids */
+  .ma-top { display: grid; grid-template-columns: minmax(200px,1fr) minmax(300px,2.5fr); gap: 0 24px; }
+  .ma-mid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; }
+  .ma-bot { display: grid; grid-template-columns: 1fr 1.4fr 1fr; gap: 0 24px; }
+  .ma-ref { display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; }
+  @media (max-width: 1100px) { .ma-bot { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 768px) { .ma-top, .ma-mid, .ma-bot, .ma-ref { grid-template-columns: 1fr; } }
+  a.card-jump { color: var(--sap-blue); font-weight: 700; text-decoration: none; cursor: pointer; }
+  a.card-jump:hover { text-decoration: underline; color: var(--sap-teal); }
+
+  /* ── Source Badges ── */
+  .src-prd  { background: #e8f5e9; color: #1b5e20; border: 1px solid #a5d6a7; border-radius: 10px; padding: 2px 8px; font-size: 10px; font-weight: 700; white-space: nowrap; display: inline-block; margin: 1px 0; }
+  .src-us   { background: #fff3e0; color: #e65100; border: 1px solid #ffcc80; border-radius: 10px; padding: 2px 8px; font-size: 10px; font-weight: 700; white-space: nowrap; display: inline-block; margin: 1px 0; }
+  .src-ddic { background: #f3e5f5; color: #6a1b9a; border: 1px solid #ce93d8; border-radius: 10px; padding: 2px 8px; font-size: 10px; font-weight: 700; white-space: nowrap; display: inline-block; margin: 1px 0; }
+  .src-tbc  { background: #fdecea; color: #c62828; border: 1px solid #ef9a9a; border-radius: 10px; padding: 2px 8px; font-size: 10px; font-weight: 700; white-space: nowrap; display: inline-block; margin: 1px 0; }
+
+  /* ── Legal Change Summary Panel ── */
+  .summary-panel { background: #fffde7; border-left: 5px solid #f9a825; border-radius: 0 6px 6px 0; padding: 16px 24px; font-size: 13px; color: #333; line-height: 1.7; }
+  .summary-panel h4 { color: #7f6000; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
+  .summary-panel p { margin-bottom: 6px; }
+  .abolish-callout { background: #fff8e1; border: 1px solid #ffe082; border-radius: 4px; padding: 10px 14px; margin-top: 12px; font-weight: 600; font-size: 13px; color: #7f6000; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════
+     HEADER
+════════════════════════════════════════════ -->
+<div class="header">
+  <h1>ERGANI II — Legal Change Breakdown Map</h1>
+  <div style="font-size:13px;opacity:.9;margin-top:4px;">Greece (GR) · HCM Localization · SAP Payroll GR + SF ECP</div>
+  <div class="meta">
+    <span>📋 Decision 32689/12.12.2025</span>
+    <span>📰 ΦΕΚ Β' 6745 / 16-12-2025</span>
+    <span>📅 Effective: 16.02.2026</span>
+    <span>🔗 Amends: Decision 40331/Δ1.13521/13-9-2019</span>
+    <span>👤 Consultant: Vassilis Stamatopoulos</span>
+    <span>📁 Epic: GSREQSE-15293</span>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     LEGAL CHANGE SUMMARY
+════════════════════════════════════════════ -->
+<div class="section" style="padding-bottom:0;">
+  <div class="summary-panel">
+    <h4>Legal Change Summary — Decision 32689 / ΦΕΚ Β' 6745 / 16.12.2025</h4>
+    <p>Ministerial Decision 32689/12.12.2025 amends Decision 40331/Δ1.13521/13-9-2019. It introduces a new framework of digital declarations for work time organization, employment changes, hiring, termination, collective agreements, and work card reporting under ERGANI II. Effective 16 February 2026.</p>
+    <p>The decision covers Articles 2.1, 2.3, 2.4 (incl. sub-sections 2A-A through 2A-E), 2.6, 2.7, 2.8, 2.10, and 2.11 — each mapped to a specific XML schema replacing or superseding prior ERGANI I reporting mechanisms.</p>
+    <div class="abolish-callout">⚠️ All legacy E-forms (E1–E12) are abolished by this decision. No dual submission. ERGANI II digital declarations are the sole reporting channel as of 16.02.2026. Customers no longer submit E3, E4, E5, E6, E7, E10, E11, or any other E-series form.</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     MASTER MAP TABLE
+════════════════════════════════════════════ -->
+<div class="section">
+  <h2>Master Map — Quick Reference</h2>
+  <table class="master">
+    <thead>
+      <tr>
+        <th>Article</th>
+        <th>ERGANI II Declaration</th>
+        <th>Govt. Data Collected</th>
+        <th>Greek Name</th>
+        <th>Old E-Form</th>
+        <th>XML Schema</th>
+        <th>SAP Infotypes</th>
+        <th>New Jira</th>
+        <th>Old Jira</th>
+        <th>JIRA Name (Internal)</th>
+        <th>JIRA Title (External / RCM)</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a href="#card-wto" onclick="jumpToCard('card-wto')" class="card-jump">2.4 / 2A-B</a></td>
+        <td>Digital Work Time Org — Leave/Absences</td>
+        <td style="font-size:12px;color:#333;">Employee ID, absence type code, reference year, quota days requested</td>
+        <td style="font-style:italic;color:#666;">Ψηφιακή Οργάνωση Χρόνου — Άδειες</td>
+        <td><span class="badge badge-unknown">No direct predecessor</span> <span class="badge badge-legal" style="font-size:10px;">Related: E11 (special purpose leave — different scope, abolished)</span></td>
+        <td><span class="badge badge-wto">WTO</span></td>
+        <td>IT2001, IT2006, PTQUODED</td>
+        <td><a class="badge-epic" href="https://jira.tools.sap/browse/GSREQSE-15293" target="_blank">GSREQSE-15293</a> <a class="jira-ref" href="https://jira.tools.sap/browse/GSREQSE-15331" target="_blank">GSREQSE-15331</a></td>
+        <td style="font-size:12px;color:#555;">No E-form predecessor — WTO_v2 updates the original WTO schema (base ERGANI II system, no prior JIRA delivery)</td>
+        <td style="font-family:monospace;font-size:12px;color:#1a237e;">LC - GR - Work Time Org Absences - XML Update WTO to WTO_v2</td>
+        <td style="font-family:monospace;font-size:12px;color:#1a237e;">ERGANI II – Art. 2.4/2A-B – Update XML for Work Time Organization — Leave/Absences (WTO_v2)</td>
+        <td><span class="badge badge-done">✅ Done</span></td>
+      </tr>
+      <tr>
+        <td><a href="#card-ma" onclick="jumpToCard('card-ma')" class="card-jump">2.3</a></td>
+        <td>Digital Employment Relationship Modification</td>
+        <td style="font-size:12px;color:#333;">Employee personal data, change reason code (17 types), new salary, contract type, work schedule, insurance funds</td>
+        <td style="font-style:italic;color:#666;">Ψηφιακή Δήλωση Μεταβολής Εργασιακής Σχέσης</td>
+        <td><span class="badge badge-ma">E4 (colloquial)</span></td>
+        <td><span class="badge badge-ma">MA_v1</span></td>
+        <td>IT0001, IT0002, IT0185, IT3219, IT3220, IT0008, IT0016, IT0007</td>
+        <td><a class="badge-epic" href="https://jira.tools.sap/browse/GSREQSE-15293" target="_blank">GSREQSE-15293</a> <a class="jira-ref" href="https://jira.tools.sap/browse/GSREQSE-16012" target="_blank">GSREQSE-16012</a></td>
+        <td style="font-size:12px;color:#555;"><a class="badge-epic" href="https://jira.tools.sap/browse/GSREQSE-1420" target="_blank">GSREQSE-1420</a> <a class="jira-ref" href="https://jira.tools.sap/browse/GSREQSE-1421" target="_blank">GSREQSE-1421</a> (2021, E4 XML Creation) + <a class="badge-epic" href="https://jira.tools.sap/browse/GSREQSE-1763" target="_blank">GSREQSE-1763</a> <a class="jira-ref" href="https://jira.tools.sap/browse/GSREQSE-1764" target="_blank">GSREQSE-1764</a> (2022, exec status IT3219 → f_xaraktirismos carried into MA_v1). ERGANI II Phase A <a class="badge-epic" href="https://jira.tools.sap/browse/GSREQSE-2240" target="_blank">GSREQSE-2240</a>: <a class="jira-ref" href="https://jira.tools.sap/browse/GSREQSE-2293" target="_blank">GSREQSE-2293</a> stable + <a class="jira-ref" href="https://jira.tools.sap/browse/GSREQSE-2294" target="_blank">GSREQSE-2294</a> variable. ERGANI II Phase B <a class="badge-epic" href="https://jira.tools.sap/browse/GSREQSE-2850" target="_blank">GSREQSE-2850</a>: <a class="jira-ref" href="https://jira.tools.sap/browse/GSREQSE-2851" target="_blank">GSREQSE-2851</a> B' Phase.</td>
+        <td style="font-family:monospace;font-size:12px;color:#1a237e;">LC - GR - Employment Relationship Modification - XML Update E4 to MA_v1</td>
+        <td style="font-family:monospace;font-size:12px;color:#1a237e;">ERGANI II – Art. 2.3 – Update XML for Employment Relationship Modification (MA_v1)</td>
+        <td><span class="badge badge-pending">🟠 In Progress</span></td>
+      </tr>
+      <tr>
+        <td><a href="#card-hiring" onclick="jumpToCard('card-hiring')" class="card-jump">2.1</a></td>
+        <td>Digital Work Commencement Notification</td>
+        <td style="font-size:12px;color:#333;">Employee personal/contract data, hire date, position, contract type, work location</td>
+        <td style="font-style:italic;color:#666;">Ψηφιακή Αναγγελία Έναρξης Εργασίας</td>
+        <td><span class="badge badge-legal">E3 / E4 (hiring)</span></td>
+        <td><span class="badge badge-unknown">TBD</span></td>
+        <td>TBD</td>
+        <td><a class="badge-epic" href="https://jira.tools.sap/browse/GSREQSE-15293" target="_blank">GSREQSE-15293</a> <a class="jira-ref" href="https://jira.tools.sap/browse/GSREQSE-16014" target="_blank">GSREQSE-16014</a></td>
+        <td style="font-size:12px;color:#555;"><a class="badge-epic" href="https://jira.tools.sap/browse/GSREQSE-1420" target="_blank">GSREQSE-1420</a> <a class="jira-ref" href="https://jira.tools.sap/browse/GSREQSE-1421" target="_blank">GSREQSE-1421</a> (2021) — ERGANI I E4 XML Creation. ERGANI II <a class="badge-epic" href="https://jira.tools.sap/browse/GSREQSE-2240" target="_blank">GSREQSE-2240</a>: <a class="jira-ref" href="https://jira.tools.sap/browse/GSREQSE-2241" target="_blank">GSREQSE-2241</a> — E3 mass hiring.</td>
+        <td style="font-family:monospace;font-size:12px;color:#1a237e;">LC - GR - Work Commencement Notification - XML Update E3/E4</td>
+        <td style="font-family:monospace;font-size:12px;color:#1a237e;">ERGANI II – Art. 2.1 – Update XML for Work Commencement Notification</td>
+        <td><span class="badge badge-planned">🔵 Open</span></td>
+      </tr>
+      <tr>
+        <td><a href="#card-termination" onclick="jumpToCard('card-termination')" class="card-jump">2.7</a></td>
+        <td>Digital Contract Termination Notification</td>
+        <td style="font-size:12px;color:#333;">Employee ID, termination type (E5/E6/E7), termination date, termination reason</td>
+        <td style="font-style:italic;color:#666;">Ψηφιακή Αναγγελία Λύσης/Λήξης Σύμβασης</td>
+        <td><span class="badge badge-legal">E5 / E6 / E7</span></td>
+        <td><span class="badge badge-unknown">TBD</span></td>
+        <td>TBD</td>
+        <td><a class="badge-epic" href="https://jira.tools.sap/browse/GSREQSE-15293" target="_blank">GSREQSE-15293</a> <a class="jira-ref" href="https://jira.tools.sap/browse/GSREQSE-16016" target="_blank">GSREQSE-16016</a></td>
+        <td style="font-size:12px;color:#555;"><a class="badge-epic" href="https://jira.tools.sap/browse/GSREQSE-1290" target="_blank">GSREQSE-1290</a> <a class="jira-ref" href="https://jira.tools.sap/browse/GSREQSE-1291" target="_blank">GSREQSE-1291</a> (2021) — E5/E6/E7 XML for termination. Vassilis. ERGANI II scope TBD.</td>
+        <td style="font-family:monospace;font-size:12px;color:#1a237e;">LC - GR - Contract Termination Notification - XML Update E5/E6/E7</td>
+        <td style="font-family:monospace;font-size:12px;color:#1a237e;">ERGANI II – Art. 2.7 – Update XML for Contract Termination Notification</td>
+        <td><span class="badge badge-planned">🔵 Open</span></td>
+      </tr>
+      <tr>
+        <td><a href="#card-sixthday" onclick="jumpToCard('card-sixthday')" class="card-jump">2.6</a></td>
+        <td>Sixth Day Employer Statement</td>
+        <td style="font-size:12px;color:#333;">Employer authorization for 6th working day: employee ID, date, hours, extra compensation type — <span style="color:#e76500;font-weight:600;">new digital req, no HR precedent — confirm scope with Vassilis</span></td>
+        <td style="font-style:italic;color:#666;">Ψηφιακή Δήλωση Στοιχείων Εργοδότη για Έκτη Ημέρα</td>
+        <td><span class="badge badge-unknown">No E-code</span></td>
+        <td><span class="badge badge-unknown">TBD</span></td>
+        <td>TBD</td>
+        <td><a class="badge-epic" href="https://jira.tools.sap/browse/GSREQSE-15293" target="_blank">GSREQSE-15293</a> <a class="jira-ref" href="https://jira.tools.sap/browse/GSREQSE-16018" target="_blank">GSREQSE-16018</a></td>
+        <td style="font-size:12px;color:#555;">No predecessor — new ERGANI II requirement</td>
+        <td style="font-family:monospace;font-size:12px;color:#1a237e;">LC - GR - Sixth Day Employer Statement - XML New Declaration</td>
+        <td style="font-family:monospace;font-size:12px;color:#1a237e;">ERGANI II – Art. 2.6 – New XML Declaration for Sixth Day Employer Statement</td>
+        <td><span class="badge badge-planned">🔵 Open</span></td>
+      </tr>
+      <tr>
+        <td><a href="#card-collective" onclick="jumpToCard('card-collective')" class="card-jump">2.8</a></td>
+        <td>Company Collective Agreement Posting</td>
+        <td style="font-size:12px;color:#333;">Collective agreement text, parties, duration, wage scales, agreement type</td>
+        <td style="font-style:italic;color:#666;">Ανάρτηση Επιχειρησιακής Συλλογικής Σύμβασης</td>
+        <td><span class="badge badge-legal">E10</span></td>
+        <td><span class="badge badge-unknown">TBD</span></td>
+        <td>TBD</td>
+        <td><a class="badge-epic" href="https://jira.tools.sap/browse/GSREQSE-15293" target="_blank">GSREQSE-15293</a> <a class="jira-ref" href="https://jira.tools.sap/browse/GSREQSE-16020" target="_blank">GSREQSE-16020</a></td>
+        <td style="font-size:12px;color:#555;"><a class="jira-ref" href="https://jira.tools.sap/browse/GSREQSE-3461" target="_blank">GSREQSE-3461</a> (2023) — Collective Agreements (payroll calculation context only — not the E10 XML reporting predecessor). ERGANI II scope TBD.</td>
+        <td style="font-family:monospace;font-size:12px;color:#1a237e;">LC - GR - Collective Agreement Posting - XML Update E10</td>
+        <td style="font-family:monospace;font-size:12px;color:#1a237e;">ERGANI II – Art. 2.8 – Update XML for Collective Agreement Posting (E10)</td>
+        <td><span class="badge badge-planned">🔵 Open</span></td>
+      </tr>
+      <tr>
+        <td><a href="#card-workcard" onclick="jumpToCard('card-workcard')" class="card-jump">2.11</a></td>
+        <td>Digital Work Card Declarations</td>
+        <td style="font-size:12px;color:#333;">Real-time clock-in/clock-out per employee: work start/end timestamp, work location — <span style="color:#e76500;font-weight:600;">time-tracking, not payroll master data — confirm scope with Vassilis</span></td>
+        <td style="font-style:italic;color:#666;">Ψηφιακές Δηλώσεις για Ψηφιακή Κάρτα Εργασίας</td>
+        <td><span class="badge badge-unknown">No E-code (new)</span></td>
+        <td><span class="badge badge-unknown">TBD</span></td>
+        <td>TBD</td>
+        <td><a class="badge-epic" href="https://jira.tools.sap/browse/GSREQSE-15293" target="_blank">GSREQSE-15293</a> <a class="jira-ref" href="https://jira.tools.sap/browse/GSREQSE-16022" target="_blank">GSREQSE-16022</a></td>
+        <td style="font-size:12px;color:#555;">ERGANI II 2022 <a class="badge-epic" href="https://jira.tools.sap/browse/GSREQSE-2240" target="_blank">GSREQSE-2240</a>: <a class="jira-ref" href="https://jira.tools.sap/browse/GSREQSE-2300" target="_blank">GSREQSE-2300</a> — EEs Card In-Out XML + <a class="jira-ref" href="https://jira.tools.sap/browse/GSREQSE-2654" target="_blank">GSREQSE-2654</a> — Clock-in/out JSON upload. Work Card delivered 2022; 2025 re-scope TBD.</td>
+        <td style="font-family:monospace;font-size:12px;color:#1a237e;">LC - GR - Work Card Declarations - XML New Declaration</td>
+        <td style="font-family:monospace;font-size:12px;color:#1a237e;">ERGANI II – Art. 2.11 – New XML Declaration for Work Card Declarations</td>
+        <td><span class="badge badge-planned">🔵 Open</span></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     ARTICLE CARDS
+════════════════════════════════════════════ -->
+<div class="section" style="padding-bottom:8px;">
+  <h2>Article Detail Cards</h2>
+</div>
+<div class="cards">
+
+  <!-- ══ CARD: Art 2.4 WTO_v2 ══ -->
+  <div class="card wto" id="card-wto">
+    <div class="card-header" onclick="toggle(this)">
+      <div class="card-title">
+        <span class="art">Art. 2.4 / 2A-B</span>
+        <div>
+          <div class="name">Digital Work Time Organization — Leave / Absences</div>
+          <div class="name-gr">Ψηφιακή Οργάνωση Χρόνου Εργασίας — Άδειες</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="card-badges">
+          <span class="badge badge-wto">WTO</span>
+          <span class="badge badge-unknown">No legacy E-code</span>
+          <span class="badge badge-done">✅ Done — GSREQSE-15331</span>
+        </div>
+        <span class="chevron">▼</span>
+      </div>
+    </div>
+    <div class="card-body">
+
+      <!-- ── Row 1: Declaration Overview | Mapping 1 ── -->
+      <div class="wto-top">
+        <div>
+          <h4>Declaration Overview</h4>
+          <table>
+            <tr><th>Attribute</th><th>Value</th></tr>
+            <tr><td>XML Schema</td><td><span class="badge badge-wto">WTO</span></td></tr>
+            <tr><td>XML Namespace</td><td><span class="field-code">http://www.yeka.gr/WTO</span></td></tr>
+            <tr><td>XML Structure</td><td><span class="field-code">WTOS → WTO</span> (employer) → <span class="field-code">Ergazomenoi → ErgazomenoiWTO</span> (employee+date) → <span class="field-code">ErgazomenosAnalytics → ErgazomenosWTOAnalytics</span> (shift/absence)</td></tr>
+            <tr><td>E-series equivalent</td><td>None — WTO has no E-form predecessor. Decision 32689/12.12.2025 added F_year + F_req_days to the existing WTO schema.</td></tr>
+            <tr><td>SAP Program</td><td><span class="field-code">HGRLE2V0</span> (updated) · BAdI: <span class="field-code">HR_GR_ERGANI2</span></td></tr>
+            <tr><td>F_year / F_req_days scope</td><td>Written only when IT2001 SUBTY matches selection screen <span class="field-code">s_abssub</span> (leave day subtypes — <strong>customer-configurable</strong>). All other absences: fields left empty.</td></tr>
+            <tr><td>Products</td><td>SAP Payroll Greece · SF Employee Central Payroll</td></tr>
+            <tr><td>Legal ref</td><td>ΦΕΚ Β' 6745/16-12-2025 · Effective 16.02.2026</td></tr>
+          </table>
+          <div class="note">EC Time-off → ECP: Standard replication covers IT2001 and IT2006 automatically. No additional localization needed for EC customers.</div>
+          <div class="note">E11 (special purpose leave) is abolished by Decision 32689/12.12.2025. All leave reporting in ERGANI II is through WTO. See Legal Change Summary above.</div>
+        </div>
+        <div>
+          <h4>Mapping 1 — How f_type is derived</h4>
+          <div class="note" style="margin-bottom:10px;">For every absence record, the program looks up T7GR1HR19 using IT2001 AWART. If found: f_type = EABCD (full-day) or EABCH (hourly). If not found: absence is silently skipped in XML.</div>
+          <table>
+            <tr><th>AWART</th><th>SAP Description</th><th>f_type (ERGANI Code)</th><th>Greek</th><th>English</th></tr>
+            <tr><td><span class="field-code">0100</span></td><td>Annual Leave</td><td><span class="field-code">ΑΔΚΑΝ</span></td><td>Κανονική άδεια</td><td>Regular annual leave</td></tr>
+            <tr><td><span class="field-code">0300</span></td><td>Illness ≤3 days</td><td><span class="field-code">ΑΔΑΣ</span></td><td>Άδεια ασθένειας</td><td>Sick leave</td></tr>
+            <tr><td><span class="field-code">0305</span></td><td>Illness &gt;3 days</td><td><span class="field-code">ΑΔΑΣ</span></td><td>Άδεια ασθένειας</td><td>Sick leave</td></tr>
+            <tr><td><span class="field-code">0330</span></td><td>Maternity leave</td><td><span class="field-code">ΑΔΜΗ</span></td><td>Άδεια μητρότητας</td><td>Maternity leave</td></tr>
+            <tr><td><span class="field-code">0335</span></td><td>Maternity over entitlement</td><td><span class="field-code">ΑΔΜΗ</span></td><td>Άδεια μητρότητας</td><td>Maternity leave</td></tr>
+            <tr><td><span class="field-code">0500</span></td><td>Unpaid Leave</td><td><span class="field-code">ΑΔΑΑ</span></td><td>Άδεια άνευ αποδοχών</td><td>Unpaid leave</td></tr>
+            <tr style="background:#fdecea;"><td colspan="5" style="font-size:12px;color:#c62828;">⚠️ Only 6 standard entries in QK8/002. Customer must add rows in T7GR1HR19 for all other absence types — otherwise those absences are silently excluded from the XML. ABNOD=true → not reported. ABDDO=true → reported even on rest days.</td></tr>
+          </table>
+
+          <!-- Other ERGANI codes — collapsible -->
+          <h4 style="cursor:pointer;user-select:none;margin-top:14px;" onclick="toggleSection(this)">
+            <span class="chevron" style="font-size:13px;margin-right:6px;display:inline-block;transition:transform .2s;">▶</span>Other ERGANI II Leave Type Codes (no T7GR1HR19 mapping in standard)
+          </h4>
+          <div class="other-codes-body" style="display:none;">
+            <div class="note" style="margin-bottom:8px;">Source: T7GR1HR18 (QK8/002 — 34 valid codes total; 4 covered above). These 30 codes are valid ERGANI codes with no SAP AWART mapping in standard. Customer must configure T7GR1HR19 to use them.</div>
+            <table>
+              <tr><th>ERGANI Code</th><th>Greek Description</th><th>English Description</th><th>Category</th></tr>
+              <tr><td><span class="field-code">ΑΔΑΙΜ</span></td><td>Αιμοδοτική άδεια</td><td>Blood donation leave</td><td>Day Leave</td></tr>
+              <tr><td><span class="field-code">ΑΔΕΞ</span></td><td>Άδεια εξετάσεων</td><td>Study / exam leave</td><td>Day Leave</td></tr>
+              <tr><td><span class="field-code">ΑΔΠΠΜ</span></td><td>Ειδική παροχή προστασίας μητρότητας</td><td>Special maternity protection</td><td>Day Leave</td></tr>
+              <tr><td><span class="field-code">ΑΔΠΑ</span></td><td>Άδεια πατρότητας</td><td>Paternity leave</td><td>Day Leave</td></tr>
+              <tr><td><span class="field-code">ΑΔΦΠ</span></td><td>Άδεια φροντίδας παιδιού</td><td>Childcare leave</td><td>Day Leave</td></tr>
+              <tr><td><span class="field-code">ΑΔΓΟΝ</span></td><td>Γονική άδεια</td><td>Parental leave</td><td>Day Leave</td></tr>
+              <tr><td><span class="field-code">ΑΔΦΡΟ</span></td><td>Άδεια φροντιστή</td><td>Carer's leave</td><td>Day Leave</td></tr>
+              <tr><td><span class="field-code">ΑΔΑΠΑΒ</span></td><td>Απουσία λόγω ανωτέρας βίας</td><td>Force majeure</td><td>Day Leave</td></tr>
+              <tr><td><span class="field-code">ΑΔΙΥΑ</span></td><td>Άδεια ιατρικώς υποβοηθούμενης αναπαραγωγής</td><td>IVF leave</td><td>Day Leave</td></tr>
+              <tr><td><span class="field-code">ΑΔΠΕ</span></td><td>Άδεια εξετάσεων προγεννητικού ελέγχου</td><td>Prenatal check-up</td><td>Day Leave</td></tr>
+              <tr><td><span class="field-code">ΑΔΓΑΜ</span></td><td>Άδεια γάμου</td><td>Marriage leave</td><td>Day Leave</td></tr>
+              <tr><td><span class="field-code">ΑΔΣΝΠ</span></td><td>Άδεια λόγω σοβαρών νοσημάτων παιδιών</td><td>Child serious illness</td><td>Day Leave</td></tr>
+              <tr><td><span class="field-code">ΑΔΝΠ</span></td><td>Άδεια λόγω νοσηλείας παιδιών</td><td>Child hospitalisation</td><td>Day Leave</td></tr>
+              <tr><td><span class="field-code">ΑΔΜΟ</span></td><td>Άδεια μονογονεϊκών οικογενειών</td><td>Single-parent leave</td><td>Day Leave</td></tr>
+              <tr><td><span class="field-code">ΑΔΠΣΕΤ</span></td><td>Άδεια παρακολούθησης σχολικής επίδοσης</td><td>Child school performance</td><td>Day Leave</td></tr>
+              <tr><td><span class="field-code">ΑΔΑΠΕΜ</span></td><td>Άδεια λόγω ασθένειας εξαρτώμενου μέλους</td><td>Dependent illness</td><td>Day Leave</td></tr>
+              <tr><td><span class="field-code">ΑΔΑΠΣΚ</span></td><td>Απουσία λόγω κινδύνου βίας/παρενόχλησης</td><td>Violence/harassment</td><td>Day Leave</td></tr>
+              <tr><td><span class="field-code">ΑΔΑΜΕΑ</span></td><td>Άδεια απουσίας ΑΜΕΑ</td><td>Disability leave</td><td>Day Leave</td></tr>
+              <tr><td><span class="field-code">ΑΔΘΣΥΓ</span></td><td>Άδεια λόγω θανάτου συγγενούς</td><td>Bereavement leave</td><td>Day Leave</td></tr>
+              <tr><td><span class="field-code">ΑΔΑΝΣΠ</span></td><td>Άδεια ανήλικων σπουδαστών</td><td>Minor student leave</td><td>Day Leave</td></tr>
+              <tr><td><span class="field-code">ΑΔΜΑΑ</span></td><td>Άδεια για μεταγγίσεις/αιμοκάθαρση</td><td>Transfusion/dialysis</td><td>Day Leave</td></tr>
+              <tr><td><span class="field-code">ΑΔΕΚΦ</span></td><td>Εκπαιδευτική άδεια ΚΑΝΕΠ-ΓΣΕΕ</td><td>Educational leave</td><td>Day Leave</td></tr>
+              <tr><td><span class="field-code">ΑΔΣΕΑΑ</span></td><td>Άδεια λόγω AIDS</td><td>AIDS leave</td><td>Day Leave</td></tr>
+              <tr><td><span class="field-code">ΑΔΕΡΕ</span></td><td>Ευέλικτες ρυθμίσεις εργασίας</td><td>Flexible arrangements</td><td>Day Leave</td></tr>
+              <tr><td><span class="field-code">ΑΔΑΛ</span></td><td>Άδεια Άλλη</td><td>Other leave — catch-all</td><td>Day Leave</td></tr>
+              <tr><td><span class="field-code">ΩΑΦΠ</span></td><td>Άδεια φροντίδας παιδιού ωρών</td><td>Childcare — hours</td><td>Hour-leave</td></tr>
+              <tr><td><span class="field-code">ΩΑΓΟΝ</span></td><td>Γονική άδεια ωρών</td><td>Parental — hours</td><td>Hour-leave</td></tr>
+              <tr><td><span class="field-code">ΩΑΑΠΑΒ</span></td><td>Απουσία ανωτέρας βίας ωρών</td><td>Force majeure — hours</td><td>Hour-leave</td></tr>
+              <tr><td><span class="field-code">ΩΑΕΡΕ</span></td><td>Ευέλικτες ρυθμίσεις ωρών</td><td>Flexible — hours</td><td>Hour-leave</td></tr>
+              <tr><td><span class="field-code">ΩΑΠΕ</span></td><td>Άδεια προγεννητικού ελέγχου ωρών</td><td>Prenatal check — hours</td><td>Hour-leave</td></tr>
+              <tr><td><span class="field-code">ΩΑΠΣΕΤ</span></td><td>Άδεια σχολικής επίδοσης ωρών</td><td>School performance — hours</td><td>Hour-leave</td></tr>
+              <tr><td><span class="field-code">ΩΑΑΛ</span></td><td>Άδεια Άλλη ωρών</td><td>Other — hours</td><td>Hour-leave</td></tr>
+            </table>
+          </div><!-- /other-codes-body -->
+        </div>
+      </div>
+
+      <!-- ── Row 2: SAP→XML Mapping (left, tall) | Mapping 2 + Selpar + Errors (right, stacked) ── -->
+      <div class="wto-top" style="margin-top:16px;align-items:start;">
+        <div>
+          <h4>SAP Infotypes → XML Field Mapping</h4>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;font-size:11px;align-items:center;">
+            <strong style="color:#555;">Source:</strong>
+            <span><span class="src-ddic">QK8 ✓</span> Validated from HGRLE2V0 source on QK8/002</span>
+            <span><span class="src-prd">PRD</span> Vassilis PRD — new fields</span>
+          </div>
+          <table>
+            <tr><th>XML Level</th><th>XML Field</th><th>SAP Source</th><th>Description</th><th style="width:80px">Source</th></tr>
+            <tr>
+              <td rowspan="6" style="font-weight:700;color:var(--sap-blue);vertical-align:top;">Employer<br><span style="font-weight:400;font-size:11px;">WTO element</span></td>
+              <td><span class="field-code">f_aa_pararthmatos</span></td><td><span class="it-badge">T7GR1HR10</span> DEPAR</td><td>Branch serial number (Α/Α Παραρτήματος)</td><td><span class="src-ddic">QK8 ✓</span></td>
+            </tr>
+            <tr><td><span class="field-code">f_rel_protocol</span></td><td><span class="it-badge">T7GR1HR10</span> PROTOCOL</td><td>Related protocol number</td><td><span class="src-ddic">QK8 ✓</span></td></tr>
+            <tr><td><span class="field-code">f_rel_date</span></td><td><span class="it-badge">T7GR1HR10</span> DATE_PROTOCOL</td><td>Protocol date (DD/MM/YYYY)</td><td><span class="src-ddic">QK8 ✓</span></td></tr>
+            <tr><td><span class="field-code">f_comments</span></td><td>Selection screen <span class="field-code">p_comm</span></td><td>Free text comment</td><td><span class="src-ddic">QK8 ✓</span></td></tr>
+            <tr><td><span class="field-code">f_from_date</span></td><td>Selection screen <span class="field-code">p_begda</span></td><td>Period from (DD/MM/YYYY) — empty in absences mode</td><td><span class="src-ddic">QK8 ✓</span></td></tr>
+            <tr><td><span class="field-code">f_to_date</span></td><td>Selection screen <span class="field-code">p_endda</span></td><td>Period to (DD/MM/YYYY) — empty in absences mode</td><td><span class="src-ddic">QK8 ✓</span></td></tr>
+            <tr>
+              <td rowspan="4" style="font-weight:700;color:var(--sap-blue);vertical-align:top;">Employee<br><span style="font-weight:400;font-size:11px;">ErgazomenoiWTO element</span></td>
+              <td><span class="field-code">f_afm</span></td><td><span class="it-badge">IT3219</span> AFM (P3219)</td><td>Employee tax number</td><td><span class="src-ddic">QK8 ✓</span></td>
+            </tr>
+            <tr><td><span class="field-code">f_eponymo</span></td><td><span class="it-badge">IT0002</span> NACHN (P0002)</td><td>Last name</td><td><span class="src-ddic">QK8 ✓</span></td></tr>
+            <tr><td><span class="field-code">f_onoma</span></td><td><span class="it-badge">IT0002</span> VORNA (P0002), max 30 chars</td><td>First name</td><td><span class="src-ddic">QK8 ✓</span></td></tr>
+            <tr><td><span class="field-code">f_date</span></td><td>Absence date (loop variable)</td><td>Date of absence (DD/MM/YYYY)</td><td><span class="src-ddic">QK8 ✓</span></td></tr>
+            <tr>
+              <td rowspan="5" style="font-weight:700;color:var(--sap-blue);vertical-align:top;">Analytics<br><span style="font-weight:400;font-size:11px;">ErgazomenosWTOAnalytics element</span></td>
+              <td><span class="field-code">f_type</span></td><td><span class="it-badge">T7GR1HR19</span> EABCD (daily) / EABCH (hourly)</td><td>ERGANI absence code (e.g. ΑΔΚΑΝ). Driven by IT2001 AWART → T7GR1HR19 lookup.</td><td><span class="src-ddic">QK8 ✓</span></td>
+            </tr>
+            <tr><td><span class="field-code">f_from</span></td><td><span class="it-badge">IT2001</span> BEGUZ (P2001)</td><td>Start time (HH:MM) — empty for full-day absences (ALLDF=X)</td><td><span class="src-ddic">QK8 ✓</span></td></tr>
+            <tr><td><span class="field-code">f_to</span></td><td><span class="it-badge">IT2001</span> ENDUZ (P2001)</td><td>End time (HH:MM) — empty for full-day absences</td><td><span class="src-ddic">QK8 ✓</span></td></tr>
+            <tr style="background:#f0fff4;">
+              <td><span class="field-code" style="font-weight:700;">F_year</span> <span class="badge badge-wto" style="font-size:9px;padding:1px 6px;">NEW</span></td>
+              <td><span class="it-badge">PA2006</span> BEGDA (year portion)</td>
+              <td><strong>Quota reference year.</strong> Filled only when SUBTY ∈ <span class="field-code">s_abssub</span>. Derived via 4-step chain — see right.</td>
+              <td><span class="src-prd">PRD</span></td>
+            </tr>
+            <tr style="background:#f0fff4;">
+              <td><span class="field-code" style="font-weight:700;">F_req_days</span> <span class="badge badge-wto" style="font-size:9px;padding:1px 6px;">NEW</span></td>
+              <td><span class="it-badge">IT2006</span> ANZHL sum (P2006)</td>
+              <td><strong>Total quota days for reference year.</strong> Sum of IT2006 ANZHL where SUBTY ∈ <span class="field-code">s_abqsub</span> and BEGDA ≠ ENDDA.</td>
+              <td><span class="src-prd">PRD</span></td>
+            </tr>
+          </table>
+        </div>
+        <div>
+          <h4>Mapping 2 — How F_year and F_req_days are derived</h4>
+          <div class="note" style="margin-bottom:10px;">Only triggered when IT2001 SUBTY ∈ <span class="field-code">s_abssub</span>. Implemented in method <span class="field-code">modify_absence_shifts</span> of <span class="field-code">lcl_hgrle2v0_work_schedule</span>.</div>
+          <table>
+            <tr><th>Step</th><th>Object</th><th>Key Condition</th><th>Output</th></tr>
+            <tr>
+              <td><strong>1</strong></td>
+              <td><span class="it-badge">IT2001</span> P2001</td>
+              <td>PERNR + BEGDA/ENDDA = absence date<br>SUBTY ∈ <span class="field-code">s_abssub</span></td>
+              <td><span class="field-code">DOCNR</span></td>
+            </tr>
+            <tr>
+              <td><strong>2</strong></td>
+              <td><span class="it-badge">PTQUODED</span></td>
+              <td>DOCNR + DATUM + PERNR</td>
+              <td><span class="field-code">QUONR</span></td>
+            </tr>
+            <tr>
+              <td><strong>3</strong></td>
+              <td><span class="it-badge">PA2006</span></td>
+              <td>PERNR + SUBTY ∈ <span class="field-code">s_abqsub</span> + QUONR</td>
+              <td><span class="field-code">BEGDA</span> → <strong>F_year</strong> = BEGDA[1:4]</td>
+            </tr>
+            <tr>
+              <td><strong>4</strong></td>
+              <td><span class="it-badge">IT2006</span> P2006</td>
+              <td>PERNR + SUBTY ∈ <span class="field-code">s_abqsub</span><br>Full quota year · BEGDA ≠ ENDDA</td>
+              <td>SUM ANZHL → <strong>F_req_days</strong></td>
+            </tr>
+          </table>
+          <div class="note" style="margin-top:8px;">If any step yields no result: F_year and F_req_days are written as empty elements — no error raised.</div>
+
+          <h4 style="margin-top:16px;">Selection Screen Parameters (key)</h4>
+          <table>
+            <tr><th>Param</th><th>Internal</th><th>Description</th></tr>
+            <tr><td><span class="field-code">s_abssub</span></td><td>leave_day_subtype</td><td>IT2001 subtypes that trigger F_year/F_req_days lookup. Customer configures their own absence type codes here.</td></tr>
+            <tr><td><span class="field-code">s_abqsub</span></td><td>leave_day_quota_subtype</td><td>IT2006 quota subtypes to sum for F_req_days.</td></tr>
+            <tr><td><span class="field-code">p_abs</span></td><td>absences</td><td>Run in Absences mode — required for F_year/F_req_days to be written to XML.</td></tr>
+            <tr><td><span class="field-code">p_bukrs</span></td><td>bukrs</td><td>Company code filter.</td></tr>
+            <tr><td><span class="field-code">s_depar</span></td><td>depar</td><td>Department (branch) filter.</td></tr>
+          </table>
+
+          <h4 style="margin-top:16px;">Error Conditions (F_year / F_req_days chain)</h4>
+          <table>
+            <tr><th>Condition</th><th>Result</th></tr>
+            <tr><td>SUBTY not in <span class="field-code">s_abssub</span></td><td>F_year + F_req_days left empty</td></tr>
+            <tr><td>No QUONR in PTQUODED</td><td>F_year + F_req_days left empty — no quota document linked</td></tr>
+            <tr><td>No BEGDA in PA2006</td><td>F_year + F_req_days left empty — quota exists but no begin date</td></tr>
+          </table>
+          <div class="note" style="margin-top:8px;">The PRD provides a model function (placeholder <span class="field-code">zzzzzzzzzz</span>) as guidance. The actual implementation uses method <span class="field-code">modify_absence_shifts</span> — same logic, integrated directly in HGRLE2V0.</div>
+        </div>
+      </div>
+
+      <!-- ── Source Files ── -->
+      <h4>Source Files</h4>
+      <span class="file-ref">📄 input/PRD/GR/ERGANI II – Update XML WTO_v2 for Absences PRD.docx</span>
+      <span class="file-ref">📖 input/Resources/GR/WTO_Digital_Card.pdf (ERGANI II official guide, ed. 30.06.2025)</span>
+      <span class="file-ref">🔬 input/Resources/GR/ERGANI II – Update XML WTO_v2 for Absences TechRef.md (SAP Tech Ref — QK8/002 validated)</span>
+    </div>
+  </div>
+
+  <!-- ══ CARD: Art 2.3 MA_v1 ══ -->
+  <div class="card ma" id="card-ma">
+    <div class="card-header" onclick="toggle(this)">
+      <div class="card-title">
+        <span class="art">Art. 2.3</span>
+        <div>
+          <div class="name">Digital Employment Relationship Modification</div>
+          <div class="name-gr">Ψηφιακή Δήλωση Μεταβολής Στοιχείων Εργασιακής Σχέσης</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="card-badges">
+          <span class="badge badge-ma">MA_v1</span>
+          <span class="badge badge-ma">E4 (colloquial)</span>
+          <span class="badge badge-planned">🔵 In Progress — <a class="jira-ref" href="https://jira.tools.sap/browse/GSREQSE-16012" target="_blank">GSREQSE-16012</a></span>
+        </div>
+        <span class="chevron">▼</span>
+      </div>
+    </div>
+    <div class="card-body">
+
+      <!-- ── Band 1: Declaration Overview | New DB Objects ── -->
+      <div class="ma-top">
+        <div>
+          <h4>Declaration Overview</h4>
+          <table>
+            <tr><th>Attribute</th><th>Value</th></tr>
+            <tr><td>XML Schema</td><td><span class="badge badge-ma">MA_v1</span></td></tr>
+            <tr><td>XML Namespace</td><td><span class="field-code">http://www.yeka.gr/MA</span></td></tr>
+            <tr><td>XML Root</td><td><span class="field-code">AnaggeliesMA → AnaggeliaMA</span></td></tr>
+            <tr><td>E-series name</td><td>E4 (colloquial — Vassilis uses this term; MA_v1 is the actual schema name)</td></tr>
+            <tr><td>SAP Program</td><td><span class="field-code">HGRLLIA4</span> (new — copy of HGRLLIA1)</td></tr>
+            <tr><td>PRD Author</td><td>Vassilis Stamatopoulos (April 30, 2026 · v1.2 updated 28.5.2026)</td></tr>
+            <tr><td>Products</td><td>SAP Payroll Greece · SF Employee Central Payroll</td></tr>
+            <tr><td>Legal ref</td><td>ΦΕΚ Β' 6745/16-12-2025 · Effective 16.02.2026</td></tr>
+          </table>
+        </div>
+        <div>
+          <h4>New DB Objects (PRD-required)</h4>
+          <table>
+            <tr><th>Table</th><th>Description</th><th>Key Fields</th><th>Value Fields</th></tr>
+            <tr>
+              <td><span class="field-code">T7GR1ERG1</span></td>
+              <td>Customizing: SAP field value → ERGANI reason code mapping. Used for IT8 and IT0016 PREAS. IT3219/IT3220 logic is hardcoded — no mapping needed.</td>
+              <td>MANDT, INFOTYPE, SUBTYPE, FIELDNAME, SAP_VAL1</td>
+              <td>ERGANI_VAL2 (reason 001–016/999)</td>
+            </tr>
+            <tr>
+              <td><span class="field-code">T7GR1ERG2</span></td>
+              <td>Employee image — snapshot of master data fields by infotype for change detection. Enables program to determine which f_typos_metabolhs to report. Added 28.5.2026.</td>
+              <td>MANDT, PERNR, AEDTM (last changed), BEGDA, INFOTYPE, SUBTYPE, FIELDNAME</td>
+              <td>SAP_VAL1 (field value), ERGANI_VAL2 (reason at change time)</td>
+            </tr>
+            <tr>
+              <td><span class="field-code">T7GR1HR24</span></td>
+              <td>Main insurance fund codes</td>
+              <td colspan="2">001 e-EFKA · 002 Naval veterans · 003 Bank of Greece</td>
+            </tr>
+            <tr>
+              <td><span class="field-code">T7GR1HR25</span></td>
+              <td>Supplementary insurance fund codes</td>
+              <td colspan="2">001 e-EFKA ancillary · 002 e-TEKA · 003 ETEAPEP · 004 TEAYFE · 005 TEAYET · 006 TEA-EAPAE · 007 EDOEAP · 008 MTPY · 009 Bank of Greece · 010 KEAN</td>
+            </tr>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── Band 2: Change Reason Codes + Ref Data + PDF Uploads (left) | SAP Infotypes → XML (right, tall) ── -->
+      <div class="ma-mid" style="margin-top:16px;align-items:start;">
+        <div>
+          <h4>Change Reason Codes (f_typos_metabolhs)</h4>
+          <table>
+            <tr><th>Code</th><th>Description (EN)</th><th>Greek</th><th>SAP Infotype</th></tr>
+            <tr><td><span class="field-code">001</span></td><td>Salary change — legislation</td><td>Μεταβολή αποδοχών λόγω νομοθεσίας</td><td><span class="it-badge">IT0008</span></td></tr>
+            <tr><td><span class="field-code">002</span></td><td>Salary change — agreement</td><td>Μεταβολή αποδοχών κατόπιν συμφωνίας</td><td><span class="it-badge">IT0008</span></td></tr>
+            <tr><td><span class="field-code">003</span></td><td>Acquire managerial status</td><td>Κτήση ιδιότητας διευθυντικού στελέχους</td><td><span class="it-badge">IT3219</span> EXEC: blank→1/2</td></tr>
+            <tr><td><span class="field-code">004</span></td><td>Lose managerial status</td><td>Απώλεια ιδιότητας διευθυντικού στελέχους</td><td><span class="it-badge">IT3219</span> EXEC: 1/2→blank</td></tr>
+            <tr><td><span class="field-code">005</span></td><td>Fixed-term contract extension</td><td>Παράταση ισχύος σύμβασης ορισμένου χρόνου</td><td><span class="it-badge">IT0016</span> PREAS</td></tr>
+            <tr><td><span class="field-code">006</span></td><td>Fixed-term → permanent</td><td>Μετατροπή ορισμένου σε αορίστου χρόνου</td><td><span class="it-badge">IT0016</span> PREAS</td></tr>
+            <tr><td><span class="field-code">007</span></td><td>Part-time / rotating → full-time</td><td>Μετατροπή μερικής / εκ περιτροπής σε πλήρη</td><td><span class="it-badge">IT0016</span> PREAS</td></tr>
+            <tr><td><span class="field-code">008</span></td><td>Full-time → part-time</td><td>Μετατροπή πλήρους σε μερική</td><td><span class="it-badge">IT0016</span> PREAS</td></tr>
+            <tr><td><span class="field-code">009</span></td><td>Change of specialty</td><td>Μεταβολή ειδικότητας</td><td><span class="it-badge">IT3220</span> SPIKA</td></tr>
+            <tr><td><span class="field-code">010</span></td><td>Change of work location</td><td>Μεταβολή τόπου παροχής εργασίας</td><td><span class="it-badge">IT3220</span> DEPAR</td></tr>
+            <tr><td><span class="field-code">011</span></td><td>Register for digital work card</td><td>Ένταξη στην ψηφιακή κάρτα</td><td>Manual ALV</td></tr>
+            <tr><td><span class="field-code">012</span></td><td>Loaned worker</td><td>Δανεισμός εργαζόμενου</td><td>Manual ALV</td></tr>
+            <tr><td><span class="field-code">013</span></td><td>Digital Work Time Org changes</td><td>Αλλαγές Ψηφιακής Οργάνωσης Χρόνου</td><td>Manual ALV</td></tr>
+            <tr><td><span class="field-code">014</span></td><td>Full-time → rotating (bilateral)</td><td>Μετατροπή πλήρους σε εκ περιτροπής</td><td><span class="it-badge">IT0016</span> PREAS</td></tr>
+            <tr><td><span class="field-code">015</span></td><td>Full-time → rotating (unilateral)</td><td>Μετατροπή πλήρους σε εκ περιτροπής (μονομερώς)</td><td><span class="it-badge">IT0016</span> PREAS</td></tr>
+            <tr><td><span class="field-code">016</span></td><td>Work time arrangement</td><td>Διευθέτηση του χρόνου εργασίας</td><td>Manual ALV</td></tr>
+            <tr><td><span class="field-code">999</span></td><td>Other</td><td>Άλλο / Άλλη περίπτωση</td><td>Manual ALV</td></tr>
+          </table>
+
+          <h4 style="margin-top:16px;">Reference Data Tables</h4>
+          <table>
+            <tr><th>XML Field</th><th>Table / Source</th><th>Codes</th></tr>
+            <tr>
+              <td><span class="field-code">f_kyria_asfalish</span></td>
+              <td>Main social insurance funds.xlsx</td>
+              <td><span class="field-code">001</span> e-EFKA · <span class="field-code">002</span> Naval veterans · <span class="field-code">003</span> Bank of Greece</td>
+            </tr>
+            <tr>
+              <td><span class="field-code">f_epikouriki_kod</span></td>
+              <td>Supplementary social insurance funds.xlsx</td>
+              <td><span class="field-code">001</span> e-EFKA ancillary · <span class="field-code">002</span> e-TEKA · <span class="field-code">003</span> ETEAPEP · <span class="field-code">004</span> TEAYFE · <span class="field-code">005</span> TEAYET · <span class="field-code">006</span> TEA-EAPAE · <span class="field-code">007</span> EDOEAP · <span class="field-code">008</span> MTPY · <span class="field-code">009</span> Bank of Greece · <span class="field-code">010</span> KEAN</td>
+            </tr>
+          </table>
+
+          <h4 style="margin-top:16px;">PDF File Uploads (within XML)</h4>
+          <table>
+            <tr><th>XML Field</th><th>Document</th><th>Mandatory</th></tr>
+            <tr><td><span class="field-code">f_file</span></td><td>Acceptance of Material Terms form</td><td>Yes</td></tr>
+            <tr><td><span class="field-code">f_foreign_file</span></td><td>Legalization docs for third-country citizen access to labor market</td><td>No</td></tr>
+            <tr><td><span class="field-code">f_young_file</span></td><td>Underage worker booklet</td><td>No</td></tr>
+            <tr><td><span class="field-code">f_epibolh_file</span></td><td>Decision to impose a system of employment rotation</td><td>No</td></tr>
+          </table>
+        </div>
+        <div>
+          <h4>SAP Infotypes → XML Fields Mapping</h4>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;font-size:11px;align-items:center;">
+            <strong style="color:#555;">Source:</strong>
+            <span><span class="src-prd">PRD</span> Vassilis PRD — explicit</span>
+            <span><span class="src-us">INFERRED</span> Added by us</span>
+            <span><span class="src-ddic">QK8 ✓</span> Live DDIC validated</span>
+            <span><span class="src-tbc">TBC</span> Unconfirmed</span>
+          </div>
+          <table>
+            <tr><th>Infotype</th><th>SAP Field</th><th>XML Field</th><th>Notes</th><th style="width:120px">Source</th></tr>
+            <tr>
+              <td><span class="it-badge">IT0001</span> Org Assignment</td>
+              <td><strong>BUKRS</strong> — Company Code<br><strong>BTRTL</strong> — Personnel Subarea<br><strong>WERKS</strong> — Personnel Area<br><strong>DEPAR</strong> — Department</td>
+              <td><span class="field-code">f_aa_pararthmatos</span> <span class="field-code">f_ypiresia_sepe</span> <span class="field-code">f_kad_pararthmatos</span> <span class="field-code">f_kallikratis_pararthmatos</span></td>
+              <td>Via T7GR1HR10 lookup</td>
+              <td><span class="src-prd">PRD</span></td>
+            </tr>
+            <tr>
+              <td><span class="it-badge">IT0002</span> Personal Data</td>
+              <td><strong>NACHN</strong> — Last Name<br><strong>VORNA</strong> — First Name<br><strong>GBDAT</strong> — Date of Birth<br><strong>GESCH</strong> — Gender<br><strong>LNAMR</strong> — Father's Name<br><strong>NABIR</strong> — Mother's Name</td>
+              <td><span class="field-code">f_eponymo</span> <span class="field-code">f_onoma</span> <span class="field-code">f_birthdate</span> <span class="field-code">f_sex</span> <span class="field-code">f_onoma_patros</span> <span class="field-code">f_onoma_mitros</span></td>
+              <td>Date format: DD/MM/YYYY. NACHN/VORNA/GBDAT/GESCH from PRD. LNAMR/NABIR inferred — not in PRD.</td>
+              <td><span class="src-prd">PRD</span><br><span class="src-us">INFERRED</span> (LNAMR, NABIR)</td>
+            </tr>
+            <tr>
+              <td><span class="it-badge">IT0185</span> Personal IDs</td>
+              <td><strong>NATIO</strong> — Nationality<br><strong>SUBTY</strong> — Document Type<br><strong>IDNUM</strong> — ID Number<br><strong>ISAUT</strong> — Issuing Authority<br><strong>ISSDT</strong> — Issue Date<br><strong>EXPDT</strong> — Expiry Date</td>
+              <td><span class="field-code">f_yphkoothta</span> <span class="field-code">f_typos_taytothtas</span> <span class="field-code">f_ar_taytothtas</span> <span class="field-code">f_ekdousa_arxh</span> <span class="field-code">f_date_ekdosis</span> <span class="field-code">f_date_ekdosis_lixi</span></td>
+              <td>Nationality: ISO→3-digit ERGANI code (e.g. GR→048). GRC subtypes: G2=Passport, G3=Driver's Lic, G4=Work Permit, G5=Residence Permit, G6=Adult Book, G8=National ID</td>
+              <td><span class="src-prd">PRD</span></td>
+            </tr>
+            <tr>
+              <td><span class="it-badge">IT3219</span> Payroll Data Greece</td>
+              <td><strong>AFM</strong> — Tax ID Number (AFM)<br><strong>DOY</strong> — Tax Authority (DOY)<br><strong>EXEC</strong> — Executive Status</td>
+              <td><span class="field-code">f_afm</span> <span class="field-code">f_doy</span> <span class="field-code">f_responsible_position</span></td>
+              <td>EXEC blank→1/2 = code 003; 1/2→blank = code 004</td>
+              <td><span class="src-prd">PRD</span><br><span class="src-ddic">QK8 ✓</span></td>
+            </tr>
+            <tr>
+              <td><span class="it-badge">IT3220</span> Social Insurance Greece</td>
+              <td><strong>SPIKA</strong> — Specialty IKA (PGR_SPEC_IKA)<br><strong>DEPAR</strong> — Department IKA (PGR_DEPAR)<br><strong>RGIKA</strong> — Registration Number IKA (PGR_REG_NUMB_IKA)</td>
+              <td><span class="field-code">f_eidikothta</span> <span class="field-code">f_topos_ergasias</span> <span class="field-code">f_amika</span></td>
+              <td>SPIKA change = code 009; DEPAR change = code 010. RGIKA confirmed in IT3220 (not IT3219) via QK8 DD03VT.</td>
+              <td><span class="src-prd">PRD</span> (SPIKA, DEPAR)<br><span class="src-ddic">QK8 ✓</span> (all 3)</td>
+            </tr>
+            <tr>
+              <td><span class="it-badge">IT0008</span> Basic Pay</td>
+              <td><strong>BET01</strong> — Basic Pay (→ f_apodoxes)<br><strong>BET01</strong> ÷ <strong>IT0007-WOSTD</strong> hours → f_hour_apodoxes</td>
+              <td><span class="field-code">f_apodoxes</span> <span class="field-code">f_hour_apodoxes</span></td>
+              <td>f_apodoxes = monthly amount (subtype 0); f_hour_apodoxes = derived (BET01 ÷ standard hours from IT0007). Codes 001/002 only</td>
+              <td><span class="src-prd">PRD</span></td>
+            </tr>
+            <tr>
+              <td><span class="it-badge">IT0016</span> Contract Elements</td>
+              <td><strong>PREAS</strong> — Reason for Contract Change (→ f_kathestosapasxolisis)<br><strong>PREAS</strong> via T7GR1ERG1 — (→ f_xaraktirismos)<br><strong>ANSVH</strong> — Employment Contract Type (→ f_sxeshapasxolisis)<br><strong>BEGDA</strong> — Contract Begin Date (→ f_orismenou_apo)<br><strong>ENDDA</strong> — Contract End Date (→ f_orismenou_ews)</td>
+              <td><span class="field-code">f_kathestosapasxolisis</span> <span class="field-code">f_xaraktirismos</span> <span class="field-code">f_sxeshapasxolisis</span> <span class="field-code">f_orismenou_apo</span> <span class="field-code">f_orismenou_ews</span></td>
+              <td>PREAS drives both f_kathestosapasxolisis and f_xaraktirismos via T7GR1ERG1 mapping table; Codes 005–008, 014, 015</td>
+              <td><span class="src-prd">PRD</span></td>
+            </tr>
+            <tr>
+              <td><span class="it-badge">IT0007</span> Work Schedule</td>
+              <td><strong>WOSTD</strong> — Work Schedule Rule (→ f_week_hours)<br><strong>WOSTD</strong> — Work Schedule Rule (→ f_full_employment_hours)<br><strong>WOSTD</strong> — Work Schedule Rule (→ f_week_days)<br><strong>P_E2FLEX</strong> — Flexible Hours sel. param (→ f_euelikto_wrario_minutes)<br><strong>P_E2BMIN</strong> — Break Duration sel. param (→ f_dialeimma_minutes)<br><strong>P_E2BRIN</strong> — Break Within Schedule sel. param (→ f_dialeimma_entos_wrariou)</td>
+              <td><span class="field-code">f_week_hours</span> <span class="field-code">f_full_employment_hours</span> <span class="field-code">f_week_days</span> <span class="field-code">f_euelikto_wrario_minutes</span> <span class="field-code">f_dialeimma_minutes</span> <span class="field-code">f_dialeimma_entos_wrariou</span></td>
+              <td>P_E2FLEX/BMIN/BRIN are selection screen params, not direct IT0007 fields. WOSTD drives 3 XML fields via work schedule calculation.</td>
+              <td><span class="src-prd">PRD</span></td>
+            </tr>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── Band 3: ALV Editable Fields | Default Field Values | Education Level Mapping ── -->
+      <div class="ma-bot" style="margin-top:16px;">
+        <div>
+          <h4>ALV Editable Fields (28.5.2026 update)</h4>
+          <table>
+            <tr><th>XML Field</th><th>Notes</th></tr>
+            <tr><td><span class="field-code">f_typos_metabolhs</span></td><td>Change reason code — must be editable per row</td></tr>
+            <tr><td><span class="field-code">f_xronos_katabolhs</span></td><td>Payment timing text</td></tr>
+            <tr><td><span class="field-code">f_topos_ergasias</span></td><td>Work location</td></tr>
+            <tr><td><span class="field-code">f_topos_ergasias_comments</span></td><td>Work location comments</td></tr>
+            <tr><td><span class="field-code">f_xaraktirismos</span></td><td>Employment characterization</td></tr>
+            <tr><td><span class="field-code">f_efarmostea_sillogiki_simbasi</span></td><td>Applicable collective agreement</td></tr>
+            <tr><td><span class="field-code">f_efarmostea_sillogiki_simbasi_comments</span></td><td>Collective agreement comments</td></tr>
+            <tr><td><span class="field-code">f_kyria_asfalish</span></td><td>Main insurance fund code</td></tr>
+            <tr><td><span class="field-code">f_prosthetes_asfalistikes_paraxes</span></td><td>Additional insurance benefits</td></tr>
+            <tr><td><span class="field-code">f_trial_period</span></td><td>Trial period indicator</td></tr>
+            <tr><td><span class="field-code">f_trial_date_to</span></td><td>Trial period end date</td></tr>
+            <tr><td><span class="field-code">f_borrow_type</span></td><td>Loan type (for loaned worker reason 012)</td></tr>
+            <tr><td><span class="field-code">f_borrow_date_from</span></td><td>Loan start date</td></tr>
+            <tr><td><span class="field-code">f_borrow_date_to</span></td><td>Loan end date</td></tr>
+            <tr><td><span class="field-code">f_borrow_company_afm</span></td><td>Borrowing company tax number</td></tr>
+            <tr><td><span class="field-code">f_borrow_company_eponimia</span></td><td>Borrowing company name</td></tr>
+            <tr><td><span class="field-code">f_epikouriki_kod</span></td><td>Supplementary insurance fund code</td></tr>
+          </table>
+        </div>
+        <div>
+          <h4>Default Field Values (Selection Screen)</h4>
+          <table>
+            <tr><th>XML Field</th><th>Default</th><th>Meaning</th></tr>
+            <tr><td><span class="field-code">f_efarmostea_sillogiki_simbasi</span></td><td><span class="default-val">0</span></td><td>No collective agreement applicable</td></tr>
+            <tr><td><span class="field-code">f_ipoxreotiki_katartisi</span></td><td><span class="default-val">0</span></td><td>No mandatory training</td></tr>
+            <tr><td><span class="field-code">f_working_time_digital_organization</span></td><td>Selection screen param</td><td>0=No digital work time org · 1=Yes digital work time org (user selects per run)</td></tr>
+            <tr><td><span class="field-code">f_eidos_dieuthethshs</span></td><td><span class="default-val">2</span></td><td>Work time arrangement: 0=Collective, 1=Individual, 2=None</td></tr>
+            <tr><td><span class="field-code">f_mh_problepsimo_programma</span></td><td><span class="default-val">0</span></td><td>No unpredictable work schedule</td></tr>
+            <tr><td><span class="field-code">f_week_days</span></td><td><span class="default-val">5</span></td><td>5-day work week</td></tr>
+            <tr><td><span class="field-code">f_working_card</span></td><td><span class="default-val">0</span></td><td>Not enrolled in digital work card</td></tr>
+            <tr><td><span class="field-code">f_topothetisioaed</span></td><td><span class="default-val">0</span></td><td>No OAED placement</td></tr>
+            <tr><td><span class="field-code">f_basics_acceptance</span></td><td><span class="default-val">0</span></td><td>0=with attached file · 1=waiting for acceptance within ERGANI · 2=not required</td></tr>
+            <tr><td><span class="field-code">f_xronos_katabolhs</span></td><td><span class="default-val">ΤΕΛΕΥΤΑΙΑ ΕΡΓΑΣΙΜΗ ΚΑΘΕ ΜΗΝΑ</span></td><td>Payment timing: last working day of month (text param, editable in ALV)</td></tr>
+            <tr><td><span class="field-code">f_kyria_asfalish</span></td><td><span class="default-val">001</span></td><td>Main insurance: selection screen default = e-EFKA (001). Private sector does not use 002/003.</td></tr>
+            <tr><td><span class="field-code">f_epikouriki_kod</span></td><td>Derived</td><td>No selection screen default. Logic: if P3220-TEKAR initial → 001 (EFKA-ETEAM); if P3220-TEKAR = 1 or 2 → 002 (TEKA). Domain covers 001–010.</td></tr>
+            <tr><td><span class="field-code">f_dialeimma_entos_wrariou</span></td><td>Derived</td><td>if p_e2brin not initial → 1, else → 0 (break inside work schedule)</td></tr>
+          </table>
+        </div>
+        <div>
+          <h4>Education Level Mapping (f_epipedo_morfosis)</h4>
+          <table>
+            <tr><th>SAP Code</th><th>ERGANI Code</th></tr>
+            <tr><td>01</td><td>11</td></tr><tr><td>04</td><td>2</td></tr><tr><td>05</td><td>3</td></tr>
+            <tr><td>07</td><td>4</td></tr><tr><td>08</td><td>17</td></tr><tr><td>13</td><td>9</td></tr>
+            <tr><td>14</td><td>8</td></tr><tr><td>15</td><td>12</td></tr><tr><td>19</td><td>11</td></tr>
+            <tr><td>21</td><td>10</td></tr><tr><td>22</td><td>13</td></tr><tr><td>23</td><td>13</td></tr>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── Band 4: Source Files ── -->
+      <h4>Source Files</h4>
+      <span class="file-ref">📄 input/LC/GR/ERGANI_II/GR ERGANI II E4_XML_Draft_PRD.docx</span>
+      <span class="file-ref">📋 input/LC/GR/ERGANI_II/MA_v1.xsd</span>
+      <span class="file-ref">🧪 input/LC/GR/ERGANI_II/testMA.xml</span>
+      <span class="file-ref">📊 input/LC/GR/ERGANI_II/Main social insurance funds.xlsx</span>
+      <span class="file-ref">📊 input/LC/GR/ERGANI_II/Suplementary social insurance funds.xlsx</span>
+      <span class="file-ref">⚙️ input/LC/GR/ERGANI_II/Fields with Default values.txt</span>
+      <span class="file-ref">💻 input/LC/GR/ERGANI_II/data.txt</span>
+      <span class="file-ref">💻 input/LC/GR/ERGANI_II/gt_lia.txt</span>
+    </div>
+  </div>
+
+
+  <!-- ══ CARD: Art 2.1 Hiring ══ -->
+  <div class="card tbd" id="card-hiring">
+    <div class="card-header" onclick="toggle(this)">
+      <div class="card-title">
+        <span class="art">Art. 2.1</span>
+        <div>
+          <div class="name">Digital Work Commencement Notification (Hiring)</div>
+          <div class="name-gr">Ψηφιακή Αναγγελία Έναρξης Εργασίας</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="card-badges">
+          <span class="badge badge-legal">Replaces: E3 + E4 (hiring)</span>
+          <span class="badge badge-planned">🔵 Open — <a class="jira-ref" href="https://jira.tools.sap/browse/GSREQSE-16014" target="_blank">GSREQSE-16014</a></span>
+        </div>
+        <span class="chevron">▼</span>
+      </div>
+    </div>
+    <div class="card-body">
+      <table>
+        <tr><th>Attribute</th><th>Value</th></tr>
+        <tr><td>XML Schema</td><td>TBD — to be provided by Vassilis / ministry technical spec</td></tr>
+        <tr><td>E-series replaced</td><td>E3 (hiring notification), E4 (hiring) — both consolidated into this declaration</td></tr>
+        <tr><td>Hiring types covered</td><td>Standard recruitment · Recruitment for loaning · Transfer from company · Loaning/EPA placement</td></tr>
+        <tr><td>Special rule</td><td>Submitted BEFORE work starts. Employee must accept via MyErgani. Auto-cancels if not accepted before work start.</td></tr>
+        <tr><td>Essential terms included</td><td>Per Labor Code Art. 73 — employment terms must be incorporated in the declaration</td></tr>
+        <tr><td>SAP Infotypes</td><td>TBD — likely IT0000, IT0001, IT0002, IT3219, IT3220, IT0007, IT0008, IT0016 (similar to MA_v1 but for new hire)</td></tr>
+        <tr><td>JIRA</td><td><a class="jira-ref" href="https://jira.tools.sap/browse/GSREQSE-16014" target="_blank">GSREQSE-16014</a></td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══ CARD: Art 2.7 Termination ══ -->
+  <div class="card tbd" id="card-termination">
+    <div class="card-header" onclick="toggle(this)">
+      <div class="card-title">
+        <span class="art">Art. 2.7</span>
+        <div>
+          <div class="name">Digital Contract Termination Notification</div>
+          <div class="name-gr">Ψηφιακή Αναγγελία Λύσης/Λήξης Σύμβασης Εργασίας</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="card-badges">
+          <span class="badge badge-legal">Replaces: E5 + E6 + E7</span>
+          <span class="badge badge-planned">🔵 Open — <a class="jira-ref" href="https://jira.tools.sap/browse/GSREQSE-16016" target="_blank">GSREQSE-16016</a></span>
+        </div>
+        <span class="chevron">▼</span>
+      </div>
+    </div>
+    <div class="card-body">
+      <table>
+        <tr><th>Attribute</th><th>Value</th></tr>
+        <tr><td>XML Schema</td><td>TBD</td></tr>
+        <tr><td>E-series replaced</td><td>E5 (voluntary departure) · E6 (dismissal with/without notice) · E7 (fixed-term termination)</td></tr>
+        <tr><td>Termination types covered</td><td>Voluntary departure · Harassment notice · Post-harassment departure · Dismissal without notice · Dismissal with notice · Fixed-term end · Death · Probation auto-termination · Transfer/loaning end</td></tr>
+        <tr><td>Special rules</td><td>Requires employer + employee signatures on scanned document. Certified court officer notice if employee refuses. 3+ consecutive absent days trigger: employer has 2 workdays to file.</td></tr>
+        <tr><td>SAP Infotypes</td><td>TBD — likely IT0000 (action), IT0001, IT0002, IT3219 (AFM)</td></tr>
+        <tr><td>JIRA</td><td><a class="jira-ref" href="https://jira.tools.sap/browse/GSREQSE-16016" target="_blank">GSREQSE-16016</a></td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══ CARD: Art 2.6 Sixth Day ══ -->
+  <div class="card tbd" id="card-sixthday">
+    <div class="card-header" onclick="toggle(this)">
+      <div class="card-title">
+        <span class="art">Art. 2.6</span>
+        <div>
+          <div class="name">Sixth Day Employer Statement</div>
+          <div class="name-gr">Ψηφιακή Δήλωση Στοιχείων Εργοδότη για Έκτη Ημέρα</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="card-badges">
+          <span class="badge badge-unknown">No E-code (new in ERGANI II)</span>
+          <span class="badge badge-planned">🔵 Open — <a class="jira-ref" href="https://jira.tools.sap/browse/GSREQSE-16018" target="_blank">GSREQSE-16018</a></span>
+        </div>
+        <span class="chevron">▼</span>
+      </div>
+    </div>
+    <div class="card-body">
+      <table>
+        <tr><th>Attribute</th><th>Value</th></tr>
+        <tr><td>XML Schema</td><td>TBD</td></tr>
+        <tr><td>E-series</td><td>None — new declaration type introduced by ERGANI II</td></tr>
+        <tr><td>Scope</td><td>Emergency 6th working day shifts for 5-day system enterprises (Labor Code Art. 192). Filed per shift.</td></tr>
+        <tr><td>SAP Infotypes</td><td>TBD</td></tr>
+        <tr><td>JIRA</td><td><a class="jira-ref" href="https://jira.tools.sap/browse/GSREQSE-16018" target="_blank">GSREQSE-16018</a></td></tr>
+      </table>
+      <div class="note">Note: Change reason code 016 in MA_v1 ("Work time arrangement") may overlap with this article. Clarify with Vassilis.</div>
+    </div>
+  </div>
+
+  <!-- ══ CARD: Art 2.8 Collective ══ -->
+  <div class="card tbd" id="card-collective">
+    <div class="card-header" onclick="toggle(this)">
+      <div class="card-title">
+        <span class="art">Art. 2.8</span>
+        <div>
+          <div class="name">Company Collective Agreement Posting</div>
+          <div class="name-gr">Ανάρτηση Επιχειρησιακής Συλλογικής Σύμβασης</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="card-badges">
+          <span class="badge badge-legal">Replaces: E10</span>
+          <span class="badge badge-planned">🔵 Open — <a class="jira-ref" href="https://jira.tools.sap/browse/GSREQSE-16020" target="_blank">GSREQSE-16020</a></span>
+        </div>
+        <span class="chevron">▼</span>
+      </div>
+    </div>
+    <div class="card-body">
+      <table>
+        <tr><th>Attribute</th><th>Value</th></tr>
+        <tr><td>XML Schema</td><td>TBD</td></tr>
+        <tr><td>E-series replaced</td><td>E10 — collective labor agreement filing</td></tr>
+        <tr><td>SAP Infotypes</td><td>TBD — likely custom GR infotype for collective agreements</td></tr>
+        <tr><td>JIRA</td><td><a class="jira-ref" href="https://jira.tools.sap/browse/GSREQSE-16020" target="_blank">GSREQSE-16020</a></td></tr>
+      </table>
+      <div class="note">⚠️ GSREQSE-3461 is referenced for payroll calculation business context only. It is not a usable XML template for the ERGANI II E10 replacement — the new XML schema must come from Vassilis / ministry technical spec.</div>
+    </div>
+  </div>
+
+  <!-- ══ CARD: Art 2.11 Work Card ══ -->
+  <div class="card tbd" id="card-workcard">
+    <div class="card-header" onclick="toggle(this)">
+      <div class="card-title">
+        <span class="art">Art. 2.11</span>
+        <div>
+          <div class="name">Digital Work Card Declarations</div>
+          <div class="name-gr">Ψηφιακές Δηλώσεις για Ψηφιακή Κάρτα Εργασίας</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="card-badges">
+          <span class="badge badge-unknown">No E-code (new in ERGANI II)</span>
+          <span class="badge badge-planned">🔵 Open — <a class="jira-ref" href="https://jira.tools.sap/browse/GSREQSE-16022" target="_blank">GSREQSE-16022</a></span>
+        </div>
+        <span class="chevron">▼</span>
+      </div>
+    </div>
+    <div class="card-body">
+      <table>
+        <tr><th>Attribute</th><th>Value</th></tr>
+        <tr><td>XML Schema</td><td>TBD (real-time transmission separate from MA)</td></tr>
+        <tr><td>Sub-declarations</td><td>a) Actual start/end times (real-time auto-transmission) · b) Pre-announcement vs. retroactive system choice (monthly) · c) Retroactive schedule changes (due end of following month)</td></tr>
+        <tr><td>Partial coverage in MA_v1</td><td>Change reason <span class="field-code">011</span> = "Register for digital work card" handled as Manual ALV in MA_v1</td></tr>
+        <tr><td>Data retention</td><td>5 years local · 6 months in ERGANI II system</td></tr>
+        <tr><td>SAP Infotypes</td><td>TBD — real-time data, likely a separate integration point</td></tr>
+        <tr><td>JIRA</td><td><a class="jira-ref" href="https://jira.tools.sap/browse/GSREQSE-16022" target="_blank">GSREQSE-16022</a></td></tr>
+        <tr><td>2022 Predecessors</td><td><a class="badge-epic" href="https://jira.tools.sap/browse/GSREQSE-2240" target="_blank">GSREQSE-2240</a> <a class="jira-ref" href="https://jira.tools.sap/browse/GSREQSE-2300" target="_blank">GSREQSE-2300</a> — EEs Card In-Out XML · <a class="jira-ref" href="https://jira.tools.sap/browse/GSREQSE-2654" target="_blank">GSREQSE-2654</a> — Clock-in/out JSON upload. Delivered in ERGANI II Modifications 2022.</td></tr>
+      </table>
+      <div class="note">Note: Work Card was delivered in 2022 under Epic GSREQSE-2240 "ERGANI II Modifications" (GSREQSE-2300 = XML format, GSREQSE-2654 = JSON upload). The 2025 re-scoping under GSREQSE-15293 is pending confirmation from Vassilis. MA_v1 change code 011 covers the enrollment step only; real-time clock-in/out is a separate integration point.</div>
+    </div>
+  </div>
+
+</div><!-- /cards -->
+
+<!-- ═══════════════════════════════════════════
+     FOOTER
+════════════════════════════════════════════ -->
+<div style="background:#f0f4fa;border-top:1px solid var(--sap-border);padding:16px 32px;font-size:12px;color:#666;">
+  <strong>Last updated:</strong> 2026-05-30 · <strong>LPM:</strong> Hany Zanaty · <strong>Consultant:</strong> Vassilis Stamatopoulos ·
+  <strong>Epic:</strong> <a href="https://jira.tools.sap/browse/GSREQSE-15293" style="color:var(--sap-teal)">GSREQSE-15293</a> ·
+  <strong>Plan:</strong> processing/Plans/GR/plan_ergani_jira_structure.md
+</div>
+
+<script>
+function toggleSection(h4) {
+  const body = h4.nextElementSibling;
+  const chevron = h4.querySelector('.chevron');
+  if (body.style.display === 'none') {
+    body.style.display = 'block';
+    chevron.style.transform = 'rotate(90deg)';
+  } else {
+    body.style.display = 'none';
+    chevron.style.transform = 'rotate(0deg)';
+  }
+}
+function toggle(header) {
+  const body = header.nextElementSibling;
+  const chevron = header.querySelector('.chevron');
+  if (body.classList.contains('open')) {
+    body.classList.remove('open');
+    chevron.style.transform = 'rotate(0deg)';
+  } else {
+    body.classList.add('open');
+    chevron.style.transform = 'rotate(180deg)';
+  }
+}
+function jumpToCard(id) {
+  const card = document.getElementById(id);
+  const body = card.querySelector('.card-body');
+  const chevron = card.querySelector('.chevron');
+  if (!body.classList.contains('open')) {
+    body.classList.add('open');
+    chevron.style.transform = 'rotate(180deg)';
+  }
+  setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+}
+// Open first two cards by default
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.card-body').forEach((b, i) => { if (i < 2) { b.classList.add('open'); b.previousElementSibling.querySelector('.chevron').style.transform='rotate(180deg)'; }});
+});
+</script>
+</body>
+</html>

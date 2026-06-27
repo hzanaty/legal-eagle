@@ -1,0 +1,86 @@
+# Greece Legal Repository Structure
+
+## Labor
+
+### Employment Platform
+- ERGANI
+- ERGANI II
+
+### Labor Law
+- Ministry of Labour & Social Affairs
+- Labor Legislation
+- Ministerial Decisions
+- Circulars & Guidelines
+
+---
+
+## Social Insurance
+
+### Social Insurance Authority
+- e-EFKA
+
+### Supplementary Pension Authority
+- TEKA
+
+### Social Insurance Reporting
+- APD (Analytical Periodic Declaration)
+- Employer Reporting
+- Contribution Rules
+
+---
+
+## Taxation
+
+### Tax Authority
+- AADE
+
+### Tax Reporting
+- Income Tax
+- Payroll Tax Withholding
+- Employer Tax Reporting
+
+---
+
+## Legal Publications
+
+### Official Gazette
+- FEK (Government Gazette)
+
+### Government Portal
+- Gov.gr
+
+---
+
+# Monitoring Sources
+
+| Domain | Authority | Priority |
+|----------|----------|----------|
+| Labor | ERGANI | High |
+| Labor | Ministry of Labour | High |
+| Social Insurance | e-EFKA | High |
+| Social Insurance | TEKA | High |
+| Taxation | AADE | Medium |
+| Legal Publications | FEK | Medium |
+| Government Services | Gov.gr | Low |
+
+---
+
+# Suggested Legal Eagle URLs
+
+## Labor
+- https://ergani.gov.gr
+- https://ypergasias.gov.gr
+
+## Social Insurance
+- https://www.efka.gov.gr
+- https://teka.gov.gr
+- https://eservices.yeka.gr
+
+## Taxation
+- https://www.aade.gr
+
+## Legal Publications
+- https://www.et.gr
+
+## Government Portal
+- https://www.gov.gr
