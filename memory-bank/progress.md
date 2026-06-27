@@ -1,3 +1,90 @@
+## v2.32 (2026-06-28) — ANS OAuth Fix + Documentation Sync
+
+**ANS OAuth Fix** (`agents/ans_sender.py`):
+- Token request changed to use HTTP Basic auth: `auth=(client_id, client_secret)` + `data={"grant_type": "client_credentials"}`
+- Fixes 404 errors when provisioning ANS Actions via "Re-provision all" button
+- SAP XSUAA requires credentials in Authorization header, not request body
+
+**Gitignore Cleanup** (`.gitignore`):
+- Added `.playwright-mcp/`, `.superpowers/`, `docs/superpowers/`, `server.pid`, `outputs/GR_HCM/`
+
+**Documentation Sync**:
+- `SPEC.md` updated from v2.26 to v2.32 — adds repo_nodes/repo_assets tables, Legal Repo routes, v2.31 enhancements, Greece profile section, Section 13
+- `README.md` updated — Greece added to deployments, Legal Repository feature, v2.32 spec link
+- `CHANGELOG.md` — v2.32 entry added
+- All memory-bank files synced to v2.32
+
+**Files Changed**:
+- `agents/ans_sender.py`
+- `.gitignore`
+- `SPEC.md`, `README.md`, `CHANGELOG.md`
+- `memory-bank/activeContext.md`, `memory-bank/progress.md`, `memory-bank/techContext.md`, `memory-bank/productContext.md`
+
+---
+
+## v2.31 (2026-06-01) — UI Fixes & Enhancements
+
+**URL Source Editing Enhancement**:
+- Edit form exposes all fields including URL rename (new_url field)
+- If new_url differs, old row deleted and new row inserted preserving all config
+
+**Auto-translate in Review** (`admin/templates/review_news.html`):
+- Non-English profiles auto-translate visible items to English on page load
+- SAP AI Core call via `POST /admin/profiles/<id>/review/translate`
+
+**Pre-run Preflight Checklist** (`admin/templates/run_status.html`):
+- `GET /admin/preflight` returns JSON checks + ready flag
+- Start Run button disabled until all checks pass
+
+**Legal Repo lifecycle bar colors** (`admin/templates/legal_repo.html`):
+- completed=green, current=blue, future=dark grey
+
+**Resources/ Flask Route** (`admin/app.py`):
+- `GET /Resources/<path>` serves files from project Resources/ directory
+
+**BTP Config Sync** (`admin/app.py`, `scripts/export_config.py`, `scripts/import_config.py`):
+- Export/import DB config for BTP seeding via `/admin/export-config` and `/admin/import-config`
+
+**Files Changed**:
+- `admin/app.py`
+- `admin/templates/profile.html`, `run_status.html`, `review_news.html`, `legal_repo.html`
+- `scripts/export_config.py` (new), `scripts/import_config.py` (new)
+
+---
+
+## v2.30 (2026-06-01) — Legal Repository + Greece Profile
+
+**Legal Repository** (new feature):
+- New DB tables: `repo_nodes` + `repo_assets`
+- Global `/admin/legal-repo` three-column page (countries / topic tree / node detail)
+- Node lifecycle: NEW → SCOPING → ANALYZED → COMPLETE
+- Asset types: jira_epic, jira_req, sap_note, prd, kba, mindmap, xml_schema, analysis, other
+- L2S Prompt: create repo node from news item (`source_news_id` traceability)
+- `📋 In Legal Repo` badge + `+ L2S Prompt` button on Review page
+- `📚 Legal Repo` navbar link
+
+**Greece Profile (GR/HCM)**:
+- Language: el, 8 URL sources (ERGANI, Ministry of Labour, EFKA, TEKA×2, AADE, FEK, Gov.gr)
+- 87 glossary terms (7 categories)
+- 8 seed repo nodes: ERGANI II parent (ANALYZED) + 4 children + EFKA + TEKA + AADE
+- ERGANI II MindMap v2 linked as mindmap asset
+
+**Files Changed/Added**:
+- `configurations/db.py` — repo_nodes + repo_assets schema + CRUD
+- `admin/app.py` — Legal Repo routes + L2S Prompt
+- `admin/templates/base.html` — Legal Repo navbar link
+- `admin/templates/legal_repo.html` (new)
+- `admin/templates/review_news.html` — L2S Prompt + badge
+- `scripts/seed_greece_profile.py` (new)
+- `scripts/seed_greece_repo.py` (new)
+- `Resources/ERGANI_II_MindMap_v2.html`, `Greece_Glossary.md`, `Greece_URL_Resources`, `Legal_Repository_Strategy.md`
+
+---
+
+## v2.29 (2026-05-xx) — ANS Email Routing (merged into v2.26 documentation)
+
+---
+
 ## v2.26 (2026-05-13) — Run Log Visualization + ANS Email + Per-Feed RSS Tracking
 
 **Run Log Visualization** (`admin/templates/run_status.html` — major redesign):

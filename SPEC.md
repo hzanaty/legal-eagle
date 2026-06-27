@@ -1,7 +1,7 @@
-# Legal Eagle 2.26 — Technical Specification
+# Legal Eagle 2.32 — Technical Specification
 
-**Version:** 2.26 (Run Log Visualization + ANS Email Integration + Per-Feed RSS Tracking)  
-**Last Updated:** 2026-05-13
+**Version:** 2.32 (ANS OAuth Fix + Legal Repository + Greece Profile + v2.31 Enhancements)  
+**Last Updated:** 2026-06-28
 
 This document provides the technical specification for Legal Eagle, an AI-powered regulatory compliance monitoring system for SAP Localization.
 
@@ -50,7 +50,7 @@ Legal Eagle monitors government sources for legal updates in chosen countries an
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                           LEGAL EAGLE 2.26 ARCHITECTURE                      │
+│                           LEGAL EAGLE 2.32 ARCHITECTURE                      │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
@@ -432,8 +432,6 @@ CREATE TABLE run_logs (
 
 #### Table: `global_credentials`
 
-Global credentials (legacy, mostly moved to environment variables).
-
 ```sql
 CREATE TABLE global_credentials (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -465,6 +463,79 @@ CREATE TABLE audit_log (
 - `timestamp`: ISO 8601 timestamp
 - `action`: Action performed (e.g., 'create_profile', 'delete_rss_feed')
 - `details`: JSON string with action details
+
+#### Table: `repo_nodes` (v2.30)
+
+Legal repository nodes with hierarchical structure.
+
+```sql
+CREATE TABLE repo_nodes (
+    id INTEGER PRIMARY KEY,
+    parent_node_id INTEGER REFERENCES repo_nodes(id) ON DELETE SET NULL,
+    country_code TEXT NOT NULL,
+    domain TEXT NOT NULL,
+    subdomain TEXT NOT NULL,
+    topic TEXT NOT NULL,
+    authority TEXT,
+    law_reference TEXT,
+    official_url TEXT,
+    status TEXT NOT NULL DEFAULT 'NEW'
+        CHECK(status IN ('NEW','SCOPING','ANALYZED','COMPLETE')),
+    source_news_id INTEGER REFERENCES news_items(id) ON DELETE SET NULL,
+    summary TEXT,
+    effective_date TEXT,
+    date_detected TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+);
+```
+
+**Columns:**
+- `id`: Auto-increment primary key
+- `parent_node_id`: Self-referential FK for parent-child hierarchy (EPIC → topic-level children)
+- `country_code`: ISO country code (e.g., 'GR', 'SA')
+- `domain`: Business domain (e.g., 'HCM', 'Payroll')
+- `subdomain`: Functional subdomain (e.g., 'Social Insurance', 'Time Management')
+- `topic`: Specific regulation topic (e.g., 'ERGANI II Digital Work Card')
+- `authority`: Issuing authority (e.g., 'Ministry of Labour')
+- `law_reference`: Law/regulation number or reference
+- `official_url`: Link to official regulation source
+- `status`: Lifecycle status — NEW → SCOPING → ANALYZED → COMPLETE
+- `source_news_id`: FK to news_items (traceability — which news item spawned this node)
+- `summary`: Analysis summary
+- `effective_date`: When the regulation takes effect
+- `date_detected`: When Legal Eagle first detected this regulation
+- `created_at`, `updated_at`: Timestamps
+
+**Status Progression Constant:**
+```python
+STATUS_PROGRESSION = ["NEW", "SCOPING", "ANALYZED", "COMPLETE"]
+```
+
+#### Table: `repo_assets` (v2.30)
+
+Knowledge files and SAP delivery artifacts linked to repo nodes.
+
+```sql
+CREATE TABLE repo_assets (
+    id INTEGER PRIMARY KEY,
+    node_id INTEGER NOT NULL REFERENCES repo_nodes(id) ON DELETE CASCADE,
+    asset_type TEXT NOT NULL,
+    title TEXT NOT NULL,
+    reference TEXT,
+    url TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+);
+```
+
+**Columns:**
+- `id`: Auto-increment primary key
+- `node_id`: FK to repo_nodes (cascades on delete)
+- `asset_type`: Type of asset — `jira_epic`, `jira_req`, `sap_note`, `prd`, `kba`, `mindmap`, `xml_schema`, `analysis`, `other`
+- `title`: Human-readable asset name
+- `reference`: External ID (JIRA ticket ID, SAP Note number, etc.)
+- `url`: Link to asset
+- `created_at`: Timestamp
 
 ---
 
@@ -936,6 +1007,28 @@ def run_profile_once(
 - `POST /admin/profiles/<id>/review/<item_id>/score` - Update relevance score
 - `POST /admin/profiles/<id>/review/clear` - Clear all filtered news
 
+#### ANS Email (v2.26+)
+- `POST /admin/profiles/<id>/ans/provision` - Re-provision ANS Actions for all receivers
+
+#### Legal Repository (v2.30)
+- `GET /admin/legal-repo` - Legal Repo three-column page
+- `POST /admin/legal-repo/nodes/create` - Create repo node
+- `POST /admin/legal-repo/nodes/<id>/update` - Update node fields
+- `POST /admin/legal-repo/nodes/<id>/delete` - Delete node
+- `POST /admin/legal-repo/nodes/<id>/advance-status` - Advance lifecycle status
+- `POST /admin/legal-repo/nodes/<id>/assets/add` - Add asset to node
+- `POST /admin/legal-repo/assets/<id>/delete` - Remove asset
+- `POST /admin/profiles/<id>/news/<id>/to-legal-repo` - L2S Prompt (news → repo node)
+
+#### v2.31 Routes
+- `GET /admin/preflight` - Pre-run checklist JSON (checks, ready)
+- `POST /admin/profiles/<id>/review/translate` - Batch translate review items to English
+- `GET /Resources/<path>` - Serve files from project Resources/ directory
+
+#### BTP Config Sync (v2.31)
+- `GET /admin/export-config` - Export DB config to JSON
+- `POST /admin/import-config` - Import config from JSON (BTP DB seeding)
+
 ### 7.2 Templates (`admin/templates/`)
 
 **Current Templates** (Jinja2 + Custom CSS):
@@ -945,6 +1038,7 @@ def run_profile_once(
 - `profile.html` - Profile configuration (Configure tab)
 - `run_status.html` - Run execution and logs (Run tab)
 - `review_news.html` - Filtered news review (Review tab)
+- `legal_repo.html` - Legal Repository three-column page (v2.30)
 
 **Design System**:
 - SAP Fiori color palette (CSS variables)
@@ -1038,9 +1132,87 @@ Try ANS → success → return True
          → failure → log warning → fall through to Gmail SMTP
 ```
 
-Gmail IMAP credentials (`LEGAL_EAGLE_GMAIL_*`) remain required on BTP for reading monitor-update emails, even when ANS handles outbound sending.
+**OAuth2 Token Request** (v2.32 fix):
+```python
+resp = requests.post(
+    self._oauth_url,
+    auth=(self._client_id, self._client_secret),  # HTTP Basic auth
+    data={"grant_type": "client_credentials"},
+    timeout=30,
+)
+```
+Credentials go in the `Authorization: Basic` header (not the request body) — required by SAP XSUAA.
 
-### 7.7 UI Enhancements History
+**ANS Provisioning UI:**
+- `POST /admin/profiles/<id>/ans/provision` — Re-provision ANS Actions for all receivers ("Re-provision all" button)
+- Idempotent: 409 responses silently ignored (already provisioned)
+- Auto-provision also triggered on: add email receiver, bulk save email receivers
+
+### 7.7 Legal Repository (v2.30)
+
+Global knowledge base at `/admin/legal-repo` for tracking regulatory changes and their SAP delivery status.
+
+**Three-Column Layout:**
+- **Left**: Country list (derived from repo_nodes countries)
+- **Center**: Topic tree for selected country (parent nodes → children, grouped by domain/subdomain)
+- **Right**: Node detail (status, assets, summary, official URL, linked news item)
+
+**Node Lifecycle:**
+```
+NEW → SCOPING → ANALYZED → COMPLETE
+```
+Each node advances one step at a time via the `advance-status` action.
+
+**Asset Types:**
+`jira_epic`, `jira_req`, `sap_note`, `prd`, `kba`, `mindmap`, `xml_schema`, `analysis`, `other`
+
+**L2S Prompt (News → Repo Traceability):**
+- `+ L2S Prompt` button on Review page creates a repo node stub from a news item
+- `source_news_id` FK preserves traceability: which news item spawned which repo node
+- `📋 In Legal Repo` badge shown on review items already linked to a repo node
+
+**Routes:**
+- `GET /admin/legal-repo` — three-column repo UI
+- `POST /admin/legal-repo/nodes/create` — create node
+- `POST /admin/legal-repo/nodes/<id>/update` — update node fields
+- `POST /admin/legal-repo/nodes/<id>/delete` — delete node
+- `POST /admin/legal-repo/nodes/<id>/advance-status` — advance lifecycle status
+- `POST /admin/legal-repo/nodes/<id>/assets/add` — link asset to node
+- `POST /admin/legal-repo/assets/<id>/delete` — remove asset
+- `POST /admin/profiles/<id>/news/<id>/to-legal-repo` — L2S Prompt (news → repo node)
+
+### 7.8 v2.31 Enhancements
+
+**URL Source Rename:**
+- Edit form exposes all fields including URL identity rename
+- `new_url` form field: if different from original `url`, old row is deleted and new row inserted
+- Preserves all other fields (mode, sample_link, read_more_label, etc.)
+
+**Auto-translate in Review:**
+- Non-English profiles auto-translate all visible news items to English on page load
+- Uses SAP AI Core (gpt-4o) via `POST /admin/profiles/<id>/review/translate`
+- Translation shown inline below original text
+- Response format: `{"translations": {"<id>": {"title_en": "...", "content_en": "..."}}}`
+
+**Pre-run Preflight Checklist:**
+- `GET /admin/preflight?profile_id=<id>` returns JSON `{checks: [...], ready: bool}`
+- Checks: at least one source configured, email receiver configured, AI Core credentials set, Twitter token valid (if Twitter accounts exist)
+- Start Run button is disabled in UI until all checks pass
+
+**Lifecycle Bar Colors:**
+- Completed stages: green
+- Current stage: blue
+- Future stages: dark grey
+
+**Resources/ Flask Route:**
+- `GET /Resources/<path>` serves any file from the project's `Resources/` directory
+- Enables MindMap HTML files and other static assets to be opened directly from the Legal Repo
+
+**BTP Config Sync:**
+- `GET /admin/export-config` — exports full DB config to JSON (for BTP seeding)
+- `POST /admin/import-config` — imports config from JSON (idempotent, used on BTP cold start)
+
+### 7.9 UI Enhancements History
 
 #### v2.16 — Table Consistency
 - Added "Lookback Days", "Sample Link", "Read More Label" columns to tables (later superseded by v2.22)
@@ -1440,6 +1612,7 @@ legal-eagle/
 │   ├── compare_news.py              # Deduplication
 │   ├── news_grouper.py              # AI clustering
 │   ├── email_sender.py              # Email delivery
+│   ├── ans_sender.py                # SAP BTP ANS email sender (v2.26)
 │   ├── sap_ai_client.py             # SAP AI Core client
 │   ├── loka_agent.py                # LOKA integration
 │   ├── loka_client.py               # LOKA HTTP client
@@ -1454,7 +1627,8 @@ legal-eagle/
 │   │   ├── create_profile.html      # Create profile
 │   │   ├── profile.html             # Configure tab
 │   │   ├── run_status.html          # Run tab
-│   │   └── review_news.html         # Review tab
+│   │   ├── review_news.html         # Review tab
+│   │   └── legal_repo.html          # Legal Repository (v2.30)
 │   └── outputs/                     # Symlink to ../outputs/
 │
 ├── configurations/                  # Configuration layer
@@ -1476,6 +1650,10 @@ legal-eagle/
 │   ├── migrate_*.py                 # Database migrations
 │   ├── setup_*.py                   # Profile setup scripts
 │   ├── resend_email_from_html.py    # Email resend utility
+│   ├── seed_greece_profile.py       # Greece profile seed (idempotent, v2.30)
+│   ├── seed_greece_repo.py          # Greece repo nodes seed (idempotent, v2.30)
+│   ├── export_config.py             # Export DB config to JSON (v2.31)
+│   ├── import_config.py             # Import DB config from JSON (v2.31)
 │   ├── launchd/                     # macOS launchd configs
 │   │   └── com.legaleagle.admin.plist
 │   └── systemd/                     # Linux systemd configs
@@ -1503,8 +1681,11 @@ legal-eagle/
 ├── docs/                            # Documentation
 │   └── README.md                    # User guide
 │
-├── Resources/                       # Test resources
-│   └── *.pdf                        # Sample documents
+├── Resources/                       # Static assets served via /Resources/<path>
+│   ├── ERGANI_II_MindMap_v2.html    # Greece ERGANI II MindMap (v2.30)
+│   ├── Greece_Glossary.md           # Greece glossary source (87 terms, v2.30)
+│   ├── Greece_URL_Resources         # Greece URL source list (v2.30)
+│   └── Legal_Repository_Strategy.md # Legal Repo strategy document (v2.30)
 │
 ├── .cfignore                        # Cloud Foundry ignore
 ├── .gitignore                       # Git ignore
@@ -1597,6 +1778,60 @@ legal-eagle/
 For information about planned UI5/Fiori migration and other strategic initiatives, see:
 - **[UI5_MIGRATION_ROADMAP.md](UI5_MIGRATION_ROADMAP.md)** — Detailed UI5/Fiori migration plan
 - **[README.md](README.md)** — Roadmap section for all planned enhancements
+
+---
+
+## 13. Greece Profile (v2.30)
+
+### 13.1 Profile Configuration
+
+| Field | Value |
+|-------|-------|
+| Country Code | `GR` |
+| LoB | `HCM` |
+| Name | Default GR/HCM |
+| Language | `el` (Greek) |
+
+### 13.2 URL Sources (8)
+
+| Source | URL | Mode |
+|--------|-----|------|
+| ERGANI | https://www.ergani.gov.gr | auto |
+| Ministry of Labour | https://www.ypergasias.gov.gr | auto |
+| EFKA | https://www.efka.gov.gr | auto |
+| TEKA | https://www.teka.gov.gr | auto |
+| TEKA eServices | https://www.tekaservices.gr | auto |
+| AADE | https://www.aade.gr | auto |
+| FEK (Official Gazette) | https://www.et.gr | auto |
+| Gov.gr | https://www.gov.gr | auto |
+
+### 13.3 Glossary
+
+87 Greek legal terms seeded from `Resources/Greece_Glossary.md` across 7 categories:
+- Employment Law, Social Insurance, Tax/Finance, Labor Relations, Digital Systems, Pension/Benefits, Health & Safety
+
+### 13.4 Legal Repo Nodes (8 seed nodes)
+
+| Node | Status | Level | Type |
+|------|--------|-------|------|
+| ERGANI II (parent) | ANALYZED | 3 | Parent |
+| ERGANI II — Digital Work Card | SCOPING | 2 | Child |
+| ERGANI II — Digital Employment Contract | SCOPING | 2 | Child |
+| ERGANI II — Digital Overtime | NEW | 1 | Child |
+| ERGANI II — Digital Leave | NEW | 1 | Child |
+| EFKA Social Insurance Reform | NEW | 1 | Independent |
+| TEKA Supplementary Pension | NEW | 1 | Independent |
+| AADE Tax Obligations | NEW | 1 | Independent |
+
+### 13.5 Assets
+
+- ERGANI II parent node → `mindmap` asset: `Resources/ERGANI_II_MindMap_v2.html`
+
+### 13.6 Seeding Scripts
+
+Both scripts are idempotent (safe to re-run):
+- `scripts/seed_greece_profile.py` — creates profile, URL sources, glossary
+- `scripts/seed_greece_repo.py` — creates repo nodes and assets
 
 ---
 

@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## v2.32 — 2026-06-28
+### ANS OAuth Fix + Gitignore Cleanup
+
+- **ANS OAuth fix**: Token request now uses HTTP Basic auth (`auth=(client_id, client_secret)`) instead of body params — required by SAP XSUAA for client credentials flow. Fixes 404 errors when provisioning ANS Actions via "Re-provision all"
+- **Gitignore cleanup**: Added `.playwright-mcp/`, `.superpowers/`, `docs/superpowers/`, `server.pid`, `outputs/GR_HCM/` to `.gitignore`
+
+**Files Changed:**
+- `agents/ans_sender.py` — OAuth token request fix
+- `.gitignore` — added tooling and runtime artifacts
+
 ## v2.31 — 2026-06-01
 ### UI Fixes & Enhancements
 

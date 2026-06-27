@@ -1,3 +1,19 @@
+## Update v2.32 (2026-06-28)
+
+### Current Product State
+
+**Stage 1 — Journalist**: Fully operational. Monitors regulatory sources, filters with AI, groups by theme, delivers bilingual email digests via BTP ANS or Gmail.
+
+**Legal Repository** (v2.30): Global knowledge base linking detected regulations to SAP delivery artifacts. Tracks lifecycle NEW → SCOPING → ANALYZED → COMPLETE. Connects news items to JIRA EPICs, SAP Notes, PRDs, MindMaps.
+
+**Active Profiles**: Saudi Arabia (SA/HCM), Turkey (TR/HCM), Spain (ES/HCM), UAE (AE/HCM), Greece (GR/HCM)
+
+**Stage 2 — Lawyer**: Planned. Legal text interpretation, impact analysis.
+
+**Strategic Vision**: See [Big_Picture.md](../Big_Picture.md) — 6-stage evolution to Virtual LPM.
+
+---
+
 ## Update v2.4.0 (2026-01-13 18:49:55Z)
 
 ### v2.4.0 — Admin Run Page, Live Logs, Bulk Actions, and Credentials View (2026-01-13 18:49:55Z)

@@ -42,10 +42,12 @@ Legal Eagle automatically:
 | **AI-Powered Filtering** | SAP AI Core (GPT-4o) semantic relevance evaluation |
 | **Smart Deduplication** | Detects duplicate news and updates to previously reported items |
 | **Intelligent Grouping** | AI clusters related news by regulatory theme |
-| **Multi-Profile Support** | Country + Line of Business combinations (SA/HCM, TR/HCM, ES/HCM, etc.) |
+| **Multi-Profile Support** | Country + Line of Business combinations (SA/HCM, TR/HCM, ES/HCM, GR/HCM, etc.) |
 | **Bilingual Digests** | Native language + English translation in single email |
 | **Human-in-the-Loop** | Review/score workflow continuously improves accuracy |
 | **Specialized Scrapers** | Custom support for Turkey Official Gazette, Saudi GOSI, and more |
+| **Legal Repository** | Global knowledge base linking regulations → SAP delivery artifacts (JIRA, Notes, PRDs) |
+| **BTP Email via ANS** | SAP Alert Notification Service handles outbound email on BTP Cloud Foundry |
 
 ### Supported Regions & Domains
 
@@ -54,9 +56,9 @@ Legal Eagle automatically:
 | **HCM** | HR, Payroll, Social Insurance, Labor Law, Pensions, Benefits |
 | **FIN** | Tax, E-Invoicing, Financial Reporting, Accounting Standards |
 
-**Current Deployments**: Saudi Arabia, Turkey, Spain, UAE (more countries being added)
+**Current Deployments**: Saudi Arabia, Turkey, Spain, UAE, Greece (more countries being added)
 
-📋 **Technical Details**: See [SPEC.md](SPEC.md) for complete v2.26 architecture
+📋 **Technical Details**: See [SPEC.md](SPEC.md) for complete v2.32 architecture
 
 ---
 
@@ -242,6 +244,15 @@ Each profile allows you to configure:
 - Score filtered-out items for continuous improvement
 - Approve items to add to baseline
 - High-scored items become "rescue baseline" for future filtering
+- **Auto-translate**: non-English profiles show items translated to English inline
+- **L2S Prompt**: create Legal Repository node directly from a news item
+
+### Legal Repository
+- Global knowledge base at `/admin/legal-repo`
+- Three-column layout: countries → topic tree → node detail
+- Track regulations through lifecycle: NEW → SCOPING → ANALYZED → COMPLETE
+- Link SAP delivery artifacts per node: JIRA EPICs/Reqs, SAP Notes, PRDs, MindMaps
+- Full traceability from news item → repo node → SAP delivery
 
 ---
 
@@ -287,7 +298,7 @@ Each profile allows you to configure:
 - **[UI5_MIGRATION_ROADMAP.md](UI5_MIGRATION_ROADMAP.md)** — UI5/Fiori migration detailed plan
 
 ### Technical & Operations
-- **[SPEC.md](SPEC.md)** — Technical specification (v2.24 current architecture)
+- **[SPEC.md](SPEC.md)** — Technical specification (v2.32 current architecture)
 - **[CHANGELOG.md](CHANGELOG.md)** — Version history and release notes
 - **[BTP_DEPLOYMENT.md](BTP_DEPLOYMENT.md)** — SAP BTP Cloud Foundry deployment guide
 

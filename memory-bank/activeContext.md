@@ -1,4 +1,20 @@
-## Current State: v2.31 — UI Fixes & Enhancements (2026-06-01)
+## Current State: v2.32 — ANS OAuth Fix + Documentation Sync (2026-06-28)
+
+### ✅ v2.32 COMPLETE
+**Completion Date**: 2026-06-28
+
+### Key Features (v2.32):
+
+- **ANS OAuth fix**: Token request now uses HTTP Basic auth — fixes 404 errors on "Re-provision all"
+- **Gitignore cleanup**: `.playwright-mcp/`, `.superpowers/`, `docs/superpowers/`, `server.pid`, `outputs/GR_HCM/` now ignored
+- **Documentation sync**: SPEC.md, README.md, CHANGELOG.md, memory-bank all updated to v2.32
+
+### Key files changed (v2.32):
+- `agents/ans_sender.py` — OAuth token fix
+- `.gitignore` — tooling/runtime artifacts
+- `SPEC.md`, `README.md`, `CHANGELOG.md`, `memory-bank/*` — documentation sync
+
+## Previous State: v2.31 — UI Fixes & Enhancements (2026-06-01)
 
 ### ✅ v2.31 COMPLETE
 **Completion Date**: 2026-06-01

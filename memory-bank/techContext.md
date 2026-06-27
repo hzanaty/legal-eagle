@@ -1,3 +1,32 @@
+## Update v2.32 (2026-06-28)
+
+### Current Technical Stack
+
+**Backend**: Python 3.11+ / Flask 3.0+ / SQLite 3 / Gunicorn (BTP)
+
+**AI**: SAP AI Core — gpt-4o (chat/filter/group/translate) + text-embedding-ada-002
+
+**Email Transport**:
+- BTP: SAP Alert Notification Service (ANS) — `agents/ans_sender.py`
+  - OAuth2 via HTTP Basic auth: `auth=(client_id, client_secret)`, `grant_type=client_credentials`
+  - Reads credentials from `VCAP_SERVICES` (Cloud Foundry auto-injection)
+- Local: Gmail SMTP fallback (`agents/email_sender.py`)
+- Gmail IMAP: still used for monitor-update inbox reading
+
+**Database**: SQLite — 15 tables including `repo_nodes` + `repo_assets` (v2.30)
+
+**Key Agents**:
+- `agents/ans_sender.py` — ANS sender (BTP email)
+- `agents/agents_controller.py` — main orchestrator
+- `agents/email_sender.py` — ANS-first, Gmail fallback
+- `agents/sap_ai_client.py` — SAP AI Core OAuth2 client
+
+**Admin UI**: Flask + Jinja2 + SAP Fiori CSS tokens — port 8080 (configurable via `PORT` env var)
+
+**Deployment**: SAP BTP Cloud Foundry (`cf push`) — manifest.yaml, Procfile, apt.yml, .profile
+
+---
+
 ## Update v2.5.0 (2026-02-23)
 
 ### v2.5.0 — Turkey Official Gazette Support (2026-02-23)
