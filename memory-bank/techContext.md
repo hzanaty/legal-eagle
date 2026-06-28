@@ -7,18 +7,19 @@
 **AI**: SAP AI Core — gpt-4o (chat/filter/group/translate) + text-embedding-ada-002
 
 **Email Transport**:
-- BTP: SAP Alert Notification Service (ANS) — `agents/ans_sender.py`
+- **Current**: Gmail SMTP only — ANS disabled (BTP environment not active)
+- **BTP (when rebuilt)**: SAP Alert Notification Service (ANS) — `agents/ans_sender.py`
   - OAuth2 via HTTP Basic auth: `auth=(client_id, client_secret)`, `grant_type=client_credentials`
   - Reads credentials from `VCAP_SERVICES` (Cloud Foundry auto-injection)
-- Local: Gmail SMTP fallback (`agents/email_sender.py`)
+  - Re-enable by uncommenting ANS blocks in `ans_sender.py`, `email_sender.py`, `admin/app.py`
 - Gmail IMAP: still used for monitor-update inbox reading
 
 **Database**: SQLite — 15 tables including `repo_nodes` + `repo_assets` (v2.30)
 
 **Key Agents**:
-- `agents/ans_sender.py` — ANS sender (BTP email)
+- `agents/ans_sender.py` — ANS sender (disabled; stub only — re-enable for BTP)
 - `agents/agents_controller.py` — main orchestrator
-- `agents/email_sender.py` — ANS-first, Gmail fallback
+- `agents/email_sender.py` — Gmail SMTP (ANS-first block disabled)
 - `agents/sap_ai_client.py` — SAP AI Core OAuth2 client
 
 **Admin UI**: Flask + Jinja2 + SAP Fiori CSS tokens — port 8080 (configurable via `PORT` env var)

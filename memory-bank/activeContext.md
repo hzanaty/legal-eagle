@@ -1,18 +1,22 @@
-## Current State: v2.32 — ANS OAuth Fix + Documentation Sync (2026-06-28)
+## Current State: v2.32 — ANS Disabled + ANS OAuth Fix + Documentation Sync (2026-06-28)
 
 ### ✅ v2.32 COMPLETE
 **Completion Date**: 2026-06-28
 
 ### Key Features (v2.32):
 
+- **ANS disabled**: BTP environment torn down — ANS send path commented out in all three files. Gmail SMTP is sole active email transport. Code preserved for re-activation. Re-provision button visible but dimmed/disabled in UI.
 - **ANS OAuth fix**: Token request now uses HTTP Basic auth — fixes 404 errors on "Re-provision all"
 - **Gitignore cleanup**: `.playwright-mcp/`, `.superpowers/`, `docs/superpowers/`, `server.pid`, `outputs/GR_HCM/` now ignored
-- **Documentation sync**: SPEC.md, README.md, CHANGELOG.md, memory-bank all updated to v2.32
+- **Documentation sync**: SPEC.md, README.md, CHANGELOG.md, BTP_DEPLOYMENT.md, memory-bank all updated to v2.32
 
 ### Key files changed (v2.32):
-- `agents/ans_sender.py` — OAuth token fix
+- `agents/ans_sender.py` — ANS implementation commented out; stub returns `None`
+- `agents/email_sender.py` — ANS-first block commented out; direct Gmail SMTP
+- `admin/app.py` — ANS provisioning calls commented out; `ans_available` hardcoded `False`
+- `admin/templates/profile.html` — Re-provision button dimmed/disabled when ANS unavailable
 - `.gitignore` — tooling/runtime artifacts
-- `SPEC.md`, `README.md`, `CHANGELOG.md`, `memory-bank/*` — documentation sync
+- `SPEC.md`, `README.md`, `CHANGELOG.md`, `BTP_DEPLOYMENT.md`, `memory-bank/*` — documentation sync
 
 ## Previous State: v2.31 — UI Fixes & Enhancements (2026-06-01)
 

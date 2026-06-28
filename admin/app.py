@@ -454,29 +454,29 @@ def admin_profile_runs(profile_id: int):
     )
 
 
-# ANS provision route — tries to create Action+Condition+Subscription per recipient
-@app.route("/admin/profiles/<int:profile_id>/ans/provision", methods=["POST"])
-def admin_ans_provision(profile_id: int):
-    from agents.ans_sender import get_ans_sender
-    receivers = load_email_receivers_with_lang(profile_id)
-    emails = [r["email"] for r in receivers]
-    sender = get_ans_sender()
-    if not sender:
-        flash("ANS not bound — cannot provision.", "error")
-        return redirect(url_for("admin_profile_detail", profile_id=profile_id))
-    errors = []
-    ok_count = 0
-    for email in emails:
-        try:
-            sender.ensure_provisioned(email)
-            ok_count += 1
-        except Exception as e:
-            errors.append(f"{email}: {str(e)[:120]}")
-    if errors:
-        flash("ANS provision errors: " + " | ".join(errors), "error")
-    else:
-        flash(f"ANS: {ok_count} recipient(s) provisioned successfully.", "success")
-    return redirect(url_for("admin_profile_detail", profile_id=profile_id))
+# DISABLED: ANS provision route — re-enable for BTP deployment
+# @app.route("/admin/profiles/<int:profile_id>/ans/provision", methods=["POST"])
+# def admin_ans_provision(profile_id: int):
+#     from agents.ans_sender import get_ans_sender
+#     receivers = load_email_receivers_with_lang(profile_id)
+#     emails = [r["email"] for r in receivers]
+#     sender = get_ans_sender()
+#     if not sender:
+#         flash("ANS not bound — cannot provision.", "error")
+#         return redirect(url_for("admin_profile_detail", profile_id=profile_id))
+#     errors = []
+#     ok_count = 0
+#     for email in emails:
+#         try:
+#             sender.ensure_provisioned(email)
+#             ok_count += 1
+#         except Exception as e:
+#             errors.append(f"{email}: {str(e)[:120]}")
+#     if errors:
+#         flash("ANS provision errors: " + " | ".join(errors), "error")
+#     else:
+#         flash(f"ANS: {ok_count} recipient(s) provisioned successfully.", "success")
+#     return redirect(url_for("admin_profile_detail", profile_id=profile_id))
 
 
 # Confirm run → create, start, redirect to same page with run_id so right pane streams logs
@@ -727,11 +727,13 @@ def admin_profile_detail(profile_id: int):
     reset_quota_date = get_setting_value(profile_id, 'tweets_reset_quota_date')
     monitor_enabled = get_setting_value(profile_id, 'monitor_updates_enabled', 'false') == 'true'
 
-    from agents.ans_sender import get_ans_sender
-    try:
-        ans_available = bool(get_ans_sender())
-    except Exception:
-        ans_available = False
+    # DISABLED: ANS check — re-enable for BTP deployment
+    # from agents.ans_sender import get_ans_sender
+    # try:
+    #     ans_available = bool(get_ans_sender())
+    # except Exception:
+    #     ans_available = False
+    ans_available = False
 
     return render_template(
         "profile.html",
@@ -1120,14 +1122,15 @@ def add_email_receiver_route(profile_id: int):
     upsert_email_receiver(conn, profile_id, email=email)
     add_audit_log(conn, entity="email_receivers", action="add", details=email, profile_id=profile_id)
     conn.close()
-    from agents.ans_sender import get_ans_sender
-    sender = get_ans_sender()
-    if sender:
-        try:
-            sender.ensure_provisioned(email)
-        except Exception as e:
-            flash(f"Email added, but ANS provisioning failed: {str(e)[:120]}", "error")
-            return redirect(url_for("admin_profile_detail", profile_id=profile_id))
+    # DISABLED: ANS auto-provisioning — re-enable for BTP deployment
+    # from agents.ans_sender import get_ans_sender
+    # sender = get_ans_sender()
+    # if sender:
+    #     try:
+    #         sender.ensure_provisioned(email)
+    #     except Exception as e:
+    #         flash(f"Email added, but ANS provisioning failed: {str(e)[:120]}", "error")
+    #         return redirect(url_for("admin_profile_detail", profile_id=profile_id))
     flash("Email receiver added.", "success")
     return redirect(url_for("admin_profile_detail", profile_id=profile_id))
 
@@ -1149,18 +1152,19 @@ def save_email_receivers_route(profile_id: int):
         upsert_email_receiver(conn, profile_id, email=e)
     add_audit_log(conn, entity="email_receivers", action="save", details=f"count={len(emails)}", profile_id=profile_id)
     conn.close()
-    from agents.ans_sender import get_ans_sender
-    sender = get_ans_sender()
-    if sender:
-        ans_errors = []
-        for e in emails:
-            try:
-                sender.ensure_provisioned(e)
-            except Exception as ex:
-                ans_errors.append(f"{e}: {str(ex)[:80]}")
-        if ans_errors:
-            flash("Emails saved, but ANS provisioning failed for: " + ", ".join(ans_errors), "error")
-            return redirect(url_for("admin_profile_detail", profile_id=profile_id))
+    # DISABLED: ANS auto-provisioning — re-enable for BTP deployment
+    # from agents.ans_sender import get_ans_sender
+    # sender = get_ans_sender()
+    # if sender:
+    #     ans_errors = []
+    #     for e in emails:
+    #         try:
+    #             sender.ensure_provisioned(e)
+    #         except Exception as ex:
+    #             ans_errors.append(f"{e}: {str(ex)[:80]}")
+    #     if ans_errors:
+    #         flash("Emails saved, but ANS provisioning failed for: " + ", ".join(ans_errors), "error")
+    #         return redirect(url_for("admin_profile_detail", profile_id=profile_id))
     flash("Email receivers saved.", "success")
     return redirect(url_for("admin_profile_detail", profile_id=profile_id))
 

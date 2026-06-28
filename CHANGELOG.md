@@ -1,13 +1,17 @@
 # CHANGELOG
 
 ## v2.32 — 2026-06-28
-### ANS OAuth Fix + Gitignore Cleanup
+### ANS Disabled (Non-BTP Mode) + ANS OAuth Fix + Gitignore Cleanup
 
+- **ANS disabled**: ANS send path commented out — Gmail SMTP is now the sole active email transport. ANS code preserved for re-activation when BTP environment is rebuilt. Re-provision button remains visible in UI but is dimmed/disabled with tooltip.
 - **ANS OAuth fix**: Token request now uses HTTP Basic auth (`auth=(client_id, client_secret)`) instead of body params — required by SAP XSUAA for client credentials flow. Fixes 404 errors when provisioning ANS Actions via "Re-provision all"
 - **Gitignore cleanup**: Added `.playwright-mcp/`, `.superpowers/`, `docs/superpowers/`, `server.pid`, `outputs/GR_HCM/` to `.gitignore`
 
 **Files Changed:**
-- `agents/ans_sender.py` — OAuth token request fix
+- `agents/ans_sender.py` — ANS implementation commented out; stub always returns `None`
+- `agents/email_sender.py` — ANS-first block commented out; direct Gmail SMTP path
+- `admin/app.py` — ANS provisioning calls commented out; `ans_available` hardcoded `False`
+- `admin/templates/profile.html` — Re-provision button dimmed/disabled when ANS unavailable
 - `.gitignore` — added tooling and runtime artifacts
 
 ## v2.31 — 2026-06-01

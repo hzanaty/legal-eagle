@@ -1,4 +1,10 @@
-## v2.32 (2026-06-28) — ANS OAuth Fix + Documentation Sync
+## v2.32 (2026-06-28) — ANS Disabled + ANS OAuth Fix + Documentation Sync
+
+**ANS Disabled** (BTP environment torn down):
+- `agents/ans_sender.py` — full implementation commented out; stub always returns `None`/`False`
+- `agents/email_sender.py` — ANS-first block commented out; Gmail SMTP is sole send path
+- `admin/app.py` — ANS provisioning calls commented out; `ans_available` hardcoded `False`
+- `admin/templates/profile.html` — Re-provision button visible but dimmed/disabled with tooltip
 
 **ANS OAuth Fix** (`agents/ans_sender.py`):
 - Token request changed to use HTTP Basic auth: `auth=(client_id, client_secret)` + `data={"grant_type": "client_credentials"}`
@@ -15,10 +21,13 @@
 - All memory-bank files synced to v2.32
 
 **Files Changed**:
-- `agents/ans_sender.py`
+- `agents/ans_sender.py` — ANS disabled (stub) + OAuth fix preserved in comments
+- `agents/email_sender.py` — ANS-first block commented out
+- `admin/app.py` — ANS provisioning commented out; `ans_available=False`
+- `admin/templates/profile.html` — Re-provision button dimmed/disabled
 - `.gitignore`
-- `SPEC.md`, `README.md`, `CHANGELOG.md`
-- `memory-bank/activeContext.md`, `memory-bank/progress.md`, `memory-bank/techContext.md`, `memory-bank/productContext.md`
+- `SPEC.md`, `README.md`, `CHANGELOG.md`, `BTP_DEPLOYMENT.md`
+- `memory-bank/activeContext.md`, `memory-bank/progress.md`, `memory-bank/techContext.md`
 
 ---
 

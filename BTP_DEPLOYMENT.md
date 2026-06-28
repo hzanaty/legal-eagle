@@ -76,6 +76,8 @@ Before deploying, you need to configure environment variables for your applicati
 
 ## Step 1b: Bind Alert Notification Service (Email Sending)
 
+> **Note (v2.32):** ANS is currently disabled in the codebase — the BTP environment was torn down. When rebuilding BTP, follow these steps, then uncomment the ANS blocks in `agents/ans_sender.py`, `agents/email_sender.py`, and `admin/app.py`.
+
 Legal Eagle uses SAP BTP **Alert Notification Service (ANS)** for outbound email on BTP.
 Gmail App Passwords are rejected by Google from cloud IPs, so ANS handles sending while
 Gmail IMAP credentials remain required for reading monitor-update emails.

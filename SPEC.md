@@ -1,6 +1,6 @@
 # Legal Eagle 2.32 — Technical Specification
 
-**Version:** 2.32 (ANS OAuth Fix + Legal Repository + Greece Profile + v2.31 Enhancements)  
+**Version:** 2.32 (ANS Disabled + ANS OAuth Fix + Legal Repository + Greece Profile + v2.31 Enhancements)  
 **Last Updated:** 2026-06-28
 
 This document provides the technical specification for Legal Eagle, an AI-powered regulatory compliance monitoring system for SAP Localization.
@@ -1007,8 +1007,8 @@ def run_profile_once(
 - `POST /admin/profiles/<id>/review/<item_id>/score` - Update relevance score
 - `POST /admin/profiles/<id>/review/clear` - Clear all filtered news
 
-#### ANS Email (v2.26+)
-- `POST /admin/profiles/<id>/ans/provision` - Re-provision ANS Actions for all receivers
+#### ANS Email (v2.26+, currently disabled)
+- `POST /admin/profiles/<id>/ans/provision` - Re-provision ANS Actions for all receivers — **route disabled; re-enable for BTP deployment**
 
 #### Legal Repository (v2.30)
 - `GET /admin/legal-repo` - Legal Repo three-column page
@@ -1111,13 +1111,15 @@ Each sub-item shows its own state icon and item count when complete. Clicking an
 
 **Implementation**: entirely in `admin/templates/run_status.html` (inline CSS + JS). Log lines stream via SSE from `/admin/profiles/<id>/run/<run_id>/logs`. Each line is routed to the owning stage bucket and optionally to a sub-source slice.
 
-### 7.6 ANS Email Integration (v2.26)
+### 7.6 ANS Email Integration (v2.26, currently disabled)
 
-On SAP BTP, Gmail App Passwords are blocked by Google from cloud IPs. Legal Eagle uses **SAP BTP Alert Notification Service (ANS)** as the primary email transport, with Gmail SMTP as a local fallback.
+> **Status (v2.32):** ANS is disabled — BTP environment not active. Gmail SMTP is the sole email transport. ANS code is preserved (commented out) for re-activation on next BTP deployment. The "Re-provision all" button is visible in the admin UI but dimmed/non-clickable.
 
-**File**: `agents/ans_sender.py`
+On SAP BTP, Gmail App Passwords are blocked by Google from cloud IPs. Legal Eagle uses **SAP BTP Alert Notification Service (ANS)** as the primary email transport on BTP, with Gmail SMTP for local/non-BTP operation.
 
-**Detection**: `get_ans_sender()` reads `VCAP_SERVICES` for an ANS binding. Returns `None` when absent (local dev → Gmail SMTP used directly).
+**File**: `agents/ans_sender.py` (implementation commented out; stub returns `None`)
+
+**Detection**: `get_ans_sender()` reads `VCAP_SERVICES` for an ANS binding. Returns `None` when absent or disabled (current state → Gmail SMTP used directly).
 
 **Provisioning** (idempotent per recipient):
 1. Creates one ANS **Action** (SMTP endpoint) per email address
@@ -1126,13 +1128,12 @@ On SAP BTP, Gmail App Passwords are blocked by Google from cloud IPs. Legal Eagl
 
 **Sending**: `send_digest_via_ans(profile_slug, subject, body, emails)` fires one resource event per recipient per digest run.
 
-**Fallback chain** in `agents/email_sender.py`:
+**Current send path** in `agents/email_sender.py` (ANS block disabled):
 ```
-Try ANS → success → return True
-         → failure → log warning → fall through to Gmail SMTP
+Gmail SMTP directly (ANS-first block commented out)
 ```
 
-**OAuth2 Token Request** (v2.32 fix):
+**OAuth2 Token Request** (v2.32 fix — preserved in comments):
 ```python
 resp = requests.post(
     self._oauth_url,
@@ -1144,9 +1145,9 @@ resp = requests.post(
 Credentials go in the `Authorization: Basic` header (not the request body) — required by SAP XSUAA.
 
 **ANS Provisioning UI:**
-- `POST /admin/profiles/<id>/ans/provision` — Re-provision ANS Actions for all receivers ("Re-provision all" button)
-- Idempotent: 409 responses silently ignored (already provisioned)
-- Auto-provision also triggered on: add email receiver, bulk save email receivers
+- "Re-provision all" button visible on profile page, dimmed and non-clickable (disabled) when ANS unavailable
+- Route `POST /admin/profiles/<id>/ans/provision` commented out; auto-provision on add/save email also disabled
+- To re-enable: uncomment `agents/ans_sender.py`, `admin/app.py` ANS blocks, `agents/email_sender.py` ANS-first block
 
 ### 7.7 Legal Repository (v2.30)
 
@@ -1612,7 +1613,7 @@ legal-eagle/
 │   ├── compare_news.py              # Deduplication
 │   ├── news_grouper.py              # AI clustering
 │   ├── email_sender.py              # Email delivery
-│   ├── ans_sender.py                # SAP BTP ANS email sender (v2.26)
+│   ├── ans_sender.py                # SAP BTP ANS email sender (v2.26, disabled — re-enable for BTP)
 │   ├── sap_ai_client.py             # SAP AI Core client
 │   ├── loka_agent.py                # LOKA integration
 │   ├── loka_client.py               # LOKA HTTP client

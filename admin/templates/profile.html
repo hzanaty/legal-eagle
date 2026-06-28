@@ -614,9 +614,14 @@
       {% if ans_available %}
       <div style="margin-top: var(--sapSpacingS); display: flex; align-items: center; gap: var(--sapSpacingS);">
         <span class="sapBadge sapBadge-positive" style="font-size: 11px;">ANS Bound ✓</span>
-        <form method="post" action="{{ url_for('admin_ans_provision', profile_id=profile.id) }}">
+        <form method="post" action="#">
           <button type="submit" class="sapBtn sapBtn-default sapBtn-sm">↺ Re-provision all</button>
         </form>
+      </div>
+      {% else %}
+      <div style="margin-top: var(--sapSpacingS); display: flex; align-items: center; gap: var(--sapSpacingS);">
+        <span class="sapBadge" style="font-size: 11px; opacity: 0.5;">ANS Not Bound</span>
+        <button type="button" class="sapBtn sapBtn-default sapBtn-sm" disabled title="ANS not configured — available on BTP deployment" style="opacity: 0.4; cursor: not-allowed;">↺ Re-provision all</button>
       </div>
       {% endif %}
     </div>

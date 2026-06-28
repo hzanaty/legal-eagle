@@ -47,7 +47,7 @@ Legal Eagle automatically:
 | **Human-in-the-Loop** | Review/score workflow continuously improves accuracy |
 | **Specialized Scrapers** | Custom support for Turkey Official Gazette, Saudi GOSI, and more |
 | **Legal Repository** | Global knowledge base linking regulations → SAP delivery artifacts (JIRA, Notes, PRDs) |
-| **BTP Email via ANS** | SAP Alert Notification Service handles outbound email on BTP Cloud Foundry |
+| **BTP Email via ANS** | SAP Alert Notification Service handles outbound email on BTP Cloud Foundry *(disabled — re-enable on next BTP deployment)* |
 
 ### Supported Regions & Domains
 
