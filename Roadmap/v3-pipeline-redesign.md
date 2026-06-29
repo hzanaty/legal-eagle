@@ -22,11 +22,11 @@ v3.0 introduces a **four-dimensional item model**, a **three-tier self-improving
 | ID | Location | Bug | Fix in v3 |
 |---|---|---|---|
 | B1 | `news_filter.py:14` | `MAX_NEWS_AGE_DAYS = 7` hardcoded — conflicts silently with profile `date_scope` | Replace with profile's `date_scope` value |
-| B2 | `config_loader.py` | Baseline window `today - 7 days` — meaningless when runs have gaps | Anchor to `last_successful_run_date`, cap 90 days |
+| B2 | `config_loader.py` | Baseline window `today - 7 days` — meaningless when runs have gaps | Anchor to `last_successful_fetch` per source; new sources fall back to `date_scope` days ago |
 | B3 | `news_grouper.py` | Grouper assigns FIN/OTHER to HCM profile items | Constrain to profile LoB |
 | B4 | `news_grouper.py` | "OTHER" category exists and accepted in email | Eliminate — items that don't fit profile LoB are false positives |
 | B5 | `email_sender.py` | `published_at` never rendered in email | Show on every email card and in Review UI |
-| B6 | `news_filter.py` | Binary yes/no filter — noise ("the king met the president") reaches email | Demote to pre-screen only; AI ranker is the real gate |
+| B6 | `news_filter.py` | Binary yes/no filter — noise ("the king met the president") reaches email | Delete `news_filter.py` entirely — ranker (Rank 1 = Noise) is the quality gate; useful code migrated (see §12) |
 | B7 | `compare_news.py` | `hash_signature` breaks on minor editorial changes — cross-source dedup fails | Entity-based canonical fingerprint |
 | B8 | `email_sender.py` | Translation called inside email sender (wrong layer) | Move to post-save step, store in DB, email sender renders only |
 
@@ -35,6 +35,8 @@ v3.0 introduces a **four-dimensional item model**, a **three-tier self-improving
 - **Rescue pass** is a near-no-op: requires human score ≥ 4 on baseline items, which almost never exists → powered by AI rank in v3
 - **Binary filter** is the sole quality gate: no gradation of significance, noise and gazette entries are treated identically
 - **Dedup silently drops** REPEATED news: repetition across sources is actually a significance signal, not noise
+- **DUPLICATEs silently dropped**: in v2 identical items are discarded with no audit trail — v3 saves them with rank 0 and shows them in Review UI
+- **Per-source lookback missing**: profile-level `date_scope` drives all sources identically, ignoring individual source fetch history — a failed source resets to the profile window on next run, potentially missing items
 - **Grouping discards item-level signal**: LLM summarization obscures individual items and their ranks
 - **No publish date** anywhere in the user-facing output: critical for urgency assessment
 
@@ -49,30 +51,44 @@ Every news item in v3 carries four independent dimensions, stored in the DB and 
 | **Significance Rank** | How legally important is this? | Three-tier ranking engine | 1–5 |
 | **LoB Relevance** | Is this HCM/FIN relevant? | Glossary semantic match | Matched terms, or blank (gap alert) |
 | **Topic Label** | What is this about? | Glossary keyword tagging | One or more glossary terms |
-| **Repetition Tag** | Is this a recurring topic? | Cross-run frequency counter | NEW / REPEATED ×N / UPDATE |
+| **Repetition Tag** | Is this a recurring topic? | Cross-run frequency counter | NEW / UPDATE / REPEATED ×N / DUPLICATE (rank 0) |
 
 These dimensions are **independent**. A rank 4 item with blank LoB Relevance is valid — it means the AI found a legally significant item that the current glossary cannot explain. This triggers a Glossary Gap Alert (see §7).
+
+**DUPLICATE items carry rank 0** — a special value meaning "not evaluated by the ranker, exact match of a previously processed item." Rank 0 is outside the 1–5 significance scale. DUPLICATEs are never dropped — they are always saved to DB and visible in the Review UI in a collapsed section.
 
 ---
 
 ## 4. New Pipeline Architecture
 
 ```
-FETCH (unchanged)
-  RSS + Twitter/X + URL scrapers, date-windowed by profile date_scope
+HEALTH CHECK (new: agents/health_check.py)
+  Runs after preflight config check, before any fetching
+  Parallel checks — completes in seconds:
+    - URL sources (selected): HTTP HEAD → warn + allow skip on failure
+    - RSS feeds (selected): HTTP HEAD → warn + allow skip on failure
+    - Twitter API: GET /2/users/me → validates auth only, zero quota cost → warn + allow skip
+    - Gmail SMTP: connect → login → quit (no email sent) → HARD BLOCK on failure
+    - SAP AI Core: minimal chat completion → HARD BLOCK on failure
+    - DB writability: quick write test → HARD BLOCK on failure
+  Hard blocks prevent run from starting; warnings let user skip source or abort
    ↓
-PRE-SCREEN (coarse, fast, cheap)
-  Binary LLM check — "is this vaguely related to [country] [LoB]?"
-  Drop obvious garbage only. Not a quality gate.
+FETCH (per-source lookback anchor)
+  RSS + Twitter/X + URL scrapers
+  Per source: use last_successful_fetch as window start (null = new source → fallback to profile date_scope days ago)
+  Force fetch: treat last_successful_fetch as null for this run (bounded by date_scope — never unlimited)
+  last_successful_fetch updated immediately on success, not at end of run
    ↓
 ANNOTATE (compare_news.py — redesigned)
-  Entity fingerprint matching against last_successful_run_date baseline
-  Classify: NEW | UPDATE (with delta) | REPEATED (with count) | DUPLICATE (log only)
-  No items dropped. Everything annotated.
+  Entity fingerprint matching against per-source last_successful_fetch baseline
+  Classify: NEW | UPDATE (with delta) | REPEATED (with count) | DUPLICATE
+  DUPLICATE = canonical fingerprint matches existing DB item
+  ⚠️ DUPLICATE items are NEVER dropped — saved to DB with rank 0, visible in Review UI
    ↓
 RANK (new: news_ranker.py)
   Three-tier ranking engine (see §5)
-  Each item receives Significance Rank 1–5
+  DUPLICATE items skip ranking — they carry rank 0
+  Each non-duplicate item receives Significance Rank 1–5
    ↓
 TAG (new: news_tagger.py)
   Glossary keyword matching — assigns Topic Labels and LoB Relevance
@@ -84,7 +100,8 @@ TRANSLATE (new: news_translator.py — extracted from email_sender.py)
   Operates on ALL items regardless of rank (translations available in Review UI)
    ↓
 SAVE TO DB
-  All four dimensions stored per item
+  All four dimensions stored per item (rank 0 for DUPLICATEs)
+  Both published_at and fetched_at stored and indexed
   Available immediately in Review UI
    ↓
 EMAIL FILTER + SEND
@@ -300,8 +317,8 @@ created_at TEXT
 
 ### Modified `news_items` / `filtered_news`
 New columns:
-- `significance_rank INTEGER` — AI-assigned 1–5
-- `rank_tier TEXT` — 'tier1' | 'tier2'
+- `significance_rank INTEGER` — 0 = DUPLICATE (not evaluated), 1–5 = AI-ranked significance
+- `rank_tier TEXT` — 'tier1' | 'tier2' | 'duplicate'
 - `rank_reasoning TEXT` — AI explanation
 - `lob_relevance_terms TEXT` — JSON array of matched glossary keywords
 - `topic_labels TEXT` — JSON array of primary topic labels
@@ -312,6 +329,18 @@ New columns:
 - `title_translated TEXT`
 - `content_translated TEXT`
 - `translation_lang TEXT`
+- `published_at TEXT` — publication date (parsed from source)
+- `fetched_at TEXT` — when Legal Eagle retrieved this item
+
+### Modified `rss_feeds`
+- Add `last_successful_fetch TEXT` — updated only on successful fetch (existing `last_fetch_date` kept for debugging)
+
+### Modified `tweet_accounts`
+- Add `last_successful_fetch TEXT` — updated only on successful fetch (existing `last_fetch_date` kept for debugging)
+
+### Modified `runs`
+- Add `error_step TEXT` — which pipeline step failed (null if success)
+- Add `error_message TEXT` — human-readable failure reason
 
 ---
 
@@ -319,28 +348,49 @@ New columns:
 
 | File | Purpose | Replaces |
 |---|---|---|
-| `agents/news_ranker.py` | Three-tier ranking engine | Part of `news_filter.py` |
+| `agents/news_ranker.py` | Three-tier ranking engine | `news_filter.py` (deleted) |
 | `agents/news_tagger.py` | Glossary keyword tagging + LoB relevance | Part of `news_grouper.py` |
 | `agents/news_translator.py` | Post-save translation step | Extracted from `email_sender.py` |
+| `agents/health_check.py` | Pre-run runtime reachability checks | New |
+
+**`agents/news_filter.py` — DELETED in Phase 1.** Useful pieces migrated:
+- `_parse_publication_date()` → `agents/text_utils.py` (utility, fixes B5)
+- Age gate logic (`is_news_too_old()`) → `agents/compare_news.py` ANNOTATE step (driven by per-source `last_successful_fetch`, not a hardcoded constant)
+- `semantic_glossary_check()` prompt structure → `agents/news_ranker.py` Tier 2 prompt (cross-language semantic approach inherited)
+
+Not migrated (obsolete):
+- `is_similar_to_baseline()` embedding rescue — superseded by ranker
+- `high_score_baseline` mechanism — superseded by Tier 1 + Tier 2
+- Binary `is_relevant` gate — replaced by Rank 1 = Noise
 
 Modified files:
-- `agents/news_filter.py` — demoted to coarse pre-screen only
-- `agents/compare_news.py` — redesigned as annotator (NEW/UPDATE/REPEATED/DUPLICATE)
+- `agents/compare_news.py` — redesigned as annotator (NEW/UPDATE/REPEATED/DUPLICATE); DUPLICATEs saved with rank 0, never dropped
 - `agents/news_grouper.py` — replaced by tagger; LLM summarization removed
 - `agents/email_sender.py` — pure rendering, no AI calls
-- `configurations/db.py` — new tables + new columns
-- `admin/app.py` — new Review UI routes (Challenge, Override, Glossary enrichment)
-- `admin/templates/profile.html` / `review_news.html` — rank badges, gap alerts, challenge button
+- `configurations/db.py` — new tables + new columns (see §11)
+- `configurations/config_loader.py` — remove "all" / "force_full" from `parse_date_scope()`; force fetch now means "use date_scope window" not "unlimited"
+- `admin/app.py` — new Review UI routes (Challenge, Override, Glossary enrichment, Re-rank); remove "all" from date_scope allowed values
+- `admin/templates/profile.html` — remove "Full" option from lookback dropdown
+- `admin/templates/run_status.html` — health check results display; per-step error messages; immediate stop via threading event
+- `admin/templates/review_news.html` — rank badges, DUPLICATE collapsed section, gap alerts, challenge button, re-rank action, published/fetched date on every card
 
 ---
 
 ## 13. Transition Plan v2.32 → v3.0
 
-### Phase 1 — Fix bugs (no pipeline changes)
-- B1, B5, B8 — code-only fixes, no DB migration needed
-- B2 — requires migration: add `last_successful_run_date` column to `runs` table (already exists as `completed_at` — verify and alias)
-- B7 — requires migration: add `canonical_fingerprint TEXT` column to `news_items`; fingerprint = normalized(publication_date + issuing_authority_name + topic_noun_phrase)
-- No visible behavior changes to user in this phase
+### Phase 1 — Structural improvements (no pipeline behavior change to user)
+- **B1**: Replace hardcoded `MAX_NEWS_AGE_DAYS = 7` with per-source `last_successful_fetch` anchor; age gate moved to ANNOTATE step
+- **B2**: Per-source `last_successful_fetch` on all source types (RSS, Twitter, URL); new sources fall back to `date_scope` days ago
+- **B5**: Surface `published_at` in email cards and Review UI; migrate `_parse_publication_date()` to `text_utils.py`
+- **B7**: Add `canonical_fingerprint TEXT` to `news_items`; fingerprint = normalized(publication_date + issuing_authority_name + topic_noun_phrase)
+- **B8**: Move translation to post-save step; extract `news_translator.py`
+- **Delete `news_filter.py`**: migrate useful pieces, remove binary filter entirely
+- **Force fetch redefined**: treat `last_successful_fetch` as null for this run; bounded by `date_scope` always; remove "full/all/unlimited" options
+- **DUPLICATE handling**: save to DB with rank 0, never drop; collapsed section in Review UI
+- **Pre-run health check**: add `agents/health_check.py`; run before FETCH
+- **Run error messages**: add `error_step` + `error_message` to `runs` table; surface in run status UI
+- **Immediate stop**: threading stop event checked between items; `last_successful_fetch` written per source on completion
+- **Run/publish date**: store both `published_at` and `fetched_at`; Review UI default sort by publish date descending
 
 ### Phase 2 — Add ranking alongside existing pipeline
 - Add `significance_rank` column (nullable) to `news_items`
@@ -350,8 +400,9 @@ Modified files:
 
 ### Phase 3 — Replace email filter with rank threshold
 - Email gated on rank ≥ 3 (configurable)
-- Binary filter demoted to pre-screen
+- Binary filter fully removed (already deleted in Phase 1)
 - Fix B3, B4 (category/OTHER)
+- ANNOTATE fully operational: DUPLICATE items saved to DB with rank 0, collapsed section in Review UI
 
 ### Phase 4 — Replace grouping with tagging
 - Add `news_tagger.py`
@@ -363,6 +414,7 @@ Modified files:
 - Add `ranking_signals` and `ranking_grounding` tables
 - Add Challenge UI + override reason validation chat
 - Wire self-improving signal extraction
+- Add **Re-rank selected items** action in Review UI (re-runs ranker on existing DB items without re-fetching — for testing ranking fixes)
 
 ### Phase 6 — Add Glossary Gap Alert
 - Red badge for rank ≥ 3 + no LoB match
@@ -376,3 +428,31 @@ Modified files:
 - v3.1 — Phase 4 (tagging replaces grouping)
 - v3.2 — Phase 5 (Challenge + grounding loop)
 - v3.3 — Phase 6 (glossary gap alert)
+
+---
+
+## 15. Features Added Post-Initial Design
+
+### F1 — Per-Source Successful Lookback Anchor
+Every source type (RSS, Twitter, URL) tracks its own `last_successful_fetch`. Lookback anchors to that date per source. New sources (null) fall back to `profile.date_scope` days ago. Updated only on success — failed fetches leave the anchor intact, ensuring no gap in coverage. "Full/unlimited" lookback removed entirely.
+
+### F2 — Pre-Run Health Check
+Before any fetching begins, `agents/health_check.py` verifies runtime reachability in parallel: HTTP HEAD for each selected URL/RSS source, `GET /2/users/me` for Twitter auth, SMTP connect+login+quit for Gmail, a minimal AI Core chat call, and a DB write test. Gmail, AI Core, and DB failures are hard blocks. Source unreachability is a warning (user can skip or abort).
+
+### F3 — Improved Run Error Messages
+Each pipeline step records its failure reason in `runs.error_step` + `runs.error_message`. The run status UI shows the specific step and message, not just a red icon.
+
+### F4 — Immediate Stop + Per-Source Save
+Stop is a threading event checked between items (not just between steps) — run breaks at the next item boundary. `last_successful_fetch` is written immediately when each source finishes, so a mid-run stop correctly records which sources completed.
+
+### F5 — Force Fetch Redefined
+Force fetch = treat `last_successful_fetch` as null for this run → use `date_scope` window. Always bounded by `date_scope`. Re-fetched items hit ANNOTATE and are tagged DUPLICATE (rank 0) if already in DB. Not a re-test mechanism — use Re-rank (F6) for that.
+
+### F6 — Re-Rank Action in Review UI
+"Re-rank selected items" bulk/per-item action in Review UI. Passes existing DB items through the current ranker without re-fetching. Updates `significance_rank`, `rank_tier`, `rank_reasoning`. Correct mechanism for testing ranking fixes.
+
+### F7 — DUPLICATE Handling: Rank 0, Never Dropped
+DUPLICATE = canonical fingerprint matches an existing DB item — not evaluated by ranker, assigned rank 0 (grey badge, outside 1–5 scale). **Never dropped** — always saved to DB and visible in Review UI in a collapsed section (expand to see). v2 silently dropped these; v3 makes them auditable.
+
+### F8 — Run Date vs Publish Date Segregation
+Every item card shows both `published_at` (legally meaningful, drives urgency) and `fetched_at` (when Legal Eagle retrieved it). Review UI default sort: publish date descending. Email cards: publish date prominent on every card (fixes B5).
