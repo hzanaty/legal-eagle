@@ -235,28 +235,27 @@ Before overriding, user hits **"Challenge"** on any item:
 
 ### Override Reason Validation (mini-chat)
 1. Reason written (or AI auto-populated from challenge)
-2. AI reflects: *"I understood: future items from Official Gazette sources with decree numbers and effective dates within 30 days should be ranked 5 in SA/HCM. Correct?"*
-3. User confirms or corrects
-4. Confirmed summary saved as profile-specific grounding example (Tier 2 prompt)
+2. AI reflects back the understood signal: *"I understood: future items from Official Gazette sources with decree numbers and effective dates within 30 days should be ranked 5 in SA/HCM. Correct?"*
+3. User confirms once — **both writes happen simultaneously**
 
 ### Self-Improving Signal Schema
-When Challenge → rank override → confirm, **two things happen simultaneously:**
+When Challenge → rank override → confirm, **one confirmation covers everything:**
 
-1. Item override recorded with confirmed reason
-2. AI extracts generalizable signal pattern → proposes new `ranking_signals` row:
-   - *"New ranking rule proposed: effective_date_within_days ≤ 14 + penalty_clause → rank 5 for SA/HCM — confirm to add?"*
-   - One-click confirm, or auto-add with 24-hour review window
+1. Human writes (or accepts AI-populated) override reason
+2. AI reflects back the understood signal (see mini-chat above)
+3. Human confirms once — **both writes happen simultaneously:**
+   - `ranking_grounding` updated: validated summary becomes a Tier 2 grounding example
+   - `ranking_signals` updated: extracted pattern becomes a new Tier 1 deterministic rule
 
 **Full self-improvement loop:**
 ```
 Challenge
   → LLM re-evaluates
     → Override + reason auto-populated
-      → User confirms
-        → Item override saved
-        → Signal pattern extracted
-          → ranking_signals DB updated
-            → Next run: Tier 1 catches this pattern, no AI call needed
+      → AI reflects signal back
+        → User confirms (single action)
+          → W ranking_grounding  (grounding example — LLM uses this as few-shot context next run)
+          → W ranking_signals    (Tier 1 rule — deterministic match, no AI call needed next run)
 ```
 
 ---
