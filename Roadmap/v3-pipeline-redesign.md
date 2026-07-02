@@ -104,12 +104,15 @@ SAVE TO DB
   Both published_at and fetched_at stored and indexed
   Available immediately in Review UI
    ↓
-EMAIL FILTER + SEND
+EMAIL FILTER + SEND (decoupled — runs after run marks SUCCESS)
   Apply rank threshold (default: send rank 3+)
   Apply REPEATED suppression rules (see §6)
-  Organize by Topic Label (replaces grouping)
-  Render email — publish date on every card, rank badge, topic tag, source link
+  Generate AI digest via email_composer.py — grouped by Topic Label, one AI call per topic
+  Language: recipient profile language only — no bilingual
+  Render email — publish date on every card, rank badge, topic tag, source links
+  Set email_sent = 1 on all included items; update runs.email_status
   Gmail SMTP (ANS re-enabled when BTP rebuilt)
+  Run log shows email stage status + Resend button on failure
 ```
 
 ---
@@ -377,56 +380,89 @@ Modified files:
 
 ## 13. Transition Plan v2.32 → v3.0
 
-### Phase 1 — Structural improvements (no pipeline behavior change to user)
-- **B1**: Replace hardcoded `MAX_NEWS_AGE_DAYS = 7` with per-source `last_successful_fetch` anchor; age gate moved to ANNOTATE step
-- **B2**: Per-source `last_successful_fetch` on all source types (RSS, Twitter, URL); new sources fall back to `date_scope` days ago
-- **B5**: Surface `published_at` in email cards and Review UI; migrate `_parse_publication_date()` to `text_utils.py`
-- **B7**: Add `canonical_fingerprint TEXT` to `news_items`; fingerprint = normalized(publication_date + issuing_authority_name + topic_noun_phrase)
-- **B8**: Move translation to post-save step; extract `news_translator.py`
-- **Delete `news_filter.py`**: migrate useful pieces, remove binary filter entirely
-- **Force fetch redefined**: treat `last_successful_fetch` as null for this run; bounded by `date_scope` always; remove "full/all/unlimited" options
-- **DUPLICATE handling**: save to DB with rank 0, never drop; collapsed section in Review UI
-- **Pre-run health check**: add `agents/health_check.py`; run before FETCH
-- **Run error messages**: add `error_step` + `error_message` to `runs` table; surface in run status UI
-- **Immediate stop**: threading stop event checked between items; `last_successful_fetch` written per source on completion
-- **Run/publish date**: store both `published_at` and `fetched_at`; Review UI default sort by publish date descending
+### Phase 1 — Setup + Collect structural improvements (no pipeline behaviour change to user)
+Follows lifecycle order: Setup → ① Start → ② Collect → infrastructure fixes.
 
-### Phase 2 — Add ranking alongside existing pipeline
+**Setup — Sources (F9 Source Simulator):**
+- URL source form reduced to 1 field; simulator auto-discovers container selectors, field selectors, depth, render mode, pagination (see F9)
+- Add `agents/source_simulator.py`; migrate `url_sources` schema; add `/simulate` SSE route; replace form in `profile.html`
+- Add `scrape_url_source_with_config()` to `url_sources_runner.py`
+- **Spec:** `docs/superpowers/specs/2026-07-01-source-simulator-design.md` · **Plan:** `docs/superpowers/plans/2026-07-01-source-simulator.md`
+
+**① Start — Health Check (F2):**
+- Add `agents/health_check.py`; runs before any fetching begins
+- Hard blocks: Gmail SMTP, SAP AI Core, DB writability
+- Warnings: source unreachability (user can skip or abort)
+- Run error messages: add `error_step` + `error_message` to `runs` table; surface in run status UI (F3)
+- Immediate stop: threading event checked between items; `last_successful_fetch` written per source on completion (F4)
+
+**② Collect — Per-source lookback (F1, B1, B2):**
+- Per-source `last_successful_fetch` on all source types (RSS, Twitter, URL); new sources fall back to `date_scope` days ago
+- Replace hardcoded `MAX_NEWS_AGE_DAYS = 7` with per-source anchor; age gate moved to ANNOTATE step
+- Force fetch redefined: treat `last_successful_fetch` as null, bounded by `date_scope`; remove "full/all/unlimited" options (F5)
+
+**③ Process — Infrastructure fixes (B5, B7, B8, F7, F8):**
+- Delete `news_filter.py`; migrate useful pieces (B6)
+- Move translation to post-save step; extract `news_translator.py` (B8)
+- Add `canonical_fingerprint TEXT` to `news_items`; entity-based fingerprint (B7)
+- DUPLICATE items saved to DB with rank 0, never dropped; collapsed section in Review UI (F7)
+- Store both `published_at` and `fetched_at`; Review UI default sort by publish date descending (F5, F8)
+
+### Phase 2 — Rank (③ Process — new step)
+Follows lifecycle order: Compare → **Rank** added after Compare.
+
 - Add `significance_rank` column (nullable) to `news_items`
-- Add `news_ranker.py` — runs after filter, writes rank to DB
-- Review UI shows rank — no email behavior change yet
-- Validate ranking quality across all profiles before proceeding
+- Add `news_ranker.py` — three-tier engine runs after ANNOTATE, writes rank 1–5 to DB
+- DUPLICATE items (rank 0) skip ranker
+- Review UI shows rank badges — no email behaviour change yet
+- Validate ranking quality across all profiles before proceeding to Phase 3
 
-### Phase 3 — Replace email filter with rank threshold
-- Email gated on rank ≥ 3 (configurable)
-- Binary filter fully removed (already deleted in Phase 1)
-- Fix B3, B4 (category/OTHER)
-- ANNOTATE fully operational: DUPLICATE items saved to DB with rank 0, collapsed section in Review UI
+### Phase 3 — Tag + Email threshold (③ Process + ④ Finish)
+Follows lifecycle order: Rank → **Tag** → Group removed → **Send Email** threshold gate.
 
-### Phase 4 — Replace grouping with tagging
-- Add `news_tagger.py`
-- Add topic label columns
-- Redesign email organization by topic label
-- Add publish date to email cards
+- Add `news_tagger.py` — glossary keyword matching; assigns Topic Labels + LoB Relevance
+- Remove `news_grouper.py` — LLM summarization eliminated; Group step removed
+- Fix B3, B4 (category/OTHER constrained to profile LoB)
+- Email gated on rank ≥ 3 (configurable); binary filter gate fully gone
+- **Email V2 digest format** — new `agents/email_composer.py`; AI digest grouped by Topic Label (one AI call per topic, sequential); single language per recipient; no bilingual
+- Email send **decoupled from run** — run marks SUCCESS first, digest runs as follow-on step
+- `email_sent INTEGER` on `news_items`; `email_status TEXT` on `runs`
+- Run log: email stage indicator (`PENDING → SENDING → SENT / FAILED / SKIPPED`) + Resend button on failure
+- Review page: Email filter chip (Unsent only), Send Email toolbar button, Sent/Unsent pill per item
+- Publish date on every email card (B5)
+- ANNOTATE fully operational: DUPLICATE collapsed section in Review UI
+- Fallback: if tagger not yet live at Phase 3 deploy, email uses single "General" block
 
-### Phase 5 — Add Challenge + Grounding Loop
+### Phase 4 — Challenge + Grounding Loop (Review — Challenge Rank)
+Follows lifecycle order: Review → **Challenge Rank** → feeds back into Rank (next run).
+
 - Add `ranking_signals` and `ranking_grounding` tables
-- Add Challenge UI + override reason validation chat
-- Wire self-improving signal extraction
-- Add **Re-rank selected items** action in Review UI (re-runs ranker on existing DB items without re-fetching — for testing ranking fixes)
+- Add Challenge UI + override reason mini-chat validation
+- Wire self-improving signal extraction: confirmed override → W `ranking_grounding` + W `ranking_signals` simultaneously
+- Add **Re-rank selected items** action in Review UI (F6 — re-runs ranker on existing DB items without re-fetching)
+- **Email V2 topic grouping fully active** — tagger output feeds directly into `email_composer.py` topic grouping; no extra work needed
 
-### Phase 6 — Add Glossary Gap Alert
-- Red badge for rank ≥ 3 + no LoB match
+### Phase 5 — Glossary Gap Alert (Review — after Challenge Rank)
+Follows lifecycle order: final Review enhancement, depends on Tag (Phase 3) being live.
+
+- Red **"No LoB Match"** badge for rank ≥ 3 + zero glossary keyword matches
 - "+ Add to Glossary" inline action in Review UI
+- AI pre-suggests keywords; user confirms; glossary updated immediately without navigation
 
 ---
 
 ## 14. Version Naming
 
-- v3.0 — Phase 3 complete (rank-gated email, bugs fixed)
-- v3.1 — Phase 4 (tagging replaces grouping)
-- v3.2 — Phase 5 (Challenge + grounding loop)
-- v3.3 — Phase 6 (glossary gap alert)
+Versions are targets — none are implemented yet. Each version is reached when its phase is fully delivered and tested.
+
+| Version | Phase | What it delivers |
+|---|---|---|
+| **v3.0** | Phase 0 | Admin UI navigation overhaul — clean flow between Setup → Run → Review; fix jumping/disorientation between config, run status, and review screens. **Spec:** `docs/superpowers/specs/2026-07-02-v3-0-admin-ux-design.md` · **Mockups:** `docs/superpowers/mockups/v3-0-admin-ux/` |
+| **v3.1** | Phase 1 | All structural fixes (bugs B1–B8, F1–F5, F7–F9) + Source Simulator. No pipeline behaviour change visible to email recipients. |
+| **v3.2** | Phase 2 | Ranking engine live; rank badges in Review UI. Email still uses old threshold. |
+| **v3.3** | Phase 3 | Email gated on rank ≥ 3; tagging replaces grouping; publish dates on cards. **Email V2 digest format** — AI newsletter grouped by Topic Label; decoupled from run; Resend button; manual send from Review. |
+| **v3.4** | Phase 4 | Challenge + grounding loop; self-improving Tier 1 rules; Re-rank action (F6). |
+| **v3.5** | Phase 5 | Glossary gap alert; inline "+ Add to Glossary" in Review UI. |
 
 ---
 
@@ -455,3 +491,69 @@ DUPLICATE = canonical fingerprint matches an existing DB item — not evaluated 
 
 ### F8 — Run Date vs Publish Date Segregation
 Every item card shows both `published_at` (legally meaningful, drives urgency) and `fetched_at` (when Legal Eagle retrieved it). Review UI default sort: publish date descending. Email cards: publish date prominent on every card (fixes B5).
+
+### F9 — Source Simulator (Zero-Config URL Source Setup)
+Adding a new URL source today requires filling 11 manual fields (mode, sample_link, read_more_label, max_depth, allowed_domains, path_filter, etc.). F9 replaces all of this with a single URL field and a one-time AI-powered simulation step.
+
+**What changes:**
+- URL source form reduced from 11 fields → 1 field (URL only)
+- All structural config (container selector, field selectors, depth, render mode, pagination) auto-discovered once by the simulator and stored in DB
+- Runtime scraper reads stored selectors per run — no re-discovery on every run (faster, more reliable)
+- Dropped params: `mode`, `crawl_version`, `max_depth`, `allowed_domains`, `path_filter`, `max_results`, `url_date_template`, `read_more_label`
+- Repurposed: `sample_link` — simulator writes a proof article URL here
+
+**Simulator pipeline (one-time, user-triggered):**
+1. **Fetch** — static HTTP first; auto-falls back to Playwright if page is JS-skeleton (`requires_js` stored)
+2. **Detect containers** — scans DOM for repeating elements (same tag + class, ≥3 occurrences); presents preview of found articles to user
+3. **Depth loop** — if articles not found at entry URL, LLM picks most likely nav link, simulator follows it one level deeper; user confirms or requests another level (max depth 5)
+4. **Map fields** — extracts CSS selectors for title, link, date, author within confirmed container (automatic, no user input)
+5. **Button picker** — if multiple clickable elements found near articles, presents up to 4 candidates; user picks which opens article detail (conditional — skipped if article title IS the link)
+6. **Pagination detection** — scans for date-nav or page-nav controls; stores selector + type; shown to user informally before saving (no action required)
+7. **Sample capture** — follows first article link, stores detail URL as `sample_link` (proof of success)
+8. **Save** — all discovered config written to `url_sources`; `simulation_status = success`
+
+**New `url_sources` columns:** `simulation_status` (pending/success/failed), `simulated_at`, `container_selector`, `field_selectors` (JSON), `read_more_selector`, `pagination_type`, `pagination_selector`, `depth_level`, `requires_js`
+
+**Simulation trigger:** User adds URL → row saved as `pending` → user clicks **⚡ Simulate** button in the row. Not triggered automatically on save. Existing un-simulated sources show same `⏳ Pending` badge + Simulate button.
+
+**Runtime impact:** `url_sources_runner.py` gains `scrape_url_source_with_config()` — reads stored selectors directly instead of re-discovering. Legacy path (un-simulated sources) preserved as fallback.
+
+**Limits:** Does not handle login-required sites. GOSI-style click-discover absorbed into general Playwright + depth loop.
+
+**Spec:** `docs/superpowers/specs/2026-07-01-source-simulator-design.md`  
+**Plan:** `docs/superpowers/plans/2026-07-01-source-simulator.md`
+
+### Email V2 — AI Digest + Manual Send
+
+Replaces the current flat bilingual HTML email with a structured AI-generated newsletter digest. Ships in **v3.3 (Phase 3)**.
+
+**Digest format:**
+- Header: "Legal Eagle Digest — {Profile Name}" + date
+- One topic block per glossary Topic Label, sorted by highest rank item desc
+- Within each topic: AI detects distinct legal aspects → one sub-section per aspect (title + collective summary + first publish date + source links)
+- Single language per recipient (profile language) — no bilingual output
+
+**AI generation approach:**
+- Topic grouping is deterministic in code (uses existing Topic Labels from tagger — no AI needed)
+- One sequential AI call per topic group: detects sub-aspects, writes title + summary per aspect
+- In-memory dict collects results per topic; assembled into final HTML after all calls complete
+- Fallback: if tagger not yet live, all items fall into a single "General" block
+
+**Decoupling from run execution:**
+- Run marks SUCCESS as soon as items are stored and ranked — does not wait for email
+- Digest generation starts immediately after as a follow-on step
+- `email_status` on `runs` table tracks: `PENDING → SENDING → SENT / FAILED / SKIPPED`
+- `SKIPPED` = test mode run (no auto-send)
+- Run log shows email as a separate observable stage + **Resend** button on `FAILED`
+
+**Manual send from Review page (test mode use case):**
+- "Unsent only" filter chip (5th filter row, amber) — filters `email_sent = 0`
+- "✉ Send Email (N)" button in toolbar — active only when items selected
+- `✉ Unsent` / `✓ Sent` pill in item meta line — DUPLICATE items get no pill
+- `/send-email` route accepts either `item_ids` (manual) or `run_id` (Resend from run log)
+
+**DB changes:**
+- `news_items.email_sent INTEGER DEFAULT 0` — set to 1 on first send, never reset
+- `runs.email_status TEXT DEFAULT 'PENDING'`
+
+**Spec:** `docs/superpowers/specs/2026-07-02-email-v2-design.md`
