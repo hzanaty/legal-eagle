@@ -457,8 +457,8 @@ Versions are targets — none are implemented yet. Each version is reached when 
 
 | Version | Phase | What it delivers |
 |---|---|---|
-| **v3.0** | Phase 0 | Admin UI navigation overhaul — clean flow between Setup → Run → Review; fix jumping/disorientation between config, run status, and review screens. **Spec:** `docs/superpowers/specs/2026-07-02-v3-0-admin-ux-design.md` · **Mockups:** `docs/superpowers/mockups/v3-0-admin-ux/` |
-| **v3.1** | Phase 1 | All structural fixes (bugs B1–B8, F1–F5, F7–F9) + Source Simulator. No pipeline behaviour change visible to email recipients. |
+| **v3.0** | Phase 0 | Admin UI navigation overhaul — clean flow between Setup → Run → Review; fix jumping/disorientation between config, run status, and review screens. **Run All Active UI:** button enabled (solid blue, no "Soon" badge), live status pill CSS on profile rows, toast on click. **Spec:** `docs/superpowers/specs/2026-07-02-v3-0-admin-ux-design.md` · `docs/superpowers/specs/2026-07-02-run-all-active-design.md` · **Mockups:** `docs/superpowers/mockups/v3-0-admin-ux/` |
+| **v3.1** | Phase 1 | All structural fixes (bugs B1–B8, F1–F5, F7–F9) + Source Simulator. No pipeline behaviour change visible to email recipients. **Run All Active backend:** sequential background thread, skip-on-failure, SSE live row updates on dashboard. |
 | **v3.2** | Phase 2 | Ranking engine live; rank badges in Review UI. Email still uses old threshold. |
 | **v3.3** | Phase 3 | Email gated on rank ≥ 3; tagging replaces grouping; publish dates on cards. **Email V2 digest format** — AI newsletter grouped by Topic Label; decoupled from run; Resend button; manual send from Review. |
 | **v3.4** | Phase 4 | Challenge + grounding loop; self-improving Tier 1 rules; Re-rank action (F6). |
@@ -557,3 +557,21 @@ Replaces the current flat bilingual HTML email with a structured AI-generated ne
 - `runs.email_status TEXT DEFAULT 'PENDING'`
 
 **Spec:** `docs/superpowers/specs/2026-07-02-email-v2-design.md`
+
+### Run All Active — One-Click Multi-Profile Runner
+
+Activates the "Run All Active" placeholder button in the dashboard summary strip. Split across two phases.
+
+**v3.0 (UI only):**
+- Button enabled: solid blue `#0a6ed1`, no dashed border, no "Soon" badge
+- Live status pill CSS added to profile rows (Waiting / Running / Done / Failed)
+- Clicking shows toast: "Run All wiring coming in v3.1"
+
+**v3.1 (backend wired):**
+- `POST /admin/run-all`: spawns background thread, runs each active profile sequentially using existing `run_profile()` logic
+- Skip-on-failure: failed profile is marked `✗ Failed` with error reason, next profile starts immediately
+- One session at a time: button disabled while running, shows `N / TOTAL` counter
+- SSE push events (`run_all_status`) update profile row pills live on the dashboard — reuses existing SSE infrastructure
+- `GET /admin/run-all/status`: reconnect recovery after page reload
+
+**Spec:** `docs/superpowers/specs/2026-07-02-run-all-active-design.md`
