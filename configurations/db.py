@@ -357,6 +357,38 @@ def create_schema_if_needed(conn: sqlite3.Connection) -> None:
         except Exception:
             pass
 
+        # Authorities — legislative bodies per profile (v3.0)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS authorities (
+                id INTEGER PRIMARY KEY,
+                profile_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                aliases TEXT,
+                UNIQUE(profile_id, name),
+                FOREIGN KEY(profile_id) REFERENCES profiles(id) ON DELETE CASCADE
+            );
+        """)
+
+        # rss_feeds source attribution columns (v3.0)
+        try:
+            conn.execute("ALTER TABLE rss_feeds ADD COLUMN publisher_name TEXT")
+        except Exception:
+            pass
+        try:
+            conn.execute("ALTER TABLE rss_feeds ADD COLUMN authority_id INTEGER")
+        except Exception:
+            pass
+
+        # url_sources source attribution columns (v3.0)
+        try:
+            conn.execute("ALTER TABLE url_sources ADD COLUMN publisher_name TEXT")
+        except Exception:
+            pass
+        try:
+            conn.execute("ALTER TABLE url_sources ADD COLUMN authority_id INTEGER")
+        except Exception:
+            pass
+
         # Legal Repository
         conn.execute(
             """
@@ -468,21 +500,64 @@ def _list_simple(conn: sqlite3.Connection, table: str, col: str, profile_id: int
 
 def list_rss_feeds(conn: sqlite3.Connection, profile_id: int) -> List[Dict[str, Any]]:
     """
-    Return RSS feeds with per-source config (url, max_lookback_days, last_fetch_date).
-    Returns List[Dict] since v2.9.
+    Return RSS feeds with per-source config.
+    Returns List[Dict] since v2.9; includes publisher_name and authority_id since v3.0.
     """
     rows = conn.execute(
-        "SELECT url, COALESCE(max_lookback_days, 7) as max_lookback_days, last_fetch_date FROM rss_feeds WHERE profile_id = ? ORDER BY url",
+        """SELECT id, url, COALESCE(max_lookback_days, 7) as max_lookback_days,
+           last_fetch_date, publisher_name, authority_id
+           FROM rss_feeds WHERE profile_id = ? ORDER BY url""",
         (profile_id,)
     ).fetchall()
     return [
         {
+            "id": r["id"],
             "url": r["url"],
             "max_lookback_days": r["max_lookback_days"],
             "last_fetch_date": r["last_fetch_date"],
+            "publisher_name": r["publisher_name"],
+            "authority_id": r["authority_id"],
         }
         for r in rows
     ]
+
+
+# -----------------------
+# Authority CRUD (v3.0)
+# -----------------------
+
+def create_authority(conn: sqlite3.Connection, profile_id: int, name: str, aliases: str = "") -> int:
+    with conn:
+        cur = conn.execute(
+            "INSERT INTO authorities(profile_id, name, aliases) VALUES(?,?,?)",
+            (profile_id, name, aliases or "")
+        )
+        return cur.lastrowid
+
+
+def list_authorities(conn: sqlite3.Connection, profile_id: int) -> List[Dict[str, Any]]:
+    rows = conn.execute(
+        "SELECT id, name, aliases FROM authorities WHERE profile_id=? ORDER BY name",
+        (profile_id,)
+    ).fetchall()
+    return [{"id": r["id"], "name": r["name"], "aliases": r["aliases"] or ""} for r in rows]
+
+
+def get_authority(conn: sqlite3.Connection, authority_id: int) -> Optional[Dict[str, Any]]:
+    r = conn.execute(
+        "SELECT id, profile_id, name, aliases FROM authorities WHERE id=?", (authority_id,)
+    ).fetchone()
+    return {"id": r["id"], "profile_id": r["profile_id"], "name": r["name"], "aliases": r["aliases"] or ""} if r else None
+
+
+def update_authority(conn: sqlite3.Connection, authority_id: int, name: str, aliases: str = "") -> None:
+    with conn:
+        conn.execute("UPDATE authorities SET name=?, aliases=? WHERE id=?", (name, aliases or "", authority_id))
+
+
+def delete_authority(conn: sqlite3.Connection, authority_id: int) -> None:
+    with conn:
+        conn.execute("DELETE FROM authorities WHERE id=?", (authority_id,))
 
 
 def list_tweet_accounts(conn: sqlite3.Connection, profile_id: int) -> List[Dict[str, Any]]:
@@ -547,11 +622,16 @@ def upsert_email_receiver_with_lang(conn: sqlite3.Connection, profile_id: int, e
 # Insert helpers (for migration/admin)
 # -----------------------
 
-def upsert_rss_feed(conn: sqlite3.Connection, profile_id: int, url: str) -> None:
+def upsert_rss_feed(conn: sqlite3.Connection, profile_id: int, url: str,
+                    publisher_name=None, authority_id=None) -> None:
     with conn:
         conn.execute(
             "INSERT OR IGNORE INTO rss_feeds(profile_id, url) VALUES(?,?)",
             (profile_id, url)
+        )
+        conn.execute(
+            "UPDATE rss_feeds SET publisher_name=?, authority_id=? WHERE profile_id=? AND url=?",
+            (publisher_name, authority_id, profile_id, url)
         )
 
 
