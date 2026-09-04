@@ -1,1099 +1,120 @@
 {% extends "base.html" %}
-{% block content %}
+{% block run_tab %}
+<div style="display:flex;gap:24px;height:calc(100vh - 200px)">
 
-<style>
-  /* Status Card Styles (matching review page) */
-  .sapStatCard {
-    background: var(--sapTileBackground);
-    border: 1px solid var(--sapTileBorderColor);
-    border-radius: 0.25rem;
-    padding: var(--sapSpacingL);
-    text-align: center;
-    box-shadow: var(--sapTileShadow);
-  }
-  
-  .sapStatCard-value {
-    font-size: 2rem;
-    font-weight: 300;
-    line-height: 1.2;
-    margin: var(--sapSpacingS) 0;
-  }
-  
-  .sapStatCard-label {
-    font-size: var(--sapFontSize);
-    color: var(--sapNeutralColor);
-    font-weight: 600;
-  }
-  
-  .sapStatCard-neutral { border-left: 4px solid var(--sapNeutralColor); }
-  .sapStatCard-warning { border-left: 4px solid var(--sapCriticalColor); }
-  .sapStatCard-positive { border-left: 4px solid var(--sapPositiveColor); }
-  
-  /* Run Page Specific Fiori Styles */
-  .sapTable-compact {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: var(--sapFontSmallSize);
-  }
-  
-  .sapTable-compact th {
-    padding: var(--sapSpacingXS) var(--sapSpacingS);
-    text-align: left;
-    font-weight: 600;
-    background: var(--sapNeutralBackground);
-    border-bottom: 1px solid var(--sapGroup_ContentBorderColor);
-  }
-  
-  .sapTable-compact td {
-    padding: var(--sapSpacingXS) var(--sapSpacingS);
-    border-bottom: 1px solid var(--sapGroup_ContentBorderColor);
-    vertical-align: middle;
-  }
-  
-  .sapTable-compact tbody tr:hover {
-    background: var(--sapList_Hover_Background);
-    cursor: pointer;
-  }
-  
-  .sapTable-compact a {
-    color: var(--sapLinkColor);
-    text-decoration: none;
-  }
-  
-  .sapTable-compact a:hover {
-    color: var(--sapLinkHoverColor);
-    text-decoration: underline;
-  }
-  
-  /* Stage Pipeline Viewer */
-  .sapStagePanel {
-    display: flex;
-    height: 520px;
-  }
+  <!-- Left panel (300px) -->
+  <div style="width:300px;flex-shrink:0;display:flex;flex-direction:column;gap:16px;overflow-y:auto">
 
-  .sapStageList {
-    width: 164px;
-    border-right: 1px solid var(--sapGroup_ContentBorderColor);
-    overflow-y: auto;
-    padding: 8px 0;
-    flex-shrink: 0;
-    background: var(--sapNeutralBackground);
-  }
-
-  .stage-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    padding: 7px 12px;
-    cursor: pointer;
-    transition: background 0.15s;
-    font-size: 12px;
-    line-height: 1.4;
-    border-left: 3px solid transparent;
-    user-select: none;
-  }
-
-  .stage-item:hover { background: var(--sapList_Hover_Background); }
-  .stage-item.selected { background: var(--sapList_SelectionBackgroundColor); border-left-color: var(--sapSelectedColor); }
-
-  .stage-icon { font-style: normal; font-size: 13px; flex-shrink: 0; min-width: 14px; }
-  .stage-label { font-size: 12px; }
-
-  .stage-idle .stage-icon,
-  .stage-idle .stage-label { color: var(--sapNeutralColor); }
-
-  .stage-active { background: rgba(0,112,242,0.05); }
-  .stage-active .stage-icon { color: var(--sapInformativeColor); animation: stagePulse 1.2s ease-in-out infinite; }
-  .stage-active .stage-label { color: var(--sapTextColor); font-weight: 600; }
-
-  .stage-done .stage-icon  { color: var(--sapPositiveColor); }
-  .stage-done .stage-label { color: var(--sapTextColor); }
-
-  .stage-skipped .stage-icon,
-  .stage-skipped .stage-label { color: var(--sapNeutralColor); }
-  .stage-skipped .stage-label { text-decoration: line-through; }
-
-  .stage-failed .stage-icon,
-  .stage-failed .stage-label { color: var(--sapNegativeColor); }
-
-  .stage-connector {
-    width: 2px;
-    height: 6px;
-    background: var(--sapGroup_ContentBorderColor);
-    margin-left: 18px;
-  }
-
-  @keyframes stagePulse { 0%,100%{opacity:1} 50%{opacity:.35} }
-
-  .sapStageLog {
-    flex: 1;
-    overflow: auto;
-    background: #0b0f19;
-    padding: 12px 14px;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
-    font-size: 12px;
-    color: #d3d7de;
-  }
-
-  .sapStageLog pre { margin: 0; white-space: pre-wrap; word-wrap: break-word; }
-  .log-warn  { color: #f0ad4e; }
-  .log-error { color: #ff6b6b; }
-
-  .stage-body { display: flex; flex-direction: column; min-width: 0; }
-  .stage-summary { font-size: 10px; color: var(--sapNeutralColor); display: none; margin-top: 1px; }
-  .stage-summary.visible { display: block; }
-  .stage-summary.s-error { color: var(--sapCriticalColor); }
-
-  .stage-sub-item {
-    display: flex; align-items: flex-start; gap: 6px;
-    padding: 4px 8px 4px 26px; cursor: pointer;
-    font-size: 11px; line-height: 1.3;
-    border-left: 3px solid transparent; user-select: none;
-    transition: background 0.15s;
-  }
-  .stage-sub-item:hover { background: var(--sapList_Hover_Background); }
-  .stage-sub-item.selected { background: var(--sapList_SelectionBackgroundColor); border-left-color: var(--sapSelectedColor); }
-  .sub-icon { font-size: 12px; flex-shrink: 0; min-width: 14px; }
-  .sub-idle .sub-icon, .sub-idle .sub-label { color: var(--sapNeutralColor); }
-  .sub-active { background: rgba(0,112,242,0.03); }
-  .sub-active .sub-icon { color: var(--sapInformativeColor); animation: stagePulse 1.2s ease-in-out infinite; }
-  .sub-active .sub-label { color: var(--sapTextColor); font-weight: 600; }
-  .sub-done .sub-icon  { color: var(--sapPositiveColor); }
-  .sub-done .sub-label { color: var(--sapTextColor); }
-  .sub-failed .sub-icon, .sub-failed .sub-label { color: var(--sapNegativeColor); }
-  .sub-skipped .sub-label { color: var(--sapNeutralColor); text-decoration: line-through; }
-  .sub-count { font-size: 10px; color: var(--sapNeutralColor); display: none; margin-top: 1px; }
-  .sub-count.visible { display: block; }
-  .sub-count.s-error { color: var(--sapCriticalColor); }
-  
-  /* Split Layout */
-  .sapSplitPanel {
-    display: grid;
-    grid-template-columns: 320px 1fr;
-    gap: var(--sapSpacingM);
-  }
-  
-  @media (max-width: 992px) {
-    .sapSplitPanel {
-      grid-template-columns: 1fr;
-    }
-  }
-  
-  /* Modal Overlay */
-  .sapDialog-overlay {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0,0,0,0.6);
-    z-index: 2000;
-    align-items: center;
-    justify-content: center;
-  }
-  
-  .sapDialog-overlay.show {
-    display: flex;
-  }
-  
-  .sapDialog {
-    background: var(--sapBaseColor);
-    border-radius: 0.25rem;
-    box-shadow: 0 8px 16px rgba(0,0,0,0.3);
-    max-width: 500px;
-    width: 90%;
-  }
-  
-  .sapDialog-header {
-    padding: var(--sapSpacingM);
-    border-bottom: 1px solid var(--sapGroup_ContentBorderColor);
-    font-weight: 600;
-    font-size: var(--sapFontLargeSize);
-  }
-  
-  .sapDialog-content {
-    padding: var(--sapSpacingL);
-    font-size: var(--sapFontSize);
-    line-height: 1.5;
-  }
-  
-  .sapDialog-footer {
-    padding: var(--sapSpacingM);
-    border-top: 1px solid var(--sapGroup_ContentBorderColor);
-    display: flex;
-    justify-content: flex-end;
-    gap: var(--sapSpacingS);
-  }
-  
-  .sapMonospace {
-    font-family: monospace;
-    font-size: var(--sapFontSmallSize);
-    color: var(--sapNeutralColor);
-  }
-</style>
-
-<div class="sapSplitPanel">
-  <!-- Left Panel: Controls & History -->
-  <div>
-    <!-- Twitter Error Banner (Only shown when there's an error) -->
-    {% if twitter_error_flag %}
-    <div class="sapMessageStrip sapMessageStrip-error" style="margin-bottom: var(--sapSpacingM);">
-      <strong>🐦 Twitter API Error</strong>
-      <p style="margin: var(--sapSpacingXS) 0; font-size: var(--sapFontSmallSize);">{{ twitter_error_flag }}</p>
-      <form method="post" action="{{ url_for('clear_twitter_error_flag_route', profile_id=profile.id) }}" style="margin-top: var(--sapSpacingS);">
-        <button type="submit" class="sapBtn sapBtn-emphasized sapBtn-sm">Clear Error & Retry</button>
-      </form>
+    <!-- Source chips -->
+    {% if rss_feeds %}
+    <div>
+      <div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;margin-bottom:8px">
+        <span>&#128225; RSS Feeds</span>
+        <span style="background:#e5e5e5;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:normal">{{ rss_feeds|length }}</span>
+        <a href="#" onclick="deselectAll('rss');return false" style="margin-left:auto;font-size:12px;color:#0a6ed1;text-decoration:none">Deselect all</a>
+      </div>
+      {% for feed in rss_feeds %}
+      <label class="src-chip selected" onclick="toggleChip(this)">
+        <input type="checkbox" name="selected_rss" value="{{ feed.url }}" checked form="startRunForm" style="display:none">
+        {{ feed.publisher_name or feed.url|truncate(30) }}
+      </label>
+      {% endfor %}
     </div>
     {% endif %}
-    
-    <!-- Run Controls -->
-    <div class="sapCard" style="margin-bottom: var(--sapSpacingM);">
-      <div class="sapCard-header">
-        <span>▶️ Run Workflow</span>
-      </div>
-      <div class="sapCard-content">
-        <form method="post" action="{{ url_for('resend_email_from_preview', profile_id=profile.id) }}" style="margin-bottom: var(--sapSpacingS);">
-          <button 
-            type="submit" 
-            class="sapBtn sapBtn-default sapBtn-sm" 
-            style="width: 100%;"
-            {% if run_active %}disabled{% endif %}
-            title="Parse email_preview.html and send with translation to all configured receivers">
-            📧 Resend Last Email
-          </button>
-        </form>
 
-        <form method="post" action="{{ url_for('admin_start_run', profile_id=profile.id) }}" id="runForm">
-          <!-- Source Selection -->
-          <div style="margin-bottom: var(--sapSpacingM); padding: var(--sapSpacingS); background: var(--sapNeutralBackground); border-radius: 0.25rem;">
-            <div style="font-weight: 600; margin-bottom: var(--sapSpacingS); font-size: var(--sapFontSmallSize); color: var(--sapNeutralColor);">
-              Select Sources:
-            </div>
-            
-            <!-- RSS Feeds -->
-            <div class="source-category" style="margin-bottom: var(--sapSpacingS);">
-              <div style="display: flex; align-items: center; gap: var(--sapSpacingXS); margin-bottom: var(--sapSpacingXS);">
-                <input type="checkbox" id="rss_all" class="category-all" data-category="rss" checked style="cursor: pointer;">
-                <label for="rss_all" style="font-weight: 600; font-size: var(--sapFontSmallSize); cursor: pointer;">
-                  📰 RSS Feeds (<span id="rss_count">0</span>)
-                </label>
-                <button type="button" class="collapse-btn" data-target="rss_list" style="margin-left: auto; background: none; border: none; cursor: pointer; font-size: var(--sapFontSmallSize); color: var(--sapLinkColor);">
-                  ▼
-                </button>
-              </div>
-              <div id="rss_list" class="source-list" style="margin-left: var(--sapSpacingM); font-size: var(--sapFontSmallSize);">
-                <!-- Will be populated by JavaScript -->
-              </div>
-              <!-- Hidden flag to indicate RSS UI section exists -->
-              <input type="hidden" name="has_rss_sources" value="1">
-            </div>
-            
-            <!-- Twitter Accounts -->
-            <div class="source-category" style="margin-bottom: var(--sapSpacingS);">
-              <div style="display: flex; align-items: center; gap: var(--sapSpacingXS); margin-bottom: var(--sapSpacingXS);">
-                <input type="checkbox" id="twitter_all" class="category-all" data-category="twitter" checked style="cursor: pointer;">
-                <label for="twitter_all" style="font-weight: 600; font-size: var(--sapFontSmallSize); cursor: pointer;">
-                  🐦 Twitter Accounts (<span id="twitter_count">0</span>)
-                </label>
-                <button type="button" class="collapse-btn" data-target="twitter_list" style="margin-left: auto; background: none; border: none; cursor: pointer; font-size: var(--sapFontSmallSize); color: var(--sapLinkColor);">
-                  ▼
-                </button>
-              </div>
-              <div id="twitter_list" class="source-list" style="margin-left: var(--sapSpacingM); font-size: var(--sapFontSmallSize);">
-                <!-- Will be populated by JavaScript -->
-              </div>
-              <!-- Hidden flag to indicate Twitter UI section exists -->
-              <input type="hidden" name="has_twitter_sources" value="1">
-            </div>
-            
-            <!-- URL Sources -->
-            <div class="source-category" style="margin-bottom: var(--sapSpacingS);">
-              <div style="display: flex; align-items: center; gap: var(--sapSpacingXS); margin-bottom: var(--sapSpacingXS);">
-                <input type="checkbox" id="urls_all" class="category-all" data-category="urls" checked style="cursor: pointer;">
-                <label for="urls_all" style="font-weight: 600; font-size: var(--sapFontSmallSize); cursor: pointer;">
-                  🕵️ URL Sources (<span id="urls_count">0</span>)
-                </label>
-                <button type="button" class="collapse-btn" data-target="urls_list" style="margin-left: auto; background: none; border: none; cursor: pointer; font-size: var(--sapFontSmallSize); color: var(--sapLinkColor);">
-                  ▼
-                </button>
-              </div>
-              <div id="urls_list" class="source-list" style="margin-left: var(--sapSpacingM); font-size: var(--sapFontSmallSize);">
-                <!-- Will be populated by JavaScript -->
-              </div>
-              <!-- Hidden flag to indicate URL Sources UI section exists -->
-              <input type="hidden" name="has_url_sources" value="1">
-            </div>
-          </div>
-          
-            <!-- Run Options -->
-          <div style="margin-bottom: var(--sapSpacingM); padding: var(--sapSpacingS); background: var(--sapNeutralBackground); border-radius: 0.25rem;">
-            <div style="font-weight: 600; margin-bottom: var(--sapSpacingS); font-size: var(--sapFontSmallSize); color: var(--sapNeutralColor);">
-              Run Options:
-            </div>
-
-            <div style="margin-bottom: var(--sapSpacingS);">
-              <label style="font-size: var(--sapFontSmallSize); font-weight: 600; display: block; margin-bottom: 4px;">Lookback</label>
-              <select class="sapForm-select" name="lookback_override" style="font-size: var(--sapFontSmallSize); width: 100%;">
-                <option value="">Use profile default</option>
-                <option value="force_full">Force full (re-fetch all, ignore last run)</option>
-                <option value="delta">Delta (since last fetch)</option>
-                <option value="today">Today only</option>
-                <option value="last_7_days">Last 7 days</option>
-                <option value="last_30_days">Last 30 days</option>
-              </select>
-            </div>
-
-            <label style="display: flex; align-items: center; gap: var(--sapSpacingS); margin-bottom: var(--sapSpacingXS); cursor: pointer;">
-              <input type="checkbox" name="skip_comparison" value="1" style="cursor: pointer;">
-              <span style="font-size: var(--sapFontSmallSize);">
-                <strong>Skip comparison (treat all as new)</strong>
-                <br>
-                <span style="color: var(--sapNeutralColor); font-size: 11px;">
-                  Bypass duplicate detection, useful for testing
-                </span>
-              </span>
-            </label>
-            
-            <label style="display: flex; align-items: center; gap: var(--sapSpacingS); margin-bottom: var(--sapSpacingXS); cursor: pointer;">
-              <input type="checkbox" name="skip_filtering" value="1" style="cursor: pointer;">
-              <span style="font-size: var(--sapFontSmallSize);">
-                <strong>Skip filtering (accept all as relevant)</strong>
-                <br>
-                <span style="color: var(--sapNeutralColor); font-size: 11px;">
-                  Bypass LLM relevance check, useful for testing
-                </span>
-              </span>
-            </label>
-
-            <label style="display: flex; align-items: center; gap: var(--sapSpacingS); margin-bottom: var(--sapSpacingXS); cursor: pointer;">
-              <input type="checkbox" name="skip_grouping" value="1" style="cursor: pointer;">
-              <span style="font-size: var(--sapFontSmallSize);">
-                <strong>Skip grouping (one item per email entry)</strong>
-                <br>
-                <span style="color: var(--sapNeutralColor); font-size: 11px;">
-                  Bypass LLM grouping, useful for testing layout
-                </span>
-              </span>
-            </label>
-
-            <label style="display: flex; align-items: center; gap: var(--sapSpacingS); cursor: pointer;">
-              <input type="checkbox" name="skip_email" value="1" style="cursor: pointer;">
-              <span style="font-size: var(--sapFontSmallSize);">
-                <strong>Test mode (skip emails)</strong>
-                <br>
-                <span style="color: var(--sapNeutralColor); font-size: 11px;">
-                  Run pipeline without sending emails
-                </span>
-              </span>
-            </label>
-          </div>
-          
-          <div id="preflight-checklist" style="margin-bottom: var(--sapSpacingM); padding: var(--sapSpacingS); background: var(--sapNeutralBackground); border-radius: 4px; font-size: var(--sapFontSmallSize);">
-            <div style="font-weight:600; margin-bottom: 6px; color: var(--sapTitleColor);">⚙️ Pre-run Checklist</div>
-            <div id="preflight-items" style="color: var(--sapNeutralColor);">Checking...</div>
-          </div>
-
-          <button type="submit" id="start-run-btn" class="sapBtn sapBtn-accept" style="width: 100%;" disabled>
-            Start Run
-          </button>
-        </form>
-        
-        {% if selected_run and selected_run.status == 'Running' %}
-        <form method="post" action="{{ url_for('cancel_run', run_id=selected_run.id) }}" style="margin-top: var(--sapSpacingS);">
-          <button type="submit" class="sapBtn sapBtn-attention" style="width: 100%;">
-            Cancel Run
-          </button>
-        </form>
-        {% endif %}
+    <!-- Test mode toggle -->
+    <div style="padding:12px;background:#f5f6f7;border-radius:6px">
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;cursor:pointer">
+        Test mode
+        <input type="checkbox" id="testToggle" onchange="onTestMode()">
+      </label>
+      <div style="font-size:12px;color:#6a6d70;margin-top:4px">Fetches last 7 days, skips email send and pre-checks.</div>
+      <div id="testImplied" style="display:none;margin-top:8px;font-size:12px">
+        <div>&#10003; Lookback: 7 days</div>
+        <div style="color:#6a6d70">Email send <span style="color:#e9730c">skipped</span></div>
+        <div style="color:#6a6d70">Email pre-checks <span style="color:#e9730c">skipped</span></div>
       </div>
     </div>
 
-    <!-- Run History -->
-    <div class="sapCard">
-      <div class="sapCard-header">
-        <span>📊 History</span>
-        <span style="color: var(--sapNeutralColor); font-weight: 400; font-size: var(--sapFontSmallSize);">
-          Last 7 days
-        </span>
-      </div>
-      <div class="sapCard-content" style="padding: 0;">
-        {% if runs and runs|length > 0 %}
-        <div style="overflow-x: auto;">
-          <table class="sapTable-compact">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Status</th>
-                <th>Started</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for r in runs %}
-              <tr onclick="window.location.href='{{ url_for('admin_profile_runs', profile_id=profile.id, run_id=r.id) }}'">
-                <td>
-                  <a href="{{ url_for('admin_profile_runs', profile_id=profile.id, run_id=r.id) }}">#{{ r.id }}</a>
-                </td>
-                <td>
-                  {% set s = r.status %}
-                  <span class="sapBadge 
-                    {% if s == 'Success' %}sapBadge-positive
-                    {% elif s == 'Failed' %}sapBadge-negative
-                    {% elif s == 'Canceled' %}sapBadge-critical
-                    {% elif s == 'Running' %}sapBadge-neutral{% else %}sapBadge-neutral{% endif %}">
-                    {% if s == 'Success' %}✓
-                    {% elif s == 'Failed' %}✗
-                    {% elif s == 'Canceled' %}⏸
-                    {% elif s == 'Running' %}⟳{% else %}—{% endif %}
-                    {{ s }}
-                  </span>
-                  {% if r.origin %}
-                    <span class="sapBadge sapBadge-neutral" style="margin-left: var(--sapSpacingXS);">
-                      {% if r.origin == 'scheduled' %}🗓️{% else %}👤{% endif %}
-                    </span>
-                  {% endif %}
-                </td>
-                <td class="sapMonospace">{{ (r.started_at or '')|format_date('Asia/Dubai') }}</td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-        {% else %}
-        <div style="padding: var(--sapSpacingL); text-align: center; color: var(--sapNeutralColor);">
-          <p style="margin: 0;">No runs yet</p>
-        </div>
-        {% endif %}
-      </div>
-    </div>
+    <!-- Start Run button -->
+    <form method="POST" action="{{ url_for('admin_start_run', profile_id=selected_profile.id) }}" id="startRunForm">
+      <input type="hidden" name="test_mode" id="testModeVal" value="0">
+      <input type="hidden" name="has_rss_sources" value="1">
+      <button type="submit" id="startBtn"
+              style="width:100%;padding:12px;background:#107e3e;color:#fff;border:none;border-radius:4px;font-size:14px;font-weight:600;cursor:pointer">
+        &#9654; Start Run
+      </button>
+    </form>
   </div>
 
-  <!-- Right Panel: Log Viewer -->
-  <div>
-    <div class="sapCard">
-      <div class="sapCard-header">
-        <div style="display: flex; align-items: center; gap: var(--sapSpacingS);">
-          <span>📝 Run Logs</span>
-          {% if selected_run %}
-          <span style="color: var(--sapNeutralColor); font-weight: 400;">#{{ selected_run.id }}</span>
-          {% endif %}
-        </div>
-        <div style="display: flex; align-items: center; gap: var(--sapSpacingS);">
-          {% if selected_run %}
-            {% set s = selected_run.status %}
-            <span id="run-status" class="sapBadge 
-              {% if s == 'Success' %}sapBadge-positive
-              {% elif s == 'Failed' %}sapBadge-negative
-              {% elif s == 'Canceled' %}sapBadge-critical
-              {% elif s == 'Running' %}sapBadge-neutral{% else %}sapBadge-neutral{% endif %}">
-              {% if s == 'Success' %}✓
-              {% elif s == 'Failed' %}✗
-              {% elif s == 'Canceled' %}⏸
-              {% elif s == 'Running' %}⟳{% else %}—{% endif %}
-              {{ s }}
-            </span>
-            {% if selected_run.origin %}
-              <span class="sapBadge sapBadge-neutral">
-                {% if selected_run.origin == 'scheduled' %}🗓️ Scheduled{% else %}👤 Manual{% endif %}
-              </span>
-            {% endif %}
-          {% else %}
-            <span id="run-status" class="sapBadge sapBadge-neutral">Idle</span>
-          {% endif %}
-        </div>
+  <!-- Right panel -->
+  <div style="flex:1;display:flex;flex-direction:column;gap:12px;min-height:0">
+
+    <!-- Stage stepper -->
+    <div style="display:flex;gap:4px;flex-wrap:wrap">
+      {% for s in ['Starting','Collecting','Filtering','Comparing','Grouping','Sending','Done'] %}
+      <div class="stage-pill" data-stage="{{ s|lower }}">{{ s }}</div>
+      {% endfor %}
+    </div>
+
+    <!-- Test mode banner -->
+    <div id="testBanner" style="display:none;background:#e9730c;color:#fff;padding:8px 16px;border-radius:4px;font-size:13px">
+      &#9888; Test mode &#8212; 7-day lookback &middot; no email will be sent
+    </div>
+
+    <!-- History strip -->
+    <div style="display:flex;align-items:center;gap:8px;overflow-x:auto;padding:4px 0">
+      <span style="font-size:11px;font-weight:700;color:#6a6d70;flex-shrink:0">HISTORY</span>
+      {% for run in runs|default([]) %}
+      <a href="{{ url_for('admin_profile_detail', profile_id=selected_profile.id) }}?tab=run"
+         style="padding:4px 12px;border-radius:12px;font-size:12px;flex-shrink:0;text-decoration:none;
+                {% if run.status == 'failed' %}background:#fde8e8;color:#bb0000{% else %}background:#dcefd8;color:#107e3e{% endif %}">
+        {{ run.started_at[:10] if run.started_at else '—' }} &middot; {{ run.filtered_count or 0 }} items
+      </a>
+      {% endfor %}
+    </div>
+
+    <!-- Log panel -->
+    <div style="flex:1;background:#1e1e1e;border-radius:6px;padding:16px;overflow-y:auto;min-height:0" id="logPanel">
+      <div id="logIdle" style="color:#888;text-align:center;padding-top:60px">
+        <div style="font-size:32px;margin-bottom:8px">&#9654;</div>
+        <div>Configure sources and click Start Run to begin</div>
+        <div style="margin-top:8px;font-size:12px">Or click a history pill above to view a past run</div>
       </div>
-      <div class="sapCard-content" style="padding: 0;">
-        <div class="sapStagePanel">
-          <div class="sapStageList" id="stage-list"></div>
-          <div class="sapStageLog" id="stage-log-panel">
-            <pre id="stage-log-pre"></pre>
-          </div>
-        </div>
-      </div>
+      <div id="logLines" style="display:none;font-size:12px;font-family:monospace;color:#d4d4d4"></div>
     </div>
   </div>
 </div>
 
+<style>
+  .src-chip { display:inline-block;padding:6px 12px;border-radius:16px;font-size:13px;cursor:pointer;margin:3px;background:#0a6ed1;color:#fff;user-select:none; }
+  .src-chip.deselected { background:#e5e5e5;color:#6a6d70;text-decoration:line-through; }
+  .stage-pill { padding:6px 12px;border-radius:14px;font-size:12px;background:#e5e5e5;color:#6a6d70; }
+  .stage-pill.active { background:#0a6ed1;color:#fff;animation:pulse 1.5s infinite; }
+  .stage-pill.done { background:#107e3e;color:#fff; }
+  .stage-pill.failed { background:#bb0000;color:#fff; }
+  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.7} }
+</style>
 <script>
-// Pass sources data from backend to JavaScript
-const SOURCES_DATA = {{ sources_json|safe }};
-const PROFILE_ID = {{ profile.id }};
-
-// Run Options Persistence
-(function() {
-  const optionsKey = 'legal_eagle_run_options_profile_' + PROFILE_ID;
-  
-  // Load saved run options
-  function loadRunOptions() {
-    try {
-      const saved = localStorage.getItem(optionsKey);
-      return saved ? JSON.parse(saved) : null;
-    } catch (error) {
-      console.error('Failed to load run options:', error);
-      return null;
-    }
+  function onTestMode() {
+    var on = document.getElementById('testToggle').checked;
+    document.getElementById('testModeVal').value = on ? '1' : '0';
+    document.getElementById('testBanner').style.display = on ? 'block' : 'none';
+    document.getElementById('testImplied').style.display = on ? 'block' : 'none';
+    var btn = document.getElementById('startBtn');
+    btn.style.background = on ? '#e9730c' : '#107e3e';
+    btn.textContent = on ? '► Start Test Run' : '► Start Run';
   }
-  
-  // Save run options
-  function saveRunOptions() {
-    try {
-      const options = {
-        force_run: document.querySelector('input[name="force_run"]') ? document.querySelector('input[name="force_run"]').checked : false,
-        skip_comparison: document.querySelector('input[name="skip_comparison"]').checked,
-        skip_filtering: document.querySelector('input[name="skip_filtering"]').checked,
-        skip_grouping: document.querySelector('input[name="skip_grouping"]').checked,
-        skip_email: document.querySelector('input[name="skip_email"]').checked
-      };
-      localStorage.setItem(optionsKey, JSON.stringify(options));
-    } catch (error) {
-      console.error('Failed to save run options:', error);
-    }
+  function toggleChip(label) {
+    var cb = label.querySelector('input');
+    cb.checked = !cb.checked;
+    label.classList.toggle('deselected', !cb.checked);
   }
-
-  // Restore run options on page load
-  function restoreRunOptions() {
-    const saved = loadRunOptions();
-    if (saved) {
-      if (saved.force_run !== undefined && document.querySelector('input[name="force_run"]')) {
-        document.querySelector('input[name="force_run"]').checked = saved.force_run;
-      }
-      if (saved.skip_comparison !== undefined) {
-        document.querySelector('input[name="skip_comparison"]').checked = saved.skip_comparison;
-      }
-      if (saved.skip_filtering !== undefined) {
-        document.querySelector('input[name="skip_filtering"]').checked = saved.skip_filtering;
-      }
-      if (saved.skip_grouping !== undefined) {
-        document.querySelector('input[name="skip_grouping"]').checked = saved.skip_grouping;
-      }
-      if (saved.skip_email !== undefined) {
-        document.querySelector('input[name="skip_email"]').checked = saved.skip_email;
-      }
-    }
-  }
-  
-  // Initialize on page load
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', restoreRunOptions);
-  } else {
-    restoreRunOptions();
-  }
-  
-  // Save on checkbox change
-  document.querySelectorAll('input[name="force_run"], input[name="skip_comparison"], input[name="skip_filtering"], input[name="skip_grouping"], input[name="skip_email"]').forEach(function(checkbox) {
-    checkbox.addEventListener('change', saveRunOptions);
-  });
-})();
-
-// Source Selection Management
-(function() {
-  const storageKey = 'legal_eagle_sources_profile_' + PROFILE_ID;
-  
-  // Load saved selections from localStorage
-  function loadSelections() {
-    try {
-      const saved = localStorage.getItem(storageKey);
-      return saved ? JSON.parse(saved) : null;
-    } catch (error) {
-      console.error('Failed to load selections:', error);
-      return null;
-    }
-  }
-  
-  // Save selections to localStorage
-  function saveSelections(selections) {
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(selections));
-    } catch (error) {
-      console.error('Failed to save selections:', error);
-    }
-  }
-  
-  // Render source checkboxes
-  function renderSources(category, sources, savedSelections) {
-    const container = document.getElementById(category + '_list');
-    const countSpan = document.getElementById(category + '_count');
-    
-    if (!container || !countSpan) return;
-    
-    countSpan.textContent = sources.length;
-    container.innerHTML = '';
-    
-    if (sources.length === 0) {
-      container.innerHTML = '<div style="color: var(--sapNeutralColor); font-style: italic;">No sources configured</div>';
-      return;
-    }
-    
-    sources.forEach(function(source) {
-      const isChecked = savedSelections ? savedSelections.includes(source) : true;
-      const displayName = source.length > 40 ? source.substring(0, 37) + '...' : source;
-      
-      const label = document.createElement('label');
-      label.style.cssText = 'display: flex; align-items: center; gap: var(--sapSpacingXS); margin-bottom: var(--sapSpacingXXS); cursor: pointer;';
-      
-      const checkbox = document.createElement('input');
-      checkbox.type = 'checkbox';
-      checkbox.name = 'selected_' + category;
-      checkbox.value = source;
-      checkbox.checked = isChecked;
-      checkbox.className = 'source-checkbox';
-      checkbox.dataset.category = category;
-      checkbox.style.cursor = 'pointer';
-      
-      const span = document.createElement('span');
-      span.textContent = displayName;
-      span.title = source;
-      
-      label.appendChild(checkbox);
-      label.appendChild(span);
-      container.appendChild(label);
-    });
-    
-    updateCategoryCheckbox(category);
-  }
-  
-  // Update "All" checkbox state based on individual checkboxes
-  function updateCategoryCheckbox(category) {
-    const allCheckbox = document.getElementById(category + '_all');
-    const checkboxes = document.querySelectorAll('input[name="selected_' + category + '"]');
-    
-    if (!allCheckbox || checkboxes.length === 0) return;
-    
-    const checkedCount = Array.from(checkboxes).filter(function(cb) { return cb.checked; }).length;
-    
-    if (checkedCount === 0) {
-      allCheckbox.checked = false;
-      allCheckbox.indeterminate = false;
-    } else if (checkedCount === checkboxes.length) {
-      allCheckbox.checked = true;
-      allCheckbox.indeterminate = false;
-    } else {
-      allCheckbox.checked = false;
-      allCheckbox.indeterminate = true;
-    }
-  }
-  
-  // Handle "All" checkbox toggle
-  function handleCategoryAllToggle(category, checked) {
-    const checkboxes = document.querySelectorAll('input[name="selected_' + category + '"]');
-    checkboxes.forEach(function(cb) {
-      cb.checked = checked;
+  function deselectAll(type) {
+    document.querySelectorAll('input[name="selected_' + type + '"]').forEach(function(cb) {
+      cb.checked = false;
+      cb.closest('.src-chip').classList.add('deselected');
     });
   }
-  
-  // Handle collapse/expand
-  function handleCollapseToggle(button) {
-    const targetId = button.dataset.target;
-    const target = document.getElementById(targetId);
-    
-    if (!target) return;
-    
-    if (target.style.display === 'none') {
-      target.style.display = 'block';
-      button.textContent = '▼';
-    } else {
-      target.style.display = 'none';
-      button.textContent = '▶';
-    }
-  }
-  
-  // Save selections on form submit
-  function handleFormSubmit() {
-    const selections = {
-      rss: Array.from(document.querySelectorAll('input[name="selected_rss"]:checked')).map(function(cb) { return cb.value; }),
-      twitter: Array.from(document.querySelectorAll('input[name="selected_twitter"]:checked')).map(function(cb) { return cb.value; }),
-      urls: Array.from(document.querySelectorAll('input[name="selected_urls"]:checked')).map(function(cb) { return cb.value; })
-    };
-    
-    saveSelections(selections);
-  }
-  
-  // Initialize
-  function init() {
-    const savedSelections = loadSelections();
-    
-    renderSources('rss', SOURCES_DATA.rss, savedSelections ? savedSelections.rss : null);
-    renderSources('twitter', SOURCES_DATA.twitter, savedSelections ? savedSelections.twitter : null);
-    renderSources('urls', SOURCES_DATA.urls, savedSelections ? savedSelections.urls : null);
-    
-    // Event listeners
-    document.querySelectorAll('.category-all').forEach(function(checkbox) {
-      checkbox.addEventListener('change', function() {
-        handleCategoryAllToggle(this.dataset.category, this.checked);
-      });
-    });
-    
-    document.querySelectorAll('.source-checkbox').forEach(function(checkbox) {
-      checkbox.addEventListener('change', function() {
-        updateCategoryCheckbox(this.dataset.category);
-      });
-    });
-    
-    document.querySelectorAll('.collapse-btn').forEach(function(button) {
-      button.addEventListener('click', function() {
-        handleCollapseToggle(this);
-      });
-    });
-    
-    const form = document.getElementById('runForm');
-    if (form) {
-      form.addEventListener('submit', handleFormSubmit);
-    }
-  }
-  
-  // Run on DOM ready
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    init();
-  }
-})();
-
-// Stage Pipeline Viewer (IIFE for scoping)
-(function() {
-  const statusEl    = document.getElementById('run-status');
-  const stageListEl = document.getElementById('stage-list');
-  const logPanel    = document.getElementById('stage-log-panel');
-  const logPre      = document.getElementById('stage-log-pre');
-
-  const STAGES = [
-    { id:1, icon:'🚀', label:'Starting',
-      startPatterns:[/Running single profile/], skipPatterns:[] },
-    { id:2, icon:'📰', label:'Collecting',
-      startPatterns:[/Running RSS Parser Agent|Tweet Feed Agent|URL Sources Runner/], skipPatterns:[] },
-    { id:3, icon:'🧹', label:'Filtering',
-      startPatterns:[/Filtering for relevance|Skip filtering enabled/],
-      skipPatterns:[/Skip filtering enabled/] },
-    { id:4, icon:'🔍', label:'Comparing',
-      startPatterns:[/Relevant items after filtering/], skipPatterns:[] },
-    { id:5, icon:'🧠', label:'Grouping',
-      startPatterns:[/Grouping similar news items|Skipping grouping/],
-      skipPatterns:[/Skipping grouping/] },
-    { id:6, icon:'📧', label:'Sending',
-      startPatterns:[/Sending summary email|Generating email preview/], skipPatterns:[] },
-    { id:7, icon:'✅', label:'Done', startPatterns:[], skipPatterns:[] }
-  ];
-
-  const stageStates = {};
-  const stageLogs   = {};
-  STAGES.forEach(function(s) { stageStates[s.id] = 'idle'; stageLogs[s.id] = []; });
-
-  let activeStageId    = 0;
-  let selectedId       = null; // number (stage) or string (sub-source key) or null (auto-follow)
-  let displayedId      = 0;
-
-  const subSourceLogs   = {}; // key → []
-  const subSourceStates = {}; // key → state string
-  const subKeyToNum     = {}; // key → numeric counter for DOM element IDs
-  let   subKeyCounter   = 0;
-  let   activeSubKey    = null; // key of the sub-source currently being fetched
-
-  function buildStageList() {
-    STAGES.forEach(function(stage, idx) {
-      if (idx > 0) {
-        const conn = document.createElement('div');
-        conn.className = 'stage-connector';
-        stageListEl.appendChild(conn);
-      }
-      const item = document.createElement('div');
-      item.className = 'stage-item stage-idle';
-      item.dataset.stageId = stage.id;
-      item.innerHTML = '<span class="stage-icon">·</span><div class="stage-body"><span class="stage-label">' + stage.icon + ' ' + stage.label + '</span><span class="stage-summary" id="stage-summary-' + stage.id + '"></span></div>';
-      item.addEventListener('click', function() { selectView(stage.id); });
-      stageListEl.appendChild(item);
-    });
-  }
-
-  function getItem(id) { return stageListEl.querySelector('[data-stage-id="' + id + '"]'); }
-
-  function urlHostname(url) {
-    try { var h = new URL(url.trim()).hostname; return h.length > 18 ? h.substring(0,17)+'…' : h; }
-    catch(e) { return url.trim().substring(0, 18); }
-  }
-
-  function getSubItem(key) {
-    var items = stageListEl.querySelectorAll('[data-sub-key]');
-    for (var i = 0; i < items.length; i++) { if (items[i].dataset.subKey === key) return items[i]; }
-    return null;
-  }
-
-  function createSubSource(key, icon, label, logTarget) {
-    if (subSourceStates[key] !== undefined) return;
-    subKeyCounter++;
-    subKeyToNum[key] = subKeyCounter;
-    subSourceStates[key] = 'idle';
-    subSourceLogs[key] = [];
-    var n = subKeyCounter;
-    var item = document.createElement('div');
-    item.className = 'stage-sub-item sub-idle';
-    item.dataset.subKey = key;
-    item.innerHTML = '<span class="sub-icon">·</span><div class="stage-body"><span class="sub-label">' + icon + ' ' + label + '</span><span class="sub-count" id="sub-c-' + n + '"></span></div>';
-    // logTarget: if set, clicking shows that stage/key's logs instead of this sub-source's own logs
-    var target = (logTarget !== undefined) ? logTarget : key;
-    item.addEventListener('click', (function(t) { return function() { selectView(t); }; })(target));
-    var filterItem = getItem(3);
-    var ref = filterItem ? filterItem.previousSibling : null;
-    if (ref) stageListEl.insertBefore(item, ref);
-    else stageListEl.appendChild(item);
-  }
-
-  function updateSubSource(key, state, summary, isError) {
-    if (subSourceStates[key] === undefined) return;
-    subSourceStates[key] = state;
-    var item = getSubItem(key);
-    if (!item) return;
-    var wasSelected = item.classList.contains('selected');
-    item.className = 'stage-sub-item sub-' + state + (wasSelected ? ' selected' : '');
-    var icons = { idle:'·', active:'⟳', done:'✓', failed:'✗', skipped:'⏭' };
-    item.querySelector('.sub-icon').textContent = icons[state] || '·';
-    if (summary !== undefined) {
-      var el = document.getElementById('sub-c-' + subKeyToNum[key]);
-      if (el) { el.textContent = summary; el.className = 'sub-count visible' + (isError ? ' s-error' : ''); }
-    }
-  }
-
-  function setStageState(id, state) {
-    stageStates[id] = state;
-    const item = getItem(id);
-    if (!item) return;
-    const wasSelected = item.classList.contains('selected');
-    item.className = 'stage-item stage-' + state + (wasSelected ? ' selected' : '');
-    const icons = { idle:'·', active:'⟳', done:'✓', skipped:'⏭', failed:'✗' };
-    item.querySelector('.stage-icon').textContent = icons[state] || '·';
-  }
-
-  function advanceToStage(id) {
-    if (id <= activeStageId) return;
-    if (id > 2 && activeStageId <= 2) {
-      if (activeSubKey !== null) { updateSubSource(activeSubKey, 'done'); activeSubKey = null; }
-      Object.keys(subSourceStates).forEach(function(k) {
-        if (subSourceStates[k] === 'idle' || subSourceStates[k] === 'active') updateSubSource(k, 'done');
-      });
-    }
-    for (let i = 1; i < id; i++) {
-      if (stageStates[i] === 'active' || stageStates[i] === 'idle') {
-        setStageState(i, 'done');
-      }
-    }
-    activeStageId = id;
-    setStageState(id, 'active');
-    if (selectedId === null) {
-      stageListEl.querySelectorAll('.stage-item, .stage-sub-item').forEach(function(el) { el.classList.remove('selected'); });
-      const it = getItem(id); if (it) it.classList.add('selected');
-    }
-  }
-
-  function getAutoId() {
-    if (activeStageId === 2 && activeSubKey !== null) return activeSubKey;
-    return activeStageId > 0 ? activeStageId : 1;
-  }
-
-  function renderView(id) {
-    displayedId = id;
-    logPre.innerHTML = '';
-    var logs = (typeof id === 'string' ? subSourceLogs[id] : stageLogs[id]) || [];
-    logs.forEach(appendLineToLog);
-    logPanel.scrollTop = logPanel.scrollHeight;
-  }
-
-  function selectView(id) {
-    selectedId = id;
-    stageListEl.querySelectorAll('.stage-item, .stage-sub-item').forEach(function(el) { el.classList.remove('selected'); });
-    if (typeof id === 'number') { var it = getItem(id); if (it) it.classList.add('selected'); }
-    else                        { var it = getSubItem(id); if (it) it.classList.add('selected'); }
-    renderView(id);
-  }
-
-  function setStageSummary(id, text, isError) {
-    const el = document.getElementById('stage-summary-' + id);
-    if (!el) return;
-    el.textContent = text;
-    el.className = 'stage-summary visible' + (isError ? ' s-error' : '');
-  }
-
-  const SUMMARY_PATTERNS = [
-    { id:2, re:/Total collected items \(pre-filter\): (\d+)/,      fn:function(m){ return m[1]+' collected'; } },
-    { id:2, re:/(\d+) errors while scraping/,                      fn:function(m){ return m[1]+' scraping errors'; }, err:true },
-    { id:3, re:/Relevant items after filtering: (\d+)/,            fn:function(m){ return m[1]+' relevant'; } },
-    { id:4, re:/(\d+) new items and (\d+) updates after semantic/, fn:function(m){ return m[1]+' new · '+m[2]+' updated'; } },
-    { id:5, re:/Grouped summary ready with (\d+) entries/,         fn:function(m){ return m[1]+' groups'; } },
-    { id:6, re:/Email sent to stakeholders/,                       fn:function(){ return 'sent ✓'; } },
-    { id:6, re:/Email send failed/,                                fn:function(){ return 'failed'; }, err:true },
-  ];
-
-  function appendLineToLog(line) {
-    const span = document.createElement('span');
-    span.className = /\[ERROR\]/.test(line) ? 'log-error' : /\[WARN\]/.test(line) ? 'log-warn' : '';
-    span.textContent = line + '\n';
-    logPre.appendChild(span);
-  }
-
-  function processSubSourceLine(line) {
-    var m;
-    // RSS per-feed: start
-    if ((m = line.match(/↳ RSS: (\S+): fetching\.\.\./))) {
-      var key = 'rss:'+m[1];
-      createSubSource(key, '📰', urlHostname(m[1]));
-      updateSubSource(key, 'active');
-      activeSubKey = key; return;
-    }
-    // RSS per-feed: done
-    if ((m = line.match(/↳ RSS: (\S+): (\d+) items/))) {
-      var key = 'rss:'+m[1];
-      updateSubSource(key, 'done', m[2]+' items');
-      if (activeSubKey === key) activeSubKey = null; return;
-    }
-    // Twitter: parse accounts list (batch — all activated together, share stage-2 log)
-    if ((m = line.match(/↳ Fetching from \d+ accounts: (.+)/))) {
-      var handles = m[1].split(', ');
-      handles.forEach(function(h) {
-        var handle = h.trim();
-        createSubSource('tw:'+handle, '🐦', handle, 2); // logTarget=2: clicking shows Collecting log
-        updateSubSource('tw:'+handle, 'active');
-      });
-      return;
-    }
-    // Twitter: all done
-    if ((m = line.match(/Total tweets collected from all accounts: (\d+)/))) {
-      Object.keys(subSourceStates).forEach(function(k) {
-        if (k.startsWith('tw:') && (subSourceStates[k] === 'active' || subSourceStates[k] === 'idle')) {
-          updateSubSource(k, 'done');
-        }
-      });
-      if (activeSubKey && activeSubKey.startsWith('tw:')) activeSubKey = null; return;
-    }
-    // Twitter disabled
-    if (/Tweet.*disabled|Twitter.*disabled/i.test(line)) {
-      Object.keys(subSourceStates).forEach(function(k) {
-        if (k.startsWith('tw:')) updateSubSource(k, 'skipped');
-      }); return;
-    }
-    // URL setup (pre-register as idle)
-    if ((m = line.match(/↳\s+(\S+):\s+(TODAY|FULL|DELTA)\s+mode/))) {
-      createSubSource('url:'+m[1], '🔗', urlHostname(m[1])); return;
-    }
-    // URL activate
-    if ((m = line.match(/\[Source \d+\/\d+\] url=(\S+)/))) {
-      var key = 'url:'+m[1];
-      if (subSourceStates[key] === undefined) createSubSource(key, '🔗', urlHostname(m[1]));
-      if (activeSubKey !== null && activeSubKey !== key) updateSubSource(activeSubKey, 'done');
-      updateSubSource(key, 'active'); activeSubKey = key; return;
-    }
-    // URL done (final item count)
-    if ((m = line.match(/\[source\] date filter: \d+ → (\d+) items/))) {
-      if (activeSubKey !== null) updateSubSource(activeSubKey, 'done', m[1]+' items'); return;
-    }
-    // URL errors
-    if ((m = line.match(/\[source\] (?:static|dynamic|recursive) path items=\d+ errors=([1-9]\d*)/))) {
-      if (activeSubKey !== null) updateSubSource(activeSubKey, 'failed', m[1]+' errors', true); return;
-    }
-  }
-
-  function processLine(line) {
-    if (!line) return;
-    for (let i = 0; i < STAGES.length; i++) {
-      const stage = STAGES[i];
-      if (stage.startPatterns.length > 0 && stage.startPatterns.some(function(re) { return re.test(line); })) {
-        const isSkip = stage.skipPatterns.some(function(re) { return re.test(line); });
-        advanceToStage(stage.id);
-        if (isSkip) setStageState(stage.id, 'skipped');
-        break;
-      }
-    }
-    const bucket = activeStageId > 0 ? activeStageId : 1;
-    stageLogs[bucket].push(line);
-    if (activeSubKey !== null) subSourceLogs[activeSubKey].push(line);
-    if (activeStageId === 2) processSubSourceLine(line);
-    for (let j = 0; j < SUMMARY_PATTERNS.length; j++) {
-      const sp = SUMMARY_PATTERNS[j];
-      const m = line.match(sp.re);
-      if (m) { setStageSummary(sp.id, sp.fn(m), !!sp.err); break; }
-    }
-    var viewId = selectedId !== null ? selectedId : getAutoId();
-    var inView = (viewId === bucket) || (viewId === activeSubKey);
-    if (viewId !== displayedId) {
-      renderView(viewId);
-    } else if (inView) {
-      appendLineToLog(line);
-      logPanel.scrollTop = logPanel.scrollHeight;
-    }
-  }
-
-  buildStageList();
-
-  {% if selected_run %}
-  const es = new EventSource("{{ url_for('stream_run_logs', run_id=selected_run.id) }}");
-
-  es.onmessage = function(e) { processLine(e.data); };
-
-  es.addEventListener('done', function(e) {
-    const status = e.data || 'Success';
-    if (status === 'Failed' || status === 'Canceled') {
-      if (activeStageId > 0) setStageState(activeStageId, 'failed');
-      if (activeSubKey !== null) updateSubSource(activeSubKey, 'failed');
-      Object.keys(subSourceStates).forEach(function(k) {
-        if (subSourceStates[k] === 'active') updateSubSource(k, 'failed');
-      });
-    } else {
-      for (let i = 1; i <= 7; i++) {
-        if (stageStates[i] !== 'skipped') setStageState(i, 'done');
-      }
-      Object.keys(subSourceStates).forEach(function(k) {
-        if (subSourceStates[k] !== 'skipped') updateSubSource(k, 'done');
-      });
-    }
-    let badgeClass = 'sapBadge ', icon = '';
-    if (status === 'Success')       { badgeClass += 'sapBadge-positive'; icon = '✓ '; }
-    else if (status === 'Failed')   { badgeClass += 'sapBadge-negative'; icon = '✗ '; }
-    else if (status === 'Canceled') { badgeClass += 'sapBadge-critical'; icon = '⏸ '; }
-    else                            { badgeClass += 'sapBadge-neutral';  icon = '— '; }
-    statusEl.textContent = icon + status;
-    statusEl.className = badgeClass;
-    es.close();
-  });
-
-  es.onerror = function() { /* Browser auto-reconnects */ };
-  {% else %}
-  logPre.textContent = '💡 Click "Start Run" to execute the profile workflow, or select a run from history to view its logs.\n\nLogs will appear here in real-time during execution.';
-  {% endif %}
-})();
-
-// Pre-flight checklist
-(function() {
-  var profileId = {{ profile.id }};
-  var btn = document.getElementById('start-run-btn');
-  var itemsEl = document.getElementById('preflight-items');
-
-  function runPreflight() {
-    fetch('/admin/profiles/' + profileId + '/preflight')
-      .then(function(r) { return r.json(); })
-      .then(function(data) {
-        var html = '';
-        data.checks.forEach(function(c) {
-          var icon = c.ok ? '✅' : '❌';
-          html += '<div style="margin-bottom:4px">' + icon + ' ' + c.label;
-          if (!c.ok && c.message) {
-            html += '<br><span style="margin-left:20px;color:var(--sapNegativeColor)">' + c.message + '</span>';
-          }
-          html += '</div>';
-        });
-        itemsEl.innerHTML = html;
-        if (data.ready) {
-          btn.disabled = false;
-          btn.style.opacity = '1';
-        } else {
-          btn.disabled = true;
-          btn.style.opacity = '0.5';
-        }
-      })
-      .catch(function() {
-        itemsEl.innerHTML = '<span style="color:var(--sapNeutralColor)">Could not load preflight checks.</span>';
-        btn.disabled = false;
-        btn.style.opacity = '1';
-      });
-  }
-
-  runPreflight();
-})();
 </script>
 {% endblock %}
