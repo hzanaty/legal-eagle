@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel>
+  <title>XN Mixed News Portal</title>
+  <item><title>Xanadu central bank raises benchmark interest rate to 6.5%</title><link>http://localhost:9999/articles/b1.html</link><guid>xn-b1</guid><pubDate>Wed, 02 Sep 2026 11:00:00 +0000</pubDate><description>Central Bank raised benchmark rate 50bp to 6.5% due to inflation in the financial sector.</description></item>
+  <item><title>President of Xanadu holds bilateral meeting with foreign trade delegation</title><link>http://localhost:9999/articles/b2.html</link><guid>xn-b2</guid><pubDate>Tue, 01 Sep 2026 13:00:00 +0000</pubDate><description>Presidential meeting with foreign delegation on regional trade and infrastructure.</description></item>
+  <item><title>Xanadu signs new regional trade facilitation agreement</title><link>http://localhost:9999/articles/b3.html</link><guid>xn-b3</guid><pubDate>Mon, 31 Aug 2026 09:00:00 +0000</pubDate><description>Trade facilitation agreement reducing customs documentation across five member states.</description></item>
+  <item><title>Annual minimum wage review committee to convene next spring</title><link>http://localhost:9999/articles/b4.html</link><guid>xn-b4</guid><pubDate>Mon, 03 Aug 2026 10:00:00 +0000</pubDate><description>Committee to convene in March 2027 for annual minimum wage adjustment review.</description></item>
+  <item><title>Xanadu parliament approves three-year tax reform package</title><link>http://localhost:9999/articles/b5.html</link><guid>xn-b5</guid><pubDate>Wed, 02 Sep 2026 08:00:00 +0000</pubDate><description>Three-year tax reform package restructuring corporate tax brackets and VAT exemptions.</description></item>
+</channel></rss>

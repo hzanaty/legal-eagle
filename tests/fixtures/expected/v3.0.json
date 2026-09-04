@@ -1,0 +1,14 @@
+{
+  "version": "v3.0",
+  "assertions": [
+    {"type":"table_exists",  "table":"authorities",       "description":"authorities table created"},
+    {"type":"column_exists", "table":"rss_feeds",  "column":"publisher_name", "description":"rss_feeds.publisher_name present"},
+    {"type":"column_exists", "table":"rss_feeds",  "column":"authority_id",   "description":"rss_feeds.authority_id present"},
+    {"type":"column_exists", "table":"url_sources","column":"publisher_name", "description":"url_sources.publisher_name present"},
+    {"type":"column_exists", "table":"url_sources","column":"authority_id",   "description":"url_sources.authority_id present"},
+    {"type":"row_count",     "table":"authorities", "expected":2,             "description":"2 authorities for XN/HCM"},
+    {"type":"row_count",     "table":"rss_feeds",   "expected":4,             "description":"4 RSS feeds for XN/HCM"},
+    {"type":"value_check",   "table":"rss_feeds",   "where":"url LIKE '%xn_feed_a%'", "column":"publisher_name", "expected":"XN Ministry of HR", "description":"feed_a publisher_name set"},
+    {"type":"value_check",   "table":"rss_feeds",   "where":"url LIKE '%xn_feed_a%'", "column":"authority_id",   "expected_not_null":true,        "description":"feed_a authority_id linked"}
+  ]
+}
