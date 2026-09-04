@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block content %}
+{% block configure_tab %}
 <style>
   /* Profile-specific Fiori styles */
   .sapTable-compact {
@@ -211,8 +211,24 @@
     {% endif %}
     
     <form method="post" action="{{ url_for('add_rss', profile_id=profile.id) }}">
-      <div class="sapForm-row">
-        <input class="sapForm-input" name="url" placeholder="https://example.gov/news/feed" required>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
+        <div>
+          <label style="font-size:11px;color:#6a6d70;display:block;margin-bottom:3px;">Feed URL *</label>
+          <input class="sapForm-input" name="url" placeholder="https://example.gov/news/feed" required style="min-width:260px;">
+        </div>
+        <div>
+          <label style="font-size:11px;color:#6a6d70;display:block;margin-bottom:3px;">Publisher (optional)</label>
+          <input class="sapForm-input" name="publisher_name" placeholder="e.g. Ministry of Finance" style="min-width:180px;">
+        </div>
+        <div>
+          <label style="font-size:11px;color:#6a6d70;display:block;margin-bottom:3px;">Authority (optional)</label>
+          <select class="sapForm-select" name="authority_id">
+            <option value="">None</option>
+            {% for a in authorities|default([]) %}
+            <option value="{{ a.id }}">{{ a.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
         <button type="submit" class="sapBtn sapBtn-accept">Add RSS</button>
       </div>
     </form>
@@ -780,5 +796,79 @@ function toggleEditRow(rowId) {
     }
   }
 }
+
+function openAuthModal(id, name, aliases) {
+  var modal = document.getElementById('auth-modal');
+  document.getElementById('auth-modal-title').textContent = id ? 'Edit Authority' : 'Add Authority';
+  document.getElementById('auth-modal-form').action = id
+    ? '/admin/profiles/{{ selected_profile.id }}/authorities/' + id + '/update'
+    : '/admin/profiles/{{ selected_profile.id }}/authorities/add';
+  document.getElementById('auth-name').value = name || '';
+  document.getElementById('auth-aliases').value = aliases || '';
+  modal.style.display = 'flex';
+}
+function closeAuthModal() { document.getElementById('auth-modal').style.display = 'none'; }
 </script>
+
+<!-- Authorities Section -->
+<div class="sapCard" style="margin-top:20px;">
+  <div class="sapCard-header">
+    <span>&#9878; Authorities</span>
+    <span style="color:#6a6d70;font-weight:400;font-size:13px;">
+      {{ authorities|length if authorities else 0 }} configured
+    </span>
+  </div>
+  <div class="sapCard-content">
+    {% if authorities %}
+    <table style="width:100%;border-collapse:collapse;margin-bottom:12px;">
+      <thead>
+        <tr>
+          <th style="text-align:left;padding:8px 12px;font-size:11px;font-weight:700;color:#6a6d70;text-transform:uppercase;border-bottom:1px solid #f0f0f0;">Name</th>
+          <th style="text-align:left;padding:8px 12px;font-size:11px;font-weight:700;color:#6a6d70;text-transform:uppercase;border-bottom:1px solid #f0f0f0;">Aliases</th>
+          <th style="padding:8px 12px;border-bottom:1px solid #f0f0f0;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in authorities %}
+        <tr>
+          <td style="padding:8px 12px;font-size:13px;border-bottom:1px solid #f0f0f0;">{{ a.name }}</td>
+          <td style="padding:8px 12px;font-size:13px;color:#6a6d70;border-bottom:1px solid #f0f0f0;">{{ a.aliases or '—' }}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;text-align:right;">
+            <button class="sapBtn sapBtn-sm" onclick="openAuthModal({{ a.id }},'{{ a.name|e }}','{{ a.aliases|e }}')">Edit</button>
+            <form method="post" action="{{ url_for('delete_authority_route', profile_id=selected_profile.id, auth_id=a.id) }}" style="display:inline;margin-left:4px;">
+              <button type="submit" class="sapBtn sapBtn-reject sapBtn-sm" onclick="return confirm('Delete authority \'{{ a.name|e }}\'?')">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p style="color:#6a6d70;padding:12px 0;margin:0;">No authorities configured yet.</p>
+    {% endif %}
+    <button class="sapBtn sapBtn-accept" onclick="openAuthModal(null,'','')">+ Add Authority</button>
+  </div>
+</div>
+
+<!-- Authority Modal -->
+<div id="auth-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:6px;padding:24px;width:420px;max-width:90vw;box-shadow:0 8px 24px rgba(0,0,0,0.15);">
+    <h3 id="auth-modal-title" style="margin-bottom:16px;font-size:16px;">Add Authority</h3>
+    <form id="auth-modal-form" method="post">
+      <div style="margin-bottom:12px;">
+        <label style="display:block;font-size:12px;color:#6a6d70;margin-bottom:4px;">Name *</label>
+        <input type="text" name="name" id="auth-name" required class="sapForm-input" style="width:100%;">
+      </div>
+      <div style="margin-bottom:20px;">
+        <label style="display:block;font-size:12px;color:#6a6d70;margin-bottom:4px;">Aliases (comma-separated)</label>
+        <input type="text" name="aliases" id="auth-aliases" class="sapForm-input" style="width:100%;" placeholder="e.g. MoF, Ministry">
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button type="button" onclick="closeAuthModal()" class="sapBtn">Cancel</button>
+        <button type="submit" class="sapBtn sapBtn-accept">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 {% endblock %}
