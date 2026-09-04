@@ -20,6 +20,7 @@ snapshots/
 # Superpowers local files (Claude tooling, not part of project)
 .superpowers/
 docs/superpowers/
+.claude/
 # Test run artifacts (ignore local test outputs written by scripts)
 scripts/test_runs/
 scripts/archive/
