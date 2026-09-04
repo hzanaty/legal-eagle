@@ -449,6 +449,17 @@ Follows lifecycle order: final Review enhancement, depends on Tag (Phase 3) bein
 - "+ Add to Glossary" inline action in Review UI
 - AI pre-suggests keywords; user confirms; glossary updated immediately without navigation
 
+### Phase 6 — Impact Analysis Agent
+Produces the "Expected Solution" half of a Law2Spec epic. Together with the v3.3 email digest (Announcement half), LPMs have all inputs needed to create a Law2Spec epic.
+
+- **Aspect persistence:** during digest generation, `email_composer.py` saves each detected aspect to `news_aspects` table — including `announcement_md` formatted to Law2Spec Announcement structure (Introduction / Background / Related Resources)
+- **Two-level Review grouping:** item list gains topic rows (Level 1, collapsible) and aspect rows (Level 2, collapsible) when `news_aspects` data exists; falls back to flat list otherwise
+- **"Preview Announcement"** button on each aspect row → modal with saved `announcement_md` → Copy MD (paste into Law2Spec "Text" field)
+- **"Preview Analysis"** button on each aspect row → triggers impact agent on first click (saves to `news_aspects.impact_analysis_md`); subsequent clicks load cached result → Copy MD + Regenerate (paste into Law2Spec "Prompt" field)
+- **New files:** `agents/impact_analyzer.py` (single AI call per aspect); `POST /admin/analyze-impact` (aspect_id + profile_id); `GET /admin/aspect-announcement` (stateless read)
+- **New DB table:** `news_aspects` (run_id, topic_label, title, announcement_md, impact_analysis_md, source_links_json, item_ids_json)
+- **Spec:** `docs/superpowers/specs/2026-07-03-impact-analysis-agent.md`
+
 ---
 
 ## 14. Version Naming
@@ -457,12 +468,13 @@ Versions are targets — none are implemented yet. Each version is reached when 
 
 | Version | Phase | What it delivers |
 |---|---|---|
-| **v3.0** | Phase 0 | Admin UI navigation overhaul — clean flow between Setup → Run → Review; fix jumping/disorientation between config, run status, and review screens. **Run All Active UI:** button enabled (solid blue, no "Soon" badge), live status pill CSS on profile rows, toast on click. **Spec:** `docs/superpowers/specs/2026-07-02-v3-0-admin-ux-design.md` · `docs/superpowers/specs/2026-07-02-run-all-active-design.md` · **Mockups:** `docs/superpowers/mockups/v3-0-admin-ux/` |
-| **v3.1** | Phase 1 | All structural fixes (bugs B1–B8, F1–F5, F7–F9) + Source Simulator. No pipeline behaviour change visible to email recipients. **Run All Active backend:** sequential background thread, skip-on-failure, SSE live row updates on dashboard. |
-| **v3.2** | Phase 2 | Ranking engine live; rank badges in Review UI. Email still uses old threshold. |
-| **v3.3** | Phase 3 | Email gated on rank ≥ 3; tagging replaces grouping; publish dates on cards. **Email V2 digest format** — AI newsletter grouped by Topic Label; decoupled from run; Resend button; manual send from Review. |
+| **v3.0** | Phase 0 | Admin UI navigation overhaul — clean flow between Setup → Run → Review; fix jumping/disorientation between config, run status, and review screens. **Run All Active UI:** button enabled (solid blue, no "Soon" badge), live status pill CSS on profile rows, toast on click. **Source Attribution (config):** `authorities` table + Authorities CRUD section in Configure tab + `publisher_name`/`authority_id` fields on feed/source forms; "Source" column renamed to "Channel" in Review UI with stub Publisher + Authority columns. **Spec:** `docs/superpowers/specs/2026-07-02-v3-0-admin-ux-design.md` · `docs/superpowers/specs/2026-07-02-run-all-active-design.md` · `docs/superpowers/specs/2026-09-04-source-attribution-design.md` · **Mockups:** `docs/superpowers/mockups/v3-0-admin-ux/` |
+| **v3.1** | Phase 1 | All structural fixes (bugs B1–B8, F1–F5, F7–F9) + Source Simulator. No pipeline behaviour change visible to email recipients. **Run All Active backend:** sequential background thread, skip-on-failure, SSE live row updates on dashboard. **Source Attribution (pipeline):** `publisher`/`authority_id`/`authority_status` columns on `news_items`; ATTRIBUTE stage (configured path — stamps from feed config, no AI); Publisher + Authority columns populated in Review UI; same-authority dedup threshold lowering. **Test Harness v3.1:** first full automated run against Xanadu (XN/HCM) test profile. |
+| **v3.2** | Phase 2 | Ranking engine live; rank badges in Review UI. Email still uses old threshold. **Source Attribution (AI + ranking):** ATTRIBUTE AI path for mixed publishers (ai_suggested status + ✦ spark icon + override UI); Tier 1 first-party source rank boost. |
+| **v3.3** | Phase 3 | Email gated on rank ≥ 3; tagging replaces grouping; publish dates on cards. **Email V2 digest format** — AI newsletter grouped by Authority then Topic Label; Law2Spec Announcement-aligned structure; decoupled from run; Resend button; manual send from Review. |
 | **v3.4** | Phase 4 | Challenge + grounding loop; self-improving Tier 1 rules; Re-rank action (F6). |
 | **v3.5** | Phase 5 | Glossary gap alert; inline "+ Add to Glossary" in Review UI. |
+| **v3.6** | Phase 6 | **Impact Analysis Agent** — digest generation persists aspects to `news_aspects` table with `announcement_md` (Law2Spec Announcement format). Review tab gains 2-level grouping: topic rows + aspect rows. Each aspect row has **"Preview Announcement"** (instant, from DB) + **"Preview Analysis"** (AI on first click, cached thereafter). Both open modals with Copy MD. Together with the v3.3 digest, LPM has both halves to create a Law2Spec epic. **Spec:** `docs/superpowers/specs/2026-07-03-impact-analysis-agent.md` |
 
 ---
 
@@ -575,3 +587,35 @@ Activates the "Run All Active" placeholder button in the dashboard summary strip
 - `GET /admin/run-all/status`: reconnect recovery after page reload
 
 **Spec:** `docs/superpowers/specs/2026-07-02-run-all-active-design.md`
+
+### Source Attribution — Publisher + Authority (added 2026-09-04)
+
+Three distinct source dimensions exposed across the pipeline:
+- **Channel** — mechanism: RSS / Twitter / URL (existing `source_type`, renamed in UI)
+- **Publisher** — who published on that channel: "GOSI Official Website", "Saudi Gazette", "iKANUN"
+- **Authority** — the legislative body that issued the regulation: "GOSI", "Ministry of HR"
+
+Authority is optional per feed. If blank, the publisher is a mixed aggregator. ATTRIBUTE stage (new, after ANNOTATE) stamps authority on items from configured feeds instantly; AI detection fires only for unconfigured mixed publishers. Ships across v3.0 (config UI) → v3.1 (pipeline + dedup) → v3.2 (AI attribution + rank boost) → v3.3 (email grouping by authority).
+
+**Spec:** `docs/superpowers/specs/2026-09-04-source-attribution-design.md`
+
+---
+
+## 16. Test Harness (added 2026-09-04)
+
+Deterministic integration test harness for automated verification of every v3.x upgrade. Uses a controlled "Xanadu" (XN/HCM) test profile with pre-crafted RSS feeds served from `localhost:9999`. Known input → calculable expected output → fully automated pass/fail assertions.
+
+**Two datasets per run:**
+- **Feed XML files** — served at `localhost:9999/feeds/` — what Legal Eagle fetches
+- **Baseline seed** — pre-loaded `news_items` rows — what Legal Eagle has seen before (enables dedup testing)
+
+**AI calls:** hybrid caching — real on first run, replayed from `tests/ai_cache/` on all subsequent runs. Activated by `LEGAL_EAGLE_TEST_MODE=1`.
+
+**Test scenarios covered:** HCM-relevant items (pass), wrong LoB + noise + old items (filter), exact + near + intra-run duplicates, REPEATED tag items, authority attribution.
+
+**Version delta:** same XML feed files across all versions; only `expected/vX.Y.json` adds new assertions per version (rank, tag, email eligibility, authority group, gap badge).
+
+**Entry point:** `python tests/run_harness.py --version v3.1` — exits 0 (all pass) or 1 (any fail).
+
+**Spec:** `docs/superpowers/specs/2026-09-04-test-harness-design.md`
+
