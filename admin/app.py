@@ -91,6 +91,12 @@ from configurations.db import (
     delete_repo_asset,
     advance_repo_node_status,
     STATUS_PROGRESSION,
+    # source attribution (v3.0)
+    create_authority,
+    list_authorities,
+    get_authority,
+    update_authority,
+    delete_authority,
 )
 
 # Flask app
@@ -227,7 +233,9 @@ def admin_dashboard():
     profiles.sort(key=lambda p: (p["last_run_sort_key"], p["country_code"], p["lob"]))
     
     conn.close()
-    return render_template("dashboard.html", profiles=profiles)
+    return render_template("dashboard.html", profiles=profiles,
+                           selected_profile=None, active_tab="configure",
+                           review_badge_count=0)
 
 
 @app.route("/admin/profiles/create", methods=["GET"])
@@ -483,14 +491,17 @@ def admin_profile_runs(profile_id: int):
 @app.route("/admin/profiles/<int:profile_id>/runs/start", methods=["POST"])
 def admin_start_run(profile_id: int):
     _ensure_schema()
-    
+
     # Get run options from form
     lookback_override = request.form.get('lookback_override', '').strip() or None
     force_run = (lookback_override == 'force_full')  # map force_full override → force_run flag
+    test_mode = request.form.get('test_mode') == '1'
     skip_comparison = request.form.get('skip_comparison') == '1'
     skip_filtering = request.form.get('skip_filtering') == '1'
-    skip_email = request.form.get('skip_email') == '1'
+    skip_email = (request.form.get('skip_email') == '1') or test_mode
     skip_grouping = request.form.get('skip_grouping') == '1'
+    if test_mode:
+        lookback_override = '7'
     
     # Get source selections from form (getlist returns [] if not present)
     selected_rss = request.form.getlist('selected_rss')
@@ -674,7 +685,9 @@ def cancel_run(run_id: int):
 @app.route("/admin/profiles/<int:profile_id>")
 def admin_profile_detail(profile_id: int):
     _ensure_schema()
+    active_tab = request.args.get("tab", "configure")
     conn = get_connection()
+    create_schema_if_needed(conn)
     prof = conn.execute("SELECT * FROM profiles WHERE id = ?", (profile_id,)).fetchone()
     if not prof:
         conn.close()
@@ -691,6 +704,15 @@ def admin_profile_detail(profile_id: int):
         "schedule_day": prof["schedule_day"],
         "date_scope": prof["date_scope"] if "date_scope" in prof.keys() else "all",
     }
+
+    # Load profiles list for FCL shell
+    profiles_rows = conn.execute(
+        "SELECT id, country_code, lob, name, active FROM profiles ORDER BY country_code, lob"
+    ).fetchall()
+    profiles_list = [dict(r) for r in profiles_rows]
+
+    authorities = list_authorities(conn, profile_id)
+    review_badge_count = count_all_news_for_review(conn, profile_id)
     conn.close()
 
     rss = load_rss_feeds(profile_id)
@@ -738,6 +760,11 @@ def admin_profile_detail(profile_id: int):
     return render_template(
         "profile.html",
         profile=profile,
+        selected_profile=profile,
+        profiles=profiles_list,
+        active_tab=active_tab,
+        authorities=authorities,
+        review_badge_count=review_badge_count,
         rss=rss,
         urls=urls,
         tweets=tweets,
@@ -853,9 +880,12 @@ def add_rss(profile_id: int):
     if not url:
         flash("RSS URL is required.", "error")
         return redirect(url_for("admin_profile_detail", profile_id=profile_id))
+    publisher_name = request.form.get("publisher_name", "").strip() or None
+    auth_raw = request.form.get("authority_id", "").strip()
+    authority_id = int(auth_raw) if auth_raw.isdigit() else None
     conn = get_connection()
     create_schema_if_needed(conn)
-    upsert_rss_feed(conn, profile_id, url)
+    upsert_rss_feed(conn, profile_id, url, publisher_name=publisher_name, authority_id=authority_id)
     add_audit_log(conn, entity="rss_feeds", action="add", details=url, profile_id=profile_id)
     conn.close()
     flash("RSS feed added.", "success")
@@ -1405,6 +1435,60 @@ def add_glossary_term_bulk_route(profile_id: int):
     return redirect(url_for("admin_profile_detail", profile_id=profile_id))
 
 
+# -----------------------
+# Authority CRUD (v3.0)
+# -----------------------
+
+@app.route("/admin/profiles/<int:profile_id>/authorities.json")
+def list_authorities_json(profile_id: int):
+    from flask import jsonify
+    conn = get_connection()
+    create_schema_if_needed(conn)
+    auths = list_authorities(conn, profile_id)
+    conn.close()
+    return jsonify({"authorities": auths})
+
+
+@app.route("/admin/profiles/<int:profile_id>/authorities/add", methods=["POST"])
+def add_authority_route(profile_id: int):
+    name = request.form.get("name", "").strip()
+    if not name:
+        flash("Authority name is required.", "error")
+        return redirect(url_for("admin_profile_detail", profile_id=profile_id))
+    aliases = request.form.get("aliases", "").strip()
+    conn = get_connection()
+    create_schema_if_needed(conn)
+    create_authority(conn, profile_id, name, aliases)
+    add_audit_log(conn, entity="authorities", action="add", details=name, profile_id=profile_id)
+    conn.close()
+    flash(f"Authority '{name}' added.", "success")
+    return redirect(url_for("admin_profile_detail", profile_id=profile_id))
+
+
+@app.route("/admin/profiles/<int:profile_id>/authorities/<int:auth_id>/update", methods=["POST"])
+def update_authority_route(profile_id: int, auth_id: int):
+    name = request.form.get("name", "").strip()
+    if not name:
+        flash("Authority name is required.", "error")
+        return redirect(url_for("admin_profile_detail", profile_id=profile_id))
+    conn = get_connection()
+    create_schema_if_needed(conn)
+    update_authority(conn, auth_id, name, request.form.get("aliases", "").strip())
+    add_audit_log(conn, entity="authorities", action="update", details=f"id={auth_id}", profile_id=profile_id)
+    conn.close()
+    flash("Authority updated.", "success")
+    return redirect(url_for("admin_profile_detail", profile_id=profile_id))
+
+
+@app.route("/admin/profiles/<int:profile_id>/authorities/<int:auth_id>/delete", methods=["POST"])
+def delete_authority_route(profile_id: int, auth_id: int):
+    conn = get_connection()
+    create_schema_if_needed(conn)
+    delete_authority(conn, auth_id)
+    add_audit_log(conn, entity="authorities", action="delete", details=f"id={auth_id}", profile_id=profile_id)
+    conn.close()
+    flash("Authority deleted.", "success")
+    return redirect(url_for("admin_profile_detail", profile_id=profile_id))
 
 
 # Historical news clear (per profile)
