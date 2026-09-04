@@ -217,6 +217,15 @@ def admin_dashboard():
             except Exception:
                 pass
         
+        # Review count + source count for the summary strip and profile rows
+        review_count = count_all_news_for_review(conn, profile_id)
+        source_count = conn.execute(
+            "SELECT (SELECT COUNT(*) FROM rss_feeds WHERE profile_id=?) "
+            "+ (SELECT COUNT(*) FROM tweet_accounts WHERE profile_id=?) "
+            "+ (SELECT COUNT(*) FROM url_sources WHERE profile_id=?)",
+            (profile_id, profile_id, profile_id),
+        ).fetchone()[0]
+
         profiles.append({
             "id": profile_id,
             "country_code": r["country_code"],
@@ -227,15 +236,28 @@ def admin_dashboard():
             "last_run_time": last_run_time,
             "last_run_display": last_run_display,
             "last_run_sort_key": last_run_sort_key,
+            "review_count": review_count,
+            "source_count": source_count,
         })
-    
+
     # Sort by last run (never/oldest first), then by country/lob as secondary sort
     profiles.sort(key=lambda p: (p["last_run_sort_key"], p["country_code"], p["lob"]))
-    
+
     conn.close()
+
+    # Summary-strip aggregates
+    profiles_total = len(profiles)
+    review_total = sum(p["review_count"] for p in profiles)
+    recently_run_count = sum(1 for p in profiles if p["last_run_time"])
+    never_run_count = profiles_total - recently_run_count
+
     return render_template("dashboard.html", profiles=profiles,
                            selected_profile=None, active_tab="configure",
-                           review_badge_count=0)
+                           review_badge_count=0,
+                           profiles_total=profiles_total,
+                           review_total=review_total,
+                           recently_run_count=recently_run_count,
+                           never_run_count=never_run_count)
 
 
 @app.route("/admin/profiles/create", methods=["GET"])
@@ -714,11 +736,62 @@ def admin_profile_detail(profile_id: int):
         "date_scope": prof["date_scope"] if "date_scope" in prof.keys() else "all",
     }
 
-    # Load profiles list for FCL shell
+    # Load profiles list for FCL shell (enriched with counts + last-run display)
+    def _fmt_last_run(iso_ts):
+        if not iso_ts:
+            return "Never run"
+        try:
+            last_dt = datetime.fromisoformat(iso_ts)
+            mins = int((datetime.utcnow() - last_dt).total_seconds() / 60)
+            if mins < 1:
+                return "just now"
+            if mins < 60:
+                return f"{mins} min ago"
+            if mins < 1440:
+                h = mins // 60
+                return f"{h} hour{'s' if h != 1 else ''} ago"
+            d = mins // 1440
+            return f"{d} day{'s' if d != 1 else ''} ago"
+        except Exception:
+            return "Never run"
+
+    def _src_count(pid):
+        return conn.execute(
+            "SELECT (SELECT COUNT(*) FROM rss_feeds WHERE profile_id=?) "
+            "+ (SELECT COUNT(*) FROM tweet_accounts WHERE profile_id=?) "
+            "+ (SELECT COUNT(*) FROM url_sources WHERE profile_id=?)",
+            (pid, pid, pid),
+        ).fetchone()[0]
+
     profiles_rows = conn.execute(
         "SELECT id, country_code, lob, name, active FROM profiles ORDER BY country_code, lob"
     ).fetchall()
-    profiles_list = [dict(r) for r in profiles_rows]
+    profiles_list = []
+    for r in profiles_rows:
+        pid = int(r["id"])
+        last = conn.execute(
+            "SELECT started_at FROM runs WHERE profile_id=? AND started_at IS NOT NULL "
+            "ORDER BY started_at DESC LIMIT 1", (pid,)
+        ).fetchone()
+        last_time = last["started_at"] if last and last["started_at"] else None
+        d = dict(r)
+        d["last_run_time"] = last_time
+        d["last_run_display"] = _fmt_last_run(last_time)
+        d["review_count"] = count_all_news_for_review(conn, pid)
+        d["source_count"] = _src_count(pid)
+        profiles_list.append(d)
+
+    # Summary-strip aggregates (shared with dashboard)
+    profiles_total = len(profiles_list)
+    review_total = sum(p["review_count"] for p in profiles_list)
+    recently_run_count = sum(1 for p in profiles_list if p["last_run_time"])
+    never_run_count = profiles_total - recently_run_count
+
+    # Object-page meta for the selected profile
+    sel = next((p for p in profiles_list if p["id"] == profile_id), None)
+    profile["source_count"] = sel["source_count"] if sel else 0
+    profile["last_run_display"] = sel["last_run_display"] if sel else "Never run"
+    profile["language_name"] = LANGUAGE_NAMES.get(profile["language"], profile["language"])
 
     authorities = list_authorities(conn, profile_id)
     review_badge_count = count_all_news_for_review(conn, profile_id)
@@ -785,6 +858,10 @@ def admin_profile_detail(profile_id: int):
         monitor_enabled=monitor_enabled,
         language_names=LANGUAGE_NAMES,
         ans_available=ans_available,
+        profiles_total=profiles_total,
+        review_total=review_total,
+        recently_run_count=recently_run_count,
+        never_run_count=never_run_count,
     )
 
 

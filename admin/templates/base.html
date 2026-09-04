@@ -6,303 +6,224 @@
   <title>Legal Eagle</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: "72", Arial, sans-serif; background: #f5f6f7; color: #32363a; }
+    body { font-family: "72", Arial, sans-serif; background: #f0f0f0; color: #32363a; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 
-    /* ── FCL Shell ── */
-    .fcl-shell { display: flex; height: 100vh; overflow: hidden; }
-
-    .fcl-list {
-      width: 100%;
-      max-width: 600px;
-      margin: 0 auto;
-      overflow-y: auto;
-      background: #fff;
-      border-right: 1px solid #e5e5e5;
-      flex-shrink: 0;
-      transition: width 0.35s cubic-bezier(0.4,0,0.2,1),
-                  max-width 0.35s cubic-bezier(0.4,0,0.2,1),
-                  opacity 0.35s ease;
-    }
-    .fcl-shell.profile-selected .fcl-list { width: 260px; max-width: 260px; }
-    .fcl-shell.profile-maximized .fcl-list { width: 0; opacity: 0; overflow: hidden; }
-
-    .fcl-detail {
-      flex: 1;
-      opacity: 0;
-      pointer-events: none;
-      overflow-y: auto;
-      transition: opacity 0.3s ease 0.15s;
-      background: #f5f6f7;
-      min-width: 0;
-    }
-    .fcl-shell.profile-selected .fcl-detail,
-    .fcl-shell.profile-maximized .fcl-detail { opacity: 1; pointer-events: auto; }
+    /* ── Shell bar ── */
+    .shell { background: #354a5f; color: white; padding: 0 16px; height: 40px; display: flex; align-items: center; gap: 16px; flex-shrink: 0; }
+    .shell-brand { font-weight: 700; font-size: 14px; }
+    .shell-title { color: #b0c4d8; font-size: 12px; }
+    .shell-right { margin-left: auto; color: #b0c4d8; font-size: 11px; text-decoration: none; }
 
     /* ── Summary strip ── */
-    .summary-strip {
-      display: flex;
-      align-items: center;
-      gap: 24px;
-      padding: 12px 24px;
-      background: #f5f6f7;
-      border-bottom: 1px solid #e5e5e5;
-      position: sticky;
-      top: 0;
-      z-index: 10;
-    }
-    .summary-stat { font-size: 13px; color: #6a6d70; }
-    .summary-stat strong { color: #32363a; }
-    .run-all-btn {
-      margin-left: auto;
-      padding: 8px 16px;
-      background: #0a6ed1;
-      color: #fff;
-      border: none;
-      border-radius: 4px;
-      font-size: 13px;
-      cursor: pointer;
-      white-space: nowrap;
-    }
-    .run-all-btn:hover { background: #0854a0; }
+    .summary-strip { background: white; border-bottom: 2px solid #e5e5e5; padding: 10px 20px; display: flex; align-items: center; gap: 24px; flex-shrink: 0; }
+    .sum-title { font-weight: 700; font-size: 13px; color: #32363a; }
+    .sum-count { font-size: 11px; color: #6a6d70; margin-left: 4px; }
+    .sum-divider { width: 1px; height: 32px; background: #e5e5e5; }
+    .sum-item { display: flex; align-items: baseline; gap: 6px; }
+    .sum-num { font-size: 20px; font-weight: 700; line-height: 1; }
+    .sum-num.red { color: #bb0000; }
+    .sum-num.green { color: #107e3e; }
+    .sum-num.gray { color: #aaa; }
+    .sum-label { font-size: 11px; color: #6a6d70; }
+    .btn-run-all-placeholder { margin-left: auto; background: #f5f5f5; color: #aaa; border: 1px dashed #ccc; border-radius: 4px; padding: 7px 14px; font-size: 12px; font-weight: 700; cursor: not-allowed; display: flex; align-items: center; gap: 7px; white-space: nowrap; flex-shrink: 0; }
+    .soon-badge { background: #e8f1fb; color: #0a6ed1; font-size: 9px; font-weight: 700; border-radius: 3px; padding: 1px 5px; text-transform: uppercase; }
 
-    /* ── Profile rows ── */
-    .profile-row {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 16px 24px;
-      cursor: pointer;
-      border-bottom: 1px solid #f0f0f0;
-      transition: background 0.15s;
-      text-decoration: none;
-      color: inherit;
-    }
-    .profile-row:hover { background: #eaf1fb; }
-    .profile-row.active { background: #eaf1fb; }
-
-    .profile-avatar {
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      background: #0a6ed1;
-      color: #fff;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 700;
-      font-size: 13px;
-      flex-shrink: 0;
-      transition: width 0.35s, height 0.35s, font-size 0.35s;
-    }
-    .fcl-shell.profile-selected .profile-row { padding: 10px 12px; }
-    .fcl-shell.profile-selected .profile-avatar { width: 28px; height: 28px; font-size: 10px; }
-    .fcl-shell.profile-selected .profile-desc,
-    .fcl-shell.profile-selected .profile-meta,
-    .fcl-shell.profile-selected .badge-label { display: none; }
-
-    .profile-info { flex: 1; min-width: 0; overflow: hidden; }
-    .profile-name { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .profile-desc { font-size: 12px; color: #6a6d70; margin-top: 2px; }
-    .profile-meta { font-size: 11px; color: #6a6d70; margin-top: 4px; }
-    .review-badge {
-      background: #bb0000;
-      color: #fff;
-      border-radius: 12px;
-      padding: 2px 8px;
-      font-size: 11px;
-      font-weight: 600;
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
-
-    /* ── Object Page ── */
-    .op-header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 12px 20px;
-      background: #fff;
-      border-bottom: 1px solid #e5e5e5;
-      position: sticky;
-      top: 0;
-      z-index: 10;
-    }
-    .op-breadcrumb { font-size: 12px; color: #6a6d70; white-space: nowrap; }
-    .op-title { font-size: 18px; font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .op-actions { display: flex; gap: 8px; margin-left: auto; flex-shrink: 0; }
-    .op-btn {
-      padding: 6px 12px;
-      border-radius: 4px;
-      font-size: 13px;
-      cursor: pointer;
-      border: 1px solid #ddd;
-      background: #fff;
-      color: #32363a;
-      white-space: nowrap;
-    }
-    .op-btn:hover { background: #f5f6f7; }
-    .op-btn.primary { background: #0a6ed1; color: #fff; border-color: #0a6ed1; }
-    .op-btn.primary:hover { background: #0854a0; border-color: #0854a0; }
-    .op-btn.icon { padding: 6px 8px; font-size: 16px; }
-
-    .op-tabs {
-      display: flex;
-      border-bottom: 1px solid #e5e5e5;
-      background: #fff;
-      position: sticky;
-      top: 57px;
-      z-index: 9;
-    }
-    .op-tab {
-      padding: 12px 20px;
-      font-size: 13px;
-      cursor: pointer;
-      border-bottom: 2px solid transparent;
-      color: #6a6d70;
-      user-select: none;
-      white-space: nowrap;
-    }
-    .op-tab:hover { color: #32363a; }
-    .op-tab.active { border-bottom-color: #0a6ed1; color: #0a6ed1; font-weight: 600; }
-    .op-tab-badge {
-      background: #bb0000;
-      color: #fff;
-      border-radius: 10px;
-      padding: 1px 6px;
-      font-size: 10px;
-      margin-left: 4px;
-      vertical-align: middle;
-    }
-
-    .tab-panel { display: none; padding: 20px; }
-    .tab-panel.active { display: block; }
-
-    /* ── Flash messages ── */
-    .flash-container { padding: 8px 20px 0; }
+    /* ── Flash ── */
+    .flash-container { padding: 8px 20px 0; flex-shrink: 0; background: #f0f0f0; }
     .flash { padding: 10px 16px; border-radius: 4px; font-size: 13px; margin-bottom: 8px; }
     .flash.success { background: #e5f3ea; color: #107e3e; border: 1px solid #c2e0cc; }
     .flash.error   { background: #fde8e8; color: #bb0000; border: 1px solid #f5b8b8; }
     .flash.info    { background: #eaf1fb; color: #0a6ed1; border: 1px solid #b3d1f5; }
 
-    /* ── Toast ── */
-    .toast {
-      position: fixed;
-      bottom: 24px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: #32363a;
-      color: #fff;
-      padding: 10px 20px;
-      border-radius: 4px;
-      font-size: 13px;
-      z-index: 1000;
-      opacity: 0;
-      transition: opacity 0.3s;
-      pointer-events: none;
-      white-space: nowrap;
-    }
-    .toast.visible { opacity: 1; }
+    /* ── Main content (list + detail) ── */
+    .main-content { display: flex; flex: 1; overflow: hidden; }
+
+    .profile-list { flex-shrink: 0; width: 100%; max-width: 600px; margin: 0 auto; transition: width 0.35s cubic-bezier(0.4,0,0.2,1), max-width 0.35s cubic-bezier(0.4,0,0.2,1), opacity 0.2s ease; border-right: 1px solid #e5e5e5; background: white; display: flex; flex-direction: column; overflow: hidden; }
+    .main-content.has-profile .profile-list { width: 260px; max-width: 260px; margin: 0; }
+    .main-content.maximized .profile-list { width: 0; max-width: 0; opacity: 0; pointer-events: none; }
+
+    .master-search { padding: 8px 10px; border-bottom: 1px solid #e5e5e5; flex-shrink: 0; }
+    .master-search input { width: 100%; border: 1px solid #d9d9d9; border-radius: 4px; padding: 5px 8px; font-size: 11px; color: #32363a; background: #f7f7f7; outline: none; }
+    .master-list { flex: 1; overflow-y: auto; }
+
+    .profile-row { padding: 12px 14px; cursor: pointer; border-left: 3px solid transparent; border-bottom: 1px solid #f2f2f2; transition: background 0.15s; display: flex; align-items: center; justify-content: space-between; gap: 10px; text-decoration: none; color: inherit; }
+    .profile-row:hover { background: #f5f9ff; }
+    .profile-row.selected { border-left-color: #0a6ed1; background: #e8f1fb; }
+    .row-left { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+    .row-avatar { width: 36px; height: 36px; border-radius: 50%; background: #e8f1fb; color: #0a6ed1; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; transition: width 0.3s, height 0.3s, font-size 0.3s; }
+    .main-content.has-profile .row-avatar { width: 28px; height: 28px; font-size: 10px; }
+    .profile-row.selected .row-avatar { background: #0a6ed1; color: white; }
+    .row-text { flex: 1; min-width: 0; }
+    .row-name { font-weight: 600; font-size: 12px; color: #32363a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .row-desc { font-size: 11px; color: #6a6d70; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .main-content.has-profile .row-desc { display: none; }
+    .row-meta { display: flex; gap: 14px; margin-top: 5px; opacity: 1; max-height: 20px; transition: opacity 0.2s, max-height 0.3s; }
+    .main-content.has-profile .row-meta { opacity: 0; max-height: 0; overflow: hidden; }
+    .meta-item { font-size: 11px; color: #6a6d70; }
+    .meta-dot { color: #107e3e; margin-right: 3px; }
+    .row-right { flex-shrink: 0; text-align: right; }
+    .badge-red { background: #bb0000; color: white; border-radius: 10px; padding: 2px 8px; font-size: 10px; font-weight: 700; display: inline-block; }
+    .badge-label { font-size: 10px; color: #6a6d70; margin-top: 2px; }
+    .main-content.has-profile .badge-label { display: none; }
+    .never-run { font-size: 11px; color: #bbb; }
+    .master-footer { padding: 10px 12px; border-top: 1px solid #e5e5e5; flex-shrink: 0; }
+    .btn-add { display: block; width: 100%; background: white; border: 1px dashed #0a6ed1; color: #0a6ed1; border-radius: 4px; padding: 7px; font-size: 11px; cursor: pointer; font-weight: 600; text-align: center; text-decoration: none; }
+
+    /* ── Detail panel ── */
+    .detail-panel { flex: 1; display: flex; flex-direction: column; background: #f7f7f7; overflow: hidden; min-width: 0; opacity: 0; transition: opacity 0.3s ease 0.15s; }
+    .main-content.has-profile .detail-panel, .main-content.maximized .detail-panel { opacity: 1; }
+
+    .op-header { background: white; border-bottom: 1px solid #e5e5e5; padding: 14px 18px 0; flex-shrink: 0; }
+    .op-breadcrumb { font-size: 10px; color: #6a6d70; margin-bottom: 3px; }
+    .op-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+    .op-title { font-size: 18px; font-weight: 700; color: #32363a; }
+    .op-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+    .op-actions form { display: inline; margin: 0; }
+    .btn-run-now { background: #0a6ed1; color: white; border: none; border-radius: 4px; padding: 6px 16px; font-size: 12px; font-weight: 700; cursor: pointer; }
+    .btn-overflow { background: white; border: 1px solid #d9d9d9; color: #32363a; border-radius: 4px; padding: 6px 10px; font-size: 12px; cursor: pointer; }
+    .btn-icon { background: white; border: 1px solid #e5e5e5; color: #6a6d70; border-radius: 4px; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 13px; text-decoration: none; transition: background 0.15s, color 0.15s; }
+    .btn-icon:hover { background: #f0f0f0; color: #32363a; border-color: #aaa; }
+    .btn-icon .icon-restore { display: none; }
+    .main-content.maximized .btn-icon .icon-max { display: none; }
+    .main-content.maximized .btn-icon .icon-restore { display: inline; }
+    .main-content.maximized .btn-close-detail { display: none; }
+
+    .op-meta { display: flex; align-items: center; gap: 14px; margin-top: 8px; flex-wrap: wrap; }
+    .status-badge { background: #e8f5e9; color: #107e3e; border-radius: 10px; padding: 2px 10px; font-size: 11px; font-weight: 700; }
+    .status-badge.inactive { background: #f0f0f0; color: #aaa; }
+    .op-meta-item { font-size: 11px; color: #6a6d70; }
+
+    .op-tabs { display: flex; margin-top: 12px; }
+    .tab { padding: 7px 16px; font-size: 12px; color: #6a6d70; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; user-select: none; }
+    .tab:hover { color: #32363a; }
+    /* per-tab active accent — driven by .accent-<tab> on detail-panel */
+    .accent-configure .tab.active { color: #0a6ed1; font-weight: 700; border-bottom-color: #0a6ed1; }
+    .accent-run .tab.active { color: #107e3e; font-weight: 700; border-bottom-color: #107e3e; }
+    .accent-review .tab.active { color: #e9730c; font-weight: 700; border-bottom-color: #e9730c; }
+    .tab-badge { background: #bb0000; color: white; border-radius: 8px; padding: 1px 6px; font-size: 10px; font-weight: 700; margin-left: 4px; }
+
+    .tab-panel { display: none; flex: 1; overflow: hidden; min-height: 0; }
+    .tab-panel.active { display: flex; flex-direction: column; }
+
+    /* empty-state (dashboard) */
+    .detail-empty { display: flex; align-items: center; justify-content: center; height: 100%; color: #6a6d70; text-align: center; }
   </style>
 </head>
 <body>
-<div class="fcl-shell" id="fclShell">
 
-  <!-- ── List Panel ── -->
-  <div class="fcl-list" id="fclList">
-    <div class="summary-strip">
-      <div class="summary-stat"><strong>{{ profiles|length }}</strong> profiles</div>
-      {% set review_total = profiles | sum(attribute='review_count') if profiles and profiles[0] is mapping and 'review_count' in profiles[0] else 0 %}
-      {% if review_total > 0 %}<div class="summary-stat"><strong>{{ review_total }}</strong> to review</div>{% endif %}
-      <button class="run-all-btn" onclick="showToast('Run All coming in v3.1')">&#9654; Run All Active</button>
-    </div>
+  <div class="shell">
+    <span class="shell-brand">SAP</span>
+    <span class="shell-title">Legal Eagle — Compliance Management</span>
+    <a class="shell-right" href="{{ url_for('admin_dashboard') }}">Legal Repo ›</a>
+  </div>
 
-    {% for p in profiles %}
-    <a class="profile-row {% if selected_profile and selected_profile.id == p.id %}active{% endif %}"
-       href="{{ url_for('admin_profile_detail', profile_id=p.id) }}?tab=configure">
-      <div class="profile-avatar">{{ p.country_code }}</div>
-      <div class="profile-info">
-        <div class="profile-name">{{ p.name or (p.country_code ~ ' / ' ~ p.lob) }}</div>
-        <div class="profile-desc">{{ p.lob }}</div>
-        <div class="profile-meta">
-          {% if p.last_run_display is defined %}{{ p.last_run_display }}{% else %}Never run{% endif %}
-        </div>
-      </div>
-      {% if p.review_count is defined and p.review_count > 0 %}
-      <span class="review-badge">{{ p.review_count }}<span class="badge-label"> to review</span></span>
-      {% endif %}
-    </a>
+  <div class="summary-strip">
+    <div><span class="sum-title">Profiles</span><span class="sum-count">{{ profiles_total|default(profiles|length) }} total</span></div>
+    <div class="sum-divider"></div>
+    <div class="sum-item"><span class="sum-num red">{{ review_total|default(0) }}</span><span class="sum-label">to review</span></div>
+    <div class="sum-divider"></div>
+    <div class="sum-item"><span class="sum-num green">{{ recently_run_count|default(0) }}</span><span class="sum-label">run recently</span></div>
+    <div class="sum-divider"></div>
+    <div class="sum-item"><span class="sum-num gray">{{ never_run_count|default(0) }}</span><span class="sum-label">never run</span></div>
+    <div class="btn-run-all-placeholder" title="Coming in v3.1">&#9654;&#9654; Run All Active <span class="soon-badge">Soon</span></div>
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+  <div class="flash-container">
+    {% for category, message in messages %}
+    <div class="flash {{ category }}">{{ message }}</div>
     {% endfor %}
   </div>
+  {% endif %}
+  {% endwith %}
 
-  <!-- ── Detail Panel ── -->
-  <div class="fcl-detail" id="fclDetail">
-    {% if selected_profile %}
-    <div class="op-header">
-      <span class="op-breadcrumb">Legal Eagle /</span>
-      <span class="op-title">{{ selected_profile.name or (selected_profile.country_code ~ ' / ' ~ selected_profile.lob) }}</span>
-      <div class="op-actions">
-        <form method="POST" action="{{ url_for('admin_start_run', profile_id=selected_profile.id) }}" style="display:inline">
-          <input type="hidden" name="test_mode" value="0">
-          <button type="submit" class="op-btn primary">&#9654; Run Now</button>
-        </form>
-        <button class="op-btn icon" onclick="toggleMaximize()" id="maximizeBtn" title="Expand">&#10562;</button>
-        <a href="{{ url_for('admin_dashboard') }}" class="op-btn icon" title="Back to list">&#8249;</a>
+  <div class="main-content {% if selected_profile %}has-profile{% endif %}" id="main">
+
+    <!-- ── List panel ── -->
+    <div class="profile-list">
+      <div class="master-search"><input placeholder="Search profiles…" oninput="filterProfiles(this.value)"></div>
+      <div class="master-list" id="masterList">
+        {% for p in profiles %}
+        <a class="profile-row {% if selected_profile and selected_profile.id == p.id %}selected{% endif %}"
+           href="{{ url_for('admin_profile_detail', profile_id=p.id) }}?tab=configure"
+           data-name="{{ (p.name or (p.country_code ~ ' / ' ~ p.lob))|lower }}">
+          <div class="row-left">
+            <div class="row-avatar">{{ p.country_code }}</div>
+            <div class="row-text">
+              <div class="row-name">{{ p.name or (p.country_code ~ ' / ' ~ p.lob) }}</div>
+              <div class="row-desc">{{ p.lob }}{% if p.source_count is defined %} · {{ p.source_count }} sources{% endif %}</div>
+              <div class="row-meta">
+                <span class="meta-item">{% if p.active %}<span class="meta-dot">●</span>Active{% else %}Inactive{% endif %}</span>
+                <span class="meta-item">{{ p.last_run_display|default('Never run') }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="row-right">
+            {% if p.review_count is defined and p.review_count > 0 %}
+            <span class="badge-red">{{ p.review_count }}</span><div class="badge-label">unreviewed</div>
+            {% elif not p.last_run_time %}
+            <span class="never-run">Never run</span>
+            {% endif %}
+          </div>
+        </a>
+        {% endfor %}
       </div>
+      <div class="master-footer"><a class="btn-add" href="{{ url_for('show_create_profile_page') }}">+ New Profile</a></div>
     </div>
 
-    {% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-    <div class="flash-container">
-      {% for category, message in messages %}
-      <div class="flash {{ category }}">{{ message }}</div>
-      {% endfor %}
-    </div>
-    {% endif %}
-    {% endwith %}
-
-    <div class="op-tabs">
-      <div class="op-tab {% if active_tab=='configure' %}active{% endif %}" onclick="switchTab('configure')">Configure</div>
-      <div class="op-tab {% if active_tab=='run' %}active{% endif %}" onclick="switchTab('run')">Run</div>
-      <div class="op-tab {% if active_tab=='review' %}active{% endif %}" onclick="switchTab('review')">Review{% if review_badge_count|default(0) > 0 %}<span class="op-tab-badge">{{ review_badge_count }}</span>{% endif %}</div>
-    </div>
-
-    <div id="tab-configure" class="tab-panel {% if active_tab=='configure' %}active{% endif %}">
-      {% block configure_tab %}{% endblock %}
-    </div>
-    <div id="tab-run" class="tab-panel {% if active_tab=='run' %}active{% endif %}">
-      {% block run_tab %}{% endblock %}
-    </div>
-    <div id="tab-review" class="tab-panel {% if active_tab=='review' %}active{% endif %}">
-      {% block review_tab %}{% endblock %}
-    </div>
-    {% else %}
-    <div style="display:flex;align-items:center;justify-content:center;height:100%;color:#6a6d70;">
-      <div style="text-align:center;">
-        <div style="font-size:48px;margin-bottom:16px;">&#9632;</div>
-        <div style="font-size:16px;font-weight:600;margin-bottom:8px;">Select a profile</div>
-        <div style="font-size:13px;">Choose a profile from the list to configure, run, or review.</div>
+    <!-- ── Detail panel ── -->
+    <div class="detail-panel accent-{{ active_tab|default('configure') }}">
+      {% if selected_profile %}
+      <div class="op-header">
+        <div class="op-breadcrumb">Profiles › {{ selected_profile.country_code }} / {{ selected_profile.lob }}</div>
+        <div class="op-title-row">
+          <div class="op-title">{{ selected_profile.name or (selected_profile.country_code ~ ' / ' ~ selected_profile.lob) }}</div>
+          <div class="op-actions">
+            <form method="POST" action="{{ url_for('admin_start_run', profile_id=selected_profile.id) }}">
+              <input type="hidden" name="test_mode" value="0">
+              <button type="submit" class="btn-run-now">&#9654; Run Now</button>
+            </form>
+            <button class="btn-icon" onclick="toggleMaximize()" id="maximizeBtn" title="Maximize / restore">
+              <span class="icon-max">&#10562;</span><span class="icon-restore">&#10561;</span>
+            </button>
+            <a class="btn-icon btn-close-detail" href="{{ url_for('admin_dashboard') }}" title="Back to list">&#8249;</a>
+          </div>
+        </div>
+        <div class="op-meta">
+          {% if selected_profile.active %}<span class="status-badge">● Active</span>{% else %}<span class="status-badge inactive">Inactive</span>{% endif %}
+          {% if selected_profile.language_name %}<span class="op-meta-item">{{ selected_profile.language_name }}</span>{% endif %}
+          {% if selected_profile.source_count is defined %}<span class="op-meta-item">{{ selected_profile.source_count }} sources</span>{% endif %}
+          <span class="op-meta-item">{{ selected_profile.last_run_display|default('Never run') }}</span>
+        </div>
+        <div class="op-tabs">
+          <div class="tab {% if active_tab=='configure' %}active{% endif %}" onclick="switchTab('configure')">Configure</div>
+          <div class="tab {% if active_tab=='run' %}active{% endif %}" onclick="switchTab('run')">Run</div>
+          <div class="tab {% if active_tab=='review' %}active{% endif %}" onclick="switchTab('review')">Review{% if review_badge_count|default(0) > 0 %}<span class="tab-badge">{{ review_badge_count }}</span>{% endif %}</div>
+        </div>
       </div>
+
+      <div id="tab-configure" class="tab-panel {% if active_tab=='configure' %}active{% endif %}">{% block configure_tab %}{% endblock %}</div>
+      <div id="tab-run" class="tab-panel {% if active_tab=='run' %}active{% endif %}">{% block run_tab %}{% endblock %}</div>
+      <div id="tab-review" class="tab-panel {% if active_tab=='review' %}active{% endif %}">{% block review_tab %}{% endblock %}</div>
+      {% else %}
+      <div class="detail-empty">
+        <div>
+          <div style="font-size:48px;margin-bottom:16px;">&#9632;</div>
+          <div style="font-size:16px;font-weight:600;margin-bottom:8px;">Select a profile</div>
+          <div style="font-size:13px;">Choose a profile from the list to configure, run, or review.</div>
+        </div>
+      </div>
+      {% endif %}
     </div>
-    {% endif %}
+
   </div>
 
-</div>
-
-<div class="toast" id="toast"></div>
-
 <script>
-  {% if selected_profile %}
-  document.getElementById('fclShell').classList.add('profile-selected');
-  {% endif %}
-
   function toggleMaximize() {
-    var s = document.getElementById('fclShell');
-    var b = document.getElementById('maximizeBtn');
-    var max = s.classList.toggle('profile-maximized');
-    b.innerHTML = max ? '&#10561;' : '&#10562;';
-    b.title = max ? 'Restore' : 'Expand';
+    var m = document.getElementById('main');
+    m.classList.toggle('maximized');
   }
-
   function switchTab(name) {
     {% if selected_profile %}
     var pid = {{ selected_profile.id }};
@@ -314,12 +235,12 @@
     location.href = routes[name] || ('/admin/profiles/' + pid);
     {% endif %}
   }
-
-  function showToast(msg) {
-    var t = document.getElementById('toast');
-    t.textContent = msg;
-    t.classList.add('visible');
-    setTimeout(function(){ t.classList.remove('visible'); }, 3000);
+  function filterProfiles(q) {
+    q = (q || '').toLowerCase();
+    document.querySelectorAll('#masterList .profile-row').forEach(function(row) {
+      var name = row.getAttribute('data-name') || '';
+      row.style.display = name.indexOf(q) !== -1 ? '' : 'none';
+    });
   }
 </script>
 </body>
