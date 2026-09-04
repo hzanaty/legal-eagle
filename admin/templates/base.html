@@ -261,9 +261,9 @@
     {% endwith %}
 
     <div class="op-tabs">
-      <div class="op-tab {% if active_tab=='configure' %}active{% endif %}" onclick="switchTab('configure',this)">Configure</div>
-      <div class="op-tab {% if active_tab=='run' %}active{% endif %}" onclick="switchTab('run',this)">Run</div>
-      <div class="op-tab {% if active_tab=='review' %}active{% endif %}" onclick="switchTab('review',this)">Review{% if review_badge_count|default(0) > 0 %}<span class="op-tab-badge">{{ review_badge_count }}</span>{% endif %}</div>
+      <div class="op-tab {% if active_tab=='configure' %}active{% endif %}" onclick="switchTab('configure')">Configure</div>
+      <div class="op-tab {% if active_tab=='run' %}active{% endif %}" onclick="switchTab('run')">Run</div>
+      <div class="op-tab {% if active_tab=='review' %}active{% endif %}" onclick="switchTab('review')">Review{% if review_badge_count|default(0) > 0 %}<span class="op-tab-badge">{{ review_badge_count }}</span>{% endif %}</div>
     </div>
 
     <div id="tab-configure" class="tab-panel {% if active_tab=='configure' %}active{% endif %}">
@@ -303,14 +303,16 @@
     b.title = max ? 'Restore' : 'Expand';
   }
 
-  function switchTab(name, el) {
-    document.querySelectorAll('.tab-panel').forEach(function(p){ p.classList.remove('active'); });
-    document.querySelectorAll('.op-tab').forEach(function(t){ t.classList.remove('active'); });
-    document.getElementById('tab-' + name).classList.add('active');
-    el.classList.add('active');
-    var u = new URL(location.href);
-    u.searchParams.set('tab', name);
-    history.replaceState({}, '', u.toString());
+  function switchTab(name) {
+    {% if selected_profile %}
+    var pid = {{ selected_profile.id }};
+    var routes = {
+      configure: '/admin/profiles/' + pid,
+      run: '/admin/profiles/' + pid + '/runs',
+      review: '/admin/profiles/' + pid + '/review'
+    };
+    location.href = routes[name] || ('/admin/profiles/' + pid);
+    {% endif %}
   }
 
   function showToast(msg) {

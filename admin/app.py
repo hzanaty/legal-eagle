@@ -309,6 +309,11 @@ def admin_profile_runs(profile_id: int):
         "schedule_day": prof["schedule_day"],
     }
     runs = list_runs_for_profile(conn, profile_id, limit=50)
+    profiles_rows = conn.execute(
+        "SELECT id, country_code, lob, name, active FROM profiles ORDER BY country_code, lob"
+    ).fetchall()
+    profiles_list = [dict(r) for r in profiles_rows]
+    review_badge_count = count_all_news_for_review(conn, profile_id)
     # Compute news count and whether a run is currently active for this profile
     try:
         row_cnt = conn.execute("SELECT COUNT(*) AS cnt FROM news_items WHERE profile_id = ?", (profile_id,)).fetchone()
@@ -448,6 +453,10 @@ def admin_profile_runs(profile_id: int):
     return render_template(
         "run_status.html",
         profile=profile,
+        selected_profile=profile,
+        profiles=profiles_list,
+        active_tab='run',
+        review_badge_count=review_badge_count,
         runs=runs,
         selected_run=selected_run,
         news_count=news_count,
@@ -1620,11 +1629,22 @@ def admin_review_news(profile_id: int):
     # Parent options for L2S Prompt modal dropdown
     repo_parent_options = list_repo_nodes(conn, profile["country_code"])
 
+    # FCL context
+    profiles_rows = conn.execute(
+        "SELECT id, country_code, lob, name, active FROM profiles ORDER BY country_code, lob"
+    ).fetchall()
+    profiles_list = [dict(r) for r in profiles_rows]
+    review_badge_count = count_all_news_for_review(conn, profile_id)
+
     conn.close()
 
     return render_template(
         "review_news.html",
         profile=profile,
+        selected_profile=profile,
+        profiles=profiles_list,
+        active_tab='review',
+        review_badge_count=review_badge_count,
         items=items,
         accepted_unscored_count=accepted_unscored_count,
         filtered_unscored_count=filtered_unscored_count,

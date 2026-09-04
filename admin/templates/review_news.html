@@ -1,557 +1,139 @@
 {% extends "base.html" %}
-{% block content %}
-<style>
-  /* Review News Fiori Styles */
-  .sapStatCard {
-    background: var(--sapTileBackground);
-    border: 1px solid var(--sapTileBorderColor);
-    border-radius: 0.25rem;
-    padding: var(--sapSpacingL);
-    text-align: center;
-    box-shadow: var(--sapTileShadow);
-    cursor: pointer;
-    transition: all 0.2s ease;
-    display: block;
-  }
-  
-  .sapStatCard:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-  }
-  
-  .sapStatCard-active {
-    border: 2px solid var(--sapBrandColor);
-    box-shadow: 0 4px 12px rgba(0, 112, 242, 0.2);
-  }
-  
-  .sapStatCard-value {
-    font-size: 3rem;
-    font-weight: 300;
-    line-height: 1;
-    margin: var(--sapSpacingS) 0;
-  }
-  
-  .sapStatCard-label {
-    font-size: var(--sapFontSize);
-    color: var(--sapNeutralColor);
-    font-weight: 600;
-  }
-  
-  .sapStatCard-neutral { border-left: 4px solid var(--sapNeutralColor); }
-  .sapStatCard-warning { border-left: 4px solid var(--sapCriticalColor); }
-  .sapStatCard-positive { border-left: 4px solid var(--sapPositiveColor); }
-  .sapStatCard-info { border-left: 4px solid var(--sapInformativeColor); }
-  
-  .sapSegmentedButton {
-    display: inline-flex;
-    border: 1px solid var(--sapTileBorderColor);
-    border-radius: 0.25rem;
-    overflow: hidden;
-    margin-bottom: var(--sapSpacingM);
-  }
-  
-  .sapSegmentedButton-item {
-    padding: var(--sapSpacingS) var(--sapSpacingL);
-    background: var(--sapBaseColor);
-    border: none;
-    border-right: 1px solid var(--sapTileBorderColor);
-    color: var(--sapTextColor);
-    text-decoration: none;
-    transition: all 0.2s;
-    font-size: var(--sapFontSize);
-    cursor: pointer;
-  }
-  
-  .sapSegmentedButton-item:last-child {
-    border-right: none;
-  }
-  
-  .sapSegmentedButton-item:hover {
-    background: var(--sapButton_Hover_Background);
-  }
-  
-  .sapSegmentedButton-item.active {
-    background: var(--sapBrandColor);
-    color: #ffffff;
-    font-weight: 600;
-  }
-  
-  .sapTable-review {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: var(--sapFontSmallSize);
-  }
-  
-  .sapTable-review th {
-    padding: var(--sapSpacingS);
-    text-align: left;
-    font-weight: 600;
-    background: var(--sapNeutralBackground);
-    border-bottom: 2px solid var(--sapGroup_ContentBorderColor);
-    font-size: var(--sapFontSmallSize);
-  }
-  
-  .sapTable-review td {
-    padding: var(--sapSpacingS);
-    border-bottom: 1px solid var(--sapGroup_ContentBorderColor);
-    vertical-align: top;
-  }
-  
-  .sapTable-review tbody tr:hover {
-    background: var(--sapList_Hover_Background);
-  }
-  
-  .sapGrid-stats {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: var(--sapSpacingM);
-    margin-bottom: var(--sapSpacingM);
-  }
-  
-  .sapPagination {
-    display: flex;
-    justify-content: center;
-    gap: var(--sapSpacingXS);
-    margin-top: var(--sapSpacingM);
-  }
-  
-  .sapPagination-item {
-    padding: var(--sapSpacingS) var(--sapSpacingM);
-    border: 1px solid var(--sapTileBorderColor);
-    background: var(--sapBaseColor);
-    color: var(--sapTextColor);
-    text-decoration: none;
-    border-radius: 0.25rem;
-    font-size: var(--sapFontSmallSize);
-    transition: all 0.2s;
-  }
-  
-  .sapPagination-item:hover:not(.disabled):not(.active) {
-    background: var(--sapButton_Hover_Background);
-    border-color: var(--sapBrandColor);
-    color: var(--sapBrandColor);
-  }
-  
-  .sapPagination-item.active {
-    background: var(--sapBrandColor);
-    border-color: var(--sapBrandColor);
-    color: #ffffff;
-    font-weight: 600;
-  }
-  
-  .sapPagination-item.disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-</style>
+{% block review_tab %}
+<div style="display:flex;flex-direction:column;height:calc(100vh - 200px);overflow:hidden">
 
-<!-- Stats Cards (Clickable) -->
-<div class="sapGrid-stats">
-  <a href="{{ url_for('admin_review_news', profile_id=profile.id, source='accepted', reviewed='no') }}" 
-     class="sapStatCard sapStatCard-info {% if filter_source == 'accepted' and filter_reviewed == 'no' %}sapStatCard-active{% endif %}" 
-     style="text-decoration: none; color: inherit;">
-    <div class="sapStatCard-label">Accepted (Unscored)</div>
-    <div class="sapStatCard-value">{{ accepted_unscored_count }}</div>
-  </a>
-  <a href="{{ url_for('admin_review_news', profile_id=profile.id, source='filtered', reviewed='no') }}" 
-     class="sapStatCard sapStatCard-warning {% if filter_source == 'filtered' and filter_reviewed == 'no' %}sapStatCard-active{% endif %}" 
-     style="text-decoration: none; color: inherit;">
-    <div class="sapStatCard-label">Filtered (Unscored)</div>
-    <div class="sapStatCard-value">{{ filtered_unscored_count }}</div>
-  </a>
-  <a href="{{ url_for('admin_review_news', profile_id=profile.id, reviewed='yes') }}" 
-     class="sapStatCard sapStatCard-positive {% if filter_reviewed == 'yes' %}sapStatCard-active{% endif %}" 
-     style="text-decoration: none; color: inherit;">
-    <div class="sapStatCard-label">Reviewed (All)</div>
-    <div class="sapStatCard-value">{{ reviewed_count }}</div>
-  </a>
-</div>
-
-<!-- Bulk Actions Card -->
-<div class="sapCard">
-  <div class="sapCard-header">
-    <span>⚙️ Bulk Actions</span>
-    <div style="display: flex; gap: var(--sapSpacingS);">
-      <form method="POST" action="{{ url_for('clear_filtered_news_route', profile_id=profile.id) }}" onsubmit="return confirm('Clear all filtered news items?');">
-        <input type="hidden" name="clear_type" value="all">
-        <button type="submit" class="sapBtn sapBtn-reject sapBtn-sm">Clear All</button>
-      </form>
-      <form method="POST" action="{{ url_for('clear_filtered_news_route', profile_id=profile.id) }}" onsubmit="return confirm('Clear only reviewed items?');">
-        <input type="hidden" name="clear_type" value="reviewed">
-        <button type="submit" class="sapBtn sapBtn-attention sapBtn-sm">Clear Reviewed</button>
-      </form>
+  <!-- Filter bar -->
+  <div style="background:#fff;border-bottom:1px solid #e5e5e5;padding:8px 0 4px">
+    {% for dim, label, opts in [
+      ('rank',  'Rank',  [('all','All'),('1','1'),('2','2'),('3','3'),('4','4'),('5','5')]),
+      ('src',   'Source',[('all','All'),('accepted','Accepted'),('filtered','Filtered')]),
+      ('rev',   'Status',[('all','All'),('no','Unscored'),('yes','Reviewed')])
+    ] %}
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+      <span style="font-size:12px;font-weight:700;color:#6a6d70;min-width:56px">{{ label }}</span>
+      {% for val, lbl in opts %}
+      <span class="fchip {% if val == 'all' %}active{% endif %}" data-dim="{{ dim }}" data-val="{{ val }}"
+            onclick="setFilter('{{ dim }}','{{ val }}',this)">{{ lbl }}</span>
+      {% endfor %}
     </div>
+    {% endfor %}
   </div>
-  <div class="sapCard-content">
-    <form method="POST" action="{{ url_for('bulk_score_filtered_news', profile_id=profile.id) }}" id="bulkScoreForm">
-      <div style="display: flex; gap: var(--sapSpacingS); align-items: center; flex-wrap: wrap;">
-        <label style="font-weight: 600;">Bulk Score Selected:</label>
-        <select name="bulk_score" class="sapForm-select" style="width: 180px; padding: 0.25rem 0.5rem; font-size: var(--sapFontSmallSize);">
-          <option value="1">1 - Not Relevant</option>
-          <option value="2">2 - Low</option>
-          <option value="3">3 - Medium</option>
-          <option value="4">4 - High</option>
-          <option value="5">5 - Very Relevant</option>
-        </select>
-        <button type="submit" class="sapBtn sapBtn-emphasized sapBtn-sm">Apply Score</button>
-        <button type="button" class="sapBtn sapBtn-default sapBtn-sm" onclick="toggleSelectAll()">Select All</button>
-        <button type="submit" form="bulkDeleteForm" class="sapBtn sapBtn-reject sapBtn-sm" onclick="return confirm('Delete selected items?');">Delete Selected</button>
-      </div>
-    </form>
-    <form method="POST" action="{{ url_for('bulk_delete_filtered_news', profile_id=profile.id) }}" id="bulkDeleteForm" style="display:none;"></form>
-  </div>
-</div>
 
-<!-- Items Table -->
-{% if items %}
-<div class="sapCard">
-  <div class="sapCard-header">
-    <span>📰 News Items for Review</span>
-    <span style="color: var(--sapNeutralColor); font-weight: 400; font-size: var(--sapFontSmallSize);">
-      Page {{ page }} of {{ total_pages }}
+  <!-- Toolbar -->
+  <div style="display:flex;align-items:center;gap:12px;padding:6px 0;border-bottom:1px solid #e5e5e5">
+    <span style="font-size:13px;color:#6a6d70">
+      Accepted: <strong>{{ accepted_unscored_count }}</strong> unscored &nbsp;|&nbsp;
+      Filtered: <strong>{{ filtered_unscored_count }}</strong> unscored &nbsp;|&nbsp;
+      Reviewed: <strong>{{ reviewed_count }}</strong>
     </span>
+    <span style="font-size:13px;color:#6a6d70;margin-left:auto" id="itemCount">{{ items|length }} items</span>
   </div>
-  <div class="sapCard-content" style="padding: 0;">
-    <div style="overflow-x: auto;">
-      <table class="sapTable-review">
-        <thead>
-          <tr>
-            <th style="width: 40px;">
-              <input type="checkbox" id="selectAllCheckbox" onclick="toggleSelectAll()">
-            </th>
-            <th style="width: 90px;">Status</th>
-            <th style="width: 80px;">Source</th>
-            <th>Title / Content</th>
-            <th style="width: 100px;">Filter Reason</th>
-            <th style="width: 60px;">Score</th>
-            <th style="width: 140px;">Dates</th>
-            <th style="width: 150px;">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for item in items %}
-          <tr>
-            <td style="text-align: center;">
-              <input type="checkbox" name="item_ids" value="{{ item.id }}:{{ item.item_source }}" form="bulkScoreForm" class="item-checkbox bulk-checkbox">
-            </td>
-            <td>
-              {% if item.item_source == 'accepted' %}
-              <span class="sapBadge sapBadge-positive" title="Accepted into baseline">✅ Accepted</span>
-              {% else %}
-              <span class="sapBadge sapBadge-critical" title="Filtered out">⚠️ Filtered</span>
-              {% endif %}
-            </td>
-            <td>
-              <span class="sapBadge sapBadge-neutral">{{ item.source_type or 'unknown' }}</span>
-            </td>
-            <td data-news-id="{{ item.id }}" data-item-source="{{ item.item_source }}">
-              <div style="font-weight: 600; margin-bottom: var(--sapSpacingXS);">
-                {{ item.title or '(No title)' }}
-              </div>
-              <div style="color: var(--sapNeutralColor); font-size: var(--sapFontSmallSize); margin-bottom: var(--sapSpacingXS);">
-                {{ (item.content or '')[:150] }}{% if item.content and item.content|length > 150 %}...{% endif %}
-              </div>
-              {% if item.url %}
-              <a href="{{ item.url }}" target="_blank" style="font-size: var(--sapFontSmallSize); color: var(--sapLinkColor);">
-                🔗 {{ item.url[:50] }}{% if item.url|length > 50 %}...{% endif %}
-              </a>
-              {% endif %}
-            </td>
-            <td>
-              {% if item.item_source == 'accepted' %}
-              <span class="sapBadge sapBadge-positive" title="Passed all filters">✓ Passed</span>
-              {% elif item.filter_reason == 'domain_country' %}
-              <span class="sapBadge sapBadge-neutral" title="Domain not whitelisted and no country mention">Domain</span>
-              {% elif item.filter_reason == 'glossary' %}
-              <span class="sapBadge sapBadge-critical" title="No glossary term match">Glossary</span>
-              {% elif item.filter_reason == 'llm_classification' %}
-              <span class="sapBadge sapBadge-negative" title="LLM classified as not relevant">LLM</span>
-              {% else %}
-              <span class="sapBadge sapBadge-neutral">{{ item.filter_reason or 'unknown' }}</span>
-              {% endif %}
-            </td>
-            <td style="text-align: center;">
-              {% if item.relevance_score %}
-              <span class="sapBadge {% if item.relevance_score >= 4 %}sapBadge-positive{% elif item.relevance_score >= 3 %}sapBadge-critical{% else %}sapBadge-neutral{% endif %}">
-                {{ item.relevance_score }}/5
-              </span>
-              {% else %}
-              <span style="color: var(--sapNeutralColor);">—</span>
-              {% endif %}
-            </td>
-            <td style="font-size: var(--sapFontSmallSize);">
-              <div style="margin-bottom: var(--sapSpacingXS);">
-                <span style="color: var(--sapNeutralColor);">Pub:</span> 
-                {% if item.published_at %}
-                <strong>{{ item.published_at|format_date }}</strong>
-                {% else %}
-                <span style="color: var(--sapNeutralColor);">—</span>
-                {% endif %}
-              </div>
-              <div>
-                <span style="color: var(--sapNeutralColor);">Pull:</span> 
-                <strong>{{ item.created_at|format_date }}</strong>
-              </div>
-            </td>
-            <td>
-              <form method="POST" action="{{ url_for('score_filtered_news', profile_id=profile.id) }}" style="display: flex; gap: var(--sapSpacingXS); align-items: center;">
-                <input type="hidden" name="item_id" value="{{ item.id }}:{{ item.item_source }}">
-                <select name="score" class="sapForm-select" style="width: 60px; padding: 0.25rem; font-size: var(--sapFontSmallSize);">
-                  <option value="1" {% if item.relevance_score == 1 %}selected{% endif %}>1</option>
-                  <option value="2" {% if item.relevance_score == 2 %}selected{% endif %}>2</option>
-                  <option value="3" {% if item.relevance_score == 3 %}selected{% endif %}>3</option>
-                  <option value="4" {% if item.relevance_score == 4 %}selected{% endif %}>4</option>
-                  <option value="5" {% if item.relevance_score == 5 %}selected{% endif %}>5</option>
-                </select>
-                <button type="submit" class="sapBtn sapBtn-emphasized sapBtn-sm" style="padding: 0.25rem 0.5rem;">Save</button>
-              </form>
-              <form method="POST" action="{{ url_for('delete_filtered_news_item', profile_id=profile.id) }}" onsubmit="return confirm('Delete this item?');" style="margin-top: var(--sapSpacingXS);">
-                <input type="hidden" name="item_id" value="{{ item.id }}:{{ item.item_source }}">
-                <button type="submit" class="sapBtn sapBtn-reject sapBtn-sm" style="padding: 0.25rem 0.5rem; width: 100%;" title="Delete">Delete</button>
-              </form>
-              {# Legal Repo badge / L2S Prompt button #}
-              {% if item.id in repo_node_map %}
-              <a href="{{ url_for('admin_legal_repo', country=profile.country_code, node_id=repo_node_map[item.id]) }}"
-                 class="sapButton sapButton--Information" style="display:block;text-align:center;font-size:11px;text-decoration:none;margin-top:var(--sapSpacingXS);padding:3px 6px;border-radius:4px;background:var(--sapInformativeColor);color:#fff">
-                📋 In Legal Repo
-              </a>
-              {% else %}
-              <button onclick="openL2SModal({{ item.id }}, '{{ item.title | replace("'", "\\'") | replace('"', '\\"') | truncate(60) }}')"
-                      class="sapButton sapButton--Transparent" style="width:100%;font-size:11px;margin-top:var(--sapSpacingXS);padding:3px 6px">
-                + L2S Prompt
-              </button>
-              {% endif %}
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-</div>
 
-<!-- Pagination -->
-{% if total_pages > 1 %}
-<div class="sapPagination">
-  <a class="sapPagination-item {% if page == 1 %}disabled{% endif %}" 
-     href="{{ url_for('admin_review_news', profile_id=profile.id, source=filter_source, reviewed=filter_reviewed, page=page-1) if page > 1 else '#' }}">
-    ‹ Previous
-  </a>
-  
-  {% for p in range(1, total_pages + 1) %}
-    {% if p == page %}
-      <span class="sapPagination-item active">{{ p }}</span>
-    {% elif p == 1 or p == total_pages or (p >= page - 2 and p <= page + 2) %}
-      <a class="sapPagination-item" href="{{ url_for('admin_review_news', profile_id=profile.id, source=filter_source, reviewed=filter_reviewed, page=p) }}">{{ p }}</a>
-    {% elif p == page - 3 or p == page + 3 %}
-      <span class="sapPagination-item disabled">...</span>
+  <!-- Item list -->
+  <div style="flex:1;overflow-y:auto;padding:8px 0" id="itemList">
+    {% for item in items %}
+    {% set score = item.relevance_score|default(0)|int %}
+    <div class="icard {% if score == 0 %}dup{% endif %}"
+         data-rank="{{ score }}" data-src="{{ item.item_source|default('') }}">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:6px;flex-shrink:0;width:32px">
+        <div class="rbadge r{{ score }}">{{ 'D' if score == 0 else score }}</div>
+        <span style="font-size:10px;color:#6a6d70;writing-mode:vertical-rl;transform:rotate(180deg)">{{ item.item_source|default('')[:3]|upper }}</span>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px">
+          <span style="background:#e5e5e5;border-radius:10px;padding:2px 7px;font-size:11px;font-weight:600">
+            {{ item.source_type|upper if item.source_type else 'RSS' }}
+          </span>
+          <span style="font-size:11px;color:#6a6d70">{{ (item.published_at or '')[:10] }}</span>
+        </div>
+        <div style="font-weight:600;font-size:14px;margin-bottom:3px">{{ item.title or '(no title)' }}</div>
+        <div style="font-size:13px;color:#6a6d70;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">
+          {{ (item.content or '')[:200] }}
+        </div>
+        <a href="{{ item.url }}" target="_blank" style="font-size:12px;color:#0a6ed1;word-break:break-all">{{ item.url }}</a>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">
+        <div class="ovr-strip" data-ai="{{ score }}">
+          {% for n in range(1,6) %}
+          <button class="ovr-btn {% if score == n %}ai{% endif %}"
+                  onclick="onOverride(this,{{ item.id }},{{ n }},{{ score }})">{{ n }}</button>
+          {% endfor %}
+        </div>
+        <div class="ovr-lbl" id="ol-{{ item.id }}" style="display:none;font-size:11px;color:#e9730c"></div>
+        <form method="POST" action="{{ url_for('delete_filtered_news_item', profile_id=selected_profile.id) }}">
+          <input type="hidden" name="item_id" value="{{ item.id }}:{{ item.item_source|default('accepted') }}">
+          <button type="submit" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:16px" onclick="return confirm('Delete?')">&#x2715;</button>
+        </form>
+      </div>
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:60px 0;color:#6a6d70">
+      <div style="font-size:32px;margin-bottom:8px">&#128240;</div>
+      <div>No items to review</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Pagination -->
+  {% if total_pages > 1 %}
+  <div style="display:flex;align-items:center;justify-content:center;gap:8px;padding:8px 0;border-top:1px solid #e5e5e5">
+    {% if page > 1 %}
+    <a href="{{ url_for('admin_review_news', profile_id=selected_profile.id, page=page-1) }}" class="fchip">&#8592; Prev</a>
     {% endif %}
-  {% endfor %}
-  
-  <a class="sapPagination-item {% if page == total_pages %}disabled{% endif %}" 
-     href="{{ url_for('admin_review_news', profile_id=profile.id, source=filter_source, reviewed=filter_reviewed, page=page+1) if page < total_pages else '#' }}">
-    Next ›
-  </a>
-</div>
-{% endif %}
-
-{% else %}
-<div class="sapCard">
-  <div class="sapCard-content" style="text-align: center; padding: var(--sapSpacingXL);">
-    <div style="font-size: 3rem; margin-bottom: var(--sapSpacingM); color: var(--sapNeutralColor);">📰</div>
-    <h3 style="font-size: var(--sapFontHeader3Size); margin-bottom: var(--sapSpacingS);">No news items found</h3>
-    <p style="color: var(--sapNeutralColor); margin: 0;">Run a profile to collect news. Items will appear here for review.</p>
+    <span style="font-size:13px;color:#6a6d70">Page {{ page }} / {{ total_pages }}</span>
+    {% if page < total_pages %}
+    <a href="{{ url_for('admin_review_news', profile_id=selected_profile.id, page=page+1) }}" class="fchip">Next &#8594;</a>
+    {% endif %}
   </div>
-</div>
-{% endif %}
-
-<!-- Help Card -->
-<div class="sapCard">
-  <div class="sapCard-header">
-    <span>💡 How to Use This Page</span>
-  </div>
-  <div class="sapCard-content">
-    <h3 style="font-size: var(--sapFontLargeSize); margin-bottom: var(--sapSpacingS);">Relevance Scoring Guide</h3>
-    <ul style="margin: 0; padding-left: var(--sapSpacingL); line-height: 1.8;">
-      <li><strong>1 - Not Relevant:</strong> Completely unrelated to the profile's LoB (HCM/FIN). Can be safely ignored.</li>
-      <li><strong>2 - Low:</strong> Tangentially related but not actionable. General news that happens to mention a keyword.</li>
-      <li><strong>3 - Medium:</strong> Somewhat relevant. Could be useful context but not a direct legal change.</li>
-      <li><strong>4 - High:</strong> Relevant to the LoB. Consider adding keywords to the glossary.</li>
-      <li><strong>5 - Very Relevant:</strong> This should have been included! Add missing terms to the glossary immediately.</li>
-    </ul>
-    
-    <h3 style="font-size: var(--sapFontLargeSize); margin: var(--sapSpacingM) 0 var(--sapSpacingS) 0;">Status Badges</h3>
-    <ul style="margin: 0; padding-left: var(--sapSpacingL); line-height: 1.8;">
-      <li><strong>✅ Accepted:</strong> Item passed all filters and was accepted into baseline. Review to confirm AI didn't let through irrelevant content.</li>
-      <li><strong>⚠️ Filtered:</strong> Item was filtered out. Review to check if AI was too strict and missed relevant content.</li>
-    </ul>
-    
-    <h3 style="font-size: var(--sapFontLargeSize); margin: var(--sapSpacingM) 0 var(--sapSpacingS) 0;">Filter Reasons</h3>
-    <ul style="margin: 0; padding-left: var(--sapSpacingL); line-height: 1.8;">
-      <li><strong>✓ Passed:</strong> Item passed all filters (accepted items).</li>
-      <li><strong>Domain/Country:</strong> The news source domain wasn't whitelisted and no country mention was found.</li>
-      <li><strong>Glossary:</strong> No glossary terms matched in the content. Consider adding relevant terms.</li>
-      <li><strong>LLM:</strong> The AI classified this as not relevant to the LoB. Review the content to verify.</li>
-    </ul>
-    
-    <div class="sapMessageStrip sapMessageStrip-info" style="margin-top: var(--sapSpacingM);">
-      <span>
-        <strong>💡 Tip:</strong> High scores (4-5) on filtered items indicate missing glossary terms. Low scores (1-2) on accepted items indicate AI is letting through irrelevant content. 
-        <a href="{{ url_for('admin_profile_detail', profile_id=profile.id) }}" style="color: var(--sapLinkColor); font-weight: 600;">Update the glossary</a> to improve future filtering.
-      </span>
-    </div>
-  </div>
+  {% endif %}
 </div>
 
+<style>
+  .fchip { padding:4px 10px;border-radius:12px;font-size:12px;border:1px solid #ddd;background:#fff;cursor:pointer;text-decoration:none;color:#32363a; }
+  .fchip.active { background:#0a6ed1;color:#fff;border-color:#0a6ed1; }
+  .icard { display:flex;gap:12px;background:#fff;border-radius:6px;padding:12px;margin-bottom:8px;border-left:3px solid transparent; }
+  .icard.dup { opacity:0.55; }
+  .rbadge { width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:#fff;flex-shrink:0; }
+  .r0{background:#6a6d70} .r1{background:#bb0000} .r2{background:#e9730c}
+  .r3{background:#f0ab00;color:#32363a} .r4{background:#0a6ed1} .r5{background:#107e3e}
+  .ovr-strip { display:flex;gap:3px; }
+  .ovr-btn { width:26px;height:26px;border-radius:50%;border:1px solid #ddd;background:#fff;cursor:pointer;font-size:11px;font-weight:600; }
+  .ovr-btn.ai { background:#eaf1fb;border-color:#0a6ed1;color:#0a6ed1; }
+  .ovr-btn.picked { background:#fef7e0;border-color:#e9730c;color:#e9730c; }
+</style>
 <script>
-function toggleSelectAll() {
-  const checkboxes = document.querySelectorAll('.item-checkbox');
-  const selectAll = document.getElementById('selectAllCheckbox');
-  const allChecked = Array.from(checkboxes).every(function(cb) { return cb.checked; });
-  
-  checkboxes.forEach(function(cb) {
-    cb.checked = !allChecked;
-  });
-  selectAll.checked = !allChecked;
-  syncBulkDeleteForm();
-}
+  var filters = { rank: 'all', src: 'all', rev: 'all' };
 
-function syncBulkDeleteForm() {
-  const bulkDeleteForm = document.getElementById('bulkDeleteForm');
-  bulkDeleteForm.innerHTML = '';
-  const checkboxes = document.querySelectorAll('.bulk-checkbox:checked');
-  checkboxes.forEach(function(cb) {
-    const input = document.createElement('input');
-    input.type = 'hidden';
-    input.name = 'item_ids';
-    input.value = cb.value;
-    bulkDeleteForm.appendChild(input);
-  });
-}
-
-document.addEventListener('DOMContentLoaded', function() {
-  const checkboxes = document.querySelectorAll('.bulk-checkbox');
-  checkboxes.forEach(function(cb) {
-    cb.addEventListener('change', syncBulkDeleteForm);
-  });
-});
-</script>
-
-{# ── L2S Prompt Modal ── #}
-<div id="l2sModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center">
-  <div style="background:#fff;border-radius:8px;padding:24px;width:500px;max-width:95vw;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.2)">
-    <div style="font-size:16px;font-weight:700;color:var(--sapTitleColor);margin-bottom:4px">Generate L2S Prompt</div>
-    <div id="l2sNewsTitle" style="font-size:12px;color:var(--sapNeutralColor);margin-bottom:16px;font-style:italic"></div>
-    <form id="l2sForm" method="POST">
-      <div style="margin-bottom:12px">
-        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Domain *</label>
-        <select name="domain" class="sapSelect" style="width:100%">
-          <option value="Labor">Labor</option>
-          <option value="Social Insurance">Social Insurance</option>
-          <option value="Taxation">Taxation</option>
-        </select>
-      </div>
-      <div style="margin-bottom:12px">
-        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Subdomain / Authority *</label>
-        <input name="subdomain" class="sapInput" style="width:100%" placeholder="e.g. ERGANI, EFKA">
-      </div>
-      <div style="margin-bottom:12px">
-        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Topic *</label>
-        <input name="topic" class="sapInput" style="width:100%" placeholder="e.g. Employment Relationship Modification">
-      </div>
-      <div style="margin-bottom:12px">
-        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Law Reference</label>
-        <input name="law_reference" class="sapInput" style="width:100%" placeholder="e.g. Decision 32689/2025">
-      </div>
-      <div style="margin-bottom:12px">
-        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Official URL</label>
-        <input name="official_url" class="sapInput" style="width:100%" type="url" placeholder="https://...">
-      </div>
-      <div style="margin-bottom:16px">
-        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Parent Node (optional)</label>
-        <select name="parent_node_id" class="sapSelect" style="width:100%">
-          <option value="">— none (top-level) —</option>
-          {% for p in repo_parent_options %}
-          <option value="{{ p.id }}">{{ p.domain }} › {{ p.subdomain }} › {{ p.topic }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div style="display:flex;gap:8px;justify-content:flex-end">
-        <button type="button" onclick="document.getElementById('l2sModal').style.display='none'" class="sapButton sapButton--Default">Cancel</button>
-        <button type="submit" class="sapButton sapButton--Emphasized">Create Repo Node</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<script>
-function openL2SModal(newsId, title) {
-  document.getElementById('l2sModal').style.display = 'flex';
-  document.getElementById('l2sNewsTitle').textContent = title;
-  document.getElementById('l2sForm').action =
-    '/admin/profiles/{{ profile.id }}/news/' + newsId + '/to-legal-repo';
-}
-document.getElementById('l2sModal').addEventListener('click', function(e) {
-  if (e.target === this) this.style.display = 'none';
-});
-
-{% if profile.language and profile.language != 'en' %}
-// Auto-translate: profile language is {{ profile.language }}, fetch EN translations
-(function() {
-  var profileId = {{ profile.id }};
-  var cells = document.querySelectorAll('td[data-news-id]');
-  if (!cells.length) return;
-
-  var items = [];
-  cells.forEach(function(cell) {
-    var id = cell.getAttribute('data-news-id');
-    var source = cell.getAttribute('data-item-source');
-    var titleEl = cell.querySelector('div[style*="font-weight: 600"]');
-    var contentEl = cell.querySelectorAll('div')[1];
-    items.push({
-      id: id,
-      item_source: source,
-      title: titleEl ? titleEl.textContent.trim() : '',
-      content: contentEl ? contentEl.textContent.trim() : '',
+  function setFilter(dim, val, chip) {
+    filters[dim] = val;
+    chip.closest('div').querySelectorAll('.fchip').forEach(function(c){ c.classList.remove('active'); });
+    chip.classList.add('active');
+    applyFilters();
+  }
+  function applyFilters() {
+    var vis = 0;
+    document.querySelectorAll('.icard').forEach(function(c) {
+      var show = (filters.rank === 'all' || filters.rank === c.dataset.rank) &&
+                 (filters.src  === 'all' || filters.src  === c.dataset.src);
+      c.style.display = show ? 'flex' : 'none';
+      if (show) vis++;
     });
-    // Add placeholder
-    if (!cell.querySelector('.en-translation')) {
-      var placeholder = document.createElement('div');
-      placeholder.className = 'en-translation';
-      placeholder.style.cssText = 'margin-top:6px;padding:6px 8px;background:#f0f5ff;border-left:3px solid #0070f3;border-radius:0 4px 4px 0;font-size:12px;color:#333;display:none';
-      placeholder.innerHTML = '<span style="font-size:10px;font-weight:700;color:#0070f3;text-transform:uppercase;letter-spacing:.5px">EN</span> <span class="en-text">Translating...</span>';
-      cell.appendChild(placeholder);
-      placeholder.style.display = 'block';
+    document.getElementById('itemCount').textContent = vis + ' items';
+  }
+  function onOverride(btn, itemId, rank, aiRank) {
+    var strip = btn.closest('.ovr-strip');
+    strip.querySelectorAll('.ovr-btn').forEach(function(b, i) {
+      b.classList.remove('ai', 'picked');
+      if (i + 1 === aiRank) b.classList.add('ai');
+    });
+    var lbl = document.getElementById('ol-' + itemId);
+    if (rank !== aiRank) {
+      btn.classList.add('picked');
+      lbl.textContent = 'AI: ' + aiRank + ' → You: ' + rank;
+      lbl.style.display = 'block';
+    } else {
+      lbl.style.display = 'none';
     }
-  });
-
-  fetch('/admin/profiles/' + profileId + '/review/translate', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({items: items}),
-  })
-  .then(function(r) { return r.json(); })
-  .then(function(data) {
-    var tr = data.translations || {};
-    cells.forEach(function(cell) {
-      var id = cell.getAttribute('data-news-id');
-      var t = tr[id];
-      var placeholder = cell.querySelector('.en-translation');
-      if (!placeholder) return;
-      if (t && (t.title_en || t.content_en)) {
-        var text = (t.title_en ? t.title_en : '') + (t.content_en ? ' — ' + t.content_en : '');
-        placeholder.querySelector('.en-text').textContent = text;
-      } else {
-        placeholder.style.display = 'none';
-      }
-    });
-  })
-  .catch(function() {
-    document.querySelectorAll('.en-translation').forEach(function(el) {
-      el.style.display = 'none';
-    });
-  });
-})();
-{% endif %}
+  }
 </script>
 {% endblock %}
