@@ -48,3 +48,5 @@ outputs/GR_HCM/
 
 # BTP seed data (contains email addresses — not for git, but deployed via cf push)
 scripts/btp_seed_data.json
+tests/test.db
+tests/ai_cache/
