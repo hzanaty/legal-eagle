@@ -1,625 +1,324 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <title>Legal Eagle - SAP Compliance Management</title>
+  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  
-  <!-- SAP Fiori Icon Font -->
-  <link rel="stylesheet" href="https://sdk.openui5.org/resources/sap/ui/core/themes/sap_horizon/fonts/SAP-icons.woff2">
-  
+  <title>Legal Eagle</title>
   <style>
-    /* ============================================
-       SAP FIORI DESIGN SYSTEM - CSS FRAMEWORK
-       ============================================ */
-    
-    /* CSS Variables - SAP Fiori Color Palette */
-    :root {
-      /* Brand Colors */
-      --sapBrandColor: #0a6ed1;
-      --sapHighlightColor: #0854a0;
-      --sapShellColor: #354a5f;
-      
-      /* Background Colors */
-      --sapBackgroundColor: #f7f7f7;
-      --sapTileBackground: #ffffff;
-      --sapBaseColor: #ffffff;
-      
-      /* Semantic Colors */
-      --sapPositiveColor: #107e3e;
-      --sapPositiveBackground: #e5f3ea;
-      --sapNegativeColor: #b00;
-      --sapNegativeBackground: #ffeaf1;
-      --sapCriticalColor: #e9730c;
-      --sapCriticalBackground: #fef7f1;
-      --sapNeutralColor: #6a6d70;
-      --sapNeutralBackground: #f5f5f5;
-      
-      /* Text Colors */
-      --sapTextColor: #32363a;
-      --sapLinkColor: #0a6ed1;
-      --sapLinkHoverColor: #0854a0;
-      
-      /* Border & Shadow */
-      --sapTileBorderColor: #d9d9d9;
-      --sapGroup_ContentBorderColor: #d9d9d9;
-      --sapTileShadow: 0 0 0 1px rgba(0,0,0,.1), 0 1px 3px 0 rgba(0,0,0,.08);
-      --sapContent_Shadow0: 0 0 0 1px rgba(0,0,0,.1);
-      --sapContent_Shadow1: 0 1px 3px 0 rgba(0,0,0,.15);
-      
-      /* Hover States */
-      --sapList_Hover_Background: #e5f0fa;
-      --sapButton_Hover_Background: #ebf5fe;
-      
-      /* Spacing System (16px base unit) */
-      --sapSpacingXS: 0.25rem;   /* 4px */
-      --sapSpacingS: 0.5rem;     /* 8px */
-      --sapSpacingM: 1rem;       /* 16px */
-      --sapSpacingL: 1.5rem;     /* 24px */
-      --sapSpacingXL: 2rem;      /* 32px */
-      
-      /* Typography */
-      --sapFontFamily: "72", "72full", Arial, Helvetica, sans-serif;
-      --sapFontSize: 0.875rem;   /* 14px - Fiori standard */
-      --sapFontSmallSize: 0.75rem;  /* 12px */
-      --sapFontLargeSize: 1rem;     /* 16px */
-      --sapFontHeader1Size: 2rem;   /* 32px */
-      --sapFontHeader2Size: 1.5rem; /* 24px */
-      --sapFontHeader3Size: 1.25rem; /* 20px */
-    }
-    
-    /* Reset & Base Styles */
-    * {
-      box-sizing: border-box;
-    }
-    
-    body {
-      font-family: var(--sapFontFamily);
-      font-size: var(--sapFontSize);
-      color: var(--sapTextColor);
-      background-color: var(--sapBackgroundColor);
-      margin: 0;
-      padding: 0;
-      line-height: 1.4;
-      padding-top: 76px; /* Shell bar height */
-    }
-    
-    /* ============================================
-       SAP FIORI SHELL BAR
-       ============================================ */
-    .sapShellBar {
-      background: var(--sapShellColor);
-      color: #ffffff;
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      z-index: 1000;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.15);
-    }
-    
-    .sapShellBar-top {
-      height: 44px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 var(--sapSpacingM);
-    }
-    
-    .sapShellBar-left {
-      display: flex;
-      align-items: center;
-      gap: var(--sapSpacingM);
-    }
-    
-    .sapShellBar-menuBtn {
-      background: none;
-      border: none;
-      color: #ffffff;
-      font-size: 1.25rem;
-      cursor: pointer;
-      padding: 0.5rem;
-      border-radius: 0.25rem;
-      transition: background-color 0.2s;
-    }
-    
-    .sapShellBar-menuBtn:hover {
-      background-color: rgba(255,255,255,0.1);
-    }
-    
-    .sapShellBar-logo {
-      font-size: 1.125rem;
-      font-weight: 700;
-      letter-spacing: 0.5px;
-      color: #ffffff;
-    }
-    
-    .sapShellBar-center {
-      flex: 1;
-      display: flex;
-      justify-content: center;
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: "72", Arial, sans-serif; background: #f5f6f7; color: #32363a; }
+
+    /* ── FCL Shell ── */
+    .fcl-shell { display: flex; height: 100vh; overflow: hidden; }
+
+    .fcl-list {
+      width: 100%;
       max-width: 600px;
-      margin: 0 var(--sapSpacingL);
-    }
-    
-    .sapShellBar-search {
-      width: 100%;
-      max-width: 400px;
-    }
-    
-    .sapShellBar-search input {
-      width: 100%;
-      padding: 0.375rem var(--sapSpacingM);
-      border: 1px solid rgba(255,255,255,0.3);
-      border-radius: 0.25rem;
-      background: rgba(255,255,255,0.15);
-      color: #ffffff;
-      font-size: var(--sapFontSize);
-    }
-    
-    .sapShellBar-search input::placeholder {
-      color: rgba(255,255,255,0.7);
-    }
-    
-    .sapShellBar-search input:focus {
-      outline: none;
-      background: rgba(255,255,255,0.25);
-      border-color: rgba(255,255,255,0.5);
-    }
-    
-    .sapShellBar-right {
-      display: flex;
-      align-items: center;
-      gap: var(--sapSpacingS);
-    }
-    
-    .sapShellBar-icon {
-      background: none;
-      border: none;
-      color: #ffffff;
-      font-size: 1.125rem;
-      cursor: pointer;
-      padding: 0.5rem;
-      border-radius: 0.25rem;
-      transition: background-color 0.2s;
-      position: relative;
-    }
-    
-    .sapShellBar-icon:hover {
-      background-color: rgba(255,255,255,0.1);
-    }
-    
-    .sapShellBar-subtitle {
-      height: 32px;
-      display: flex;
-      align-items: center;
-      padding: 0 var(--sapSpacingM);
-      font-size: var(--sapFontSize);
-      background: rgba(0,0,0,0.1);
-      border-top: 1px solid rgba(255,255,255,0.1);
-    }
-    
-    /* ============================================
-       FIORI LAYOUT & CONTAINERS
-       ============================================ */
-    .sapContainer {
-      max-width: 1440px;
       margin: 0 auto;
-      padding: var(--sapSpacingL);
+      overflow-y: auto;
+      background: #fff;
+      border-right: 1px solid #e5e5e5;
+      flex-shrink: 0;
+      transition: width 0.35s cubic-bezier(0.4,0,0.2,1),
+                  max-width 0.35s cubic-bezier(0.4,0,0.2,1),
+                  opacity 0.35s ease;
     }
-    
-    .sapPage {
-      background: var(--sapBackgroundColor);
-      min-height: calc(100vh - 76px);
+    .fcl-shell.profile-selected .fcl-list { width: 260px; max-width: 260px; }
+    .fcl-shell.profile-maximized .fcl-list { width: 0; opacity: 0; overflow: hidden; }
+
+    .fcl-detail {
+      flex: 1;
+      opacity: 0;
+      pointer-events: none;
+      overflow-y: auto;
+      transition: opacity 0.3s ease 0.15s;
+      background: #f5f6f7;
+      min-width: 0;
     }
-    
-    .sapCard {
-      background: var(--sapTileBackground);
-      border: 1px solid var(--sapTileBorderColor);
-      border-radius: 0.25rem;
-      box-shadow: var(--sapTileShadow);
-      margin-bottom: var(--sapSpacingM);
-    }
-    
-    .sapCard-header {
-      padding: var(--sapSpacingM);
-      border-bottom: 1px solid var(--sapGroup_ContentBorderColor);
-      font-weight: 600;
+    .fcl-shell.profile-selected .fcl-detail,
+    .fcl-shell.profile-maximized .fcl-detail { opacity: 1; pointer-events: auto; }
+
+    /* ── Summary strip ── */
+    .summary-strip {
       display: flex;
-      justify-content: space-between;
       align-items: center;
+      gap: 24px;
+      padding: 12px 24px;
+      background: #f5f6f7;
+      border-bottom: 1px solid #e5e5e5;
+      position: sticky;
+      top: 0;
+      z-index: 10;
     }
-    
-    .sapCard-content {
-      padding: var(--sapSpacingM);
-    }
-    
-    /* ============================================
-       FIORI BUTTONS
-       ============================================ */
-    .sapBtn {
-      font-family: var(--sapFontFamily);
-      font-size: var(--sapFontSize);
-      padding: 0.375rem var(--sapSpacingM);
-      border-radius: 0.25rem;
-      cursor: pointer;
-      transition: all 0.2s;
-      border: 1px solid transparent;
-      font-weight: 400;
-      display: inline-flex;
-      align-items: center;
-      gap: var(--sapSpacingS);
-      text-decoration: none;
-      line-height: 1.4;
-    }
-    
-    /* Emphasized Button (Primary) */
-    .sapBtn-emphasized {
-      background: var(--sapBrandColor);
-      color: #ffffff;
-      border-color: var(--sapBrandColor);
-    }
-    
-    .sapBtn-emphasized:hover {
-      background: var(--sapHighlightColor);
-      border-color: var(--sapHighlightColor);
-    }
-    
-    /* Default Button (Secondary) */
-    .sapBtn-default {
-      background: var(--sapBaseColor);
-      color: var(--sapTextColor);
-      border-color: var(--sapTileBorderColor);
-    }
-    
-    .sapBtn-default:hover {
-      background: var(--sapButton_Hover_Background);
-      border-color: var(--sapBrandColor);
-      color: var(--sapBrandColor);
-    }
-    
-    /* Transparent Button (Tertiary) */
-    .sapBtn-transparent {
-      background: transparent;
-      color: var(--sapLinkColor);
-      border-color: transparent;
-    }
-    
-    .sapBtn-transparent:hover {
-      background: var(--sapButton_Hover_Background);
-      color: var(--sapLinkHoverColor);
-    }
-    
-    /* Semantic Buttons */
-    .sapBtn-accept {
-      background: var(--sapPositiveColor);
-      color: #ffffff;
-      border-color: var(--sapPositiveColor);
-    }
-    
-    .sapBtn-accept:hover {
-      background: #0d6733;
-    }
-    
-    .sapBtn-reject {
-      background: var(--sapNegativeColor);
-      color: #ffffff;
-      border-color: var(--sapNegativeColor);
-    }
-    
-    .sapBtn-reject:hover {
-      background: #a00;
-    }
-    
-    .sapBtn-attention {
-      background: var(--sapCriticalColor);
-      color: #ffffff;
-      border-color: var(--sapCriticalColor);
-    }
-    
-    /* Button Sizes */
-    .sapBtn-sm {
-      font-size: var(--sapFontSmallSize);
-      padding: 0.25rem var(--sapSpacingS);
-    }
-    
-    .sapBtn-lg {
-      font-size: var(--sapFontLargeSize);
-      padding: 0.5rem var(--sapSpacingL);
-    }
-    
-    /* ============================================
-       FIORI BADGES
-       ============================================ */
-    .sapBadge {
-      display: inline-flex;
-      align-items: center;
-      padding: 0.25rem var(--sapSpacingS);
-      border-radius: 0.25rem;
-      font-size: var(--sapFontSmallSize);
-      font-weight: 600;
-      line-height: 1;
-    }
-    
-    .sapBadge-positive {
-      background: var(--sapPositiveBackground);
-      color: var(--sapPositiveColor);
-    }
-    
-    .sapBadge-negative {
-      background: var(--sapNegativeBackground);
-      color: var(--sapNegativeColor);
-    }
-    
-    .sapBadge-critical {
-      background: var(--sapCriticalBackground);
-      color: var(--sapCriticalColor);
-    }
-    
-    .sapBadge-neutral {
-      background: var(--sapNeutralBackground);
-      color: var(--sapNeutralColor);
-    }
-    
-    /* ============================================
-       FIORI ALERTS/MESSAGES
-       ============================================ */
-    .sapMessageStrip {
-      padding: var(--sapSpacingM);
-      border-radius: 0.25rem;
-      margin-bottom: var(--sapSpacingM);
-      border-left: 4px solid;
-      display: flex;
-      align-items: flex-start;
-      gap: var(--sapSpacingS);
-    }
-    
-    .sapMessageStrip-success {
-      background: var(--sapPositiveBackground);
-      border-color: var(--sapPositiveColor);
-      color: var(--sapTextColor);
-    }
-    
-    .sapMessageStrip-error {
-      background: var(--sapNegativeBackground);
-      border-color: var(--sapNegativeColor);
-      color: var(--sapTextColor);
-    }
-    
-    .sapMessageStrip-warning {
-      background: var(--sapCriticalBackground);
-      border-color: var(--sapCriticalColor);
-      color: var(--sapTextColor);
-    }
-    
-    .sapMessageStrip-info {
-      background: #e5f0fa;
-      border-color: var(--sapBrandColor);
-      color: var(--sapTextColor);
-    }
-    
-    .sapMessageStrip-close {
+    .summary-stat { font-size: 13px; color: #6a6d70; }
+    .summary-stat strong { color: #32363a; }
+    .run-all-btn {
       margin-left: auto;
-      background: none;
+      padding: 8px 16px;
+      background: #0a6ed1;
+      color: #fff;
       border: none;
+      border-radius: 4px;
+      font-size: 13px;
       cursor: pointer;
-      font-size: 1.25rem;
-      color: var(--sapTextColor);
-      opacity: 0.6;
-      padding: 0;
-      line-height: 1;
+      white-space: nowrap;
     }
-    
-    .sapMessageStrip-close:hover {
-      opacity: 1;
-    }
-    
-    /* ============================================
-       PROFILE NAVIGATION (Object Page Pattern)
-       ============================================ */
-    .sapObjectPage-header {
-      background: var(--sapTileBackground);
-      border-bottom: 1px solid var(--sapGroup_ContentBorderColor);
-      padding: var(--sapSpacingL) var(--sapSpacingM);
-      margin-bottom: var(--sapSpacingM);
-      box-shadow: var(--sapContent_Shadow0);
-    }
-    
-    .sapObjectPage-title {
-      font-size: var(--sapFontHeader2Size);
-      font-weight: 400;
-      color: var(--sapTextColor);
-      margin: 0 0 var(--sapSpacingS) 0;
+    .run-all-btn:hover { background: #0854a0; }
+
+    /* ── Profile rows ── */
+    .profile-row {
       display: flex;
       align-items: center;
-      gap: var(--sapSpacingS);
-    }
-    
-    .sapObjectPage-nav {
-      display: flex;
-      gap: var(--sapSpacingS);
-      margin-top: var(--sapSpacingM);
-    }
-    
-    .sapObjectPage-navLink {
-      padding: 0.375rem 0.75rem;
-      border-radius: 0.25rem;
-      background: var(--sapBaseColor);
-      border: 1px solid var(--sapTileBorderColor);
-      color: var(--sapTextColor);
+      gap: 12px;
+      padding: 16px 24px;
+      cursor: pointer;
+      border-bottom: 1px solid #f0f0f0;
+      transition: background 0.15s;
       text-decoration: none;
-      transition: all 0.2s;
+      color: inherit;
+    }
+    .profile-row:hover { background: #eaf1fb; }
+    .profile-row.active { background: #eaf1fb; }
+
+    .profile-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #0a6ed1;
+      color: #fff;
       display: flex;
       align-items: center;
-      gap: var(--sapSpacingS);
-      font-size: 0.75rem;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 13px;
+      flex-shrink: 0;
+      transition: width 0.35s, height 0.35s, font-size 0.35s;
     }
-    
-    .sapObjectPage-navLink:hover {
-      background: var(--sapButton_Hover_Background);
-    }
-    
-    /* Configure tab - Blue (primary) */
-    .sapObjectPage-navLink-configure:hover {
-      border-color: var(--sapBrandColor);
-      color: var(--sapBrandColor);
-    }
-    
-    .sapObjectPage-navLink-configure.active {
-      background: var(--sapBrandColor);
-      border-color: var(--sapBrandColor);
-      color: #ffffff;
+    .fcl-shell.profile-selected .profile-row { padding: 10px 12px; }
+    .fcl-shell.profile-selected .profile-avatar { width: 28px; height: 28px; font-size: 10px; }
+    .fcl-shell.profile-selected .profile-desc,
+    .fcl-shell.profile-selected .profile-meta,
+    .fcl-shell.profile-selected .badge-label { display: none; }
+
+    .profile-info { flex: 1; min-width: 0; overflow: hidden; }
+    .profile-name { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .profile-desc { font-size: 12px; color: #6a6d70; margin-top: 2px; }
+    .profile-meta { font-size: 11px; color: #6a6d70; margin-top: 4px; }
+    .review-badge {
+      background: #bb0000;
+      color: #fff;
+      border-radius: 12px;
+      padding: 2px 8px;
+      font-size: 11px;
       font-weight: 600;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
-    
-    /* Run tab - Green (success) */
-    .sapObjectPage-navLink-run:hover {
-      border-color: var(--sapPositiveColor);
-      color: var(--sapPositiveColor);
+
+    /* ── Object Page ── */
+    .op-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 20px;
+      background: #fff;
+      border-bottom: 1px solid #e5e5e5;
+      position: sticky;
+      top: 0;
+      z-index: 10;
     }
-    
-    .sapObjectPage-navLink-run.active {
-      background: var(--sapPositiveColor);
-      border-color: var(--sapPositiveColor);
-      color: #ffffff;
-      font-weight: 600;
+    .op-breadcrumb { font-size: 12px; color: #6a6d70; white-space: nowrap; }
+    .op-title { font-size: 18px; font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .op-actions { display: flex; gap: 8px; margin-left: auto; flex-shrink: 0; }
+    .op-btn {
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-size: 13px;
+      cursor: pointer;
+      border: 1px solid #ddd;
+      background: #fff;
+      color: #32363a;
+      white-space: nowrap;
     }
-    
-    /* Review tab - Orange (warning) */
-    .sapObjectPage-navLink-review:hover {
-      border-color: var(--sapCriticalColor);
-      color: var(--sapCriticalColor);
+    .op-btn:hover { background: #f5f6f7; }
+    .op-btn.primary { background: #0a6ed1; color: #fff; border-color: #0a6ed1; }
+    .op-btn.primary:hover { background: #0854a0; border-color: #0854a0; }
+    .op-btn.icon { padding: 6px 8px; font-size: 16px; }
+
+    .op-tabs {
+      display: flex;
+      border-bottom: 1px solid #e5e5e5;
+      background: #fff;
+      position: sticky;
+      top: 57px;
+      z-index: 9;
     }
-    
-    .sapObjectPage-navLink-review.active {
-      background: var(--sapCriticalColor);
-      border-color: var(--sapCriticalColor);
-      color: #ffffff;
-      font-weight: 600;
+    .op-tab {
+      padding: 12px 20px;
+      font-size: 13px;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      color: #6a6d70;
+      user-select: none;
+      white-space: nowrap;
     }
-    
-    /* ============================================
-       RESPONSIVE BEHAVIOR
-       ============================================ */
-    @media (max-width: 768px) {
-      .sapShellBar-center {
-        display: none;
-      }
-      
-      .sapContainer {
-        padding: var(--sapSpacingM);
-      }
-      
-      .sapObjectPage-nav {
-        flex-direction: column;
-      }
+    .op-tab:hover { color: #32363a; }
+    .op-tab.active { border-bottom-color: #0a6ed1; color: #0a6ed1; font-weight: 600; }
+    .op-tab-badge {
+      background: #bb0000;
+      color: #fff;
+      border-radius: 10px;
+      padding: 1px 6px;
+      font-size: 10px;
+      margin-left: 4px;
+      vertical-align: middle;
     }
-    
-    /* Utility for inline forms */
-    .form-inline { display: inline; }
+
+    .tab-panel { display: none; padding: 20px; }
+    .tab-panel.active { display: block; }
+
+    /* ── Flash messages ── */
+    .flash-container { padding: 8px 20px 0; }
+    .flash { padding: 10px 16px; border-radius: 4px; font-size: 13px; margin-bottom: 8px; }
+    .flash.success { background: #e5f3ea; color: #107e3e; border: 1px solid #c2e0cc; }
+    .flash.error   { background: #fde8e8; color: #bb0000; border: 1px solid #f5b8b8; }
+    .flash.info    { background: #eaf1fb; color: #0a6ed1; border: 1px solid #b3d1f5; }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #32363a;
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 4px;
+      font-size: 13px;
+      z-index: 1000;
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    .toast.visible { opacity: 1; }
   </style>
 </head>
 <body>
-<!-- SAP Fiori Shell Bar -->
-<header class="sapShellBar">
-  <div class="sapShellBar-top">
-    <div class="sapShellBar-left">
-      <button class="sapShellBar-menuBtn" onclick="window.location.href='{{ url_for('admin_dashboard') }}'">☰</button>
-      <span class="sapShellBar-logo">SAP</span>
+<div class="fcl-shell" id="fclShell">
+
+  <!-- ── List Panel ── -->
+  <div class="fcl-list" id="fclList">
+    <div class="summary-strip">
+      <div class="summary-stat"><strong>{{ profiles|length }}</strong> profiles</div>
+      {% set review_total = profiles | sum(attribute='review_count') if profiles and profiles[0] is mapping and 'review_count' in profiles[0] else 0 %}
+      {% if review_total > 0 %}<div class="summary-stat"><strong>{{ review_total }}</strong> to review</div>{% endif %}
+      <button class="run-all-btn" onclick="showToast('Run All coming in v3.1')">&#9654; Run All Active</button>
     </div>
-    <div class="sapShellBar-center">
-      <div class="sapShellBar-search">
-        <input type="text" placeholder="Search profiles..." id="shellSearchInput">
+
+    {% for p in profiles %}
+    <a class="profile-row {% if selected_profile and selected_profile.id == p.id %}active{% endif %}"
+       href="{{ url_for('admin_profile_detail', profile_id=p.id) }}?tab=configure">
+      <div class="profile-avatar">{{ p.country_code }}</div>
+      <div class="profile-info">
+        <div class="profile-name">{{ p.name or (p.country_code ~ ' / ' ~ p.lob) }}</div>
+        <div class="profile-desc">{{ p.lob }}</div>
+        <div class="profile-meta">
+          {% if p.last_run_display is defined %}{{ p.last_run_display }}{% else %}Never run{% endif %}
+        </div>
+      </div>
+      {% if p.review_count is defined and p.review_count > 0 %}
+      <span class="review-badge">{{ p.review_count }}<span class="badge-label"> to review</span></span>
+      {% endif %}
+    </a>
+    {% endfor %}
+  </div>
+
+  <!-- ── Detail Panel ── -->
+  <div class="fcl-detail" id="fclDetail">
+    {% if selected_profile %}
+    <div class="op-header">
+      <span class="op-breadcrumb">Legal Eagle /</span>
+      <span class="op-title">{{ selected_profile.name or (selected_profile.country_code ~ ' / ' ~ selected_profile.lob) }}</span>
+      <div class="op-actions">
+        <form method="POST" action="{{ url_for('admin_start_run', profile_id=selected_profile.id) }}" style="display:inline">
+          <input type="hidden" name="test_mode" value="0">
+          <button type="submit" class="op-btn primary">&#9654; Run Now</button>
+        </form>
+        <button class="op-btn icon" onclick="toggleMaximize()" id="maximizeBtn" title="Expand">&#10562;</button>
+        <a href="{{ url_for('admin_dashboard') }}" class="op-btn icon" title="Back to list">&#8249;</a>
       </div>
     </div>
-    <div class="sapShellBar-right">
-      <button class="sapShellBar-icon" title="Notifications">🔔</button>
-      <button class="sapShellBar-icon" title="User">👤</button>
-      <button class="sapShellBar-icon" title="Settings">⚙️</button>
-    </div>
-  </div>
-  <div class="sapShellBar-subtitle">
-    Legal Eagle - Compliance Management
-    <a href="{{ url_for('admin_legal_repo') }}"
-       style="margin-left: 24px; color: {% if request.path.startswith('/admin/legal-repo') %}#fff{% else %}rgba(255,255,255,0.7){% endif %}; text-decoration: none; font-size: 13px; font-weight: {% if request.path.startswith('/admin/legal-repo') %}700{% else %}400{% endif %};">
-      📚 Legal Repo
-    </a>
-  </div>
-</header>
 
-<!-- Object Page Header (Profile Navigation) -->
-{% if profile %}
-<div class="sapObjectPage-header">
-  <div class="sapContainer" style="padding: 0;">
-    <h1 class="sapObjectPage-title">
-      <span>{{ profile.country_code }}/{{ profile.lob }}</span>
-      {% if profile.name %}
-        <span style="font-weight: 400; color: var(--sapNeutralColor);"> - {{ profile.name }}</span>
-      {% endif %}
-      {% if profile.active == 1 %}
-        <span class="sapBadge sapBadge-positive">● Active</span>
-      {% else %}
-        <span class="sapBadge sapBadge-neutral">○ Inactive</span>
-      {% endif %}
-    </h1>
-    <nav class="sapObjectPage-nav">
-      <a class="sapObjectPage-navLink sapObjectPage-navLink-configure" href="{{ url_for('admin_profile_detail', profile_id=profile.id) }}">
-        Configure
-      </a>
-      <a class="sapObjectPage-navLink sapObjectPage-navLink-run" href="{{ url_for('admin_profile_runs', profile_id=profile.id) }}">
-        Run
-      </a>
-      <a class="sapObjectPage-navLink sapObjectPage-navLink-review" href="{{ url_for('admin_review_news', profile_id=profile.id) }}">
-        Review
-      </a>
-    </nav>
-  </div>
-</div>
-{% endif %}
-
-<!-- Main Content Area -->
-<main class="sapPage">
-  <div class="sapContainer">
-    <!-- Flash Messages -->
     {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        {% for category, message in messages %}
-          <div class="sapMessageStrip sapMessageStrip-{{ 'error' if category == 'error' else 'success' if category == 'success' else 'warning' if category == 'warning' else 'info' }}">
-            <span>{{ message }}</span>
-            <button class="sapMessageStrip-close" onclick="this.parentElement.remove()">×</button>
-          </div>
-        {% endfor %}
-      {% endif %}
+    {% if messages %}
+    <div class="flash-container">
+      {% for category, message in messages %}
+      <div class="flash {{ category }}">{{ message }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
     {% endwith %}
 
-    {% block content %}{% endblock %}
+    <div class="op-tabs">
+      <div class="op-tab {% if active_tab=='configure' %}active{% endif %}" onclick="switchTab('configure',this)">Configure</div>
+      <div class="op-tab {% if active_tab=='run' %}active{% endif %}" onclick="switchTab('run',this)">Run</div>
+      <div class="op-tab {% if active_tab=='review' %}active{% endif %}" onclick="switchTab('review',this)">Review{% if review_badge_count|default(0) > 0 %}<span class="op-tab-badge">{{ review_badge_count }}</span>{% endif %}</div>
+    </div>
+
+    <div id="tab-configure" class="tab-panel {% if active_tab=='configure' %}active{% endif %}">
+      {% block configure_tab %}{% endblock %}
+    </div>
+    <div id="tab-run" class="tab-panel {% if active_tab=='run' %}active{% endif %}">
+      {% block run_tab %}{% endblock %}
+    </div>
+    <div id="tab-review" class="tab-panel {% if active_tab=='review' %}active{% endif %}">
+      {% block review_tab %}{% endblock %}
+    </div>
+    {% else %}
+    <div style="display:flex;align-items:center;justify-content:center;height:100%;color:#6a6d70;">
+      <div style="text-align:center;">
+        <div style="font-size:48px;margin-bottom:16px;">&#9632;</div>
+        <div style="font-size:16px;font-weight:600;margin-bottom:8px;">Select a profile</div>
+        <div style="font-size:13px;">Choose a profile from the list to configure, run, or review.</div>
+      </div>
+    </div>
+    {% endif %}
   </div>
-</main>
+
+</div>
+
+<div class="toast" id="toast"></div>
 
 <script>
-  // Active page detection for object page navigation
-  document.addEventListener('DOMContentLoaded', function() {
-    const currentPath = window.location.pathname;
-    const navLinks = document.querySelectorAll('.sapObjectPage-navLink');
-    
-    navLinks.forEach(function(link) {
-      const linkPath = link.getAttribute('href');
-      if (linkPath && currentPath === linkPath) {
-        link.classList.add('active');
-      }
-    });
-    
-    // Simple search functionality
-    const searchInput = document.getElementById('shellSearchInput');
-    if (searchInput) {
-      searchInput.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-          // Could implement search functionality here
-          console.log('Search:', this.value);
-        }
-      });
-    }
-  });
+  {% if selected_profile %}
+  document.getElementById('fclShell').classList.add('profile-selected');
+  {% endif %}
+
+  function toggleMaximize() {
+    var s = document.getElementById('fclShell');
+    var b = document.getElementById('maximizeBtn');
+    var max = s.classList.toggle('profile-maximized');
+    b.innerHTML = max ? '&#10561;' : '&#10562;';
+    b.title = max ? 'Restore' : 'Expand';
+  }
+
+  function switchTab(name, el) {
+    document.querySelectorAll('.tab-panel').forEach(function(p){ p.classList.remove('active'); });
+    document.querySelectorAll('.op-tab').forEach(function(t){ t.classList.remove('active'); });
+    document.getElementById('tab-' + name).classList.add('active');
+    el.classList.add('active');
+    var u = new URL(location.href);
+    u.searchParams.set('tab', name);
+    history.replaceState({}, '', u.toString());
+  }
+
+  function showToast(msg) {
+    var t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('visible');
+    setTimeout(function(){ t.classList.remove('visible'); }, 3000);
+  }
 </script>
 </body>
 </html>
