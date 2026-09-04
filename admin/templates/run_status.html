@@ -1,109 +1,218 @@
 {% extends "base.html" %}
 {% block run_tab %}
-<div style="display:flex;gap:24px;height:calc(100vh - 200px)">
+<style>
+  /* ── Run tab (matches run-tab.html mockup) ── */
+  .run-body { display: flex; flex: 1; overflow: hidden; min-height: 0; }
+  .run-left { width: 300px; flex-shrink: 0; border-right: 1px solid #e5e5e5; background: white; display: flex; flex-direction: column; overflow-y: auto; }
+  .section-block { padding: 14px 16px; border-bottom: 1px solid #f0f0f0; }
+  .section-block-title { font-size: 11px; font-weight: 700; color: #6a6d70; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; }
+  .source-group { margin-bottom: 10px; }
+  .source-group:last-child { margin-bottom: 0; }
+  .source-group-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .source-group-label { font-size: 12px; font-weight: 600; color: #32363a; display: flex; align-items: center; gap: 6px; }
+  .source-group-count { font-size: 10px; color: #6a6d70; background: #f0f0f0; border-radius: 8px; padding: 1px 6px; }
+  .source-toggle { font-size: 10px; color: #0a6ed1; cursor: pointer; }
+  .chip-list { display: flex; flex-wrap: wrap; gap: 5px; }
+  .chip { background: #e8f1fb; color: #0a6ed1; border: 1px solid #c5d8f5; border-radius: 12px; padding: 3px 10px; font-size: 11px; cursor: pointer; white-space: nowrap; user-select: none; }
+  .chip.deselected { background: #f5f5f5; color: #aaa; border-color: #e0e0e0; text-decoration: line-through; }
+  .chip input { display: none; }
 
-  <!-- Left panel (300px) -->
-  <div style="width:300px;flex-shrink:0;display:flex;flex-direction:column;gap:16px;overflow-y:auto">
+  .test-mode-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .test-mode-text { flex: 1; }
+  .test-mode-label { font-size: 13px; font-weight: 600; color: #32363a; }
+  .test-mode-desc { font-size: 11px; color: #6a6d70; margin-top: 3px; line-height: 1.5; }
+  .test-mode-implications { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; padding-top: 10px; border-top: 1px solid #f0f0f0; overflow: hidden; max-height: 0; opacity: 0; transition: max-height 0.3s ease, opacity 0.25s ease, margin-top 0.3s ease, padding-top 0.3s ease; }
+  .test-mode-implications.visible { max-height: 100px; opacity: 1; }
+  .impl-row { display: flex; align-items: center; gap: 7px; font-size: 11px; color: #6a6d70; }
+  .impl-icon { color: #e9730c; font-size: 12px; }
 
-    <!-- Source chips -->
-    {% if rss_feeds %}
-    <div>
-      <div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;margin-bottom:8px">
-        <span>&#128225; RSS Feeds</span>
-        <span style="background:#e5e5e5;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:normal">{{ rss_feeds|length }}</span>
-        <a href="#" onclick="deselectAll('rss');return false" style="margin-left:auto;font-size:12px;color:#0a6ed1;text-decoration:none">Deselect all</a>
+  .toggle { width: 36px; height: 20px; border-radius: 10px; background: #e0e0e0; cursor: pointer; position: relative; flex-shrink: 0; transition: background 0.2s; margin-top: 1px; }
+  .toggle::after { content:''; position:absolute; top:3px; left:3px; width:14px; height:14px; border-radius:50%; background:white; transition:left 0.2s; box-shadow:0 1px 3px rgba(0,0,0,0.2); }
+  .toggle.on { background: #e9730c; }
+  .toggle.on::after { left: 19px; }
+
+  .checklist { display: flex; flex-direction: column; gap: 6px; }
+  .check-row { display: flex; align-items: center; gap: 7px; font-size: 12px; color: #32363a; transition: opacity 0.2s; }
+  .check-row.skipped { opacity: 0.35; text-decoration: line-through; color: #aaa; }
+  .check-icon-ok { color: #107e3e; }
+  .check-skip-label { font-size: 10px; color: #e9730c; font-style: italic; margin-left: 2px; }
+
+  .run-footer { padding: 12px 16px; border-top: 1px solid #e5e5e5; }
+  .btn-start { width: 100%; background: #107e3e; color: white; border: none; border-radius: 4px; padding: 9px; font-size: 13px; font-weight: 700; cursor: pointer; transition: background 0.2s; }
+  .btn-start.test { background: #e9730c; }
+
+  .run-right { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+  .test-banner { background: #fff3e0; border-bottom: 1px solid #ffe0b2; padding: 7px 14px; font-size: 11px; color: #c4600a; font-weight: 600; display: none; align-items: center; gap: 7px; flex-shrink: 0; }
+  .test-banner.visible { display: flex; }
+  .stage-bar { background: white; border-bottom: 1px solid #e5e5e5; padding: 8px 12px; display: flex; align-items: center; overflow-x: auto; flex-shrink: 0; }
+  .stage-step { display: flex; align-items: center; }
+  .stage-pill { display: flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; color: #aaa; background: #f7f7f7; white-space: nowrap; }
+  .stage-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: 0.7; }
+  .stage-arrow { color: #ccc; font-size: 12px; padding: 0 3px; }
+  .right-toolbar { background: white; border-bottom: 1px solid #e5e5e5; padding: 6px 12px; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .history-label { font-size: 10px; font-weight: 700; color: #6a6d70; text-transform: uppercase; letter-spacing: 0.05em; flex-shrink: 0; }
+  .history-pills { display: flex; gap: 6px; overflow-x: auto; flex: 1; }
+  .history-pill { padding: 3px 10px; border-radius: 10px; font-size: 10px; font-weight: 600; cursor: pointer; white-space: nowrap; border: 1px solid transparent; text-decoration: none; }
+  .history-pill.success { background: #e8f5e9; color: #107e3e; border-color: #b8e0c8; }
+  .history-pill.failed  { background: #ffeaea; color: #bb0000; border-color: #f5c0c0; }
+  .log-panel { flex: 1; background: #1e1e1e; overflow-y: auto; padding: 14px 16px; font-family: 'Menlo','Consolas',monospace; font-size: 11px; line-height: 1.7; min-height: 0; }
+  .log-idle { color: #555; text-align: center; padding-top: 50px; line-height: 2.2; }
+  .log-idle-icon { font-size: 28px; margin-bottom: 6px; }
+</style>
+
+<div class="run-body">
+  <!-- Left panel -->
+  <div class="run-left">
+    <div class="section-block">
+      <div class="section-block-title">Sources</div>
+
+      {% if rss_feeds %}
+      <div class="source-group">
+        <div class="source-group-header">
+          <span class="source-group-label">&#128225; RSS <span class="source-group-count">{{ rss_feeds|length }}</span></span>
+          <span class="source-toggle" onclick="deselectAll('rss')">Deselect all</span>
+        </div>
+        <div class="chip-list">
+          {% for feed in rss_feeds %}
+          <label class="chip" onclick="toggleChip(this)">
+            <input type="checkbox" name="selected_rss" value="{{ feed.url }}" checked form="startRunForm">
+            {{ feed.publisher_name or feed.url|truncate(28, True, '…') }}
+          </label>
+          {% endfor %}
+        </div>
       </div>
-      {% for feed in rss_feeds %}
-      <label class="src-chip selected" onclick="toggleChip(this)">
-        <input type="checkbox" name="selected_rss" value="{{ feed.url }}" checked form="startRunForm" style="display:none">
-        {{ feed.publisher_name or feed.url|truncate(30) }}
-      </label>
-      {% endfor %}
-    </div>
-    {% endif %}
+      {% endif %}
 
-    <!-- Test mode toggle -->
-    <div style="padding:12px;background:#f5f6f7;border-radius:6px">
-      <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;cursor:pointer">
-        Test mode
-        <input type="checkbox" id="testToggle" onchange="onTestMode()">
-      </label>
-      <div style="font-size:12px;color:#6a6d70;margin-top:4px">Fetches last 7 days, skips email send and pre-checks.</div>
-      <div id="testImplied" style="display:none;margin-top:8px;font-size:12px">
-        <div>&#10003; Lookback: 7 days</div>
-        <div style="color:#6a6d70">Email send <span style="color:#e9730c">skipped</span></div>
-        <div style="color:#6a6d70">Email pre-checks <span style="color:#e9730c">skipped</span></div>
+      {% if tweets %}
+      <div class="source-group">
+        <div class="source-group-header">
+          <span class="source-group-label">&#128038; Twitter <span class="source-group-count">{{ tweets|length }}</span></span>
+          <span class="source-toggle" onclick="deselectAll('twitter')">Deselect all</span>
+        </div>
+        <div class="chip-list">
+          {% for h in tweets %}
+          <label class="chip" onclick="toggleChip(this)">
+            <input type="checkbox" name="selected_twitter" value="{{ h.handle }}" checked form="startRunForm">
+            @{{ h.handle }}
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      {% if url_sources %}
+      <div class="source-group">
+        <div class="source-group-header">
+          <span class="source-group-label">&#127760; URL Sources <span class="source-group-count">{{ url_sources|length }}</span></span>
+          <span class="source-toggle" onclick="deselectAll('url')">Deselect all</span>
+        </div>
+        <div class="chip-list">
+          {% for s in url_sources %}
+          <label class="chip" onclick="toggleChip(this)">
+            <input type="checkbox" name="selected_url" value="{{ s.url }}" checked form="startRunForm">
+            {{ s.url|truncate(28, True, '…') }}
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      {% if not rss_feeds and not tweets and not url_sources %}
+      <div style="font-size:12px;color:#6a6d70;">No sources configured. Add sources in the Configure tab.</div>
+      {% endif %}
+    </div>
+
+    <div class="section-block">
+      <div class="test-mode-row">
+        <div class="test-mode-text">
+          <div class="test-mode-label">Test mode</div>
+          <div class="test-mode-desc">Fetches last 7 days from all sources, skips email send and email pre-checks.</div>
+        </div>
+        <div class="toggle" id="testToggle" onclick="toggleTestMode()"></div>
+      </div>
+      <div class="test-mode-implications" id="testImplications">
+        <div class="impl-row"><span class="impl-icon">&#8617;</span> Lookback: last 7 days (ignores per-source anchor)</div>
+        <div class="impl-row"><span class="impl-icon">&#9993;</span> Email send skipped</div>
+        <div class="impl-row"><span class="impl-icon">&#10003;</span> Email pre-checks skipped</div>
       </div>
     </div>
 
-    <!-- Start Run button -->
-    <form method="POST" action="{{ url_for('admin_start_run', profile_id=selected_profile.id) }}" id="startRunForm">
-      <input type="hidden" name="test_mode" id="testModeVal" value="0">
-      <input type="hidden" name="has_rss_sources" value="1">
-      <button type="submit" id="startBtn"
-              style="width:100%;padding:12px;background:#107e3e;color:#fff;border:none;border-radius:4px;font-size:14px;font-weight:600;cursor:pointer">
-        &#9654; Start Run
-      </button>
-    </form>
+    <div class="section-block">
+      <div class="section-block-title">Pre-run Checklist</div>
+      <div class="checklist">
+        <div class="check-row"><span class="check-icon-ok">&#10003;</span> At least one source configured</div>
+        <div class="check-row" id="check-email-rcv"><span class="check-icon-ok">&#10003;</span> Email receiver configured</div>
+        <div class="check-row"><span class="check-icon-ok">&#10003;</span> SAP AI Core credentials set</div>
+        <div class="check-row" id="check-smtp"><span class="check-icon-ok">&#10003;</span> Gmail SMTP reachable</div>
+        <div class="check-row"><span class="check-icon-ok">&#10003;</span> Twitter API token valid</div>
+      </div>
+    </div>
+
+    <div class="run-footer">
+      <form method="POST" action="{{ url_for('admin_start_run', profile_id=selected_profile.id) }}" id="startRunForm">
+        <input type="hidden" name="test_mode" id="testModeVal" value="0">
+        <button type="submit" class="btn-start" id="btnStart">&#9654; Start Run</button>
+      </form>
+    </div>
   </div>
 
   <!-- Right panel -->
-  <div style="flex:1;display:flex;flex-direction:column;gap:12px;min-height:0">
-
-    <!-- Stage stepper -->
-    <div style="display:flex;gap:4px;flex-wrap:wrap">
+  <div class="run-right">
+    <div class="test-banner" id="testBanner">&#9888; Test mode — 7-day lookback · no email will be sent</div>
+    <div class="stage-bar">
       {% for s in ['Starting','Collecting','Filtering','Comparing','Grouping','Sending','Done'] %}
-      <div class="stage-pill" data-stage="{{ s|lower }}">{{ s }}</div>
-      {% endfor %}
-    </div>
-
-    <!-- Test mode banner -->
-    <div id="testBanner" style="display:none;background:#e9730c;color:#fff;padding:8px 16px;border-radius:4px;font-size:13px">
-      &#9888; Test mode &#8212; 7-day lookback &middot; no email will be sent
-    </div>
-
-    <!-- History strip -->
-    <div style="display:flex;align-items:center;gap:8px;overflow-x:auto;padding:4px 0">
-      <span style="font-size:11px;font-weight:700;color:#6a6d70;flex-shrink:0">HISTORY</span>
-      {% for run in runs|default([]) %}
-      <a href="{{ url_for('admin_profile_detail', profile_id=selected_profile.id) }}?tab=run"
-         style="padding:4px 12px;border-radius:12px;font-size:12px;flex-shrink:0;text-decoration:none;
-                {% if run.status == 'failed' %}background:#fde8e8;color:#bb0000{% else %}background:#dcefd8;color:#107e3e{% endif %}">
-        {{ run.started_at[:10] if run.started_at else '—' }} &middot; {{ run.filtered_count or 0 }} items
-      </a>
-      {% endfor %}
-    </div>
-
-    <!-- Log panel -->
-    <div style="flex:1;background:#1e1e1e;border-radius:6px;padding:16px;overflow-y:auto;min-height:0" id="logPanel">
-      <div id="logIdle" style="color:#888;text-align:center;padding-top:60px">
-        <div style="font-size:32px;margin-bottom:8px">&#9654;</div>
-        <div>Configure sources and click Start Run to begin</div>
-        <div style="margin-top:8px;font-size:12px">Or click a history pill above to view a past run</div>
+      <div class="stage-step">
+        <div class="stage-pill"><span class="stage-dot"></span>{{ s }}</div>
+        {% if not loop.last %}<span class="stage-arrow">&rsaquo;</span>{% endif %}
       </div>
-      <div id="logLines" style="display:none;font-size:12px;font-family:monospace;color:#d4d4d4"></div>
+      {% endfor %}
+    </div>
+    <div class="right-toolbar">
+      <span class="history-label">History</span>
+      <div class="history-pills">
+        {% for run in runs|default([]) %}
+        <a class="history-pill {% if run.status == 'failed' or run.status == 'Failed' %}failed{% else %}success{% endif %}"
+           href="{{ url_for('admin_profile_runs', profile_id=selected_profile.id) }}?run_id={{ run.id }}">
+          {{ run.started_at|default('')|truncate(10, True, '') }} · {% if run.status in ('failed','Failed') %}Error{% else %}{{ run.filtered_count|default(0) }} items{% endif %}
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="log-panel">
+      <div class="log-idle">
+        <div class="log-idle-icon">&#9654;</div>
+        <div style="color:#666;font-size:12px">Configure sources and click <strong style="color:#999">Start Run</strong> to begin.</div>
+        <div style="color:#444;font-size:11px;margin-top:6px">Or click a history pill above to view a past run.</div>
+      </div>
     </div>
   </div>
 </div>
 
-<style>
-  .src-chip { display:inline-block;padding:6px 12px;border-radius:16px;font-size:13px;cursor:pointer;margin:3px;background:#0a6ed1;color:#fff;user-select:none; }
-  .src-chip.deselected { background:#e5e5e5;color:#6a6d70;text-decoration:line-through; }
-  .stage-pill { padding:6px 12px;border-radius:14px;font-size:12px;background:#e5e5e5;color:#6a6d70; }
-  .stage-pill.active { background:#0a6ed1;color:#fff;animation:pulse 1.5s infinite; }
-  .stage-pill.done { background:#107e3e;color:#fff; }
-  .stage-pill.failed { background:#bb0000;color:#fff; }
-  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.7} }
-</style>
 <script>
-  function onTestMode() {
-    var on = document.getElementById('testToggle').checked;
-    document.getElementById('testModeVal').value = on ? '1' : '0';
-    document.getElementById('testBanner').style.display = on ? 'block' : 'none';
-    document.getElementById('testImplied').style.display = on ? 'block' : 'none';
-    var btn = document.getElementById('startBtn');
-    btn.style.background = on ? '#e9730c' : '#107e3e';
-    btn.textContent = on ? '► Start Test Run' : '► Start Run';
+  var testMode = false;
+  function toggleTestMode() {
+    testMode = !testMode;
+    document.getElementById('testToggle').classList.toggle('on', testMode);
+    document.getElementById('testImplications').classList.toggle('visible', testMode);
+    document.getElementById('testBanner').classList.toggle('visible', testMode);
+    document.getElementById('testModeVal').value = testMode ? '1' : '0';
+    var btn = document.getElementById('btnStart');
+    btn.classList.toggle('test', testMode);
+    btn.innerHTML = testMode ? '&#9654; Start Test Run' : '&#9654; Start Run';
+    ['check-email-rcv','check-smtp'].forEach(function(id) {
+      var row = document.getElementById(id);
+      if (!row) return;
+      row.classList.toggle('skipped', testMode);
+      var existing = row.querySelector('.check-skip-label');
+      if (testMode && !existing) {
+        var lbl = document.createElement('span');
+        lbl.className = 'check-skip-label';
+        lbl.textContent = 'skipped in test mode';
+        row.appendChild(lbl);
+      } else if (!testMode && existing) {
+        existing.remove();
+      }
+    });
   }
   function toggleChip(label) {
     var cb = label.querySelector('input');
@@ -113,7 +222,7 @@
   function deselectAll(type) {
     document.querySelectorAll('input[name="selected_' + type + '"]').forEach(function(cb) {
       cb.checked = false;
-      cb.closest('.src-chip').classList.add('deselected');
+      cb.closest('.chip').classList.add('deselected');
     });
   }
 </script>
