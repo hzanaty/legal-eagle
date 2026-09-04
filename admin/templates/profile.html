@@ -1,853 +1,381 @@
 {% extends "base.html" %}
 {% block configure_tab %}
 <style>
-  /* Profile-specific Fiori styles */
-  .sapTable-compact {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: var(--sapFontSmallSize);
-  }
-  
-  .sapTable-compact th {
-    padding: var(--sapSpacingXS) var(--sapSpacingS);
-    text-align: left;
-    font-weight: 600;
-    background: var(--sapNeutralBackground);
-    border-bottom: 1px solid var(--sapGroup_ContentBorderColor);
-    font-size: var(--sapFontSmallSize);
-  }
-  
-  .sapTable-compact td {
-    padding: var(--sapSpacingXS) var(--sapSpacingS);
-    border-bottom: 1px solid var(--sapGroup_ContentBorderColor);
-    vertical-align: middle;
-    font-size: var(--sapFontSmallSize);
-  }
-  
-  .sapTable-compact tbody tr:hover {
-    background: var(--sapList_Hover_Background);
-  }
-  
-  .sapTable-compact input[type="checkbox"] {
-    cursor: pointer;
-  }
-  
-  .sapTable-toolbar {
-    padding: var(--sapSpacingS) var(--sapSpacingM);
-    background: #fafafa;
-    border-bottom: 1px solid var(--sapGroup_ContentBorderColor);
-    display: flex;
-    gap: var(--sapSpacingS);
-    align-items: center;
-  }
-  
-  .sapForm-row {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: var(--sapSpacingS);
-    align-items: end;
-  }
-  
-  .sapForm-group {
-    margin-bottom: var(--sapSpacingM);
-  }
-  
-  .sapForm-label {
-    display: block;
-    margin-bottom: var(--sapSpacingXS);
-    font-weight: 400;
-    color: var(--sapTextColor);
-    font-size: var(--sapFontSize);
-  }
-  
-  .sapForm-input,
-  .sapForm-select,
-  .sapForm-textarea {
-    width: 100%;
-    padding: var(--sapSpacingS);
-    border: 1px solid var(--sapTileBorderColor);
-    border-radius: 0.25rem;
-    font-family: var(--sapFontFamily);
-    font-size: var(--sapFontSize);
-    color: var(--sapTextColor);
-    background: var(--sapBaseColor);
-    transition: border-color 0.2s;
-  }
-  
-  .sapForm-input:focus,
-  .sapForm-select:focus,
-  .sapForm-textarea:focus {
-    outline: none;
-    border-color: var(--sapBrandColor);
-    box-shadow: 0 0 0 1px var(--sapBrandColor);
-  }
-  
-  .sapForm-help {
-    display: block;
-    margin-top: var(--sapSpacingXS);
-    font-size: var(--sapFontSmallSize);
-    color: var(--sapNeutralColor);
-  }
-  
-  .sapTermItem {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: var(--sapSpacingS);
-    border: 1px solid var(--sapTileBorderColor);
-    border-radius: 0.25rem;
-    margin-bottom: var(--sapSpacingXS);
-    background: var(--sapBaseColor);
-  }
-  
-  .sapTermItem:hover {
-    background: var(--sapList_Hover_Background);
-  }
+  /* ── Configure tab — anchor-bar sections (matches configure-tab.html mockup) ── */
+  .cfg-anchor-bar { background: white; border-bottom: 1px solid #e5e5e5; padding: 0 18px; display: flex; gap: 4px; flex-shrink: 0; position: sticky; top: 0; z-index: 5; }
+  .cfg-anchor { padding: 9px 14px; font-size: 12px; font-weight: 600; color: #6a6d70; cursor: pointer; border-bottom: 2px solid transparent; }
+  .cfg-anchor:hover { color: #32363a; }
+  .cfg-anchor.active { color: #0a6ed1; border-bottom-color: #0a6ed1; }
+
+  .cfg-scroll { flex: 1; overflow-y: auto; padding: 18px; }
+  .cfg-section { margin-bottom: 26px; scroll-margin-top: 8px; }
+  .cfg-section-title { font-size: 11px; font-weight: 700; color: #6a6d70; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px; }
+
+  .kv-row { display: flex; align-items: center; gap: 16px; padding: 10px 0; border-bottom: 1px solid #f0f0f0; flex-wrap: wrap; }
+  .kv-label { width: 180px; flex-shrink: 0; font-size: 13px; color: #32363a; }
+  .kv-help { font-size: 11px; color: #6a6d70; margin-top: 3px; }
+
+  .cfg-field { padding: 6px 10px; border: 1px solid #d9d9d9; border-radius: 4px; font-size: 12px; color: #32363a; background: white; }
+  select.cfg-field { min-width: 200px; }
+  textarea.cfg-field { width: 100%; font-family: 'Menlo','Consolas',monospace; }
+
+  .segmented { display: inline-flex; border: 1px solid #d9d9d9; border-radius: 4px; overflow: hidden; }
+  .seg-btn { padding: 6px 14px; font-size: 11px; font-weight: 600; background: white; color: #6a6d70; border: none; cursor: pointer; }
+  .seg-btn + .seg-btn { border-left: 1px solid #d9d9d9; }
+  .seg-btn.active { background: #0a6ed1; color: white; }
+
+  .card-grid { display: flex; gap: 12px; flex-wrap: wrap; }
+  .src-card { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 14px 16px; width: 200px; }
+  .src-card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .src-card-name { font-size: 13px; font-weight: 700; color: #32363a; display: flex; align-items: center; gap: 6px; }
+  .src-card-count { font-size: 12px; color: #6a6d70; margin-bottom: 12px; }
+  .pill-ok { background: #e8f5e9; color: #107e3e; border-radius: 10px; padding: 1px 8px; font-size: 10px; font-weight: 700; }
+  .pill-err { background: #ffeaea; color: #bb0000; border-radius: 10px; padding: 1px 8px; font-size: 10px; font-weight: 700; cursor: pointer; }
+  .btn-manage { width: 100%; background: white; border: 1px solid #0a6ed1; color: #0a6ed1; border-radius: 4px; padding: 6px; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .btn-manage:hover { background: #f0f7ff; }
+
+  .cfg-editor { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px; margin-top: 12px; }
+  .cfg-editor.hidden { display: none; }
+  .cfg-editor-title { font-size: 12px; font-weight: 700; color: #0a6ed1; margin-bottom: 12px; }
+  .add-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 14px; }
+  .add-form label { font-size: 10px; color: #6a6d70; display: block; margin-bottom: 3px; }
+  .add-form input, .add-form select { padding: 6px 9px; border: 1px solid #d9d9d9; border-radius: 4px; font-size: 12px; }
+  .add-form button { flex: 0 0 auto; width: auto; align-self: flex-end; }
+  .btn-add { background: #107e3e; color: white; border: none; border-radius: 4px; padding: 7px 14px; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .btn-save { background: #0a6ed1; color: white; border: none; border-radius: 4px; padding: 7px 14px; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .row-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #f2f2f2; font-size: 12px; }
+  .row-item .mono { font-family: 'Menlo','Consolas',monospace; font-size: 11px; color: #32363a; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row-pub { font-size: 10px; color: #6a6d70; background: #f0f0f0; border-radius: 3px; padding: 1px 6px; white-space: nowrap; }
+  .row-date { font-size: 10px; color: #6a6d70; white-space: nowrap; }
+  .btn-del { background: transparent; border: none; color: #bb0000; font-size: 11px; cursor: pointer; opacity: 0.6; }
+  .btn-del:hover { opacity: 1; }
+  .btn-sm { background: white; border: 1px solid #d9d9d9; color: #32363a; border-radius: 4px; padding: 3px 10px; font-size: 11px; cursor: pointer; }
+  .btn-sm.danger { color: #bb0000; border-color: #f5c0c0; }
+  .empty-note { text-align: center; color: #6a6d70; padding: 16px 0; font-size: 12px; }
+
+  .out-row { display: flex; align-items: center; justify-content: space-between; background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 14px 16px; margin-bottom: 10px; }
+  .out-name { font-size: 13px; font-weight: 600; color: #32363a; }
+  .out-desc { font-size: 11px; color: #6a6d70; margin-top: 2px; }
+
+  .gloss-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .gloss-chip { background: #e8f1fb; color: #0a6ed1; border: 1px solid #c5d8f5; border-radius: 12px; padding: 3px 8px 3px 10px; font-size: 11px; display: flex; align-items: center; gap: 6px; }
+  .gloss-chip form { display: inline; margin: 0; }
+  .gloss-chip button { background: none; border: none; cursor: pointer; color: #6a94c4; font-weight: 700; font-size: 12px; padding: 0; }
+  .gloss-chip button:hover { color: #bb0000; }
+  .auth-table { width: 100%; border-collapse: collapse; background: white; border: 1px solid #e5e5e5; border-radius: 8px; overflow: hidden; }
+  .auth-table th { text-align: left; padding: 8px 12px; font-size: 10px; font-weight: 700; color: #6a6d70; text-transform: uppercase; background: #fafafa; border-bottom: 1px solid #e5e5e5; }
+  .auth-table td { padding: 8px 12px; font-size: 12px; border-bottom: 1px solid #f2f2f2; }
+  .btn-outline-add { background: white; border: 1px dashed #0a6ed1; color: #0a6ed1; border-radius: 4px; padding: 7px 14px; font-size: 12px; font-weight: 600; cursor: pointer; margin-top: 12px; }
+
+  .url-edit-panel { background: #f7f7f7; border: 1px solid #e5e5e5; border-radius: 6px; padding: 14px; margin: 6px 0 10px; }
+  .url-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .url-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .url-fieldlabel { font-size: 11px; color: #6a6d70; display: block; margin-bottom: 3px; }
+  .info-banner { padding: 10px 12px; background: #e5f5ff; border: 1px solid #b3d1f5; border-radius: 6px; font-size: 11px; line-height: 1.5; color: #32363a; margin-bottom: 12px; }
 </style>
 
-<!-- Profile Language Section -->
-<div class="sapCard">
-  <div class="sapCard-header">
-    <span>🌍 Profile Language</span>
-    <span style="color: var(--sapNeutralColor); font-weight: 400; font-size: var(--sapFontSmallSize);">
-      Language for AI news analysis
-    </span>
-  </div>
-  <div class="sapCard-content">
+<div class="cfg-anchor-bar">
+  <div class="cfg-anchor active" onclick="cfgJump('sec-general',this)">General</div>
+  <div class="cfg-anchor" onclick="cfgJump('sec-sources',this)">Sources</div>
+  <div class="cfg-anchor" onclick="cfgJump('sec-output',this)">Output</div>
+  <div class="cfg-anchor" onclick="cfgJump('sec-knowledge',this)">Knowledge</div>
+</div>
+
+<div class="cfg-scroll" id="cfgScroll">
+
+  <!-- ══ GENERAL ══ -->
+  <div class="cfg-section" id="sec-general">
+    <div class="cfg-section-title">General</div>
+
     <form method="post" action="{{ url_for('update_profile_language', profile_id=profile.id) }}">
-      <div class="sapForm-row">
-        <div class="sapForm-group" style="margin-bottom: 0;">
-          <label class="sapForm-label">Analysis Language</label>
-          <select class="sapForm-select" name="language">
-            {% for code, name in language_names.items() %}
-            <option value="{{ code }}" {% if profile.language == code %}selected{% endif %}>{{ name }} ({{ code }})</option>
-            {% endfor %}
-          </select>
-          <span class="sapForm-help">Language used by AI to read and analyze news sources (e.g., Arabic for Saudi Arabia news)</span>
+      <div class="kv-row">
+        <div class="kv-label">Analysis Language
+          <div class="kv-help">Language the AI uses to read &amp; analyze sources</div>
         </div>
-        <button type="submit" class="sapBtn sapBtn-emphasized">Save Language</button>
+        <select class="cfg-field" name="language">
+          {% for code, name in language_names.items() %}
+          <option value="{{ code }}" {% if profile.language == code %}selected{% endif %}>{{ name }} ({{ code }})</option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="btn-save">Save Language</button>
       </div>
     </form>
-  </div>
-</div>
 
-<!-- Default Lookback Window -->
-<div class="sapCard">
-  <div class="sapCard-header">
-    <span>🗓 Default Lookback Window</span>
-    <span style="color: var(--sapNeutralColor); font-weight: 400; font-size: var(--sapFontSmallSize);">
-      Applies to all URL sources in this profile
-    </span>
-  </div>
-  <div class="sapCard-content">
     <form method="post" action="{{ url_for('update_profile_date_scope', profile_id=profile.id) }}">
-      <div class="sapForm-row">
-        <div class="sapForm-group" style="margin-bottom: 0;">
-          <label class="sapForm-label">Lookback Window</label>
-          <select class="sapForm-select" name="date_scope">
-            <option value="delta" {% if profile.date_scope in ('delta', 'all', 'force_full') or not profile.date_scope %}selected{% endif %}>Delta (since last fetch)</option>
-            <option value="today" {% if profile.date_scope == 'today' %}selected{% endif %}>Today only</option>
-            <option value="last_7_days" {% if profile.date_scope == 'last_7_days' %}selected{% endif %}>Last 7 days</option>
-            <option value="last_30_days" {% if profile.date_scope == 'last_30_days' %}selected{% endif %}>Last 30 days</option>
-          </select>
-          <span class="sapForm-help">Applies to all sources. "Delta" = fetches everything on first run, then only new items since last run. Use the run modal to force a full re-fetch on demand.</span>
+      <div class="kv-row">
+        <div class="kv-label">Default Lookback
+          <div class="kv-help">Applies to all sources unless overridden at run time</div>
         </div>
-        <button type="submit" class="sapBtn sapBtn-emphasized">Save Lookback</button>
+        {% set ds = profile.date_scope %}
+        <div class="segmented" id="lookback-seg">
+          <button type="button" class="seg-btn {% if ds in ('delta','all','force_full') or not ds %}active{% endif %}" onclick="setLookback(this,'delta')">Delta</button>
+          <button type="button" class="seg-btn {% if ds == 'today' %}active{% endif %}" onclick="setLookback(this,'today')">Today</button>
+          <button type="button" class="seg-btn {% if ds == 'last_7_days' %}active{% endif %}" onclick="setLookback(this,'last_7_days')">7 days</button>
+          <button type="button" class="seg-btn {% if ds == 'last_30_days' %}active{% endif %}" onclick="setLookback(this,'last_30_days')">30 days</button>
+        </div>
+        <input type="hidden" name="date_scope" id="date_scope_val" value="{% if ds in ('delta','all','force_full') or not ds %}delta{% else %}{{ ds }}{% endif %}">
+        <button type="submit" class="btn-save">Save Lookback</button>
       </div>
     </form>
   </div>
-</div>
 
-<!-- RSS Feeds -->
-<div class="sapCard">
-  <div class="sapCard-header">
-    <span>📡 RSS Feeds</span>
-    <span style="color: var(--sapNeutralColor); font-weight: 400; font-size: var(--sapFontSmallSize);">
-      {{ rss|length if rss else 0 }} feed{% if (rss|length if rss else 0) != 1 %}s{% endif %}
-    </span>
-  </div>
-  
-  {% if rss and rss|length > 0 %}
-  <div class="sapTable-toolbar">
-    <button type="submit" form="bulk_rss_form" class="sapBtn sapBtn-reject sapBtn-sm">Delete Selected</button>
-  </div>
-  
-  <div class="sapCard-content" style="padding: 0;">
-    <div style="overflow-x: auto;">
-      <table class="sapTable-compact">
-        <thead>
-          <tr>
-            <th style="width: 40px;"><input type="checkbox" onclick="toggleAllCheckboxes(this, 'bulk_rss_form')"></th>
-            <th>URL</th>
-            <th style="width: 180px;">Last Fetch</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for u in rss %}
-          <tr>
-            <td style="text-align: center;"><input type="checkbox" name="urls" value="{{ u.url if u is mapping else u }}" form="bulk_rss_form"></td>
-            <td style="font-family: monospace; font-size: var(--sapFontSmallSize);">{{ u.url if u is mapping else u }}</td>
-            <td style="font-size: var(--sapFontSmallSize); color: var(--sapNeutralColor);">
-              {% if u is mapping and u.last_fetch_date %}
-                {{ u.last_fetch_date }}
-              {% else %}
-                <span style="font-style: italic;">Never</span>
-              {% endif %}
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-  {% endif %}
-  
-  <div class="sapCard-content">
-    {% if not rss or rss|length == 0 %}
-    <div style="text-align: center; color: var(--sapNeutralColor); padding: var(--sapSpacingL) 0;">
-      <div style="font-size: 2rem; margin-bottom: var(--sapSpacingS);">📡</div>
-      <p style="margin: 0;">No RSS feeds yet</p>
-    </div>
-    {% endif %}
-    
-    <form method="post" action="{{ url_for('add_rss', profile_id=profile.id) }}">
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
-        <div>
-          <label style="font-size:11px;color:#6a6d70;display:block;margin-bottom:3px;">Feed URL *</label>
-          <input class="sapForm-input" name="url" placeholder="https://example.gov/news/feed" required style="min-width:260px;">
+  <!-- ══ SOURCES ══ -->
+  <div class="cfg-section" id="sec-sources">
+    <div class="cfg-section-title">Sources</div>
+    <div class="card-grid">
+      <div class="src-card">
+        <div class="src-card-top"><span class="src-card-name">&#128225; RSS</span></div>
+        <div class="src-card-count">{{ rss|length }} feed{{ '' if rss|length == 1 else 's' }} configured</div>
+        <button class="btn-manage" onclick="toggleEditor('ed-rss')">Manage</button>
+      </div>
+      <div class="src-card">
+        <div class="src-card-top"><span class="src-card-name">&#128038; Twitter</span>
+          {% if twitter_error_flag %}<span class="pill-err" title="{{ twitter_error_flag }}">&#9679; Error</span>{% else %}<span class="pill-ok">&#9679; OK</span>{% endif %}
         </div>
-        <div>
-          <label style="font-size:11px;color:#6a6d70;display:block;margin-bottom:3px;">Publisher (optional)</label>
-          <input class="sapForm-input" name="publisher_name" placeholder="e.g. Ministry of Finance" style="min-width:180px;">
-        </div>
-        <div>
-          <label style="font-size:11px;color:#6a6d70;display:block;margin-bottom:3px;">Authority (optional)</label>
-          <select class="sapForm-select" name="authority_id">
-            <option value="">None</option>
-            {% for a in authorities|default([]) %}
-            <option value="{{ a.id }}">{{ a.name }}</option>
-            {% endfor %}
+        <div class="src-card-count">{{ tweets|length }} account{{ '' if tweets|length == 1 else 's' }}</div>
+        <button class="btn-manage" onclick="toggleEditor('ed-tw')">Manage</button>
+      </div>
+      <div class="src-card">
+        <div class="src-card-top"><span class="src-card-name">&#127760; URL</span></div>
+        <div class="src-card-count">{{ urls|length }} source{{ '' if urls|length == 1 else 's' }}</div>
+        <button class="btn-manage" onclick="toggleEditor('ed-url')">Manage</button>
+      </div>
+    </div>
+
+    <!-- RSS editor -->
+    <div class="cfg-editor hidden" id="ed-rss">
+      <div class="cfg-editor-title">Manage RSS Feeds</div>
+      <form method="post" action="{{ url_for('add_rss', profile_id=profile.id) }}" class="add-form">
+        <div><label>Feed URL *</label><input name="url" placeholder="https://example.gov/feed" required style="min-width:240px"></div>
+        <div><label>Publisher (optional)</label><input name="publisher_name" placeholder="e.g. Ministry of Finance" style="min-width:170px"></div>
+        <div><label>Authority (optional)</label>
+          <select name="authority_id"><option value="">None</option>
+            {% for a in authorities|default([]) %}<option value="{{ a.id }}">{{ a.name }}</option>{% endfor %}
           </select>
         </div>
-        <button type="submit" class="sapBtn sapBtn-accept">Add RSS</button>
-      </div>
-    </form>
-    
-    <form id="bulk_rss_form" method="post" action="{{ url_for('bulk_delete_rss', profile_id=profile.id) }}" style="display:none;"></form>
-  </div>
-</div>
-
-<!-- Twitter Accounts -->
-<div class="sapCard">
-  <div class="sapCard-header">
-    <span>🐦 Twitter Accounts</span>
-    <span style="color: var(--sapNeutralColor); font-weight: 400; font-size: var(--sapFontSmallSize);">
-      {{ tweets|length if tweets else 0 }} account{% if (tweets|length if tweets else 0) != 1 %}s{% endif %}
-    </span>
-  </div>
-
-  <!-- Error Banner (Red if error, Green if OK) -->
-  {% if twitter_error_flag %}
-  <div style="padding: var(--sapSpacingM); background: #ffeef0; border-left: 4px solid #d32f2f; border-bottom: 1px solid #f8d7da;">
-    <div style="display: flex; align-items: start; gap: var(--sapSpacingS);">
-      <span style="font-size: 1.2rem;">⚠️</span>
-      <div style="flex: 1;">
-        <strong style="color: #d32f2f;">Twitter API Error</strong>
-        <p style="margin: var(--sapSpacingXS) 0 var(--sapSpacingS) 0; color: #555; font-size: var(--sapFontSmallSize);">{{ twitter_error_flag }}</p>
-        <form method="post" action="{{ url_for('clear_twitter_error_flag_route', profile_id=profile.id) }}" style="margin: 0;">
-          <button type="submit" class="sapBtn sapBtn-emphasized sapBtn-sm">Clear Error & Retry</button>
-        </form>
-      </div>
-    </div>
-  </div>
-  {% else %}
-  <div style="padding: var(--sapSpacingM); background: #e8f5e9; border-left: 4px solid #4caf50; border-bottom: 1px solid var(--sapGroup_ContentBorderColor);">
-    <div style="display: flex; align-items: center; gap: var(--sapSpacingS);">
-      <span style="font-size: 1.2rem;">✅</span>
-      <span style="color: #2e7d32; font-weight: 500;">Twitter API Status: OK</span>
-    </div>
-  </div>
-  {% endif %}
-
-  {% if tweets and tweets|length > 0 %}
-  <div class="sapTable-toolbar">
-    <button type="submit" form="bulk_tweets_form" class="sapBtn sapBtn-reject sapBtn-sm">Delete Selected</button>
-  </div>
-
-  <div class="sapCard-content" style="padding: 0;">
-    <div style="overflow-x: auto;">
-      <table class="sapTable-compact">
-        <thead>
-          <tr>
-            <th style="width: 40px;"><input type="checkbox" onclick="toggleAllCheckboxes(this, 'bulk_tweets_form')"></th>
-            <th>Handle</th>
-            <th style="width: 180px;">Last Fetch</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for h in tweets %}
-          <tr>
-            <td style="text-align: center;"><input type="checkbox" name="handles" value="{{ h.handle if h is mapping else h }}" form="bulk_tweets_form"></td>
-            <td style="font-family: monospace; font-size: var(--sapFontSmallSize);">@{{ h.handle if h is mapping else h }}</td>
-            <td style="font-size: var(--sapFontSmallSize); color: var(--sapNeutralColor);">
-              {% if h is mapping and h.last_fetch_date %}
-                {{ h.last_fetch_date }}
-              {% else %}
-                <span style="font-style: italic;">Never</span>
-              {% endif %}
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-  {% endif %}
-
-  <div class="sapCard-content">
-    {% if not tweets or tweets|length == 0 %}
-    <div style="text-align: center; color: var(--sapNeutralColor); padding: var(--sapSpacingL) 0;">
-      <div style="font-size: 2rem; margin-bottom: var(--sapSpacingS);">🐦</div>
-      <p style="margin: 0;">No Twitter accounts yet</p>
-    </div>
-    {% endif %}
-
-    <form method="post" action="{{ url_for('add_tweet_account_route', profile_id=profile.id) }}">
-      <div class="sapForm-row">
-        <input class="sapForm-input" name="handle" placeholder="e.g., GOSI_SA" required>
-        <button type="submit" class="sapBtn sapBtn-accept">Add Account</button>
-      </div>
-    </form>
-
-    <form id="bulk_tweets_form" method="post" action="{{ url_for('bulk_delete_tweet_accounts', profile_id=profile.id) }}" style="display:none;"></form>
-  </div>
-</div>
-
-<!-- URL Sources -->
-<div class="sapCard">
-  <div class="sapCard-header">
-    <span>🌐 URL Sources</span>
-    <span style="color: var(--sapNeutralColor); font-weight: 400; font-size: var(--sapFontSmallSize);">
-      Incremental Fetching Enabled
-    </span>
-  </div>
-  
-  <!-- Info Banner -->
-  <div style="padding: var(--sapSpacingM); background: #e5f5ff; border-bottom: 1px solid var(--sapGroup_ContentBorderColor);">
-    <div style="display: flex; align-items: start; gap: var(--sapSpacingS);">
-      <span style="font-size: 1.2rem;">ℹ️</span>
-      <div style="flex: 1; font-size: var(--sapFontSmallSize); line-height: 1.5;">
-        <strong>Incremental Fetching:</strong> First run fetches full max lookback window. Subsequent runs fetch only new items since last successful run (delta mode). 
-        <strong>Max Lookback</strong> acts as safety cap to prevent excessive backdating.
-      </div>
-    </div>
-  </div>
-  
-  {% if urls and urls|length > 0 %}
-  <div class="sapTable-toolbar">
-    <button type="submit" form="bulk_urls_form" class="sapBtn sapBtn-reject sapBtn-sm">Delete Selected</button>
-  </div>
-  
-  <div class="sapCard-content" style="padding: 0;">
-    <div style="overflow-x: auto;">
-      <table class="sapTable-compact">
-        <thead>
-          <tr>
-            <th style="width: 40px;"><input type="checkbox" onclick="toggleAllCheckboxes(this, 'bulk_urls_form')"></th>
-            <th>URL</th>
-            <th style="width: 120px;">Last Fetch</th>
-            <th style="width: 200px;">Sample Link</th>
-            <th style="width: 150px;">Read More Label</th>
-            <th style="width: 120px;">Crawl Type</th>
-            <th style="width: 180px;">Recursive Settings</th>
-            <th style="width: 150px;">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for s in urls %}
-          <tr>
-            <td style="text-align: center;"><input type="checkbox" name="urls" value="{{ s.url }}" form="bulk_urls_form"></td>
-            <td style="font-family: monospace; font-size: var(--sapFontSmallSize);">{{ s.url }}</td>
-            <td style="font-size: var(--sapFontSmallSize); text-align: center;">
-              {% if s.last_successful_fetch_relative %}
-                <span title="{{ s.last_successful_fetch_formatted }}">{{ s.last_successful_fetch_relative }}</span>
-              {% else %}
-                <span style="color: var(--sapNeutralColor);">Never</span>
-              {% endif %}
-            </td>
-            <td style="font-family: monospace; font-size: var(--sapFontSmallSize);">
-              {% if s.sample_link %}
-                <a href="{{ s.sample_link }}" target="_blank" style="color: var(--sapBrandColor); text-decoration: none;">{{ s.sample_link[:50] }}{% if s.sample_link|length > 50 %}...{% endif %}</a>
-              {% else %}
-                <span style="color: var(--sapNeutralColor);">—</span>
-              {% endif %}
-            </td>
-            <td style="font-size: var(--sapFontSmallSize);">
-              {% if s.read_more_label %}
-                {{ s.read_more_label }}
-              {% else %}
-                <span style="color: var(--sapNeutralColor);">—</span>
-              {% endif %}
-            </td>
-            <td>
-              <select class="sapForm-select" disabled style="padding: 0.25rem 0.5rem; font-size: var(--sapFontSmallSize); width: 100%;">
-                <option {% if s.mode == 'auto' %}selected{% endif %}>Auto</option>
-                <option {% if s.mode == 'force_static' %}selected{% endif %}>Static</option>
-                <option {% if s.mode == 'force_dynamic' %}selected{% endif %}>Dynamic</option>
-                <option {% if s.mode == 'recursive' %}selected{% endif %}>Recursive</option>
-              </select>
-            </td>
-            <td style="font-size: var(--sapFontSmallSize);">
-              {% if s.mode == 'recursive' %}
-                <strong>Depth:</strong> {{ s.max_depth or 2 }} | <strong>Max:</strong> {{ s.max_results or 20 }}<br>
-                {% if s.path_filter %}
-                <strong>Filter:</strong> {{ s.path_filter }}<br>
-                {% endif %}
-                {% if s.allowed_domains %}
-                <strong>Domains:</strong> {{ s.allowed_domains.replace('\n', ', ')[:60] }}{% if s.allowed_domains|length > 60 %}...{% endif %}
-                {% endif %}
-              {% else %}
-                <span style="color: var(--sapNeutralColor);">—</span>
-              {% endif %}
-            </td>
-            <td>
-              <button type="button" class="sapBtn sapBtn-sm" onclick="toggleEditRow('edit-{{ loop.index }}')">Edit</button>
-              {% if s.last_successful_fetch %}
-              <form method="post" action="{{ url_for('reset_url_source_fetch', profile_id=profile.id) }}" style="display: inline;" onsubmit="return confirm('Reset to FULL mode?\n\nThis will clear the last fetch timestamp and force the next run to fetch the full max lookback window instead of delta.');">
-                <input type="hidden" name="url" value="{{ s.url }}">
-                <button type="submit" class="sapBtn sapBtn-sm" title="Reset to FULL mode: Clear timestamp and force full lookback on next run">🔄 Reset</button>
-              </form>
-              {% endif %}
-              <form method="post" action="{{ url_for('delete_url_source_route', profile_id=profile.id) }}" style="display: inline;">
-                <input type="hidden" name="url" value="{{ s.url }}">
-                <button type="submit" class="sapBtn sapBtn-reject sapBtn-sm">Delete</button>
-              </form>
-            </td>
-          </tr>
-          <tr id="edit-{{ loop.index }}" style="display: none;">
-            <td colspan="9" style="padding: var(--sapSpacingM); background: var(--sapNeutralBackground);">
-              <form method="post" action="{{ url_for('update_url_source_route', profile_id=profile.id) }}">
-                <input type="hidden" name="url" value="{{ s.url }}">
-
-                <h4 style="margin: 0 0 var(--sapSpacingM) 0; color: var(--sapBrandColor);">Edit URL Source</h4>
-
-                <div style="margin-bottom: var(--sapSpacingM);">
-                  <label class="sapForm-label">URL *</label>
-                  <input class="sapForm-input" name="new_url" value="{{ s.url }}" placeholder="https://..." style="width:100%" required>
-                </div>
-
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--sapSpacingM); margin-bottom: var(--sapSpacingM);">
-                  <div>
-                    <label class="sapForm-label">Sample Link (optional)</label>
-                    <input class="sapForm-input" name="sample_link" value="{{ s.sample_link or '' }}" placeholder="https://example.gov/news/12345">
-                  </div>
-                  <div>
-                    <label class="sapForm-label">Read More Label (optional)</label>
-                    <input class="sapForm-input" name="read_more_label" value="{{ s.read_more_label or '' }}" placeholder="e.g., اقرأ المزيد">
-                  </div>
-                  <div>
-                    <label class="sapForm-label">Crawl Type</label>
-                    <select class="sapForm-select" name="mode">
-                      <option value="auto" {% if s.mode == 'auto' %}selected{% endif %}>Auto-detect</option>
-                      <option value="force_static" {% if s.mode == 'force_static' %}selected{% endif %}>Static HTML</option>
-                      <option value="force_dynamic" {% if s.mode == 'force_dynamic' %}selected{% endif %}>Dynamic</option>
-                      <option value="recursive" {% if s.mode == 'recursive' %}selected{% endif %}>Recursive</option>
-                    </select>
-                  </div>
-                </div>
-                <div style="margin-bottom: var(--sapSpacingM);">
-                  <label class="sapForm-label">URL Date Template (optional)</label>
-                  <input class="sapForm-input" name="url_date_template" value="{{ s.url_date_template or '' }}" placeholder="https://example.com/{DD}.{MM}.{YYYY}" style="width: 100%;">
-                  <span class="sapForm-help">For sites where each day has its own URL. Leave blank for normal scraping. Use {DD}, {MM}, {YYYY} as date placeholders.</span>
-                </div>
-
-                <hr style="margin: var(--sapSpacingL) 0; border: 0; border-top: 1px solid var(--sapGroup_ContentBorderColor);">
-                <h4 style="margin-bottom: var(--sapSpacingM); color: var(--sapBrandColor);">Recursive Crawl Settings</h4>
-
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--sapSpacingM); margin-bottom: var(--sapSpacingM);">
-                  <div>
-                    <label class="sapForm-label">Max Depth (1-5)</label>
-                    <input class="sapForm-input" type="number" name="max_depth" value="{{ s.max_depth or 3 }}" min="1" max="5">
-                  </div>
-                  <div>
-                    <label class="sapForm-label">Max Results (1-100)</label>
-                    <input class="sapForm-input" type="number" name="max_results" value="{{ s.max_results or 20 }}" min="1" max="100">
-                  </div>
-                </div>
-
-                <div style="margin-bottom: var(--sapSpacingM);">
-                  <label class="sapForm-label">Allowed Domains (one per line)</label>
-                  <textarea class="sapForm-textarea" name="allowed_domains" rows="3">{{ s.allowed_domains or '' }}</textarea>
-                  <span class="sapForm-help">Only follow links to these domains</span>
-                </div>
-
-                <div style="margin-bottom: var(--sapSpacingM);">
-                  <label class="sapForm-label">Path Filter (optional)</label>
-                  <input class="sapForm-input" name="path_filter" value="{{ s.path_filter or '' }}" placeholder="e.g., /novedades/">
-                  <span class="sapForm-help">Only follow links with this in path</span>
-                </div>
-
-                <div style="display: flex; gap: var(--sapSpacingS);">
-                  <button type="submit" class="sapBtn sapBtn-emphasized">Save Changes</button>
-                  <button type="button" class="sapBtn" onclick="toggleEditRow('edit-{{ loop.index }}')">Cancel</button>
-                </div>
-              </form>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-  {% endif %}
-  
-  <div class="sapCard-content">
-    {% if not urls or urls|length == 0 %}
-    <div style="text-align: center; color: var(--sapNeutralColor); padding: var(--sapSpacingL) 0;">
-      <div style="font-size: 2rem; margin-bottom: var(--sapSpacingS);">🌐</div>
-      <p style="margin: 0;">No URL sources yet</p>
-    </div>
-    {% endif %}
-    
-    <form method="post" action="{{ url_for('add_url_source_route', profile_id=profile.id) }}">
-      <div class="sapForm-group">
-        <label class="sapForm-label">URL</label>
-        <input class="sapForm-input" name="url" placeholder="https://example.gov/news" required>
-      </div>
-      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--sapSpacingM);">
-        <div class="sapForm-group">
-          <label class="sapForm-label">Sample Link (optional)</label>
-          <input class="sapForm-input" name="sample_link" placeholder="https://example.gov/news/12345">
-        </div>
-        <div class="sapForm-group">
-          <label class="sapForm-label">Read More Label (optional)</label>
-          <input class="sapForm-input" name="read_more_label" placeholder="e.g., اقرأ المزيد">
-        </div>
-        <div class="sapForm-group">
-          <label class="sapForm-label">Crawl Type</label>
-          <select class="sapForm-select" name="mode" id="addUrlMode" onchange="toggleRecursiveFields('add')">
-            <option value="auto" selected>Auto-detect</option>
-            <option value="force_static">Static HTML</option>
-            <option value="force_dynamic">Dynamic</option>
-            <option value="recursive">Recursive</option>
-          </select>
-        </div>
-      </div>
-      <div class="sapForm-group" style="margin-top: var(--sapSpacingM);">
-        <label class="sapForm-label">URL Date Template (optional)</label>
-        <input class="sapForm-input" name="url_date_template" placeholder="https://example.com/{DD}.{MM}.{YYYY}" style="width: 100%;">
-        <span class="sapForm-help">For sites where each day has its own URL. Leave blank for normal scraping. Use {DD}, {MM}, {YYYY} as date placeholders.</span>
-      </div>
-      
-      <!-- Recursive Mode Fields (hidden by default) -->
-      <div id="addRecursiveFields" style="display: none;">
-        <hr style="margin: var(--sapSpacingL) 0; border: 0; border-top: 1px solid var(--sapGroup_ContentBorderColor);">
-        <h4 style="margin-bottom: var(--sapSpacingM); color: var(--sapBrandColor);">Recursive Crawl Settings</h4>
-        
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--sapSpacingM);">
-          <div class="sapForm-group">
-            <label class="sapForm-label">Max Depth</label>
-            <input class="sapForm-input" type="number" name="max_depth" value="3" min="1" max="5">
-            <span class="sapForm-help">How many levels to follow links (1-5)</span>
-          </div>
-          <div class="sapForm-group">
-            <label class="sapForm-label">Max Results</label>
-            <input class="sapForm-input" type="number" name="max_results" value="20" min="1" max="100">
-            <span class="sapForm-help">Stop after finding N articles</span>
-          </div>
-        </div>
-        
-        <div class="sapForm-group">
-          <label class="sapForm-label">Allowed Domains (one per line)</label>
-          <textarea class="sapForm-textarea" name="allowed_domains" rows="3" placeholder="sede.agenciatributaria.gob.es&#10;www2.agenciatributaria.gob.es"></textarea>
-          <span class="sapForm-help">Only follow links to these domains</span>
-        </div>
-        
-        <div class="sapForm-group">
-          <label class="sapForm-label">Path Filter (optional)</label>
-          <input class="sapForm-input" name="path_filter" placeholder="e.g., /novedades/ or news">
-          <span class="sapForm-help">Only follow links containing this text in the path</span>
-        </div>
-      </div>
-      <button type="submit" class="sapBtn sapBtn-accept" style="width: 100%;">Add URL Source</button>
-    </form>
-    
-    <form id="bulk_urls_form" method="post" action="{{ url_for('bulk_delete_url_sources', profile_id=profile.id) }}" style="display:none;"></form>
-  </div>
-</div>
-
-<!-- Email Receivers -->
-<div class="sapCard">
-  <div class="sapCard-header">
-    <span>📧 Email Receivers</span>
-    <span style="color: var(--sapNeutralColor); font-weight: 400; font-size: var(--sapFontSmallSize);">
-      {{ receivers|length if receivers else 0 }} receiver{% if (receivers|length if receivers else 0) != 1 %}s{% endif %}
-    </span>
-  </div>
-  
-  <div class="sapCard-content">
-    <form method="post" action="{{ url_for('add_email_receiver_route', profile_id=profile.id) }}">
-      <div class="sapForm-row">
-        <input class="sapForm-input" name="email" placeholder="user@example.com" type="email" required>
-        <button type="submit" class="sapBtn sapBtn-accept">Add Email</button>
-      </div>
-    </form>
-    
-    {% if receivers_with_lang and receivers_with_lang|length > 0 %}
-    <div style="margin-top: var(--sapSpacingM);">
-      <div class="sapTable-toolbar">
-        <button type="submit" form="bulk_emails_form" class="sapBtn sapBtn-reject sapBtn-sm">Delete Selected</button>
-      </div>
-      
-      <div style="overflow-x: auto;">
-        <table class="sapTable-compact">
-          <thead>
-            <tr>
-              <th style="width: 40px;"><input type="checkbox" onclick="toggleAllCheckboxes(this, 'bulk_emails_form')"></th>
-              <th>Email</th>
-              <th style="width: 100px;">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for receiver in receivers_with_lang %}
-            <tr>
-              <td style="text-align: center;"><input type="checkbox" name="emails" value="{{ receiver.email }}" form="bulk_emails_form"></td>
-              <td style="font-family: monospace; font-size: var(--sapFontSmallSize);">{{ receiver.email }}</td>
-
-              <td>
-                <form method="post" action="{{ url_for('delete_email_receiver_route', profile_id=profile.id) }}" style="display: inline;">
-                  <input type="hidden" name="email" value="{{ receiver.email }}">
-                  <button type="submit" class="sapBtn sapBtn-reject sapBtn-sm">Delete</button>
-                </form>
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      
-      <form id="bulk_emails_form" method="post" action="{{ url_for('bulk_delete_email_receivers', profile_id=profile.id) }}" style="display:none;"></form>
-      {% if ans_available %}
-      <div style="margin-top: var(--sapSpacingS); display: flex; align-items: center; gap: var(--sapSpacingS);">
-        <span class="sapBadge sapBadge-positive" style="font-size: 11px;">ANS Bound ✓</span>
-        <form method="post" action="#">
-          <button type="submit" class="sapBtn sapBtn-default sapBtn-sm">↺ Re-provision all</button>
+        <button type="submit" class="btn-add">Add Feed</button>
+      </form>
+      {% for u in rss %}
+      <div class="row-item">
+        <span class="mono">{{ u.url }}</span>
+        {% if u.publisher_name %}<span class="row-pub">{{ u.publisher_name }}</span>{% endif %}
+        <span class="row-date">{% if u.last_fetch_date %}{{ u.last_fetch_date }}{% else %}Never{% endif %}</span>
+        <form method="post" action="{{ url_for('delete_rss', profile_id=profile.id) }}">
+          <input type="hidden" name="url" value="{{ u.url }}">
+          <button type="submit" class="btn-del" onclick="return confirm('Remove this feed?')">&#10005; Remove</button>
         </form>
       </div>
       {% else %}
-      <div style="margin-top: var(--sapSpacingS); display: flex; align-items: center; gap: var(--sapSpacingS);">
-        <span class="sapBadge" style="font-size: 11px; opacity: 0.5;">ANS Not Bound</span>
-        <button type="button" class="sapBtn sapBtn-default sapBtn-sm" disabled title="ANS not configured — available on BTP deployment" style="opacity: 0.4; cursor: not-allowed;">↺ Re-provision all</button>
+      <div class="empty-note">No RSS feeds yet</div>
+      {% endfor %}
+    </div>
+
+    <!-- Twitter editor -->
+    <div class="cfg-editor hidden" id="ed-tw">
+      <div class="cfg-editor-title">Manage Twitter Accounts</div>
+      {% if twitter_error_flag %}
+      <div class="info-banner" style="background:#ffeef0;border-color:#f5c0c0;">
+        <strong style="color:#bb0000;">Twitter API Error:</strong> {{ twitter_error_flag }}
+        <form method="post" action="{{ url_for('clear_twitter_error_flag_route', profile_id=profile.id) }}" style="margin-top:6px;">
+          <button type="submit" class="btn-sm">Clear Error &amp; Retry</button>
+        </form>
       </div>
       {% endif %}
-    </div>
-    {% endif %}
-  </div>
-</div>
-
-<!-- Monitor Notifications -->
-<div class="sapCard">
-  <div class="sapCard-header">
-    <span>📧 Monitor Notifications</span>
-    <span style="color: var(--sapNeutralColor); font-weight: 400; font-size: var(--sapFontSmallSize);">
-      Law-to-Specification Integration
-    </span>
-  </div>
-  <div class="sapCard-content">
-    <div style="padding: var(--sapSpacingM); background: var(--sapNeutralBackground); border-radius: 0.25rem; margin-bottom: var(--sapSpacingM);">
-      <label style="display: flex; align-items: center; gap: var(--sapSpacingS); cursor: pointer;">
-        <input type="checkbox" id="monitorToggle" {% if monitor_enabled %}checked{% endif %} 
-               onchange="toggleMonitorUpdates({{ profile.id }}, this.checked)">
-        <span style="font-weight: 600;">Enable Law-to-Specification email notifications</span>
-      </label>
-    </div>
-    
-    <div class="sapForm-help" style="margin-top: var(--sapSpacingS);">
-      <p style="margin: 0 0 var(--sapSpacingS) 0;">
-        <strong>How it works:</strong>
-      </p>
-      <ol style="margin: 0; padding-left: var(--sapSpacingL); line-height: 1.6;">
-        <li>Law-to-Specification sends "Monitor updates" emails to the first email receiver above</li>
-        <li>That person forwards the email to Legal Eagle's Gmail inbox</li>
-        <li>Legal Eagle scans the inbox and includes changes in the daily digest</li>
-        <li>Changes appear in a separate "Website Change Alerts" section</li>
-      </ol>
-      <p style="margin: var(--sapSpacingS) 0 0 0; color: var(--sapCriticalColor);">
-        <strong>Note:</strong> Requires at least one email receiver configured above.
-      </p>
-    </div>
-  </div>
-</div>
-
-<!-- Glossary -->
-<div class="sapCard">
-  <div class="sapCard-header">
-    <span>📖 Glossary</span>
-    <span style="color: var(--sapNeutralColor); font-weight: 400; font-size: var(--sapFontSmallSize);">
-      {{ glossary.terms|length if glossary and glossary.terms else 0 }} term{% if (glossary.terms|length if glossary and glossary.terms else 0) != 1 %}s{% endif %}
-    </span>
-  </div>
-  
-  {% if glossary and glossary.terms and glossary.terms|length > 0 %}
-  <div class="sapTable-toolbar">
-    <button type="submit" form="bulk_terms_form" class="sapBtn sapBtn-reject sapBtn-sm">Delete Selected</button>
-  </div>
-  
-  <div class="sapCard-content">
-    {% for t in glossary.terms %}
-    <div class="sapTermItem">
-      <div style="display: flex; align-items: center; gap: var(--sapSpacingS);">
-        <input type="checkbox" name="term_ids" value="{{ t.id }}" form="bulk_terms_form">
-        <span>{{ t.term }}</span>
+      <form method="post" action="{{ url_for('add_tweet_account_route', profile_id=profile.id) }}" class="add-form">
+        <div><label>Handle *</label><input name="handle" placeholder="e.g. GOSI_SA" required></div>
+        <button type="submit" class="btn-add">Add Account</button>
+      </form>
+      {% for h in tweets %}
+      <div class="row-item">
+        <span class="mono">@{{ h.handle }}</span>
+        <span class="row-date">{% if h.last_fetch_date %}{{ h.last_fetch_date }}{% else %}Never{% endif %}</span>
+        <form method="post" action="{{ url_for('delete_tweet_account_route', profile_id=profile.id) }}">
+          <input type="hidden" name="handle" value="{{ h.handle }}">
+          <button type="submit" class="btn-del" onclick="return confirm('Remove @{{ h.handle }}?')">&#10005; Remove</button>
+        </form>
       </div>
+      {% else %}
+      <div class="empty-note">No Twitter accounts yet</div>
+      {% endfor %}
     </div>
-    {% endfor %}
-    
-    <form id="bulk_terms_form" method="post" action="{{ url_for('bulk_delete_glossary_terms_route', profile_id=profile.id) }}" style="display:none;"></form>
-  </div>
-  {% else %}
-  <div class="sapCard-content">
-    <div style="text-align: center; color: var(--sapNeutralColor); padding: var(--sapSpacingL) 0;">
-      <div style="font-size: 2rem; margin-bottom: var(--sapSpacingS);">📖</div>
-      <p style="margin: 0;">No glossary terms yet</p>
-    </div>
-  </div>
-  {% endif %}
-  
-  <div class="sapCard-content">
-    <hr style="margin: var(--sapSpacingL) 0; border: 0; border-top: 1px solid var(--sapGroup_ContentBorderColor);">
-    
-    <h3 style="font-size: var(--sapFontLargeSize); margin-bottom: var(--sapSpacingM);">Add Term</h3>
-    <form method="post" action="{{ url_for('add_glossary_term_simple_route', profile_id=profile.id) }}">
-      <div class="sapForm-row">
-        <input class="sapForm-input" name="term" placeholder="e.g., Saudization (Nitaqat)" required>
-        <button type="submit" class="sapBtn sapBtn-accept">Add</button>
+
+    <!-- URL sources editor (full crawl settings preserved) -->
+    <div class="cfg-editor hidden" id="ed-url">
+      <div class="cfg-editor-title">Manage URL Sources</div>
+      <div class="info-banner">
+        <strong>Incremental fetching:</strong> first run fetches the full max-lookback window; later runs fetch only new items (delta). <strong>Max Lookback</strong> caps backdating.
       </div>
-    </form>
-    
-    <div style="margin-top: var(--sapSpacingL);">
-      <h3 style="font-size: var(--sapFontLargeSize); margin-bottom: var(--sapSpacingM);">Bulk Add</h3>
-      <form method="post" action="{{ url_for('add_glossary_term_bulk_route', profile_id=profile.id) }}">
-        <div class="sapForm-group">
-          <label class="sapForm-label">One term per line</label>
-          <textarea class="sapForm-textarea" name="bulk_terms" rows="5" placeholder="Labor contracts&#10;iqama and visa&#10;dependent workers (المرافقين/المرافقات)&#10;expatriate labor policies&#10;Wage Protection" style="font-family: monospace; font-size: var(--sapFontSmallSize);"></textarea>
+
+      <!-- Add URL source -->
+      <form method="post" action="{{ url_for('add_url_source_route', profile_id=profile.id) }}">
+        <div class="url-grid-3">
+          <div><label class="url-fieldlabel">URL *</label><input class="cfg-field" style="width:100%" name="url" placeholder="https://example.gov/news" required></div>
+          <div><label class="url-fieldlabel">Sample Link (optional)</label><input class="cfg-field" style="width:100%" name="sample_link" placeholder="https://example.gov/news/12345"></div>
+          <div><label class="url-fieldlabel">Read More Label (optional)</label><input class="cfg-field" style="width:100%" name="read_more_label" placeholder="e.g. اقرأ المزيد"></div>
         </div>
-        <button type="submit" class="sapBtn sapBtn-emphasized" style="width: 100%;">Add All Terms</button>
+        <div class="url-grid-2">
+          <div><label class="url-fieldlabel">Crawl Type</label>
+            <select class="cfg-field" style="width:100%" name="mode" id="addUrlMode" onchange="toggleRecursiveFields('add')">
+              <option value="auto" selected>Auto-detect</option>
+              <option value="force_static">Static HTML</option>
+              <option value="force_dynamic">Dynamic</option>
+              <option value="recursive">Recursive</option>
+            </select>
+          </div>
+          <div><label class="url-fieldlabel">URL Date Template (optional)</label><input class="cfg-field" style="width:100%" name="url_date_template" placeholder="https://example.com/{DD}.{MM}.{YYYY}"></div>
+        </div>
+        <div id="addRecursiveFields" style="display:none;">
+          <div class="url-grid-2">
+            <div><label class="url-fieldlabel">Max Depth (1-5)</label><input class="cfg-field" style="width:100%" type="number" name="max_depth" value="3" min="1" max="5"></div>
+            <div><label class="url-fieldlabel">Max Results (1-100)</label><input class="cfg-field" style="width:100%" type="number" name="max_results" value="20" min="1" max="100"></div>
+          </div>
+          <div style="margin-bottom:12px;"><label class="url-fieldlabel">Allowed Domains (one per line)</label><textarea class="cfg-field" name="allowed_domains" rows="3"></textarea></div>
+          <div style="margin-bottom:12px;"><label class="url-fieldlabel">Path Filter (optional)</label><input class="cfg-field" style="width:100%" name="path_filter" placeholder="e.g. /novedades/"></div>
+        </div>
+        <button type="submit" class="btn-add">Add URL Source</button>
+      </form>
+
+      <div style="margin-top:14px;">
+      {% for s in urls %}
+      <div class="row-item">
+        <span class="mono">{{ s.url }}</span>
+        <span class="row-pub">{{ (s.mode or 'auto')|replace('force_','')|capitalize }}{% if s.mode == 'recursive' %} · d{{ s.max_depth or 2 }}{% endif %}</span>
+        <span class="row-date">{% if s.last_successful_fetch_relative %}{{ s.last_successful_fetch_relative }}{% else %}Never{% endif %}</span>
+        <button type="button" class="btn-sm" onclick="toggleEditRow('urledit-{{ loop.index }}')">Edit</button>
+        {% if s.last_successful_fetch %}
+        <form method="post" action="{{ url_for('reset_url_source_fetch', profile_id=profile.id) }}" onsubmit="return confirm('Reset to FULL mode? Clears last-fetch timestamp so the next run fetches the full lookback window.');">
+          <input type="hidden" name="url" value="{{ s.url }}">
+          <button type="submit" class="btn-sm" title="Reset to full lookback">&#128260; Reset</button>
+        </form>
+        {% endif %}
+        <form method="post" action="{{ url_for('delete_url_source_route', profile_id=profile.id) }}">
+          <input type="hidden" name="url" value="{{ s.url }}">
+          <button type="submit" class="btn-del" onclick="return confirm('Delete this URL source?')">&#10005;</button>
+        </form>
+      </div>
+      <div id="urledit-{{ loop.index }}" class="url-edit-panel" style="display:none;">
+        <form method="post" action="{{ url_for('update_url_source_route', profile_id=profile.id) }}">
+          <input type="hidden" name="url" value="{{ s.url }}">
+          <div style="margin-bottom:12px;"><label class="url-fieldlabel">URL *</label><input class="cfg-field" style="width:100%" name="new_url" value="{{ s.url }}" required></div>
+          <div class="url-grid-3">
+            <div><label class="url-fieldlabel">Sample Link</label><input class="cfg-field" style="width:100%" name="sample_link" value="{{ s.sample_link or '' }}"></div>
+            <div><label class="url-fieldlabel">Read More Label</label><input class="cfg-field" style="width:100%" name="read_more_label" value="{{ s.read_more_label or '' }}"></div>
+            <div><label class="url-fieldlabel">Crawl Type</label>
+              <select class="cfg-field" style="width:100%" name="mode">
+                <option value="auto" {% if s.mode == 'auto' %}selected{% endif %}>Auto-detect</option>
+                <option value="force_static" {% if s.mode == 'force_static' %}selected{% endif %}>Static HTML</option>
+                <option value="force_dynamic" {% if s.mode == 'force_dynamic' %}selected{% endif %}>Dynamic</option>
+                <option value="recursive" {% if s.mode == 'recursive' %}selected{% endif %}>Recursive</option>
+              </select>
+            </div>
+          </div>
+          <div style="margin-bottom:12px;"><label class="url-fieldlabel">URL Date Template</label><input class="cfg-field" style="width:100%" name="url_date_template" value="{{ s.url_date_template or '' }}" placeholder="https://example.com/{DD}.{MM}.{YYYY}"></div>
+          <div class="url-grid-2">
+            <div><label class="url-fieldlabel">Max Depth (1-5)</label><input class="cfg-field" style="width:100%" type="number" name="max_depth" value="{{ s.max_depth or 3 }}" min="1" max="5"></div>
+            <div><label class="url-fieldlabel">Max Results (1-100)</label><input class="cfg-field" style="width:100%" type="number" name="max_results" value="{{ s.max_results or 20 }}" min="1" max="100"></div>
+          </div>
+          <div style="margin-bottom:12px;"><label class="url-fieldlabel">Allowed Domains (one per line)</label><textarea class="cfg-field" name="allowed_domains" rows="3">{{ s.allowed_domains or '' }}</textarea></div>
+          <div style="margin-bottom:12px;"><label class="url-fieldlabel">Path Filter</label><input class="cfg-field" style="width:100%" name="path_filter" value="{{ s.path_filter or '' }}" placeholder="e.g. /novedades/"></div>
+          <div style="display:flex;gap:8px;">
+            <button type="submit" class="btn-save">Save Changes</button>
+            <button type="button" class="btn-sm" onclick="toggleEditRow('urledit-{{ loop.index }}')">Cancel</button>
+          </div>
+        </form>
+      </div>
+      {% else %}
+      <div class="empty-note">No URL sources yet</div>
+      {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ OUTPUT ══ -->
+  <div class="cfg-section" id="sec-output">
+    <div class="cfg-section-title">Output</div>
+    <div class="out-row">
+      <div><div class="out-name">&#9993; Email Receivers</div><div class="out-desc">{{ receivers_with_lang|length if receivers_with_lang else 0 }} recipient{{ '' if (receivers_with_lang|length if receivers_with_lang else 0) == 1 else 's' }} · digest sent after each run</div></div>
+      <button class="btn-manage" style="width:auto;padding:6px 16px" onclick="toggleEditor('ed-email')">Manage</button>
+    </div>
+    <div class="cfg-editor hidden" id="ed-email">
+      <form method="post" action="{{ url_for('add_email_receiver_route', profile_id=profile.id) }}" class="add-form">
+        <div><label>Email *</label><input type="email" name="email" placeholder="user@example.com" required style="min-width:240px"></div>
+        <button type="submit" class="btn-add">Add Email</button>
+      </form>
+      {% for r in receivers_with_lang %}
+      <div class="row-item">
+        <span class="mono">{{ r.email }}</span>
+        {% if ans_available %}<span class="pill-ok">ANS Bound &#10003;</span>{% endif %}
+        <form method="post" action="{{ url_for('delete_email_receiver_route', profile_id=profile.id) }}">
+          <input type="hidden" name="email" value="{{ r.email }}">
+          <button type="submit" class="btn-del" onclick="return confirm('Remove {{ r.email }}?')">&#10005; Remove</button>
+        </form>
+      </div>
+      {% else %}
+      <div class="empty-note">No email receivers yet</div>
+      {% endfor %}
+    </div>
+
+    <!-- Monitor / Law-to-Spec emails — hidden for now (kept for later re-enable)
+    <div class="out-row">
+      <div><div class="out-name">Monitor / Law-to-Spec emails</div><div class="out-desc">Include forwarded L2S "monitor update" alerts in the digest</div></div>
+      <div class="toggle {% if monitor_enabled %}on{% endif %}" onclick="toggleMonitorUpdates({{ profile.id }}, !this.classList.contains('on'))"></div>
+    </div>
+    -->
+  </div>
+
+  <!-- ══ KNOWLEDGE ══ -->
+  <div class="cfg-section" id="sec-knowledge">
+    <div class="cfg-section-title">Knowledge</div>
+
+    <div style="font-size:12px;font-weight:600;color:#32363a;margin-bottom:8px">Glossary <span style="color:#6a6d70;font-weight:400">· {{ glossary.terms|length if glossary and glossary.terms else 0 }} terms</span></div>
+    <div class="gloss-chips">
+      {% for t in glossary.terms if glossary and glossary.terms %}
+      <span class="gloss-chip">{{ t.term }}
+        <form method="post" action="{{ url_for('delete_glossary_term_route', profile_id=profile.id) }}">
+          <input type="hidden" name="term_id" value="{{ t.id }}">
+          <button type="submit" title="Remove">&#10005;</button>
+        </form>
+      </span>
+      {% else %}
+      <span class="empty-note" style="padding:4px 0">No glossary terms yet</span>
+      {% endfor %}
+    </div>
+    <form method="post" action="{{ url_for('add_glossary_term_simple_route', profile_id=profile.id) }}" class="add-form">
+      <div><label>Add term</label><input name="term" placeholder="e.g. termination notice" required style="min-width:240px"></div>
+      <button type="submit" class="btn-add">Add</button>
+      <button type="button" class="btn-sm" style="align-self:flex-end" onclick="toggleEditor('gloss-bulk')">Bulk add…</button>
+    </form>
+    <div class="cfg-editor hidden" id="gloss-bulk">
+      <form method="post" action="{{ url_for('add_glossary_term_bulk_route', profile_id=profile.id) }}">
+        <label class="url-fieldlabel">One term per line</label>
+        <textarea class="cfg-field" name="bulk_terms" rows="5" placeholder="Labor contracts&#10;iqama and visa&#10;Wage Protection"></textarea>
+        <div style="margin-top:10px;"><button type="submit" class="btn-add">Add All Terms</button></div>
       </form>
     </div>
-  </div>
-</div>
 
-<script>
-function toggleAllCheckboxes(masterCheckbox, formId) {
-  const form = document.getElementById(formId);
-  if (!form) return;
-  
-  const checkboxes = form.querySelectorAll('input[type="checkbox"]');
-  checkboxes.forEach(function(cb) {
-    cb.checked = masterCheckbox.checked;
-  });
-}
-
-function toggleMonitorUpdates(profileId, enabled) {
-  const form = document.createElement('form');
-  form.method = 'POST';
-  form.action = '/admin/profiles/' + profileId + '/monitor-toggle';
-  
-  const input = document.createElement('input');
-  input.type = 'hidden';
-  input.name = 'enabled';
-  input.value = enabled ? 'true' : 'false';
-  
-  form.appendChild(input);
-  document.body.appendChild(form);
-  form.submit();
-}
-
-function toggleRecursiveFields(prefix) {
-  console.log('toggleRecursiveFields called with prefix:', prefix);
-  const modeSelect = document.getElementById(prefix + 'UrlMode');
-  const recursiveFields = document.getElementById(prefix + 'RecursiveFields');
-  
-  console.log('modeSelect:', modeSelect);
-  console.log('recursiveFields:', recursiveFields);
-  
-  if (modeSelect && recursiveFields) {
-    console.log('modeSelect.value:', modeSelect.value);
-    if (modeSelect.value === 'recursive') {
-      console.log('Setting display to block');
-      recursiveFields.style.display = 'block';
-    } else {
-      console.log('Setting display to none');
-      recursiveFields.style.display = 'none';
-    }
-  } else {
-    console.error('Elements not found! modeSelect:', modeSelect, 'recursiveFields:', recursiveFields);
-  }
-}
-
-function toggleEditRow(rowId) {
-  const row = document.getElementById(rowId);
-  if (row) {
-    if (row.style.display === 'none') {
-      row.style.display = 'table-row';
-    } else {
-      row.style.display = 'none';
-    }
-  }
-}
-
-function openAuthModal(id, name, aliases) {
-  var modal = document.getElementById('auth-modal');
-  document.getElementById('auth-modal-title').textContent = id ? 'Edit Authority' : 'Add Authority';
-  document.getElementById('auth-modal-form').action = id
-    ? '/admin/profiles/{{ selected_profile.id }}/authorities/' + id + '/update'
-    : '/admin/profiles/{{ selected_profile.id }}/authorities/add';
-  document.getElementById('auth-name').value = name || '';
-  document.getElementById('auth-aliases').value = aliases || '';
-  modal.style.display = 'flex';
-}
-function closeAuthModal() { document.getElementById('auth-modal').style.display = 'none'; }
-</script>
-
-<!-- Authorities Section -->
-<div class="sapCard" style="margin-top:20px;">
-  <div class="sapCard-header">
-    <span>&#9878; Authorities</span>
-    <span style="color:#6a6d70;font-weight:400;font-size:13px;">
-      {{ authorities|length if authorities else 0 }} configured
-    </span>
-  </div>
-  <div class="sapCard-content">
-    {% if authorities %}
-    <table style="width:100%;border-collapse:collapse;margin-bottom:12px;">
-      <thead>
-        <tr>
-          <th style="text-align:left;padding:8px 12px;font-size:11px;font-weight:700;color:#6a6d70;text-transform:uppercase;border-bottom:1px solid #f0f0f0;">Name</th>
-          <th style="text-align:left;padding:8px 12px;font-size:11px;font-weight:700;color:#6a6d70;text-transform:uppercase;border-bottom:1px solid #f0f0f0;">Aliases</th>
-          <th style="padding:8px 12px;border-bottom:1px solid #f0f0f0;"></th>
-        </tr>
-      </thead>
+    <div style="font-size:12px;font-weight:600;color:#32363a;margin:18px 0 8px">Authorities <span style="color:#6a6d70;font-weight:400">· {{ authorities|length if authorities else 0 }} configured</span></div>
+    <table class="auth-table">
+      <thead><tr><th>Name</th><th>Aliases</th><th style="width:120px"></th></tr></thead>
       <tbody>
         {% for a in authorities %}
         <tr>
-          <td style="padding:8px 12px;font-size:13px;border-bottom:1px solid #f0f0f0;">{{ a.name }}</td>
-          <td style="padding:8px 12px;font-size:13px;color:#6a6d70;border-bottom:1px solid #f0f0f0;">{{ a.aliases or '—' }}</td>
-          <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;text-align:right;">
-            <button class="sapBtn sapBtn-sm" onclick="openAuthModal({{ a.id }},'{{ a.name|e }}','{{ a.aliases|e }}')">Edit</button>
-            <form method="post" action="{{ url_for('delete_authority_route', profile_id=selected_profile.id, auth_id=a.id) }}" style="display:inline;margin-left:4px;">
-              <button type="submit" class="sapBtn sapBtn-reject sapBtn-sm" onclick="return confirm('Delete authority \'{{ a.name|e }}\'?')">Delete</button>
+          <td>{{ a.name }}</td>
+          <td style="color:#6a6d70">{{ a.aliases or '—' }}</td>
+          <td style="text-align:right">
+            <button class="btn-sm" onclick="openAuthModal({{ a.id }},'{{ a.name|e }}','{{ a.aliases|e }}')">Edit</button>
+            <form method="post" action="{{ url_for('delete_authority_route', profile_id=profile.id, auth_id=a.id) }}" style="display:inline;margin-left:4px;">
+              <button type="submit" class="btn-sm danger" onclick="return confirm('Delete authority \'{{ a.name|e }}\'?')">Del</button>
             </form>
           </td>
         </tr>
+        {% else %}
+        <tr><td colspan="3" style="color:#6a6d70;text-align:center;padding:12px;">No authorities configured</td></tr>
         {% endfor %}
       </tbody>
     </table>
-    {% else %}
-    <p style="color:#6a6d70;padding:12px 0;margin:0;">No authorities configured yet.</p>
-    {% endif %}
-    <button class="sapBtn sapBtn-accept" onclick="openAuthModal(null,'','')">+ Add Authority</button>
+    <button class="btn-outline-add" onclick="openAuthModal(null,'','')">+ Add Authority</button>
   </div>
+
 </div>
 
 <!-- Authority Modal -->
@@ -857,18 +385,78 @@ function closeAuthModal() { document.getElementById('auth-modal').style.display 
     <form id="auth-modal-form" method="post">
       <div style="margin-bottom:12px;">
         <label style="display:block;font-size:12px;color:#6a6d70;margin-bottom:4px;">Name *</label>
-        <input type="text" name="name" id="auth-name" required class="sapForm-input" style="width:100%;">
+        <input type="text" name="name" id="auth-name" required class="cfg-field" style="width:100%;">
       </div>
       <div style="margin-bottom:20px;">
         <label style="display:block;font-size:12px;color:#6a6d70;margin-bottom:4px;">Aliases (comma-separated)</label>
-        <input type="text" name="aliases" id="auth-aliases" class="sapForm-input" style="width:100%;" placeholder="e.g. MoF, Ministry">
+        <input type="text" name="aliases" id="auth-aliases" class="cfg-field" style="width:100%;" placeholder="e.g. MoF, Ministry">
       </div>
       <div style="display:flex;gap:8px;justify-content:flex-end;">
-        <button type="button" onclick="closeAuthModal()" class="sapBtn">Cancel</button>
-        <button type="submit" class="sapBtn sapBtn-accept">Save</button>
+        <button type="button" onclick="closeAuthModal()" class="btn-sm">Cancel</button>
+        <button type="submit" class="btn-save">Save</button>
       </div>
     </form>
   </div>
 </div>
 
+<script>
+  function cfgJump(id, el) {
+    document.querySelectorAll('.cfg-anchor').forEach(function(a){ a.classList.remove('active'); });
+    el.classList.add('active');
+    document.getElementById(id).scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  function toggleEditor(id) { document.getElementById(id).classList.toggle('hidden'); }
+  function setLookback(btn, val) {
+    btn.parentElement.querySelectorAll('.seg-btn').forEach(function(b){ b.classList.remove('active'); });
+    btn.classList.add('active');
+    document.getElementById('date_scope_val').value = val;
+  }
+  function toggleEditRow(rowId) {
+    var row = document.getElementById(rowId);
+    if (row) row.style.display = (row.style.display === 'none' || !row.style.display) ? 'block' : 'none';
+  }
+  function toggleRecursiveFields(prefix) {
+    var modeSelect = document.getElementById(prefix + 'UrlMode');
+    var recursiveFields = document.getElementById(prefix + 'RecursiveFields');
+    if (modeSelect && recursiveFields) {
+      recursiveFields.style.display = (modeSelect.value === 'recursive') ? 'block' : 'none';
+    }
+  }
+  function toggleMonitorUpdates(profileId, enabled) {
+    var form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/admin/profiles/' + profileId + '/monitor-toggle';
+    var input = document.createElement('input');
+    input.type = 'hidden'; input.name = 'enabled'; input.value = enabled ? 'true' : 'false';
+    form.appendChild(input); document.body.appendChild(form); form.submit();
+  }
+  function openAuthModal(id, name, aliases) {
+    var modal = document.getElementById('auth-modal');
+    document.getElementById('auth-modal-title').textContent = id ? 'Edit Authority' : 'Add Authority';
+    document.getElementById('auth-modal-form').action = id
+      ? '/admin/profiles/{{ profile.id }}/authorities/' + id + '/update'
+      : '/admin/profiles/{{ profile.id }}/authorities/add';
+    document.getElementById('auth-name').value = name || '';
+    document.getElementById('auth-aliases').value = aliases || '';
+    modal.style.display = 'flex';
+  }
+  function closeAuthModal() { document.getElementById('auth-modal').style.display = 'none'; }
+
+  // Scroll-spy for anchor bar
+  (function(){
+    var scroller = document.getElementById('cfgScroll');
+    if (!scroller) return;
+    var secs = ['sec-general','sec-sources','sec-output','sec-knowledge'];
+    scroller.addEventListener('scroll', function(){
+      var cur = secs[0];
+      secs.forEach(function(s){
+        var el = document.getElementById(s);
+        if (el && (el.getBoundingClientRect().top - scroller.getBoundingClientRect().top) < 60) cur = s;
+      });
+      document.querySelectorAll('.cfg-anchor').forEach(function(a){
+        a.classList.toggle('active', (a.getAttribute('onclick')||'').indexOf(cur) !== -1);
+      });
+    });
+  })();
+</script>
 {% endblock %}
