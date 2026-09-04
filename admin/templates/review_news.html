@@ -1,147 +1,255 @@
 {% extends "base.html" %}
 {% block review_tab %}
-<div style="display:flex;flex-direction:column;height:calc(100vh - 200px);overflow:hidden">
+<style>
+  /* ── Review tab (matches review-tab.html mockup) ── */
+  .review-body { display: flex; flex-direction: column; flex: 1; min-height: 0; background: #f7f7f7; }
 
-  <!-- Filter bar -->
-  <div style="background:#fff;border-bottom:1px solid #e5e5e5;padding:8px 0 4px">
-    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
-      <span style="font-size:12px;font-weight:700;color:#6a6d70;min-width:56px">Rank</span>
-      <span class="fchip active" data-dim="rank" data-val="all" onclick="setFilter('rank','all',this)">All</span>
-      <span class="fchip" data-dim="rank" data-val="1" onclick="setFilter('rank','1',this)">1</span>
-      <span class="fchip" data-dim="rank" data-val="2" onclick="setFilter('rank','2',this)">2</span>
-      <span class="fchip" data-dim="rank" data-val="3" onclick="setFilter('rank','3',this)">3</span>
-      <span class="fchip" data-dim="rank" data-val="4" onclick="setFilter('rank','4',this)">4</span>
-      <span class="fchip" data-dim="rank" data-val="5" onclick="setFilter('rank','5',this)">5</span>
+  .filter-bar { background: white; border-bottom: 1px solid #e5e5e5; padding: 10px 16px; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
+  .filter-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .filter-label { font-size: 10px; font-weight: 700; color: #6a6d70; text-transform: uppercase; letter-spacing: 0.05em; width: 48px; flex-shrink: 0; }
+  .chip-group { display: flex; gap: 4px; flex-wrap: wrap; }
+  .fchip { padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; border: 1px solid #e5e5e5; background: white; color: #6a6d70; cursor: pointer; white-space: nowrap; transition: all 0.15s; }
+  .fchip:hover { border-color: #0a6ed1; color: #0a6ed1; background: #f0f7ff; }
+  .fchip.active { background: #0a6ed1; color: white; border-color: #0a6ed1; }
+  .fchip.r1.active { background: #bb0000; border-color: #bb0000; }
+  .fchip.r2.active { background: #e9730c; border-color: #e9730c; }
+  .fchip.r3.active { background: #f0ab00; border-color: #f0ab00; }
+  .fchip.r4.active { background: #0a6ed1; border-color: #0a6ed1; }
+  .fchip.r5.active { background: #107e3e; border-color: #107e3e; }
+  .fchip.gap.active { background: #e9730c; border-color: #e9730c; }
+
+  .review-toolbar { background: #f7f7f7; border-bottom: 1px solid #e5e5e5; padding: 7px 16px; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .select-all-check { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #6a6d70; cursor: pointer; }
+  .btn-sm { background: white; border: 1px solid #d9d9d9; color: #6a6d70; border-radius: 4px; padding: 4px 10px; font-size: 11px; cursor: pointer; }
+  .btn-sm.danger { color: #bb0000; border-color: #f5c0c0; }
+  .btn-sm.danger:hover { background: #ffeaea; }
+  .items-count { font-size: 11px; color: #6a6d70; margin-left: auto; }
+  .gap-count { font-size: 11px; color: #e9730c; font-weight: 600; display: flex; align-items: center; gap: 4px; }
+
+  .item-list { flex: 1; overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 5px; min-height: 0; }
+
+  /* Level-1 topic / level-2 aspect rows (only render when grouped data present) */
+  .topic-row { background: #354a5f; color: white; padding: 8px 12px; display: flex; align-items: center; gap: 8px; cursor: pointer; border-radius: 4px; margin: 8px 0 2px; user-select: none; }
+  .topic-row:first-child { margin-top: 0; }
+  .topic-label { font-size: 12px; font-weight: 700; letter-spacing: 0.3px; }
+  .topic-count { font-size: 10px; color: #b0c4d8; margin-left: 4px; }
+  .aspect-row { background: #eaf1fb; border-left: 3px solid #0a6ed1; padding: 7px 10px 7px 12px; display: flex; align-items: center; gap: 8px; margin: 2px 0 2px 8px; border-radius: 0 4px 4px 0; user-select: none; }
+  .aspect-title { font-size: 11px; font-weight: 600; color: #32363a; flex: 1; }
+  .aspect-count { font-size: 10px; color: #6a6d70; white-space: nowrap; }
+  .btn-preview-ann { background: white; border: 1px solid #0a6ed1; color: #0a6ed1; font-size: 10px; font-weight: 600; border-radius: 3px; padding: 3px 8px; cursor: pointer; }
+  .btn-preview-analysis { background: white; border: 1px solid #aaa; color: #6a6d70; font-size: 10px; font-weight: 600; border-radius: 3px; padding: 3px 8px; cursor: pointer; }
+  .btn-preview-analysis.saved { border-color: #107e3e; color: #107e3e; }
+
+  .item-card { background: white; border: 1px solid #e5e5e5; border-radius: 6px; padding: 11px 13px; display: flex; gap: 10px; align-items: flex-start; transition: border-color 0.15s; }
+  .item-card:hover { border-color: #c5d8f5; }
+  .item-card.selected { border-color: #0a6ed1; background: #f5f9ff; }
+  .item-card.gap-card { border-left: 3px solid #e9730c; }
+  .item-card.dup-card { opacity: 0.55; }
+  .item-check { flex-shrink: 0; margin-top: 3px; cursor: pointer; }
+
+  .rank-badge { flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: white; margin-top: 1px; }
+  .rank-5 { background: #107e3e; } .rank-4 { background: #0a6ed1; } .rank-3 { background: #f0ab00; }
+  .rank-2 { background: #e9730c; } .rank-1 { background: #bb0000; } .rank-d { background: #aaa; }
+
+  .item-main { flex: 1; min-width: 0; }
+  .item-meta { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; flex-wrap: wrap; }
+  .source-tag { font-size: 10px; font-weight: 700; color: #0a6ed1; background: #e8f1fb; border-radius: 3px; padding: 1px 6px; }
+  .pub-date { font-size: 10px; color: #6a6d70; }
+  .tag-pill { font-size: 10px; font-weight: 700; border-radius: 3px; padding: 1px 6px; }
+  .tag-new { background: #e8f5e9; color: #107e3e; } .tag-update { background: #e3f2fd; color: #0a6ed1; }
+  .tag-repeated { background: #fff3e0; color: #e9730c; } .tag-dup { background: #f5f5f5; color: #aaa; }
+  .gap-badge { font-size: 10px; font-weight: 700; background: #fff3e0; color: #e9730c; border: 1px solid #ffe0b2; border-radius: 3px; padding: 1px 6px; }
+  .item-title { font-size: 12px; font-weight: 600; color: #32363a; margin-bottom: 2px; line-height: 1.4; }
+  .item-snippet { font-size: 11px; color: #6a6d70; line-height: 1.5; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .item-url { font-size: 10px; color: #0a6ed1; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 380px; display: block; text-decoration: none; }
+  .translation-toggle { font-size: 10px; color: #0a6ed1; cursor: pointer; margin-top: 3px; display: inline-block; }
+  .item-translation { font-size: 11px; color: #6a6d70; margin-top: 5px; padding: 5px 8px; background: #f5f9ff; border-left: 2px solid #c5d8f5; border-radius: 0 3px 3px 0; display: none; }
+  .item-translation.visible { display: block; }
+
+  .item-actions { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 7px; }
+  .override-strip { display: flex; gap: 3px; }
+  .ov-btn { width: 26px; height: 26px; border-radius: 4px; border: 1px solid #e5e5e5; background: white; font-size: 11px; font-weight: 700; color: #d0d0d0; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.1s; }
+  .ov-btn:hover { border-color: #aaa; color: #6a6d70; background: #f5f5f5; }
+  .ov-btn.ai-rank { border-color: #e5e5e5; color: #aaa; background: white; }
+  .ov-btn.ov-1 { background: #ffeaea; color: #bb0000; border-color: #f5c0c0; }
+  .ov-btn.ov-2 { background: #fff3e0; color: #e9730c; border-color: #ffe0b2; }
+  .ov-btn.ov-3 { background: #fffde7; color: #f0ab00; border-color: #fff176; }
+  .ov-btn.ov-4 { background: #e3f2fd; color: #0a6ed1; border-color: #bbdefb; }
+  .ov-btn.ov-5 { background: #e8f5e9; color: #107e3e; border-color: #c8e6c9; }
+  .override-label { font-size: 9px; color: #6a6d70; text-align: right; }
+  .override-label.overridden { color: #e9730c; font-weight: 700; }
+  .btn-delete { background: transparent; border: none; color: #bb0000; font-size: 10px; cursor: pointer; opacity: 0.4; }
+  .btn-delete:hover { opacity: 1; }
+  .review-empty { text-align: center; color: #6a6d70; padding: 60px 0; }
+
+  .pagination { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 8px 0; border-top: 1px solid #e5e5e5; background: white; flex-shrink: 0; }
+  .pagination a, .pagination span { font-size: 12px; color: #6a6d70; text-decoration: none; }
+  .pagination a { color: #0a6ed1; }
+</style>
+
+<div class="review-body">
+  <div class="filter-bar">
+    <div class="filter-row">
+      <span class="filter-label">Rank</span>
+      <div class="chip-group">
+        <div class="fchip active" data-dim="rank" data-val="all" onclick="setFilter(this)">All</div>
+        <div class="fchip r1" data-dim="rank" data-val="1" onclick="setFilter(this)">1 — Noise</div>
+        <div class="fchip r2" data-dim="rank" data-val="2" onclick="setFilter(this)">2 — Background</div>
+        <div class="fchip r3" data-dim="rank" data-val="3" onclick="setFilter(this)">3 — Watch</div>
+        <div class="fchip r4" data-dim="rank" data-val="4" onclick="setFilter(this)">4 — Legal Change</div>
+        <div class="fchip r5" data-dim="rank" data-val="5" onclick="setFilter(this)">5 — Urgent</div>
+      </div>
     </div>
-    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
-      <span style="font-size:12px;font-weight:700;color:#6a6d70;min-width:56px">Source</span>
-      <span class="fchip active" data-dim="src" data-val="all" onclick="setFilter('src','all',this)">All</span>
-      <span class="fchip" data-dim="src" data-val="accepted" onclick="setFilter('src','accepted',this)">Accepted</span>
-      <span class="fchip" data-dim="src" data-val="filtered" onclick="setFilter('src','filtered',this)">Filtered</span>
+    <div class="filter-row">
+      <span class="filter-label">Tag</span>
+      <div class="chip-group">
+        <div class="fchip active" data-dim="tag" data-val="all" onclick="setFilter(this)">All</div>
+        <div class="fchip" data-dim="tag" data-val="NEW" onclick="setFilter(this)">NEW</div>
+        <div class="fchip" data-dim="tag" data-val="UPDATE" onclick="setFilter(this)">UPDATE</div>
+        <div class="fchip" data-dim="tag" data-val="REPEATED" onclick="setFilter(this)">REPEATED</div>
+        <div class="fchip" data-dim="tag" data-val="DUPLICATE" onclick="setFilter(this)">DUPLICATE</div>
+      </div>
     </div>
-    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
-      <span style="font-size:12px;font-weight:700;color:#6a6d70;min-width:56px">Status</span>
-      <span class="fchip active" data-dim="rev" data-val="all" onclick="setFilter('rev','all',this)">All</span>
-      <span class="fchip" data-dim="rev" data-val="no" onclick="setFilter('rev','no',this)">Unscored</span>
-      <span class="fchip" data-dim="rev" data-val="yes" onclick="setFilter('rev','yes',this)">Reviewed</span>
+    <div class="filter-row">
+      <span class="filter-label">Source</span>
+      <div class="chip-group">
+        <div class="fchip active" data-dim="src" data-val="all" onclick="setFilter(this)">All</div>
+        <div class="fchip" data-dim="src" data-val="accepted" onclick="setFilter(this)">Accepted</div>
+        <div class="fchip" data-dim="src" data-val="filtered" onclick="setFilter(this)">Filtered</div>
+      </div>
+    </div>
+    <div class="filter-row">
+      <span class="filter-label">LoB</span>
+      <div class="chip-group">
+        <div class="fchip active" data-dim="lob" data-val="all" onclick="setFilter(this)">All</div>
+        <div class="fchip" data-dim="lob" data-val="matched" onclick="setFilter(this)">Matched</div>
+        <div class="fchip gap" data-dim="lob" data-val="gap" onclick="setFilter(this)">&#9888; Gap — needs confirmation</div>
+      </div>
     </div>
   </div>
 
-  <!-- Toolbar -->
-  <div style="display:flex;align-items:center;gap:12px;padding:6px 0;border-bottom:1px solid #e5e5e5">
-    <span style="font-size:13px;color:#6a6d70">
-      Accepted: <strong>{{ accepted_unscored_count }}</strong> unscored &nbsp;|&nbsp;
-      Filtered: <strong>{{ filtered_unscored_count }}</strong> unscored &nbsp;|&nbsp;
-      Reviewed: <strong>{{ reviewed_count }}</strong>
+  <div class="review-toolbar">
+    <label class="select-all-check"><input type="checkbox" id="selAll" onchange="toggleAll(this)"> Select all</label>
+    <span style="font-size:11px;color:#6a6d70">
+      Accepted <strong>{{ accepted_unscored_count }}</strong> · Filtered <strong>{{ filtered_unscored_count }}</strong> · Reviewed <strong>{{ reviewed_count }}</strong>
     </span>
-    <span style="font-size:13px;color:#6a6d70;margin-left:auto" id="itemCount">{{ items|length }} items</span>
+    <span class="items-count" id="itemCount">{{ items|length }} items</span>
   </div>
 
-  <!-- Item list -->
-  <div style="flex:1;overflow-y:auto;padding:8px 0" id="itemList">
+  <div class="item-list" id="itemList">
     {% for item in items %}
-    {% set score = item.relevance_score|default(0)|int %}
-    <div class="icard {% if score == 0 %}dup{% endif %}"
-         data-rank="{{ score }}" data-src="{{ item.item_source|default('') }}">
-      <div style="display:flex;flex-direction:column;align-items:center;gap:6px;flex-shrink:0;width:32px">
-        <div class="rbadge r{{ score }}">{{ 'D' if score == 0 else score }}</div>
-        <span style="font-size:10px;color:#6a6d70;writing-mode:vertical-rl;transform:rotate(180deg)">{{ 'ACC' if item.item_source == 'accepted' else 'FIL' }}</span>
-      </div>
-      <div style="flex:1;min-width:0">
-        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px">
-          <span style="background:#e5e5e5;border-radius:10px;padding:2px 7px;font-size:11px;font-weight:600">
-            {{ item.source_type|upper if item.source_type else 'RSS' }}
-          </span>
-          <span style="font-size:11px;color:#6a6d70">{{ item.published_at|default('')|truncate(10,False,'') }}</span>
+    {% set raw = item.relevance_score %}
+    {% set score = raw|int if raw is not none else -1 %}
+    <div class="item-card {% if score == 0 %}dup-card{% endif %} {% if item.is_gap %}gap-card{% endif %}"
+         data-rank="{{ score if score >= 1 else '' }}"
+         data-tag="{{ item.tag|default('') }}"
+         data-src="{{ item.item_source|default('') }}"
+         data-lob="{% if item.is_gap %}gap{% else %}matched{% endif %}">
+      <input type="checkbox" class="item-check" onchange="onCardSel(this)">
+      <div class="rank-badge {% if score >= 1 %}rank-{{ score }}{% else %}rank-d{% endif %}">{% if score == 0 %}D{% elif score >= 1 %}{{ score }}{% else %}?{% endif %}</div>
+      <div class="item-main">
+        <div class="item-meta">
+          <span class="source-tag">{{ item.source_type|upper if item.source_type else 'RSS' }}</span>
+          {% if item.tag %}<span class="tag-pill tag-{{ item.tag|lower }}">{{ item.tag }}</span>{% endif %}
+          <span class="pub-date">{{ item.published_at|default(item.created_at)|default('')|truncate(16, True, '') }}</span>
+          {% if item.is_gap %}<span class="gap-badge">&#9888; Gap — no LoB match</span>{% endif %}
+          <span style="font-size:10px;color:#aaa;">{{ 'Accepted' if item.item_source == 'accepted' else 'Filtered' }}</span>
         </div>
-        <div style="font-weight:600;font-size:14px;margin-bottom:3px">{{ item.title or '(no title)' }}</div>
-        <div style="font-size:13px;color:#6a6d70;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">
-          {{ (item.content or '')|truncate(200,False,'') }}
-        </div>
-        <a href="{{ item.url }}" target="_blank" style="font-size:12px;color:#0a6ed1;word-break:break-all">{{ item.url }}</a>
+        <div class="item-title">{{ item.title or '(no title)' }}</div>
+        <div class="item-snippet">{{ (item.content or '')|truncate(200, False, '…') }}</div>
+        {% if item.url %}<a class="item-url" href="{{ item.url }}" target="_blank">{{ item.url }}</a>{% endif %}
+        {% if item.translation %}
+        <span class="translation-toggle" onclick="toggleTr('tr-{{ item.item_source }}-{{ item.id }}')">&#9656; Show translation</span>
+        <div class="item-translation" id="tr-{{ item.item_source }}-{{ item.id }}">{{ item.translation }}</div>
+        {% endif %}
       </div>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">
-        <div class="ovr-strip" data-ai="{{ score }}">
-          {% for n in range(1,6) %}
-          <button class="ovr-btn {% if score == n %}ai{% endif %}"
-                  onclick="onOverride(this,{{ item.id }},{{ n }},{{ score }})">{{ n }}</button>
+      <div class="item-actions">
+        {% if score >= 1 or raw is none %}
+        <div class="override-strip">
+          {% for n in range(1, 6) %}
+          <button class="ov-btn {% if score == n %}ai-rank{% endif %}" onclick="setOverride(this, {{ n }})">{{ n }}</button>
           {% endfor %}
         </div>
-        <div class="ovr-lbl" id="ol-{{ item.id }}" style="display:none;font-size:11px;color:#e9730c"></div>
+        <div class="override-label">{% if score >= 1 %}AI rank · no override{% else %}Not yet scored{% endif %}</div>
+        {% else %}
+        <div style="font-size:10px;color:#aaa;text-align:right;line-height:1.8">Rank 0<br>Not evaluated</div>
+        {% endif %}
         <form method="POST" action="{{ url_for('delete_filtered_news_item', profile_id=selected_profile.id) }}">
-          <input type="hidden" name="item_id" value="{{ item.id }}:{{ item.item_source|default('accepted') }}">
-          <button type="submit" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:16px" onclick="return confirm('Delete?')">&#x2715;</button>
+          <input type="hidden" name="item_id" value="{{ item.id }}:{{ item.item_source|default('filtered') }}">
+          <button type="submit" class="btn-delete" onclick="return confirm('Delete this item?')">&#10005; Delete</button>
         </form>
       </div>
     </div>
     {% else %}
-    <div style="text-align:center;padding:60px 0;color:#6a6d70">
+    <div class="review-empty">
       <div style="font-size:32px;margin-bottom:8px">&#128240;</div>
       <div>No items to review</div>
     </div>
     {% endfor %}
   </div>
 
-  <!-- Pagination -->
-  {% if total_pages > 1 %}
-  <div style="display:flex;align-items:center;justify-content:center;gap:8px;padding:8px 0;border-top:1px solid #e5e5e5">
-    {% if page > 1 %}
-    <a href="{{ url_for('admin_review_news', profile_id=selected_profile.id, page=page-1) }}" class="fchip">&#8592; Prev</a>
-    {% endif %}
-    <span style="font-size:13px;color:#6a6d70">Page {{ page }} / {{ total_pages }}</span>
-    {% if page < total_pages %}
-    <a href="{{ url_for('admin_review_news', profile_id=selected_profile.id, page=page+1) }}" class="fchip">Next &#8594;</a>
-    {% endif %}
+  {% if total_pages and total_pages > 1 %}
+  <div class="pagination">
+    {% if page > 1 %}<a href="{{ url_for('admin_review_news', profile_id=selected_profile.id, page=page-1) }}">&#8592; Prev</a>{% endif %}
+    <span>Page {{ page }} / {{ total_pages }}</span>
+    {% if page < total_pages %}<a href="{{ url_for('admin_review_news', profile_id=selected_profile.id, page=page+1) }}">Next &#8594;</a>{% endif %}
   </div>
   {% endif %}
 </div>
 
-<style>
-  .fchip { padding:4px 10px;border-radius:12px;font-size:12px;border:1px solid #ddd;background:#fff;cursor:pointer;text-decoration:none;color:#32363a; }
-  .fchip.active { background:#0a6ed1;color:#fff;border-color:#0a6ed1; }
-  .icard { display:flex;gap:12px;background:#fff;border-radius:6px;padding:12px;margin-bottom:8px;border-left:3px solid transparent; }
-  .icard.dup { opacity:0.55; }
-  .rbadge { width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:#fff;flex-shrink:0; }
-  .r0{background:#6a6d70} .r1{background:#bb0000} .r2{background:#e9730c}
-  .r3{background:#f0ab00;color:#32363a} .r4{background:#0a6ed1} .r5{background:#107e3e}
-  .ovr-strip { display:flex;gap:3px; }
-  .ovr-btn { width:26px;height:26px;border-radius:50%;border:1px solid #ddd;background:#fff;cursor:pointer;font-size:11px;font-weight:600; }
-  .ovr-btn.ai { background:#eaf1fb;border-color:#0a6ed1;color:#0a6ed1; }
-  .ovr-btn.picked { background:#fef7e0;border-color:#e9730c;color:#e9730c; }
-</style>
 <script>
-  var filters = { rank: 'all', src: 'all', rev: 'all' };
-
-  function setFilter(dim, val, chip) {
-    filters[dim] = val;
-    chip.closest('div').querySelectorAll('.fchip').forEach(function(c){ c.classList.remove('active'); });
+  var filters = { rank: 'all', tag: 'all', src: 'all', lob: 'all' };
+  function setFilter(chip) {
+    var dim = chip.dataset.dim;
+    filters[dim] = chip.dataset.val;
+    chip.parentElement.querySelectorAll('.fchip').forEach(function(c){ c.classList.remove('active'); });
     chip.classList.add('active');
     applyFilters();
   }
   function applyFilters() {
     var vis = 0;
-    document.querySelectorAll('.icard').forEach(function(c) {
+    document.querySelectorAll('.item-card').forEach(function(c) {
       var show = (filters.rank === 'all' || filters.rank === c.dataset.rank) &&
-                 (filters.src  === 'all' || filters.src  === c.dataset.src);
+                 (filters.tag  === 'all' || filters.tag  === c.dataset.tag) &&
+                 (filters.src  === 'all' || filters.src  === c.dataset.src) &&
+                 (filters.lob  === 'all' || filters.lob  === c.dataset.lob);
       c.style.display = show ? 'flex' : 'none';
       if (show) vis++;
     });
-    document.getElementById('itemCount').textContent = vis + ' items';
+    var el = document.getElementById('itemCount');
+    if (el) el.textContent = vis + ' items';
   }
-  function onOverride(btn, itemId, rank, aiRank) {
-    var strip = btn.closest('.ovr-strip');
-    strip.querySelectorAll('.ovr-btn').forEach(function(b, i) {
-      b.classList.remove('ai', 'picked');
-      if (i + 1 === aiRank) b.classList.add('ai');
+  function onCardSel(cb) { cb.closest('.item-card').classList.toggle('selected', cb.checked); }
+  function toggleAll(cb) {
+    document.querySelectorAll('.item-check').forEach(function(c) {
+      c.checked = cb.checked;
+      c.closest('.item-card').classList.toggle('selected', cb.checked);
     });
-    var lbl = document.getElementById('ol-' + itemId);
-    if (rank !== aiRank) {
-      btn.classList.add('picked');
-      lbl.textContent = 'AI: ' + aiRank + ' → You: ' + rank;
-      lbl.style.display = 'block';
+  }
+  // UI-only override preview (persistence deferred to a later version)
+  function setOverride(btn, rank) {
+    var strip = btn.parentElement;
+    var label = strip.nextElementSibling;
+    var aiBtn = strip.querySelector('.ai-rank');
+    var aiRank = aiBtn ? parseInt(aiBtn.textContent) : null;
+    strip.querySelectorAll('.ov-btn').forEach(function(b) {
+      b.className = 'ov-btn';
+      if (aiRank && parseInt(b.textContent) === aiRank) b.classList.add('ai-rank');
+    });
+    if (rank === aiRank) {
+      label.textContent = 'AI rank · no override';
+      label.className = 'override-label';
     } else {
-      lbl.style.display = 'none';
+      btn.className = 'ov-btn ov-' + rank;
+      label.textContent = aiRank ? ('AI: ' + aiRank + ' → You: ' + rank) : ('You: ' + rank);
+      label.className = 'override-label overridden';
     }
+  }
+  function toggleTr(id) {
+    var el = document.getElementById(id);
+    var t = el.previousElementSibling;
+    var v = el.classList.toggle('visible');
+    t.innerHTML = v ? '&#9662; Hide translation' : '&#9656; Show translation';
   }
 </script>
 {% endblock %}

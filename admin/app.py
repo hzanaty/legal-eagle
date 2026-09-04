@@ -1732,11 +1732,13 @@ def admin_review_news(profile_id: int):
     # Parent options for L2S Prompt modal dropdown
     repo_parent_options = list_repo_nodes(conn, profile["country_code"])
 
-    # FCL context
-    profiles_rows = conn.execute(
-        "SELECT id, country_code, lob, name, active FROM profiles ORDER BY country_code, lob"
-    ).fetchall()
-    profiles_list = [dict(r) for r in profiles_rows]
+    # FCL shell context (list + summary aggregates + selected meta)
+    shell = _shell_context(conn, profile_id)
+    profiles_list = shell["profiles_list"]
+    _sel = shell["selected_meta"]
+    profile["source_count"] = _sel["source_count"] if _sel else 0
+    profile["last_run_display"] = _sel["last_run_display"] if _sel else "Never run"
+    profile["language_name"] = LANGUAGE_NAMES.get(profile["language"], profile["language"])
     review_badge_count = count_all_news_for_review(conn, profile_id)
 
     conn.close()
@@ -1759,6 +1761,10 @@ def admin_review_news(profile_id: int):
         per_page=per_page,
         repo_node_map=repo_node_map,
         repo_parent_options=repo_parent_options,
+        profiles_total=shell["profiles_total"],
+        review_total=shell["review_total"],
+        recently_run_count=shell["recently_run_count"],
+        never_run_count=shell["never_run_count"],
     )
 
 
