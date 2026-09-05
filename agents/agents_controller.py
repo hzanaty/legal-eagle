@@ -633,13 +633,17 @@ def run_profile_once(
 
         # v3.3: TAGGING stage — deterministic glossary-keyword matching assigns topic_label.
         try:
-            from agents.news_tagger import tag_items, save_topic_labels
+            from agents.news_tagger import tag_items, save_topic_labels, flag_glossary_gaps
             tag_conn = get_connection()
             tag_items(filtered_items, tag_conn, profile_id)
             save_topic_labels(filtered_items, tag_conn, profile_id)
+            # v3.5: flag rank-significant items with no glossary match as glossary gaps
+            flag_glossary_gaps(filtered_items, tag_conn, profile_id)
             tag_conn.close()
             tagged = sum(1 for i in filtered_items if i.get("topic_label") and i["topic_label"] != '["General"]')
+            gaps = sum(1 for i in filtered_items if i.get("glossary_gap"))
             print(f"🏷  Tag stage complete — {tagged}/{len(filtered_items)} items matched glossary terms")
+            print(f"⚠️  Glossary gap check — {gaps}/{len(filtered_items)} items flagged (rank ≥ 3, no match)")
         except Exception as e:
             print(f"⚠️ Tag stage failed: {e}")
 
