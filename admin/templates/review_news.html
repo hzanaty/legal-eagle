@@ -149,6 +149,20 @@
   .ch-btn-confirm:hover { background:#085cb8; }
   .ch-btn-confirm:disabled { background:#c8d6e5; cursor:default; }
   .ch-loading { text-align:center; padding:24px 0; color:#6a6d70; font-size:13px; }
+
+  /* v3.6: Preview for RCM */
+  .ann-status { font-size:10px; font-weight:700; padding:1px 7px; border-radius:9px; white-space:nowrap; background:#eef1f5; color:#6a6d70; border:1px solid #d9d9d9; }
+  .ann-status.done { background:#e8f5e9; color:#107e3e; border-color:#a6d9b3; }
+  .ann-preview-btn { font-size:10px; font-weight:600; color:#fff; background:#e9730c; border:none; border-radius:4px; padding:3px 9px; cursor:pointer; white-space:nowrap; }
+  .ann-preview-btn:hover { background:#cf6209; }
+  .pv-title { font-size:13px; font-weight:700; color:#1a4060; margin-bottom:10px; }
+  .pv-body { max-height:38vh; overflow:auto; border:1px solid #e5e5e5; border-radius:6px; padding:12px 14px; font-size:12px; line-height:1.55; background:#fbfcfe; }
+  .pv-src-title, .pv-l2s-title { font-size:11px; font-weight:700; color:#1a4060; margin:14px 0 5px; }
+  .pv-src { font-size:11px; color:#32363a; padding:2px 0; }
+  .pv-src a { color:#0a6ed1; }
+  .pv-l2s-link { font-size:12px; font-weight:600; color:#0a6ed1; text-decoration:none; }
+  .pv-field-label { font-size:11px; font-weight:700; color:#1a4060; margin:14px 0 4px; }
+  .pv-input { width:100%; box-sizing:border-box; border:1px solid #c8d6e5; border-radius:4px; padding:7px 9px; font-size:12px; }
   .ann-empty { text-align: center; color: #6a6d70; padding: 40px 0; font-size: 12px; }
 </style>
 
@@ -256,6 +270,26 @@
     </div>
   </div>
 
+  <!-- Preview for RCM modal (v3.6) -->
+  <div class="challenge-overlay" id="previewOverlay">
+    <div class="challenge-modal" id="previewModal" style="width:640px;">
+      <h3>&#128196; Preview for RCM <span id="pvStatus" class="ann-status" style="margin-left:6px;"></span></h3>
+      <div class="ch-subtitle">Read-only announcement in the RCM / Law2Spec template. Publish in L2S, then paste the JIRA Legal Change # and mark Done.</div>
+      <div class="pv-title" id="pvTitle"></div>
+      <div class="pv-body" id="pvBody">Loading&hellip;</div>
+      <div id="pvSources"></div>
+      <div class="pv-l2s-title">Hand-off</div>
+      <div id="pvL2s"></div>
+      <div class="pv-field-label">JIRA Legal Change #</div>
+      <input type="text" class="pv-input" id="pvJira" placeholder="e.g. GSREQWE-12345">
+      <div class="ch-footer">
+        <span class="ch-reflection" id="pvResult"></span>
+        <button class="ch-btn-cancel" onclick="closePreview()">Cancel</button>
+        <button class="ch-btn-confirm" onclick="confirmDone()">Mark Done</button>
+      </div>
+    </div>
+  </div>
+
   {% if topics %}
   <div class="view-toggle">
     <button class="vtab active" id="vtab-ann" onclick="showView('ann')">&#127758; Announcements ({{ topics|length }} topics)</button>
@@ -281,6 +315,8 @@
               <span class="ann-toggle-icon">&#9660;</span>
               <span class="ann-title">{{ ann.title or '(untitled)' }}</span>
               <span class="ann-src-count">{{ ann.sources|length }} source{{ 's' if ann.sources|length != 1 }}</span>
+              <span class="ann-status {% if ann.status == 'done' %}done{% endif %}">{% if ann.status == 'done' %}&#10003; Done{% if ann.jira_legal_change %} · {{ ann.jira_legal_change }}{% endif %}{% else %}{{ ann.status or 'draft' }}{% endif %}</span>
+              <button class="ann-preview-btn" onclick="event.stopPropagation(); openPreview({{ ann.id }})">Preview for RCM</button>
             </div>
             <div class="ann-body open">
               {% if ann.announcement_md %}
@@ -574,6 +610,75 @@
     var el = document.getElementById('itemCount');
     if (el) el.textContent = vis + ' items';
   }
+
+  // ── v3.6: Preview for RCM ──
+  var _previewAnnId = null;
+  function openPreview(annId) {
+    _previewAnnId = annId;
+    document.getElementById('previewOverlay').classList.add('open');
+    document.getElementById('pvBody').innerHTML = 'Loading…';
+    document.getElementById('pvSources').innerHTML = '';
+    document.getElementById('pvResult').textContent = '';
+    document.getElementById('pvResult').style.color = '#1d6f42';
+    fetch('/admin/announcements/' + annId + '/template')
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (!d.ok) { document.getElementById('pvBody').textContent = 'Error: ' + (d.error || 'unknown'); return; }
+        document.getElementById('pvTitle').textContent = d.title || '';
+        document.getElementById('pvBody').innerHTML = d.announcement_html || '<em>No announcement text.</em>';
+        var s = d.sources || [];
+        var html = s.length ? '<div class="pv-src-title">Sources (' + s.length + ')</div>' : '';
+        s.forEach(function(x){
+          html += '<div class="pv-src">' + (x.url ? '<a href="' + x.url + '" target="_blank">' : '')
+                + (x.title || '(no title)') + (x.url ? '</a>' : '')
+                + (x.publisher ? ' — ' + x.publisher : '') + '</div>';
+        });
+        document.getElementById('pvSources').innerHTML = html;
+        document.getElementById('pvJira').value = d.jira_legal_change || '';
+        var st = document.getElementById('pvStatus');
+        st.textContent = d.status === 'done' ? '✓ Done' : (d.status || 'draft');
+        st.className = 'ann-status' + (d.status === 'done' ? ' done' : '');
+        renderL2s(d.l2s_url || '');
+      })
+      .catch(function(e){ document.getElementById('pvBody').textContent = 'Network error: ' + e; });
+  }
+  function renderL2s(url) {
+    var el = document.getElementById('pvL2s');
+    if (url) {
+      el.innerHTML = '<a class="pv-l2s-link" href="' + url + '" target="_blank">↗ Open L2S</a>'
+                   + ' <a href="#" onclick="editL2s();return false;" style="font-size:11px;color:#6a6d70;margin-left:6px;">edit</a>';
+    } else {
+      el.innerHTML = '<input id="pvL2sInput" class="pv-input" style="display:inline-block;width:auto;min-width:240px;" placeholder="Set L2S URL…">'
+                   + ' <button class="ann-preview-btn" style="background:#0a6ed1;" onclick="saveL2sUrl()">Save</button>';
+    }
+  }
+  function editL2s() { renderL2s(''); }
+  function saveL2sUrl() {
+    var url = (document.getElementById('pvL2sInput').value || '').trim();
+    fetch('/admin/profiles/' + _profileId + '/l2s-url', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({url: url})
+    }).then(function(r){ return r.json(); }).then(function(d){ renderL2s(d.l2s_url || ''); });
+  }
+  function closePreview() {
+    document.getElementById('previewOverlay').classList.remove('open');
+    _previewAnnId = null;
+  }
+  function confirmDone() {
+    if (!_previewAnnId) return;
+    var jira = (document.getElementById('pvJira').value || '').trim();
+    var res = document.getElementById('pvResult');
+    res.style.color = '#1d6f42';
+    res.textContent = 'Saving…';
+    fetch('/admin/announcements/' + _previewAnnId + '/publish', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({jira_legal_change: jira, status: 'done'})
+    }).then(function(r){ return r.json(); }).then(function(d){
+      if (d.ok) { res.textContent = '✓ Marked done'; setTimeout(function(){ location.reload(); }, 700); }
+      else { res.style.color = '#bb0000'; res.textContent = '⚠ ' + (d.error || 'Error'); }
+    }).catch(function(){ res.style.color = '#bb0000'; res.textContent = '⚠ Network error'; });
+  }
+  document.getElementById('previewOverlay').addEventListener('click', function(e){ if (e.target === this) closePreview(); });
 
   // ── v3.5: Glossary gap ──
   function filterGapsOnly() {
