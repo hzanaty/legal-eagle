@@ -170,7 +170,7 @@
 <body>
 
 <h1>Legal Eagle — System Lifecycle</h1>
-<p class="tagline">v2.32 current state &nbsp;·&nbsp; v3 roadmap impact &nbsp;·&nbsp; Click any step for details</p>
+<p class="tagline">v3.1 shipped &nbsp;·&nbsp; v3.2+ roadmap impact &nbsp;·&nbsp; Click any step for details</p>
 
 <div class="legend">
   <span style="font-size:11px;color:#484f58;text-transform:uppercase;letter-spacing:1px;margin-right:4px;">Phases</span>
@@ -179,10 +179,10 @@
   <div class="leg"><div class="dot" style="background:#80b9ad"></div> Review</div>
   <span style="width:1px;background:#30363d;height:14px;margin:0 8px;display:inline-block"></span>
   <span style="font-size:11px;color:#484f58;text-transform:uppercase;letter-spacing:1px;margin-right:4px;">v3 Status</span>
-  <div class="leg"><div class="dot green"></div> Unchanged</div>
-  <div class="leg"><div class="dot yellow"></div> Modified</div>
-  <div class="leg"><div class="dot red"></div> Removed</div>
-  <div class="leg"><div class="dot blue"></div> New</div>
+  <div class="leg"><div class="dot green"></div> Stable / shipped</div>
+  <div class="leg"><div class="dot yellow"></div> Modified (pending)</div>
+  <div class="leg"><div class="dot red"></div> Removed (pending)</div>
+  <div class="leg"><div class="dot blue"></div> New (pending)</div>
   <div class="leg"><div class="dot grey"></div> UI only</div>
 </div>
 
@@ -227,7 +227,7 @@
         <div class="step-sub">Manual / Scheduled</div>
       </div>
       <div class="inner-arrow">›</div>
-      <div class="substep blue" onclick="showDetail('health-check')">
+      <div class="substep green" onclick="showDetail('health-check')">
         <div class="step-name">Health Check</div>
         <div class="step-sub">APIs + Gmail + DB</div>
       </div>
@@ -248,7 +248,7 @@
         <div class="step-sub">API v2</div>
       </div>
       <div class="inner-arrow">›</div>
-      <div class="substep yellow" onclick="showDetail('url-scrape')">
+      <div class="substep green" onclick="showDetail('url-scrape')">
         <div class="step-name">URL Scrape</div>
         <div class="step-sub">req + Playwright</div>
       </div>
@@ -264,12 +264,12 @@
     <!-- ③ Process -->
     <div class="substep-group">
       <div class="substep-label">③ Process</div>
-      <div class="substep red" onclick="showDetail('filter')">
+      <div class="substep green" onclick="showDetail('filter')">
         <div class="step-name">Filter</div>
-        <div class="step-sub">removed v3</div>
+        <div class="step-sub">removed ✓ v3.1</div>
       </div>
       <div class="inner-arrow">›</div>
-      <div class="substep yellow" onclick="showDetail('compare')">
+      <div class="substep green" onclick="showDetail('compare')">
         <div class="step-name">Compare</div>
         <div class="step-sub">Dedup + classify</div>
       </div>
@@ -310,7 +310,7 @@
         <div class="step-sub">HTML digest</div>
       </div>
       <div class="inner-arrow">›</div>
-      <div class="substep yellow" onclick="showDetail('baseline')">
+      <div class="substep green" onclick="showDetail('baseline')">
         <div class="step-name">Update Baseline</div>
         <div class="step-sub">SQLite store</div>
       </div>
@@ -348,7 +348,7 @@
     <div class="db-cell" onclick="showDetail('filter')">
       <div class="db-step">③ Filter</div>
       <div class="db-tag db-r">R glossary</div>
-      <div class="db-tag db-w" style="background:#2b0d0d;color:#f85149;border-color:#f85149;">W filtered_news <span style="font-size:9px;">(removed v3)</span></div>
+      <div class="db-tag db-w" style="background:#0d2b13;color:#3fb950;border-color:#1a4a22;">filtered_news <span style="font-size:9px;">(removed ✓ v3.1)</span></div>
     </div>
     <div class="db-cell" onclick="showDetail('compare')">
       <div class="db-step">④ Compare</div>
@@ -525,8 +525,8 @@ const details = {
   },
   'health-check': {
     title: 'Health Check',
-    subtitle: 'NEW in v3 Phase 1 — runs before any fetching begins',
-    tag: 'blue', tagLabel: 'New in v3',
+    subtitle: 'Shipped v3.1 — runs before any fetching begins',
+    tag: 'green', tagLabel: 'Shipped v3.1',
     cols: [
       { heading: 'What it does', items: ['HTTP HEAD check on all RSS/URL sources', 'Twitter Bearer token validation', 'Gmail SMTP connect → login → quit', 'SAP AI Core minimal chat call', 'DB writability test write'] },
       { heading: 'Key file', items: ['agents/health_check.py (to be created)', 'Source warnings → log and continue', 'Hard blocks (AI Core / Gmail / DB) → abort run early'] },
@@ -555,12 +555,12 @@ const details = {
   },
   'url-scrape': {
     title: 'URL Sources Runner',
-    subtitle: 'Modified in v3 — per-source last_successful_fetch anchoring',
-    tag: 'yellow', tagLabel: 'Modified in v3',
+    subtitle: 'Shipped v3.1 — per-source anchor + Source Simulator (F9)',
+    tag: 'green', tagLabel: 'Shipped v3.1',
     cols: [
       { heading: 'What it does', items: ['Static scraping via requests + BeautifulSoup4', 'Dynamic scraping via Playwright (JS-rendered)', 'Unified runner across both modes', 'Optional Brightdata proxy support'] },
-      { heading: 'v3 change', items: ['Per-source last_successful_fetch replaces global days window', 'New sources fall back to profile.date_scope', 'Force-fetch mode overrides anchor'] },
-      { heading: 'Key file', items: ['agents/url_sources_runner.py', 'run_unified_sources(sources) → items', 'Playwright / Chromium required for snap_urls'] },
+      { heading: 'v3.1 shipped', items: ['Per-source last_successful_fetch replaces global days window', 'Source Simulator (F9): 1-field add + ⚡ auto-discovery of selectors', 'scrape_url_source_with_config() reads stored selectors', 'Force-fetch mode overrides anchor (bounded by date_scope)'] },
+      { heading: 'Key file', items: ['agents/url_sources_runner.py', 'agents/source_simulator.py (F9)', 'run_unified_sources(sources) → items'] },
     ]
   },
   'email-inbox': {
@@ -575,22 +575,22 @@ const details = {
   },
   'filter': {
     title: 'News Filter (Binary AI Gate)',
-    subtitle: 'REMOVED in v3 Phase 1 — replaced by 3-tier Ranker',
-    tag: 'red', tagLabel: 'Removed in v3',
+    subtitle: 'Removed ✓ v3.1 — replaced by 3-tier Ranker (v3.2)',
+    tag: 'green', tagLabel: 'Removed ✓ v3.1',
     cols: [
-      { heading: 'What it does (v2)', items: ['Sends each item to GPT-4o for yes/no relevance', 'Uses glossary keywords as context', 'Hard drops irrelevant items — no audit trail', '8 known bugs flagged in v3 spec'] },
-      { heading: 'Key file', items: ['agents/news_filter.py — DELETE in v3 Phase 1', 'Replaced entirely by agents/news_ranker.py'] },
+      { heading: 'What it did (v2)', items: ['Sent each item to GPT-4o for yes/no relevance', 'Used glossary keywords as context', 'Hard dropped irrelevant items — no audit trail', '8 known bugs flagged in v3 spec'] },
+      { heading: 'v3.1 shipped', items: ['agents/news_filter.py DELETED', 'All in-date items now pass to comparison → Review', 'Ranker (agents/news_ranker.py) replaces it in v3.2'] },
       { heading: 'Why removed', items: ['Binary gate loses borderline items permanently', 'No explainability — black box decision', 'Cannot learn from human overrides', 'Replaced by graded 1–5 rank with full audit trail'] },
     ]
   },
   'compare': {
     title: 'Compare / Deduplication',
-    subtitle: 'Modified in v3 — DUPLICATEs no longer dropped silently',
-    tag: 'yellow', tagLabel: 'Modified in v3',
+    subtitle: 'Shipped v3.1 — DUPLICATEs preserved, entity + cosine dedup',
+    tag: 'green', tagLabel: 'Shipped v3.1',
     cols: [
-      { heading: 'What it does', items: ['Embedding-based semantic similarity (cosine)', 'Jaccard similarity on tokenized text', 'Classifies: NEW | UPDATE | REPEATED | DUPLICATE', '7-day rolling baseline window (SQLite)'] },
-      { heading: 'v3 change', items: ['DUPLICATEs saved with rank 0 — never dropped', 'Visible in Review UI for manual override', 'Per-source last_successful_fetch replaces global days window', 'Entity fingerprint matching added'] },
-      { heading: 'Key files', items: ['agents/compare_news.py', 'agents/sap_ai_client.py (embeddings)', 'agents/text_utils.py (Jaccard, hash_signature)'] },
+      { heading: 'What it does', items: ['Embedding-based semantic similarity (cosine)', 'Entity-canonical fingerprint for exact/near matches', 'Classifies: NEW | UPDATE | DUPLICATE (dedup_status)', '7-day rolling baseline window (SQLite)'] },
+      { heading: 'v3.1 shipped', items: ['DUPLICATEs saved with dedup_status — never dropped', 'Cosine-tiered thresholds (DUP ≥ 0.80; Jaccard AND-gate dropped)', 'Entity fingerprint + intra-run dedup', 'Graceful degrade to deterministic dedup if embeddings down'] },
+      { heading: 'Key files', items: ['agents/compare_news.py', 'agents/sap_ai_client.py (embeddings)', 'agents/ai_cache.py (record/replay)'] },
     ]
   },
   'rank': {
@@ -625,22 +625,22 @@ const details = {
   },
   'translate': {
     title: 'Translator',
-    subtitle: 'Unchanged functionality — extracted to own file in v3',
-    tag: 'green', tagLabel: 'Unchanged',
+    subtitle: 'Shipped v3.1 — extracted to agents/news_translator.py',
+    tag: 'green', tagLabel: 'Shipped v3.1',
     cols: [
-      { heading: 'What it does', items: ['Translates title + summary to recipient language', 'Stores translation in DB alongside original', 'Called post-save, not inline with email sender (v3 extraction)'] },
-      { heading: 'Key file', items: ['agents/news_translator.py (extracted in v3)', 'agents/sap_ai_client.py (GPT-4o translation prompts)'] },
-      { heading: 'Dependencies', items: ['SAP AI Core (GPT-4o)', 'configurations/db.py'] },
+      { heading: 'What it does', items: ['Translates title + summary to recipient language', 'Stores translation in DB alongside original', 'Same-language input is a no-op'] },
+      { heading: 'v3.1 shipped', items: ['Extracted from email_sender.py into its own stage', 'AI-cache ready (record/replay via agents/ai_cache.py)', 'Behaviour-preserving refactor'] },
+      { heading: 'Key file', items: ['agents/news_translator.py', 'agents/sap_ai_client.py (GPT-4o translation prompts)'] },
     ]
   },
   'save-db': {
     title: 'Save to DB',
-    subtitle: 'NEW explicit step in v3 — persists all annotations before email filter',
-    tag: 'blue', tagLabel: 'New in v3',
+    subtitle: 'Partly shipped v3.1 — attribution + dedup_status done; rank/labels v3.2+',
+    tag: 'blue', tagLabel: 'Partial — v3.2+',
     cols: [
-      { heading: 'What it does', items: ['Writes each item with full 4D model to news_items', 'Stores: rank (1–5), topic labels, LoB relevance, classification', 'Stores: published_at, fetched_at, source_type, hash_signature', 'Runs per-source — not once at the end of all collecting', 'Items immediately visible in Review UI after this step'] },
-      { heading: 'Key file', items: ['configurations/db.py (news_items INSERT/UPDATE)', 'agents/agents_controller.py (save loop per source)', 'Schema: news_items + rank + labels + status columns (v3 new columns)'] },
-      { heading: 'DB writes', items: ['news_items — full item record', 'rank — Tier output (1–5)', 'topic_labels — tagger output', 'lob_relevance — glossary match score', 'classification — NEW / UPDATE / REPEATED / DUPLICATE'] },
+      { heading: 'Shipped v3.1', items: ['publisher / authority_id / authority_status columns (ATTRIBUTE stage)', 'dedup_status (new / update / duplicate) persisted', 'Per-source save during compare'] },
+      { heading: 'Pending v3.2+', items: ['rank (1–5) from Ranker', 'topic_labels from Tagger (v3.3)', 'Full 4D model per item'] },
+      { heading: 'Key file', items: ['configurations/db.py (news_items INSERT/UPDATE)', 'agents/authority_attributor.py (v3.1)', 'agents/compare_news.py (dedup_status)'] },
     ]
   },
   'email-send': {
@@ -655,12 +655,12 @@ const details = {
   },
   'baseline': {
     title: 'Update Baseline',
-    subtitle: 'Modified in v3 — per-source fetch anchoring replaces global window',
-    tag: 'yellow', tagLabel: 'Modified in v3',
+    subtitle: 'Shipped v3.1 — per-source fetch anchoring (F1/F4)',
+    tag: 'green', tagLabel: 'Shipped v3.1',
     cols: [
       { heading: 'What it does', items: ['Stores processed items in SQLite news_items', 'Updates last_fetch_date per source after success', 'Enables deduplication on next run'] },
-      { heading: 'v3 change', items: ['Per-source last_successful_fetch anchor (not global MAX_NEWS_AGE_DAYS)', 'New sources fall back to profile.date_scope days', 'Force-fetch mode treats last_successful_fetch as null (bounded by date_scope)'] },
-      { heading: 'Key file', items: ['configurations/db.py', 'agents/agents_controller.py (baseline update logic)'] },
+      { heading: 'v3.1 shipped', items: ['Per-source anchor written immediately on each feed success (F4)', 'New sources fall back to profile.date_scope days (F1)', 'Force-fetch treats anchor as null, bounded by date_scope (F5)'] },
+      { heading: 'Key file', items: ['configurations/db.py', 'agents/agents_controller.py (per-feed anchor write)'] },
     ]
   },
   'log-monitor': {
