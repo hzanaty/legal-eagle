@@ -1969,6 +1969,7 @@ def admin_review_news(profile_id: int):
         recently_run_count=shell["recently_run_count"],
         never_run_count=shell["never_run_count"],
         authorities_for_override=authorities_for_override,
+        profile_id=profile_id,
     )
 
 
