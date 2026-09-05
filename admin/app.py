@@ -1260,6 +1260,9 @@ def save_url_simulation(profile_id: int):
     add_audit_log(conn, entity="url_sources", action="simulate", details=f"url={url}", profile_id=profile_id)
     conn.close()
     return jsonify({"ok": True})
+
+
+@app.route("/admin/profiles/<int:profile_id>/urls/update", methods=["POST"])
 def update_url_source_route(profile_id: int):
     url = request.form.get("url", "").strip()          # original URL (identity key)
     new_url = request.form.get("new_url", "").strip()  # updated URL (may differ)
@@ -1390,6 +1393,18 @@ def delete_tweet_account_route(profile_id: int):
     add_audit_log(conn, entity="tweet_accounts", action="delete", details=handle, profile_id=profile_id)
     conn.close()
     flash("Twitter account removed.", "success")
+    return redirect(url_for("admin_profile_detail", profile_id=profile_id))
+
+
+@app.route("/admin/profiles/<int:profile_id>/tweets/clear-error", methods=["POST"])
+def clear_twitter_error_flag_route(profile_id: int):
+    from configurations.db import set_setting
+    conn = get_connection()
+    create_schema_if_needed(conn)
+    set_setting(conn, profile_id, "twitter_error_flag", "")
+    add_audit_log(conn, entity="tweet_accounts", action="clear_error", details="", profile_id=profile_id)
+    conn.close()
+    flash("Twitter error flag cleared.", "success")
     return redirect(url_for("admin_profile_detail", profile_id=profile_id))
 
 
