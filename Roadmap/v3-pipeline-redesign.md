@@ -276,7 +276,25 @@ Challenge
 
 ---
 
-## 10. Email Structure (v3)
+## 10. Review Hierarchy Terminology (v3.4+)
+
+The three levels of the Review tab hierarchy, locked in v3.4:
+
+| Level | Term | Description | DB / Field |
+|---|---|---|---|
+| 1 | **Topic** | Broad regulatory area from glossary tagger | `news_items.topic_label` |
+| 2 | **Announcement** | AI-generated draft in Law2Spec Announcement format (Introduction / Business Need / Related Resources) | `news_announcements` table (renamed from `news_aspects` in v3.4) |
+| 3 | **Sources** | Individual news articles that back the Announcement | `news_items` rows (via `news_announcements.item_ids_json`) |
+
+**Why "Announcement":** The content in `announcement_md` is structured to match the SAP RCM / Law2Spec Announcement template. Calling it "Announcement" makes the intent explicit to LPMs.
+
+**Rendering timeline:**
+- v3.4: inline markdown rendering of `announcement_md` in Review tab
+- v3.6: full RCM-branded template page with publish action and JIRA linking
+
+---
+
+## 11. Email Structure (v3)
 
 Each email section:
 - Organized by Topic Label (primary glossary tag)
@@ -449,16 +467,18 @@ Follows lifecycle order: final Review enhancement, depends on Tag (Phase 3) bein
 - "+ Add to Glossary" inline action in Review UI
 - AI pre-suggests keywords; user confirms; glossary updated immediately without navigation
 
-### Phase 6 — Impact Analysis Agent
-Produces the "Expected Solution" half of a Law2Spec epic. Together with the v3.3 email digest (Announcement half), LPMs have all inputs needed to create a Law2Spec epic.
+### Phase 6 — Impact Analysis Agent + Announcement View Enhancement
+Produces the "Expected Solution" half of a Law2Spec epic. Together with the v3.4 Announcement view, LPMs have all inputs needed to create a Law2Spec epic.
 
-- **Aspect persistence:** during digest generation, `email_composer.py` saves each detected aspect to `news_aspects` table — including `announcement_md` formatted to Law2Spec Announcement structure (Introduction / Background / Related Resources)
-- **Two-level Review grouping:** item list gains topic rows (Level 1, collapsible) and aspect rows (Level 2, collapsible) when `news_aspects` data exists; falls back to flat list otherwise
-- **"Preview Announcement"** button on each aspect row → modal with saved `announcement_md` → Copy MD (paste into Law2Spec "Text" field)
-- **"Preview Analysis"** button on each aspect row → triggers impact agent on first click (saves to `news_aspects.impact_analysis_md`); subsequent clicks load cached result → Copy MD + Regenerate (paste into Law2Spec "Prompt" field)
-- **New files:** `agents/impact_analyzer.py` (single AI call per aspect); `POST /admin/analyze-impact` (aspect_id + profile_id); `GET /admin/aspect-announcement` (stateless read)
-- **New DB table:** `news_aspects` (run_id, topic_label, title, announcement_md, impact_analysis_md, source_links_json, item_ids_json)
-- **Spec:** `docs/superpowers/specs/2026-07-03-impact-analysis-agent.md`
+**Note:** v3.4 already ships the basic 3-level hierarchy (Topic→Announcement→Sources) and inline markdown rendering of `announcement_md`. Phase 6 ENHANCES that view — it does not build it from scratch.
+
+- **Impact Analysis Agent:** `agents/impact_analyzer.py` — single AI call per announcement; result saved to `news_announcements.impact_analysis_md`
+- **"Preview Analysis"** button on each Announcement row → triggers impact agent on first click (saves to `news_announcements.impact_analysis_md`); subsequent clicks load cached result → Copy MD + Regenerate (paste into Law2Spec "Prompt" field)
+- **Full RCM-branded Announcement template:** dedicated page with Law2Spec-aligned template, branding, publish action (sends to RCM), JIRA Legal Change creation from announcement content
+- **Announcement editing:** user can edit `announcement_md` before publishing; saves back to `news_announcements`
+- **New files:** `agents/impact_analyzer.py`; `POST /admin/analyze-impact` (announcement_id + profile_id); `GET /admin/announcement-template/<id>` (full RCM template page)
+- **Existing table (v3.4):** `news_announcements` (run_id, topic_label, title, announcement_md, item_ids_json) — add `impact_analysis_md` column in v3.6 migration
+- **Spec:** `docs/superpowers/specs/2026-07-03-impact-analysis-agent.md` (update before starting v3.6 — references `news_aspects`, must be renamed)
 
 ---
 
@@ -472,9 +492,9 @@ Versions are targets — none are implemented yet. Each version is reached when 
 | **v3.1** | Phase 1 | All structural fixes (bugs B1–B8, F1–F5, F7–F9) + Source Simulator. No pipeline behaviour change visible to email recipients. **Run All Active backend:** sequential background thread, skip-on-failure, SSE live row updates on dashboard. **Source Attribution (pipeline):** `publisher`/`authority_id`/`authority_status` columns on `news_items`; ATTRIBUTE stage (configured path — stamps from feed config, no AI); Publisher + Authority columns populated in Review UI; same-authority dedup threshold lowering. **Test Harness v3.1:** first full pipeline run against Xanadu (XN/HCM) test profile; asserts pass/filter/duplicate outcomes + publisher/authority values on all items. |
 | **v3.2** | Phase 2 | Ranking engine live; rank badges in Review UI. Email still uses old threshold. **Source Attribution (AI + ranking):** ATTRIBUTE AI path for mixed publishers (ai_suggested status + ✦ spark icon + override UI); Tier 1 first-party source rank boost. **Test Harness v3.2:** adds `expected_rank_min` assertions on A1–A4; adds `repetition_count = 3` to seed rows S4–S6; asserts REPEATED tag + rank +1 boost on R1–R3; asserts ✦ ai_suggested status on items from mixed-publisher feeds. |
 | **v3.3** | Phase 3 | Email gated on rank ≥ 3; tagging replaces grouping; publish dates on cards. **Email V2 digest format** — AI newsletter grouped by Authority then Topic Label; Law2Spec Announcement-aligned structure; decoupled from run; Resend button; manual send from Review. **Test Harness v3.3:** adds `expected_email_eligible: true` assertions for rank ≥ 3 items; adds `expected_authority_group` assertions matching digest grouping. |
-| **v3.4** | Phase 4 | Challenge + grounding loop; self-improving Tier 1 rules; Re-rank action (F6). **Test Harness v3.4:** pre-seeds one `ranking_grounding` row in baseline; asserts `expected_tier: "tier1"` on the matching item (Tier 1 pattern extracted from grounding catches it without AI). |
+| **v3.4** | Phase 4 | Challenge + grounding loop; self-improving Tier 1 rules; Re-rank action (F6). **Also pulled forward from Phase 6:** V2 digest wired into pipeline (`email_composer.generate_digest()` replaces old `email_sender` call); Review tab restructured into **Topic→Announcement→Sources** nested hierarchy (Option A: nested indent); clicking an Announcement renders `announcement_md` as markdown inline (intro, business need, sources). Terminology locked: Level 1 = Topic, Level 2 = Announcement (`news_announcements` table — renamed from `news_aspects`), Level 3 = Sources. **Test Harness v3.4:** pre-seeds one `ranking_grounding` row in baseline; asserts `news_announcements` table exists + has rows after run; asserts `human_rank_override` column exists. **Spec:** `docs/superpowers/specs/2026-09-05-v3-4-challenge-grounding-design.md` |
 | **v3.5** | Phase 5 | Glossary gap alert; inline "+ Add to Glossary" in Review UI. **Test Harness v3.5:** adds one item to `xn_feed_a_relevant.xml` with rank ≥ 3 + no glossary keyword match; asserts `expected_gap_badge: true` on that item. |
-| **v3.6** | Phase 6 | **Impact Analysis Agent** — digest generation persists aspects to `news_aspects` table with `announcement_md` (Law2Spec Announcement format). Review tab gains 2-level grouping: topic rows + aspect rows. Each aspect row has **"Preview Announcement"** (instant, from DB) + **"Preview Analysis"** (AI on first click, cached thereafter). Both open modals with Copy MD. Together with the v3.3 digest, LPM has both halves to create a Law2Spec epic. **Spec:** `docs/superpowers/specs/2026-07-03-impact-analysis-agent.md` |
+| **v3.6** | Phase 6 | **Impact Analysis Agent + Announcement View Enhancement** — v3.4 already ships the basic Announcement view (markdown rendering inline). v3.6 ENHANCES it: full RCM-branded template page (publish action, JIRA Legal Change creation, branding). Also adds: `agents/impact_analyzer.py` (AI impact analysis per announcement, saves to `news_announcements.impact_analysis_md`); **"Preview Analysis"** button on each Announcement row → AI on first click, cached thereafter → Copy MD. Together with the v3.4 Announcement view, LPMs have both halves to create a Law2Spec epic. **Spec:** `docs/superpowers/specs/2026-07-03-impact-analysis-agent.md` (update before starting v3.6) |
 
 ---
 
