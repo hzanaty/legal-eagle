@@ -10,15 +10,6 @@
   h1 { font-size: 20px; font-weight: 600; color: #e6edf3; margin-bottom: 4px; }
   .tagline { font-size: 13px; color: #7d8590; margin-bottom: 28px; }
 
-  .legend { display: flex; gap: 20px; margin-bottom: 28px; align-items: center; flex-wrap: wrap; }
-  .leg { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #7d8590; }
-  .dot { width: 10px; height: 10px; border-radius: 50%; }
-  .dot.green  { background: #3fb950; }
-  .dot.yellow { background: #d29922; }
-  .dot.red    { background: #f85149; }
-  .dot.blue   { background: #58a6ff; }
-  .dot.grey   { background: #484f58; }
-
   .phase-block {
     display: flex;
     align-items: stretch;
@@ -78,11 +69,8 @@
     height: 3px;
     border-radius: 6px 6px 0 0;
   }
-  .green::before  { background: #e6edf3; }
-  .yellow::before { background: #d29922; }
-  .red::before    { background: #f85149; }
-  .blue::before   { background: #58a6ff; }
-  .grey::before   { background: #e6edf3; }
+  .built::before  { background: #e6edf3; }   /* shipped / existing */
+  .future::before { background: #f85149; }    /* v3.6 + V4, not built yet */
 
   /* Substep group container */
   .substep-group {
@@ -190,25 +178,25 @@
 <div class="phase-block">
   <div class="phase-header setup">Setup</div>
   <div class="steps">
-    <div class="step grey" onclick="showDetail('profile-config')">
+    <div class="step built" onclick="showDetail('profile-config')">
       <span class="actor human" title="Human"><svg class="ic"><use href="#ic-human"/></svg></span>
       <div class="step-name">Profile Config</div>
       <div class="step-sub">Admin UI</div>
     </div>
     <div class="inner-arrow">›</div>
-    <div class="step grey" onclick="showDetail('glossary')">
+    <div class="step built" onclick="showDetail('glossary')">
       <span class="actor human" title="Human"><svg class="ic"><use href="#ic-human"/></svg></span>
       <div class="step-name">Glossary</div>
       <div class="step-sub">Terms &amp; synonyms</div>
     </div>
     <div class="inner-arrow">›</div>
-    <div class="step grey" onclick="showDetail('sources')">
+    <div class="step built" onclick="showDetail('sources')">
       <span class="actor human" title="Human"><svg class="ic"><use href="#ic-human"/></svg></span>
       <div class="step-name">Sources</div>
       <div class="step-sub">RSS / Twitter / URL</div>
     </div>
     <div class="inner-arrow">›</div>
-    <div class="step grey" onclick="showDetail('receivers')">
+    <div class="step built" onclick="showDetail('receivers')">
       <span class="actor human" title="Human"><svg class="ic"><use href="#ic-human"/></svg></span>
       <div class="step-name">Email Receivers</div>
       <div class="step-sub">Language per recipient</div>
@@ -226,13 +214,13 @@
     <!-- ① Start -->
     <div class="substep-group">
       <div class="substep-label">① Start</div>
-      <div class="substep grey" onclick="showDetail('run-select')">
+      <div class="substep built" onclick="showDetail('run-select')">
         <span class="actor human" title="Human"><svg class="ic"><use href="#ic-human"/></svg></span>
         <div class="step-name">Select Profile</div>
         <div class="step-sub">Manual / Scheduled</div>
       </div>
       <div class="inner-arrow">›</div>
-      <div class="substep green" onclick="showDetail('health-check')">
+      <div class="substep built" onclick="showDetail('health-check')">
         <span class="actor system" title="System"><svg class="ic"><use href="#ic-system"/></svg></span>
         <div class="step-name">Health Check</div>
         <div class="step-sub">APIs + Gmail + DB · v3.1</div>
@@ -244,25 +232,25 @@
     <!-- ② Collect -->
     <div class="substep-group">
       <div class="substep-label">② Collect</div>
-      <div class="substep green" onclick="showDetail('rss')">
+      <div class="substep built" onclick="showDetail('rss')">
         <span class="actor agent" title="Agent"><svg class="ic"><use href="#ic-agent"/></svg></span>
         <div class="step-name">RSS</div>
         <div class="step-sub">feedparser</div>
       </div>
       <div class="inner-arrow">›</div>
-      <div class="substep green" onclick="showDetail('twitter')">
+      <div class="substep built" onclick="showDetail('twitter')">
         <span class="actor agent" title="Agent"><svg class="ic"><use href="#ic-agent"/></svg></span>
         <div class="step-name">Twitter</div>
         <div class="step-sub">API v2</div>
       </div>
       <div class="inner-arrow">›</div>
-      <div class="substep green" onclick="showDetail('url-scrape')">
+      <div class="substep built" onclick="showDetail('url-scrape')">
         <span class="actor agent" title="Agent"><svg class="ic"><use href="#ic-agent"/></svg></span>
         <div class="step-name">URL Scrape</div>
         <div class="step-sub">req + Playwright · v3.1</div>
       </div>
       <div class="inner-arrow">›</div>
-      <div class="substep green" onclick="showDetail('email-inbox')">
+      <div class="substep built" onclick="showDetail('email-inbox')">
         <span class="actor agent" title="Agent"><svg class="ic"><use href="#ic-agent"/></svg></span>
         <div class="step-name">Email Inbox</div>
         <div class="step-sub">IMAP / Gmail</div>
@@ -274,37 +262,37 @@
     <!-- ③ Process -->
     <div class="substep-group">
       <div class="substep-label">③ Process</div>
-      <div class="substep green" onclick="showDetail('attribute')">
+      <div class="substep built" onclick="showDetail('attribute')">
         <span class="actor agent" title="Agent"><svg class="ic"><use href="#ic-agent"/></svg></span>
         <div class="step-name">Attribute</div>
         <div class="step-sub">Publisher + Authority · v3.2 ✓</div>
       </div>
       <div class="inner-arrow">›</div>
-      <div class="substep green" onclick="showDetail('compare')">
+      <div class="substep built" onclick="showDetail('compare')">
         <span class="actor agent" title="Agent"><svg class="ic"><use href="#ic-agent"/></svg></span>
         <div class="step-name">Compare</div>
         <div class="step-sub">Dedup + classify · v3.1</div>
       </div>
       <div class="inner-arrow">›</div>
-      <div class="substep green" onclick="showDetail('rank')">
+      <div class="substep built" onclick="showDetail('rank')">
         <span class="actor agent" title="Agent"><svg class="ic"><use href="#ic-agent"/></svg></span>
         <div class="step-name">Rank</div>
         <div class="step-sub">3-tier engine · v3.2 ✓</div>
       </div>
       <div class="inner-arrow">›</div>
-      <div class="substep green" onclick="showDetail('tag')">
+      <div class="substep built" onclick="showDetail('tag')">
         <span class="actor agent" title="Agent"><svg class="ic"><use href="#ic-agent"/></svg></span>
         <div class="step-name">Tag</div>
         <div class="step-sub">Glossary labels · v3.3</div>
       </div>
       <div class="inner-arrow">›</div>
-      <div class="substep green" onclick="showDetail('translate')">
+      <div class="substep built" onclick="showDetail('translate')">
         <span class="actor agent" title="Agent"><svg class="ic"><use href="#ic-agent"/></svg></span>
         <div class="step-name">Translate</div>
         <div class="step-sub">SAP AI Core · v3.1</div>
       </div>
       <div class="inner-arrow">›</div>
-      <div class="substep green" onclick="showDetail('save-db')">
+      <div class="substep built" onclick="showDetail('save-db')">
         <span class="actor db" title="Database"><svg class="ic"><use href="#ic-db"/></svg></span>
         <div class="step-name">Save to DB</div>
         <div class="step-sub">items + announcements · v3.3</div>
@@ -316,19 +304,19 @@
     <!-- ④ Finish -->
     <div class="substep-group">
       <div class="substep-label">④ Finish</div>
-      <div class="substep green" onclick="showDetail('email-send')">
+      <div class="substep built" onclick="showDetail('email-send')">
         <span class="actor agent" title="Agent"><svg class="ic"><use href="#ic-agent"/></svg></span>
         <div class="step-name">Send Email</div>
         <div class="step-sub">V2 digest · v3.3</div>
       </div>
       <div class="inner-arrow">›</div>
-      <div class="substep green" onclick="showDetail('baseline')">
+      <div class="substep built" onclick="showDetail('baseline')">
         <span class="actor db" title="Database"><svg class="ic"><use href="#ic-db"/></svg></span>
         <div class="step-name">Update Baseline</div>
         <div class="step-sub">SQLite store · v3.1</div>
       </div>
       <div class="inner-arrow">›</div>
-      <div class="substep grey" onclick="showDetail('log-monitor')">
+      <div class="substep built" onclick="showDetail('log-monitor')">
         <span class="actor system" title="System"><svg class="ic"><use href="#ic-system"/></svg></span>
         <div class="step-name">Log Monitor</div>
         <div class="step-sub">Live SSE stream</div>
@@ -414,43 +402,43 @@
 <div class="phase-block">
   <div class="phase-header review">Review</div>
   <div class="steps">
-    <div class="step grey" onclick="showDetail('review-news')">
+    <div class="step built" onclick="showDetail('review-news')">
       <span class="actor human" title="Human"><svg class="ic"><use href="#ic-human"/></svg></span>
       <div class="step-name">Review News</div>
       <div class="step-sub">Score + bulk actions</div>
     </div>
     <div class="inner-arrow">›</div>
-    <div class="step green" onclick="showDetail('challenge')">
+    <div class="step built" onclick="showDetail('challenge')">
       <span class="actor human" title="Human"><svg class="ic"><use href="#ic-human"/></svg></span>
       <div class="step-name">Challenge Rank</div>
       <div class="step-sub">Override + grounding</div>
     </div>
     <div class="inner-arrow">›</div>
-    <div class="step green" onclick="showDetail('glossary-gap')">
+    <div class="step built" onclick="showDetail('glossary-gap')">
       <span class="actor human" title="Human"><svg class="ic"><use href="#ic-human"/></svg></span>
       <div class="step-name">Glossary Gap</div>
       <div class="step-sub">Gap badge · v3.5</div>
     </div>
     <div class="inner-arrow">›</div>
-    <div class="step red" onclick="showDetail('rcm-publish')">
+    <div class="step future" onclick="showDetail('rcm-publish')">
       <span class="actor human" title="Human"><svg class="ic"><use href="#ic-human"/></svg></span>
       <div class="step-name">Preview for RCM</div>
       <div class="step-sub">RCM template popup · v3.6</div>
     </div>
     <div class="inner-arrow">›</div>
-    <div class="step red" onclick="showDetail('announce-agent')">
+    <div class="step future" onclick="showDetail('announce-agent')">
       <span class="actor agent" title="Agent"><svg class="ic"><use href="#ic-agent"/></svg></span>
       <div class="step-name">Announce Agent</div>
       <div class="step-sub">Write → JIRA · V4</div>
     </div>
     <div class="inner-arrow">›</div>
-    <div class="step red" onclick="showDetail('impact-analysis')">
+    <div class="step future" onclick="showDetail('impact-analysis')">
       <span class="actor agent" title="Agent"><svg class="ic"><use href="#ic-agent"/></svg></span>
       <div class="step-name">Impact Analysis</div>
       <div class="step-sub">AI per aspect · V4</div>
     </div>
     <div class="inner-arrow">›</div>
-    <div class="step grey" onclick="showDetail('legal-repo')">
+    <div class="step built" onclick="showDetail('legal-repo')">
       <span class="actor human" title="Human"><svg class="ic"><use href="#ic-human"/></svg></span>
       <div class="step-name">Legal Repo</div>
       <div class="step-sub">Map to JIRA / SAP Notes</div>
