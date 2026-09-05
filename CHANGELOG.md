@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## v3.5 — 2026-09-05
+### Glossary Gap Alert
+
+- **`glossary_gap` column** on `news_items` (`configurations/db.py`): set by the Tag stage when `significance_rank ≥ 3` AND `topic_label = ["General"]` — a rank-significant item the current glossary cannot explain.
+- **`flag_glossary_gaps()`** (`agents/news_tagger.py`): runs after `save_topic_labels()` in the TAG stage (`agents/agents_controller.py`); same id/source_id/url/hash fallback persistence as topic labels.
+- **Review tab** (`admin/templates/review_news.html`): `⚠ N glossary gaps` toolbar strip with "Show only gaps" (reuses the existing LoB=gap filter chip); `⚠ Gap — no LoB match` badge per gap card (template was pre-scaffolded, now activated via `is_gap`).
+- **Inline "+ Add to Glossary" panel**: AI suggests keywords for the item; user confirms a term + LoB; term is saved, item re-tagged, and the gap flag cleared — no navigation away.
+- **New routes** (`admin/app.py`): `POST /admin/profiles/<id>/glossary/suggest` (AI keyword suggestions, regex fallback), `POST /admin/news/<id>/add-to-glossary` (add term + re-tag + clear flag).
+- **Test Harness v3.5**: A5 `workplace safety` item (Tier-1 signal `min_rank=4`, no glossary match) asserts `glossary_gap=1`; maternity-leave item asserts `glossary_gap=0`. 34/34 pass (4 skipped — AI).
+- **Docs**: `docs/lifecycle.html` corrected — the mislabeled "RCM Publish · v3.5" card is now split into a shipped green "Glossary Gap · v3.5" card and a "RCM Publish · v3.6" card (RCM/JIRA publish is v3.6, not v3.5).
+
 ## v3.4 — 2026-09-05
 ### Challenge + Grounding loop
 

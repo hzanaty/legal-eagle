@@ -170,7 +170,7 @@
 <body>
 
 <h1>Legal Eagle — System Lifecycle</h1>
-<p class="tagline">v3.4 shipped &nbsp;·&nbsp; v3.5 planned &nbsp;·&nbsp; Click any step for details</p>
+<p class="tagline">v3.5 shipped &nbsp;·&nbsp; v3.6 planned &nbsp;·&nbsp; Click any step for details</p>
 
 <div class="legend">
   <span style="font-size:11px;color:#484f58;text-transform:uppercase;letter-spacing:1px;margin-right:4px;">Phases</span>
@@ -415,9 +415,14 @@
       <div class="step-sub">Override + grounding</div>
     </div>
     <div class="inner-arrow">›</div>
+    <div class="step green" onclick="showDetail('glossary-gap')">
+      <div class="step-name">Glossary Gap</div>
+      <div class="step-sub">Gap badge · v3.5</div>
+    </div>
+    <div class="inner-arrow">›</div>
     <div class="step blue" onclick="showDetail('rcm-publish')">
       <div class="step-name">RCM Publish</div>
-      <div class="step-sub">Announcement template · v3.5</div>
+      <div class="step-sub">Announcement template · v3.6</div>
     </div>
     <div class="inner-arrow">›</div>
     <div class="step blue" onclick="showDetail('impact-analysis')">
@@ -716,13 +721,23 @@ const details = {
       { heading: 'Harness', items: ['python3 tests/run_harness.py --version v3.4 → 32/32 (4 skipped — AI)'] },
     ]
   },
+  'glossary-gap': {
+    title: 'Glossary Gap Alert',
+    subtitle: 'Shipped v3.5 — Gap badge + inline Add to Glossary for rank ≥ 3 items with no glossary match',
+    tag: 'green', tagLabel: 'Shipped v3.5',
+    cols: [
+      { heading: 'What it does', items: ['glossary_gap flag set by Tag stage when significance_rank ≥ 3 AND topic_label = ["General"]', '⚠ "N glossary gaps" strip in Review toolbar with "Show only gaps" (reuses LoB=gap filter)', '⚠ Gap — no LoB match badge on each gap item card', '+ Add to Glossary panel: AI suggests keywords, user confirms inline', 'On confirm: term saved, item re-tagged, gap flag cleared — no navigation away'] },
+      { heading: 'Key files', items: ['agents/news_tagger.py — flag_glossary_gaps()', 'configurations/db.py — glossary_gap column + is_gap mapping', 'agents/agents_controller.py — gap check after TAG stage', 'admin/app.py — /glossary/suggest + /add-to-glossary', 'admin/templates/review_news.html — strip + panel + JS'] },
+      { heading: 'Harness', items: ['python3 tests/run_harness.py --version v3.5 → 34/34 (4 skipped — AI)'] },
+    ]
+  },
   'rcm-publish': {
     title: 'RCM Publish',
-    subtitle: 'Planned v3.5 — RCM-branded announcement template + JIRA Legal Change creation',
-    tag: 'blue', tagLabel: 'Planned v3.5',
+    subtitle: 'Planned v3.6 — RCM-branded announcement template + JIRA Legal Change creation',
+    tag: 'blue', tagLabel: 'Planned v3.6',
     cols: [
-      { heading: 'What it does', items: ['Full RCM-branded template page per announcement', 'Publish action → sends announcement to RCM', 'JIRA Legal Change creation directly from announcement', 'Announcement editing before publish', 'Glossary gap badge backend (gap alerts in Review tab)'] },
-      { heading: 'Key files (planned)', items: ['admin/templates/review_news.html — announcement template UI', 'admin/app.py — POST /admin/announcements/&lt;id&gt;/publish', 'agents/ — glossary gap detection'] },
+      { heading: 'What it does', items: ['Full RCM-branded template page per announcement', 'Publish action → sends announcement to RCM', 'JIRA Legal Change creation directly from announcement', 'Announcement editing before publish'] },
+      { heading: 'Key files (planned)', items: ['admin/templates/review_news.html — announcement template UI', 'admin/app.py — POST /admin/announcements/&lt;id&gt;/publish'] },
     ]
   },
   'impact-analysis': {
