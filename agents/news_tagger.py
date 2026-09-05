@@ -70,3 +70,44 @@ def save_topic_labels(items: list[dict], conn: sqlite3.Connection, profile_id: i
                 (label, pid, src_type, hash_sig),
             )
     conn.commit()
+
+
+def flag_glossary_gaps(items: list[dict], conn: sqlite3.Connection, profile_id: int | None = None) -> None:
+    """Set glossary_gap=1 for items with significance_rank >= 3 and no real glossary match.
+
+    topic_label == '["General"]' means the tagger found zero glossary term matches.
+    NULL topic_label (item was never tagged) is never flagged. Uses the same
+    id / source_id / url / hash_signature fallback persistence as save_topic_labels().
+    """
+    GENERAL = json.dumps(["General"])
+    for item in items:
+        rank = int(item.get("significance_rank") or 0)
+        label = item.get("topic_label")
+        is_gap = 1 if (rank >= 3 and label == GENERAL) else 0
+        item["glossary_gap"] = is_gap
+
+        item_id = item.get("id")
+        src_type = item.get("source_type", "RSS")
+        src_id   = item.get("source_id") or item.get("guid") or item.get("tweet_id")
+        url      = item.get("url") or item.get("link")
+        hash_sig = item.get("hash_signature")
+        pid      = item.get("profile_id") or profile_id
+
+        if item_id:
+            conn.execute("UPDATE news_items SET glossary_gap=? WHERE id=?", (is_gap, item_id))
+        elif src_id and pid:
+            conn.execute(
+                "UPDATE news_items SET glossary_gap=? WHERE profile_id=? AND source_type=? AND source_id=?",
+                (is_gap, pid, src_type, src_id),
+            )
+        elif url and pid:
+            conn.execute(
+                "UPDATE news_items SET glossary_gap=? WHERE profile_id=? AND source_type=? AND url=?",
+                (is_gap, pid, src_type, url),
+            )
+        elif hash_sig and pid:
+            conn.execute(
+                "UPDATE news_items SET glossary_gap=? WHERE profile_id=? AND source_type=? AND hash_signature=?",
+                (is_gap, pid, src_type, hash_sig),
+            )
+    conn.commit()
