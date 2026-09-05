@@ -124,15 +124,14 @@ def run_assertions(conn: sqlite3.Connection, profile_id: int, version: str, ai_a
                 ok = val is not None and int(val) >= a["min_rank"]
                 msg = f"significance_rank={val}, expected >= {a['min_rank']}" if not ok else ""
                 results.append((ok, desc, msg))
-        elif t == "news_aspects_entry":
-            # Assert a news_aspects row exists for the given topic_label.
-            # (test.db is single-profile, so no need to filter by run_id/profile_id)
+        elif t == "news_aspects_entry" or t == "news_announcements_entry":
+            # Assert a news_announcements row exists for the given topic_label.
             count = conn.execute(
-                "SELECT COUNT(*) FROM news_aspects WHERE LOWER(topic_label) LIKE ?",
+                "SELECT COUNT(*) FROM news_announcements WHERE LOWER(topic_label) LIKE ?",
                 (f"%{a['topic_label'].lower()}%",),
             ).fetchone()[0]
             ok = count > 0
-            results.append((ok, desc, f"no news_aspects row with topic_label '{a['topic_label']}'" if not ok else ""))
+            results.append((ok, desc, f"no news_announcements row with topic_label '{a['topic_label']}'" if not ok else ""))
 
     print(f"\n[TEST] Legal Eagle {version} — Xanadu (XN/HCM)")
     all_pass = True

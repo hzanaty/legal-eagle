@@ -7,7 +7,7 @@
     {"type": "column_exists", "table": "news_items", "column": "email_eligible", "description": "news_items.email_eligible column exists"},
     {"type": "column_exists", "table": "news_items", "column": "email_sent",     "description": "news_items.email_sent column exists"},
     {"type": "column_exists", "table": "runs",       "column": "email_status",   "description": "runs.email_status column exists"},
-    {"type": "table_exists",  "table": "news_aspects",                           "description": "news_aspects table exists"},
+    {"type": "table_exists",  "table": "news_announcements",                      "description": "news_announcements table exists (renamed from news_aspects in v3.4)"},
 
     {"type": "item_outcome", "title_contains": "maternity leave",
      "expect_table": "news_items",
@@ -45,11 +45,11 @@
      "fields": {"email_eligible": "0"},
      "description": "R2 duplicate (rank 0) → email_eligible=0"},
 
-    {"type": "news_aspects_entry", "topic_label": "maternity leave",
-     "description": "news_aspects has maternity leave group (A1)"},
-    {"type": "news_aspects_entry", "topic_label": "pension fund",
-     "description": "news_aspects has pension fund group (A4)"},
-    {"type": "news_aspects_entry", "topic_label": "health insurance",
-     "description": "news_aspects has health insurance group (C4)", "requires_ai": true}
+    {"type": "news_announcements_entry", "topic_label": "maternity leave",
+     "description": "news_announcements has maternity leave group (A1)"},
+    {"type": "news_announcements_entry", "topic_label": "pension fund",
+     "description": "news_announcements has pension fund group (A4)"},
+    {"type": "news_announcements_entry", "topic_label": "health insurance",
+     "description": "news_announcements has health insurance group (C4)", "requires_ai": true}
   ]
 }

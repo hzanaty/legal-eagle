@@ -3,8 +3,8 @@ Email Composer — V2 AI Digest (v3.3)
 
 Generates an HTML digest email from email_eligible news items.
 Grouping: Authority (outer) → Topic Label (inner).
-One AI call per authority+topic group to detect aspects.
-Writes rows to news_aspects table.
+One AI call per authority+topic group to detect announcements.
+Writes rows to news_announcements table.
 """
 
 import json
@@ -106,7 +106,7 @@ def _get_profile_language(conn: sqlite3.Connection, profile_id: int) -> str:
     return (row["language"] if row else "en") or "en"
 
 
-def _save_aspect(
+def _save_announcement(
     conn: sqlite3.Connection,
     run_id: int,
     topic_label: str,
@@ -115,7 +115,7 @@ def _save_aspect(
 ) -> None:
     conn.execute(
         """
-        INSERT INTO news_aspects(run_id, topic_label, title, announcement_md,
+        INSERT INTO news_announcements(run_id, topic_label, title, announcement_md,
                                  first_published, source_links_json, item_ids_json)
         VALUES(?,?,?,?,?,?,?)
         """,
@@ -199,8 +199,8 @@ def generate_digest(
 ) -> str:
     """Generate the V2 HTML email digest.
 
-    Grouping: authority → topic_label → AI-detected aspects.
-    Writes news_aspects rows. Returns rendered HTML string.
+    Grouping: authority → topic_label → AI-detected announcements.
+    Writes news_announcements rows. Returns rendered HTML string.
     """
     language = _get_profile_language(conn, profile_id)
     if not profile_name:
@@ -221,8 +221,8 @@ def generate_digest(
         for lbl in labels:
             authority_groups.setdefault(aid, {}).setdefault(lbl, []).append(it)
 
-    # Delete any existing aspects for this run (supports Resend idempotency)
-    conn.execute("DELETE FROM news_aspects WHERE run_id=?", (run_id,))
+    # Delete any existing announcements for this run (supports Resend idempotency)
+    conn.execute("DELETE FROM news_announcements WHERE run_id=?", (run_id,))
 
     authority_blocks_html = ""
     for aid, topic_map in authority_groups.items():
@@ -248,7 +248,7 @@ def generate_digest(
 
             item_ids = [int(it["id"]) for it in topic_items if it.get("id")]
             for asp in aspects:
-                _save_aspect(conn, run_id, topic_label, asp, item_ids)
+                _save_announcement(conn, run_id, topic_label, asp, item_ids)
 
             max_rank = max((int(it.get("significance_rank") or 0) for it in topic_items), default=0)
             authority_block += _render_topic_block(topic_label, aspects, max_rank=max_rank)

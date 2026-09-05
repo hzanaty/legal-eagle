@@ -500,10 +500,15 @@ def create_schema_if_needed(conn: sqlite3.Connection) -> None:
             except Exception:
                 pass
 
-        # Digest aspects table (v3.3) — one row per AI-detected aspect per run
+        # Announcements table (v3.4) — one row per AI-detected announcement per run
+        # (renamed from news_aspects in v3.4)
+        try:
+            conn.execute("ALTER TABLE news_aspects RENAME TO news_announcements")
+        except Exception:
+            pass  # already renamed or doesn't exist
         conn.execute(
             """
-            CREATE TABLE IF NOT EXISTS news_aspects (
+            CREATE TABLE IF NOT EXISTS news_announcements (
                 id                 INTEGER PRIMARY KEY AUTOINCREMENT,
                 run_id             INTEGER NOT NULL REFERENCES runs(id),
                 topic_label        TEXT NOT NULL,
