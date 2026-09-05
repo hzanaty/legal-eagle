@@ -206,6 +206,12 @@
       Accepted <strong>{{ accepted_unscored_count }}</strong> · Filtered <strong>{{ filtered_unscored_count }}</strong> · Reviewed <strong>{{ reviewed_count }}</strong>
     </span>
     <span class="items-count" id="itemCount">{{ items|length }} items</span>
+    {% if gap_count %}
+    <span class="gap-count" title="Rank ≥ 3 items with no glossary/LoB match — needs confirmation">
+      &#9888; {{ gap_count }} glossary gap{{ 's' if gap_count != 1 }}
+      <a href="#" onclick="filterGapsOnly(); return false;" style="color:#0a6ed1;margin-left:4px;">Show only gaps</a>
+    </span>
+    {% endif %}
     <button id="sendEmailBtn" onclick="sendEmailSelected()" disabled
             style="font-size:11px;padding:4px 10px;border-radius:4px;border:1px solid #0070b1;
                    background:#fff;color:#0070b1;cursor:pointer;opacity:0.5;"
@@ -353,6 +359,31 @@
         {% if item.translation %}
         <span class="translation-toggle" onclick="toggleTr('tr-{{ item.item_source }}-{{ item.id }}')">&#9656; Show translation</span>
         <div class="item-translation" id="tr-{{ item.item_source }}-{{ item.id }}">{{ item.translation }}</div>
+        {% endif %}
+        {% if item.is_gap %}
+        <button class="gap-add-btn" onclick="openGapPanel({{ item.id }})"
+          style="font-size:11px;color:#e9730c;background:none;border:none;cursor:pointer;margin-top:4px;padding:0;">
+          + Add to Glossary
+        </button>
+        <div id="gappanel-{{ item.id }}" style="display:none;margin-top:6px;padding:8px 10px;
+          background:#fff8f0;border:1px solid #ffe0b2;border-radius:4px;">
+          <div id="gapsugg-{{ item.id }}" style="margin-bottom:6px;color:#6a6d70;font-size:11px;"><em>Loading suggestions…</em></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+            <input id="gapterm-{{ item.id }}" type="text" placeholder="Glossary term…"
+              style="flex:1;min-width:140px;padding:3px 7px;border:1px solid #ccc;border-radius:3px;font-size:12px;">
+            <select id="gaplob-{{ item.id }}"
+              style="padding:3px 6px;border:1px solid #ccc;border-radius:3px;font-size:12px;">
+              <option value="">Any LoB</option>
+              <option value="HCM">HCM</option>
+              <option value="FIN">FIN</option>
+            </select>
+            <button onclick="confirmGapTerm({{ item.id }})"
+              style="background:#0a6ed1;color:#fff;border:none;border-radius:3px;padding:3px 10px;cursor:pointer;font-size:12px;">Confirm</button>
+            <button onclick="document.getElementById('gappanel-{{ item.id }}').style.display='none'"
+              style="background:none;border:1px solid #ccc;border-radius:3px;padding:3px 8px;cursor:pointer;font-size:12px;color:#6a6d70;">Cancel</button>
+          </div>
+          <div id="gapresult-{{ item.id }}" style="margin-top:5px;font-size:11px;color:#107e3e;"></div>
+        </div>
         {% endif %}
       </div>
       <div class="item-actions">
@@ -542,6 +573,62 @@
     });
     var el = document.getElementById('itemCount');
     if (el) el.textContent = vis + ' items';
+  }
+
+  // ── v3.5: Glossary gap ──
+  function filterGapsOnly() {
+    // Ensure the All-Items view is showing, then activate the existing LoB=gap chip
+    showView('items');
+    var chip = document.querySelector('.fchip.gap[data-dim="lob"][data-val="gap"]');
+    if (chip) setFilter(chip);
+  }
+
+  function openGapPanel(itemId) {
+    var panel = document.getElementById('gappanel-' + itemId);
+    if (!panel) return;
+    var isOpen = panel.style.display !== 'none';
+    panel.style.display = isOpen ? 'none' : 'block';
+    if (isOpen) return;
+    fetch('/admin/profiles/' + _profileId + '/glossary/suggest', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({item_id: itemId})
+    }).then(function(r){ return r.json(); }).then(function(d){
+      var box = document.getElementById('gapsugg-' + itemId);
+      box.innerHTML = '';
+      var sugg = (d && d.suggestions) || [];
+      if (!sugg.length) { box.innerHTML = '<em style="color:#999">No suggestions available.</em>'; return; }
+      sugg.forEach(function(s){
+        var chip = document.createElement('span');
+        chip.textContent = s;
+        chip.style.cssText = 'cursor:pointer;background:#e8f4e8;border:1px solid #9dc89d;border-radius:10px;'
+                           + 'padding:1px 8px;font-size:11px;margin:0 4px 4px 0;display:inline-block;';
+        chip.onclick = function(){ document.getElementById('gapterm-' + itemId).value = s; };
+        box.appendChild(chip);
+      });
+    }).catch(function(){
+      document.getElementById('gapsugg-' + itemId).innerHTML = '<em style="color:#999">AI unavailable — type a term below.</em>';
+    });
+  }
+
+  function confirmGapTerm(itemId) {
+    var term = document.getElementById('gapterm-' + itemId).value.trim();
+    var category = document.getElementById('gaplob-' + itemId).value;
+    if (!term) { alert('Enter a term first.'); return; }
+    var result = document.getElementById('gapresult-' + itemId);
+    result.style.color = '#107e3e';
+    result.textContent = 'Saving…';
+    fetch('/admin/news/' + itemId + '/add-to-glossary', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({term: term, category: category})
+    }).then(function(r){ return r.json(); }).then(function(d){
+      if (d && d.ok) {
+        result.textContent = '✓ "' + term + '" added. Refreshing…';
+        setTimeout(function(){ location.reload(); }, 700);
+      } else {
+        result.style.color = '#bb0000';
+        result.textContent = '⚠ ' + ((d && d.error) || 'Error');
+      }
+    }).catch(function(){ result.style.color = '#bb0000'; result.textContent = '⚠ Network error'; });
   }
   function _updateSendBtn() {
     var sel = document.querySelectorAll('.item-check:checked').length;
