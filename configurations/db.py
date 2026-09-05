@@ -1,3 +1,4 @@
+import json
 import os
 import sqlite3
 from typing import Any, Dict, List, Optional, Tuple
@@ -2012,3 +2013,110 @@ def advance_repo_node_status(conn: sqlite3.Connection, node_id: int) -> Optional
     new_status = STATUS_PROGRESSION[idx + 1]
     update_repo_node(conn, node_id, status=new_status)
     return new_status
+
+
+def insert_ranking_grounding(
+    conn: sqlite3.Connection,
+    profile_id: int,
+    item_id: int,
+    example_md: str,
+    source_label: Optional[str] = None,
+) -> int:
+    for _col, _decl in (("source_label", "TEXT"), ("created_at", "TEXT")):
+        try:
+            conn.execute(f"ALTER TABLE ranking_grounding ADD COLUMN {_col} {_decl}")
+        except Exception:
+            pass
+    cur = conn.execute(
+        """
+        INSERT INTO ranking_grounding(profile_id, source_item_id, summary, source_label, created_at)
+        VALUES(?,?,?,?,datetime('now'))
+        """,
+        (profile_id, item_id, example_md, source_label),
+    )
+    return cur.lastrowid
+
+
+def insert_ranking_signal(
+    conn: sqlite3.Connection,
+    profile_id: int,
+    pattern: str,
+    rank: int,
+    reason: Optional[str] = None,
+) -> int:
+    for _col, _decl in (("reason", "TEXT"), ("created_at", "TEXT")):
+        try:
+            conn.execute(f"ALTER TABLE ranking_signals ADD COLUMN {_col} {_decl}")
+        except Exception:
+            pass
+    cur = conn.execute(
+        """
+        INSERT INTO ranking_signals(profile_id, signal_type, pattern, min_rank, confidence, created_from, reason, created_at)
+        VALUES(?,?,?,?,?,?,?,datetime('now'))
+        """,
+        (profile_id, "human_confirmed", pattern, rank, 1.0, "challenge_modal", reason),
+    )
+    return cur.lastrowid
+
+
+def get_announcements_for_run_with_sources(
+    conn: sqlite3.Connection, run_id: int
+) -> List[Dict[str, Any]]:
+    rows = conn.execute(
+        "SELECT * FROM news_announcements WHERE run_id=? ORDER BY id",
+        (run_id,),
+    ).fetchall()
+    result = []
+    for row in rows:
+        ann = dict(row)
+        try:
+            item_ids = json.loads(ann.get("item_ids_json") or "[]")
+        except Exception:
+            item_ids = []
+        sources = []
+        if item_ids:
+            placeholders = ",".join("?" * len(item_ids))
+            src_rows = conn.execute(
+                f"SELECT * FROM news_items WHERE id IN ({placeholders})",
+                item_ids,
+            ).fetchall()
+            sources = [dict(s) for s in src_rows]
+        ann["sources"] = sources
+        result.append(ann)
+    return result
+
+
+def reset_review_data(
+    conn: sqlite3.Connection, profile_id: Optional[int] = None
+) -> Dict[str, int]:
+    if profile_id is not None:
+        run_ids = [
+            r[0]
+            for r in conn.execute(
+                "SELECT id FROM runs WHERE profile_id=?", (profile_id,)
+            ).fetchall()
+        ]
+    else:
+        run_ids = [r[0] for r in conn.execute("SELECT id FROM runs").fetchall()]
+
+    deleted_announcements = 0
+    deleted_items = 0
+    deleted_runs = 0
+
+    if run_ids:
+        placeholders = ",".join("?" * len(run_ids))
+        deleted_announcements = conn.execute(
+            f"DELETE FROM news_announcements WHERE run_id IN ({placeholders})", run_ids
+        ).rowcount
+        deleted_items = conn.execute(
+            f"DELETE FROM news_items WHERE run_id IN ({placeholders})", run_ids
+        ).rowcount
+        deleted_runs = conn.execute(
+            f"DELETE FROM runs WHERE id IN ({placeholders})", run_ids
+        ).rowcount
+
+    return {
+        "runs": deleted_runs,
+        "news_items": deleted_items,
+        "news_announcements": deleted_announcements,
+    }

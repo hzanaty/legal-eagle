@@ -97,6 +97,7 @@ from configurations.db import (
     get_authority,
     update_authority,
     delete_authority,
+    reset_review_data,
 )
 
 # Flask app
@@ -2726,6 +2727,21 @@ def admin_review_translate(profile_id: int):
         return jsonify({"translations": translations})
     except Exception as e:
         return jsonify({"translations": {}, "error": str(e)}), 200
+
+
+@app.route("/admin/reset-review-data", methods=["POST"])
+def reset_review_data_route():
+    profile_id = request.json.get("profile_id") if request.json else None
+    conn = get_connection()
+    try:
+        counts = reset_review_data(conn, profile_id)
+        conn.commit()
+        return jsonify({"ok": True, "deleted": counts})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"ok": False, "error": str(e)}), 500
+    finally:
+        conn.close()
 
 
 # Run Flask
