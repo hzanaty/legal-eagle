@@ -544,6 +544,15 @@ def create_schema_if_needed(conn: sqlite3.Connection) -> None:
             """
         )
 
+        # v3.6: close-the-loop columns on news_announcements
+        # jira_legal_change: JIRA Legal Change key the LPM links after publishing to RCM
+        # status: draft (default) -> done (once JIRA linked + marked done)
+        for _c, _d in (("jira_legal_change", "TEXT"), ("status", "TEXT")):
+            try:
+                conn.execute(f"ALTER TABLE news_announcements ADD COLUMN {_c} {_d}")
+            except Exception:
+                pass
+
         # Legal Repository
         conn.execute(
             """
@@ -2106,6 +2115,16 @@ def get_announcements_for_run_with_sources(
         ann["sources"] = sources
         result.append(ann)
     return result
+
+
+def set_announcement_publish(conn: sqlite3.Connection, announcement_id: int,
+                             jira_legal_change: Optional[str], status: str) -> None:
+    """v3.6: persist the JIRA Legal Change link + status on an announcement (close the loop)."""
+    with conn:
+        conn.execute(
+            "UPDATE news_announcements SET jira_legal_change=?, status=? WHERE id=?",
+            ((jira_legal_change or None), status, announcement_id),
+        )
 
 
 def reset_review_data(
