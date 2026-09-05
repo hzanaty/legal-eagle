@@ -1,0 +1,31 @@
+{
+  "version": "1.0",
+  "sections": [
+    {
+      "id": "introduction",
+      "title": "Introduction",
+      "type": "bullets",
+      "required": true
+    },
+    {
+      "id": "business_background",
+      "title": "Business Background/Impact",
+      "type": "bullets",
+      "required": true
+    },
+    {
+      "id": "related_legislation",
+      "title": "Reference to Related Legislation and Additional Sources",
+      "type": "links",
+      "required": true
+    },
+    {
+      "id": "additional_information",
+      "title": "Additional Information",
+      "type": "links",
+      "required": false,
+      "note": "Optional — remove if not required"
+    }
+  ],
+  "ai_prompt": "You are an SAP legal compliance editor writing an RCM (Regulatory Content Management) announcement.\n\nTitle: {title}\nSummary: {summary}\nSources: {sources_text}\n\nReturn ONLY valid JSON (no markdown fences):\n{{\"introduction\": [\"This announcement contains information about the legal change <name in English (local name if different)>, published on <date e.g. July 4, 2023> by <authority>.\", \"The legal change is <mandatory|in draft phase|postponed|in transition phase>.\", \"The effective date is <date or description e.g. on January 1, 2027>.\", \"This information is based on legislation and regulations which could be subject to change at any time by the respective authorities. The information will be updated if required.\"], \"business_background\": [\"<bullet about impacted business process, transaction type e.g. B2B, or document e.g. Annual tax report>\"] }}\n\nRules:\n- Fill every angle bracket with a real value extracted from the title, summary, or sources\n- Extract the authority/legislator name from the source publisher field\n- Extract the published date from the source published_at or from the summary\n- The 4th Introduction bullet must be copied EXACTLY verbatim — do not change a single word\n- business_background: 1-3 concise bullets on which business processes, transaction types (B2B/B2C/domestic), or documents are impacted\n- If a value cannot be determined, use a sensible placeholder like 'the relevant authority' or 'to be confirmed'\n- Return ONLY the JSON object, no other text"
+}

@@ -552,6 +552,11 @@ def create_schema_if_needed(conn: sqlite3.Connection) -> None:
                 conn.execute(f"ALTER TABLE news_announcements ADD COLUMN {_c} {_d}")
             except Exception:
                 pass
+        # v3.6: AI-filled RCM template content (JSON string), generated once on first Preview click
+        try:
+            conn.execute("ALTER TABLE news_announcements ADD COLUMN announcement_rcm_json TEXT")
+        except Exception:
+            pass
 
         # Legal Repository
         conn.execute(
@@ -2124,6 +2129,15 @@ def set_announcement_publish(conn: sqlite3.Connection, announcement_id: int,
         conn.execute(
             "UPDATE news_announcements SET jira_legal_change=?, status=? WHERE id=?",
             ((jira_legal_change or None), status, announcement_id),
+        )
+
+
+def save_announcement_rcm(conn: sqlite3.Connection, announcement_id: int, rcm_json_str: str) -> None:
+    """v3.6: persist the AI-filled RCM template JSON (called once on first Preview click)."""
+    with conn:
+        conn.execute(
+            "UPDATE news_announcements SET announcement_rcm_json=? WHERE id=?",
+            (rcm_json_str, announcement_id),
         )
 
 
