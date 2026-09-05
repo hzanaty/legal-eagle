@@ -336,7 +336,7 @@
           <span class="source-tag">{{ item.source_type|upper if item.source_type else 'RSS' }}</span>
           {% if item.tag %}<span class="tag-pill tag-{{ item.tag|lower }}">{{ item.tag }}</span>{% endif %}
           {% if item.publisher %}<span style="font-size:10px;color:#6a6d70;">{{ item.publisher }}{% if item.authority_status == 'inferred' %} <span title="Authority inferred by AI" style="color:#e9730c;font-weight:700;">✦</span>{% endif %}</span>{% endif %}
-          <span class="pub-date">{{ item.published_at|default(item.created_at)|default('')|truncate(16, True, '') }}</span>
+          <span class="pub-date">{{ item.published_at|default(item.created_at, true)|default('', true)|truncate(16, True, '') }}</span>
           {% if item.is_gap %}<span class="gap-badge">&#9888; Gap — no LoB match</span>{% endif %}
           {% if score != 0 %}
             {% if item.email_sent %}

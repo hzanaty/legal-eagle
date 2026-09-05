@@ -64,14 +64,17 @@ item_cols = [r[1] for r in test.execute("PRAGMA table_info(news_items)").fetchal
 live_item_cols = {r[1] for r in live.execute("PRAGMA table_info(news_items)").fetchall()}
 shared_item_cols = [c for c in item_cols if c in live_item_cols]
 
+item_id_map = {}  # test item id → live item id
 for item in items:
     d = {c: item[c] for c in shared_item_cols}
     d['profile_id'] = live_pid
     cols_str = ','.join(d.keys())
     ph_str = ','.join([f':{c}' for c in d.keys()])
-    live.execute(f"INSERT INTO news_items ({cols_str}) VALUES ({ph_str})", d)
+    cur2 = live.execute(f"INSERT INTO news_items ({cols_str}) VALUES ({ph_str})", d)
+    item_id_map[item['id']] = cur2.lastrowid
 
-# -- Copy news_announcements (has run_id) --
+# -- Copy news_announcements (has run_id; remap item_ids_json to live item IDs) --
+import json as _json
 anns = test.execute("SELECT * FROM news_announcements WHERE run_id=?", (old_run_id,)).fetchall()
 ann_cols = [r[1] for r in test.execute("PRAGMA table_info(news_announcements)").fetchall() if r[1] != 'id']
 live_ann_cols = {r[1] for r in live.execute("PRAGMA table_info(news_announcements)").fetchall()}
@@ -80,6 +83,14 @@ shared_ann_cols = [c for c in ann_cols if c in live_ann_cols]
 for ann in anns:
     d = {c: ann[c] for c in shared_ann_cols}
     d['run_id'] = new_run_id
+    # Remap item_ids_json so sources resolve correctly in config.db
+    if 'item_ids_json' in d and d['item_ids_json']:
+        try:
+            old_ids = _json.loads(d['item_ids_json'])
+            if isinstance(old_ids, list):
+                d['item_ids_json'] = _json.dumps([item_id_map[i] for i in old_ids if i in item_id_map])
+        except Exception:
+            pass
     cols_str = ','.join(d.keys())
     ph_str = ','.join([f':{c}' for c in d.keys()])
     live.execute(f"INSERT INTO news_announcements ({cols_str}) VALUES ({ph_str})", d)

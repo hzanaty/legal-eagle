@@ -1977,7 +1977,7 @@ def admin_review_news(profile_id: int):
             topics.append({
                 "topic_label": lbl,
                 "announcements": anns,
-                "source_count": sum(len(a.get("sources", [])) for a in anns),
+                "source_count": sum(len(a.get("sources") or []) for a in anns),
             })
 
     # v3.2: authority list for inferred-authority override dropdown
