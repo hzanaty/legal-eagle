@@ -2120,6 +2120,86 @@ def add_news_item_to_glossary(item_id: int):
         conn.close()
 
 
+# ── v3.6: Preview for RCM + close-the-loop (JIRA link → Done) ──
+
+@app.route("/admin/announcements/<int:ann_id>/template", methods=["GET"])
+def announcement_template(ann_id: int):
+    """v3.6: JSON for the Preview-for-RCM modal — rendered announcement + source links + status + L2S URL."""
+    import json as _json
+    conn = get_connection()
+    try:
+        row = conn.execute("SELECT * FROM news_announcements WHERE id=?", (ann_id,)).fetchone()
+        if not row:
+            return jsonify({"ok": False, "error": "announcement not found"}), 404
+        ann = dict(row)
+        # Resolve profile via the announcement's run (for the per-profile L2S URL setting)
+        prof_row = conn.execute("SELECT profile_id FROM runs WHERE id=?", (ann.get("run_id"),)).fetchone()
+        profile_id = prof_row["profile_id"] if prof_row else None
+        # Resolve source items
+        try:
+            item_ids = _json.loads(ann.get("item_ids_json") or "[]")
+        except Exception:
+            item_ids = []
+        sources = []
+        if item_ids:
+            ph = ",".join("?" * len(item_ids))
+            for s in conn.execute(f"SELECT * FROM news_items WHERE id IN ({ph})", item_ids).fetchall():
+                s = dict(s)
+                sources.append({
+                    "title": s.get("title"),
+                    "url": s.get("url"),
+                    "publisher": s.get("publisher"),
+                    "published_at": s.get("published_at"),
+                    "significance_rank": s.get("significance_rank"),
+                })
+    finally:
+        conn.close()
+
+    l2s_url = get_setting_value(profile_id, "l2s_url", "") if profile_id else ""
+    return jsonify({
+        "ok": True,
+        "title": ann.get("title"),
+        "announcement_html": render_md(ann.get("announcement_md") or ""),
+        "sources": sources,
+        "jira_legal_change": ann.get("jira_legal_change"),
+        "status": ann.get("status") or "draft",
+        "l2s_url": l2s_url,
+    })
+
+
+@app.route("/admin/announcements/<int:ann_id>/publish", methods=["POST"])
+def publish_announcement(ann_id: int):
+    """v3.6: persist the JIRA Legal Change link + status (close the loop). No JIRA API — manual paste."""
+    from configurations.db import set_announcement_publish
+    data = request.get_json(force=True, silent=True) or {}
+    jira = (data.get("jira_legal_change") or "").strip() or None
+    status = (data.get("status") or "done").strip()
+    conn = get_connection()
+    try:
+        row = conn.execute("SELECT run_id FROM news_announcements WHERE id=?", (ann_id,)).fetchone()
+        if not row:
+            return jsonify({"ok": False, "error": "announcement not found"}), 404
+        prof_row = conn.execute("SELECT profile_id FROM runs WHERE id=?", (row["run_id"],)).fetchone()
+        pid = prof_row["profile_id"] if prof_row else None
+        set_announcement_publish(conn, ann_id, jira, status)
+        add_audit_log(conn, entity="news_announcements", action="publish",
+                      details=f"ann_id={ann_id} jira={jira} status={status}", profile_id=pid)
+        return jsonify({"ok": True, "status": status, "jira_legal_change": jira})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/admin/profiles/<int:profile_id>/l2s-url", methods=["POST"])
+def set_l2s_url(profile_id: int):
+    """v3.6: save the per-profile L2S URL used by the Preview modal's 'Open L2S' link."""
+    data = request.get_json(force=True, silent=True) or {}
+    url = (data.get("url") or "").strip()
+    set_setting_value(profile_id, "l2s_url", url)
+    return jsonify({"ok": True, "l2s_url": url})
+
+
 @app.route("/admin/profiles/<int:profile_id>/review/score", methods=["POST"])
 def score_filtered_news(profile_id: int):
     item_id_str = request.form.get("item_id", "").strip()
