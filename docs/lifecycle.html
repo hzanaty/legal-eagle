@@ -404,7 +404,7 @@
       <div class="step-sub">Score + bulk actions</div>
     </div>
     <div class="inner-arrow">›</div>
-    <div class="step blue" onclick="showDetail('challenge')">
+    <div class="step green" onclick="showDetail('challenge')">
       <div class="step-name">Challenge Rank</div>
       <div class="step-sub">Override + grounding</div>
     </div>
@@ -611,8 +611,8 @@ const details = {
   },
   'rank': {
     title: 'News Ranker — 3-Tier Ranking Engine',
-    subtitle: 'NEW in v3 Phase 2 — replaces binary filter',
-    tag: 'blue', tagLabel: 'New in v3',
+    subtitle: 'Shipped v3.2 — 3-tier ranking engine (deterministic + AI + human override)',
+    tag: 'green', tagLabel: 'Shipped v3.2',
     cols: [
       { heading: 'Tier 1 — Deterministic', items: ['Regex/keyword rules from ranking_signals table', 'Runs first — fastest and most explainable', 'Human-approved rules auto-extracted by grounding loop'] },
       { heading: 'Tier 2 — LLM (GPT-4o)', items: ['5–8 bootstrap examples as few-shot prompt', 'Up to 10 grounding summaries (human overrides)', 'Outputs rank 1–5 with reasoning text'] },
@@ -627,16 +627,6 @@ const details = {
       { heading: 'What it does', items: ['Matches item text against glossary_terms table', 'Assigns Topic Labels (matched terms) as JSON array', 'Sets email_eligible = 1 for significance_rank ≥ 3 (configurable threshold, non-duplicate)', 'Persists topic_label + email_eligible to news_items via source_id/url/hash lookup'] },
       { heading: 'Key file', items: ['agents/news_tagger.py', 'configurations/config_loader.py (glossary helpers)', 'agents/agents_controller.py (Stage 4.4 + email gate)'] },
       { heading: 'Dependencies', items: ['SQLite glossary_terms', 'No external API needed — fully deterministic'] },
-    ]
-  },
-  'group': {
-    title: 'News Grouper (LLM Clustering)',
-    subtitle: 'REMOVED in v3 Phase 4 — replaced by keyword Tagger',
-    tag: 'red', tagLabel: 'Removed in v3',
-    cols: [
-      { heading: 'What it does (v2)', items: ['LLM clusters related news items into themes', 'Generates 2–3 sentence AI summary per group', 'Groups structure the email digest sections'] },
-      { heading: 'Key file', items: ['agents/news_grouper.py — REPLACED in v3 Phase 4', 'Replaced by agents/news_tagger.py'] },
-      { heading: 'Why replaced', items: ['LLM summaries are editorial and non-auditable', 'Groups change run-to-run (non-deterministic)', 'Glossary tags are reproducible + explainable', 'Email sections become Topic Labels, not LLM groups'] },
     ]
   },
   'translate': {
