@@ -630,6 +630,55 @@ def run_profile_once(
                     pass
         except Exception as e:
             print(f"⚠️ Rank stage failed: {e}")
+
+        # v3.3: TAGGING stage — deterministic glossary-keyword matching assigns topic_label.
+        try:
+            from agents.news_tagger import tag_items, save_topic_labels
+            tag_conn = get_connection()
+            tag_items(filtered_items, tag_conn, profile_id)
+            save_topic_labels(filtered_items, tag_conn, profile_id)
+            tag_conn.close()
+            tagged = sum(1 for i in filtered_items if i.get("topic_label") and i["topic_label"] != '["General"]')
+            print(f"🏷  Tag stage complete — {tagged}/{len(filtered_items)} items matched glossary terms")
+        except Exception as e:
+            print(f"⚠️ Tag stage failed: {e}")
+
+        # v3.3: EMAIL RANK GATE — set email_eligible=1 for items with rank >= threshold and not duplicate.
+        try:
+            email_threshold = int(get_setting_value(profile_id, "email_rank_threshold", "3") or 3)
+            gate_conn = get_connection()
+            for _it in filtered_items:
+                _rank = int(_it.get("significance_rank") or 0)
+                _tier = (_it.get("rank_tier") or "").lower()
+                _eligible = 1 if (_rank >= email_threshold and _tier != "duplicate") else 0
+                _it["email_eligible"] = _eligible
+                # Update by source_id / url / hash_signature — items may not have DB id in memory
+                _src_type = _it.get("source_type", "RSS")
+                _src_id   = _it.get("source_id") or _it.get("guid") or _it.get("tweet_id")
+                _url      = _it.get("url") or _it.get("link")
+                _hash     = _it.get("hash_signature")
+                if _src_id:
+                    gate_conn.execute(
+                        "UPDATE news_items SET email_eligible=? WHERE profile_id=? AND source_type=? AND source_id=?",
+                        (_eligible, profile_id, _src_type, _src_id),
+                    )
+                elif _url:
+                    gate_conn.execute(
+                        "UPDATE news_items SET email_eligible=? WHERE profile_id=? AND source_type=? AND url=?",
+                        (_eligible, profile_id, _src_type, _url),
+                    )
+                elif _hash:
+                    gate_conn.execute(
+                        "UPDATE news_items SET email_eligible=? WHERE profile_id=? AND source_type=? AND hash_signature=?",
+                        (_eligible, profile_id, _src_type, _hash),
+                    )
+            gate_conn.commit()
+            gate_conn.close()
+            eligible_count = sum(1 for i in filtered_items if i.get("email_eligible"))
+            print(f"✉️  Email gate complete — {eligible_count}/{len(filtered_items)} items email-eligible (rank ≥ {email_threshold})")
+        except Exception as e:
+            print(f"⚠️ Email gate failed: {e}")
+
         if skip_grouping:
             print("⏭ Skipping grouping — each item treated as its own group")
             grouped_summary = [

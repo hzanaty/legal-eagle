@@ -360,3 +360,125 @@ def send_email(
     if not sent:
         print(f"Failed to send email after retries")
     return sent
+
+
+# ─── V2 Digest send (v3.3) ───────────────────────────────────────────────────
+
+def send_digest(
+    profile_id: int,
+    run_id: int,
+    item_ids: list[int] | None,
+    conn,
+    GMAIL_CREDS: dict,
+) -> bool:
+    """Generate and send the V2 AI digest for a run.
+
+    item_ids: explicit list of news_items.id to include.
+               If None, fetches all email_eligible items for run_id.
+    Updates runs.email_status and news_items.email_sent on completion.
+    Returns True on success.
+    """
+    from agents.email_composer import generate_digest
+    from configurations.db import get_connection
+
+    # Fetch items
+    db_conn = conn
+    if item_ids:
+        placeholders = ",".join("?" * len(item_ids))
+        items = db_conn.execute(
+            f"SELECT * FROM news_items WHERE id IN ({placeholders})",
+            item_ids,
+        ).fetchall()
+    else:
+        items = db_conn.execute(
+            """SELECT n.* FROM news_items n
+               JOIN runs r ON n.profile_id = r.profile_id
+               WHERE r.id=? AND n.email_eligible=1""",
+            (run_id,),
+        ).fetchall()
+
+    items = [dict(r) for r in items]
+
+    if not items:
+        print("  ℹ️  send_digest: no eligible items — marking SKIPPED")
+        db_conn.execute("UPDATE runs SET email_status='SKIPPED' WHERE id=?", (run_id,))
+        db_conn.commit()
+        return False
+
+    # Mark SENDING
+    db_conn.execute("UPDATE runs SET email_status='SENDING' WHERE id=?", (run_id,))
+    db_conn.commit()
+
+    try:
+        profile_row = db_conn.execute(
+            "SELECT name, country_code, lob FROM profiles WHERE id=?", (profile_id,)
+        ).fetchone()
+        profile_name = profile_row["name"] if profile_row else "Digest"
+        country = (profile_row["country_code"] if profile_row else "")
+        lob = (profile_row["lob"] if profile_row else "")
+
+        html_body = generate_digest(items, profile_id, db_conn, run_id, profile_name)
+
+        receivers_rows = db_conn.execute(
+            "SELECT email FROM email_receivers WHERE profile_id=?", (profile_id,)
+        ).fetchall()
+        all_emails = [r["email"] for r in receivers_rows if r.get("email")]
+
+        if not all_emails:
+            print("  ⚠️  send_digest: no receivers configured")
+            db_conn.execute("UPDATE runs SET email_status='FAILED' WHERE id=?", (run_id,))
+            db_conn.commit()
+            return False
+
+        EMAIL_SENDER = GMAIL_CREDS.get("email_sender", "")
+        APP_PASSWORD = GMAIL_CREDS.get("app_password", "")
+        today = datetime.now().strftime("%Y-%m-%d")
+        subject = f"Legal Eagle Digest — {country}/{lob} — {today}"
+
+        msg = MIMEMultipart()
+        msg["From"] = EMAIL_SENDER
+        msg["To"] = ", ".join(all_emails)
+        msg["Subject"] = subject
+        msg.attach(MIMEText(html_body, "html"))
+
+        sent = False
+        for attempt in range(1, 3):
+            try:
+                with smtplib.SMTP("smtp.gmail.com", 587, timeout=120) as server:
+                    server.ehlo()
+                    server.starttls()
+                    server.ehlo()
+                    server.login(EMAIL_SENDER, APP_PASSWORD)
+                    server.sendmail(EMAIL_SENDER, all_emails, msg.as_string())
+                sent = True
+                break
+            except Exception as e1:
+                try:
+                    with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=120) as server:
+                        server.login(EMAIL_SENDER, APP_PASSWORD)
+                        server.sendmail(EMAIL_SENDER, all_emails, msg.as_string())
+                    sent = True
+                    break
+                except Exception:
+                    pass
+
+        if sent:
+            included_ids = [it["id"] for it in items if it.get("id")]
+            if included_ids:
+                ph = ",".join("?" * len(included_ids))
+                db_conn.execute(f"UPDATE news_items SET email_sent=1 WHERE id IN ({ph})", included_ids)
+            db_conn.execute("UPDATE runs SET email_status='SENT' WHERE id=?", (run_id,))
+            db_conn.commit()
+            print(f"  ✅ Digest sent to {len(all_emails)} receiver(s) — {len(items)} items")
+            return True
+        else:
+            db_conn.execute("UPDATE runs SET email_status='FAILED' WHERE id=?", (run_id,))
+            db_conn.commit()
+            print("  ❌ Digest send failed after retries")
+            return False
+
+    except Exception as e:
+        print(f"  ❌ send_digest exception: {e}")
+        db_conn.execute("UPDATE runs SET email_status='FAILED' WHERE id=?", (run_id,))
+        db_conn.commit()
+        return False

@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional, Callable
 from flask import Response, stream_with_context
 from flask import send_from_directory
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 
 # Ensure project root is on sys.path for module imports (configurations, agents)
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -711,11 +711,13 @@ def admin_start_run(profile_id: int):
                                 lookback_override=lookback_override if lookback_override != 'force_full' else None,
                                 skip_grouping=skip_grp, should_cancel=_cancel)
             status_final = "Success" if ok else "Failed"
-            email_status = "Sent" if ok else "Failed"
-
-            # Override email status if skip_email was used
+            # v3.3: email lifecycle — PENDING (follow-on thread will update to SENT/FAILED)
             if skip_mail:
-                email_status = "Skipped (test mode)"
+                email_status = "SKIPPED"
+            elif ok:
+                email_status = "PENDING"
+            else:
+                email_status = "FAILED"
         except Exception as e:
             status_final = "Failed"
             error_step = "pipeline"
@@ -745,6 +747,27 @@ def admin_start_run(profile_id: int):
             finish_run(fconn, rid, status_mark, metrics=_metrics)
             append_run_log(fconn, rid, "INFO", f"🏁 Run {rid} finished with status {status_mark}")
             fconn.close()
+
+            # v3.3: follow-on digest thread (normal mode only, run succeeded)
+            if status_mark == "Success" and not skip_mail:
+                def _digest_worker(run_id_d=rid, pid_d=pid):
+                    try:
+                        from agents.email_sender import send_digest
+                        from configurations.creds import creds as _creds
+                        d_conn = get_connection()
+                        create_schema_if_needed(d_conn)
+                        send_digest(pid_d, run_id_d, None, d_conn, _creds.get("gmail", {}))
+                        d_conn.close()
+                    except Exception as _de:
+                        print(f"⚠️ Digest worker exception: {_de}")
+                        try:
+                            _ec = get_connection()
+                            _ec.execute("UPDATE runs SET email_status='FAILED' WHERE id=?", (run_id_d,))
+                            _ec.commit()
+                            _ec.close()
+                        except Exception:
+                            pass
+                threading.Thread(target=_digest_worker, daemon=True).start()
 
     threading.Thread(target=_worker, args=(profile_id, run_id, force_run, skip_comparison, skip_filtering, skip_email, skip_grouping, selected_rss, selected_twitter, selected_urls), daemon=True).start()
     return redirect(url_for("admin_profile_runs", profile_id=profile_id, run_id=run_id))
@@ -2205,6 +2228,72 @@ def resend_email_from_preview(profile_id: int):
         flash(f"Error: {str(e)}", "error")
     
     return redirect(url_for("admin_profile_runs", profile_id=profile_id))
+
+
+# v3.3: V2 Digest send API
+@app.route("/admin/send-email", methods=["POST"])
+def send_email_v2():
+    """Send V2 AI digest.
+
+    Body (JSON):
+      Option A — manual from Review: {"item_ids": [1,2,3], "profile_id": 42}
+      Option B — Resend from run log: {"run_id": 17, "profile_id": 42}
+
+    Returns: {"status": "sent"|"error", "items_sent": N, "message": "..."}
+    """
+    _ensure_schema()
+    data = request.get_json(silent=True) or {}
+    profile_id_req = data.get("profile_id")
+    run_id_req = data.get("run_id")
+    item_ids_req = data.get("item_ids")
+
+    if not profile_id_req:
+        return jsonify({"status": "error", "message": "profile_id required"}), 400
+
+    conn = get_connection()
+    create_schema_if_needed(conn)
+
+    # Validate profile exists
+    prof = conn.execute("SELECT * FROM profiles WHERE id=?", (profile_id_req,)).fetchone()
+    if not prof:
+        conn.close()
+        return jsonify({"status": "error", "message": "Profile not found"}), 404
+
+    # Determine run_id: use supplied or create a synthetic one
+    if run_id_req:
+        run_row = conn.execute(
+            "SELECT id FROM runs WHERE id=? AND profile_id=?", (run_id_req, profile_id_req)
+        ).fetchone()
+        if not run_row:
+            conn.close()
+            return jsonify({"status": "error", "message": "Run not found for this profile"}), 404
+        effective_run_id = run_id_req
+    else:
+        # Manual send: create a virtual run record
+        conn.execute(
+            "INSERT INTO runs(profile_id, status, email_status, created_at) VALUES(?,?,?,datetime('now'))",
+            (profile_id_req, "Success", "SENDING"),
+        )
+        conn.commit()
+        effective_run_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+
+    try:
+        from agents.email_sender import send_digest
+        from configurations.creds import creds as _creds
+        ok = send_digest(
+            profile_id_req, effective_run_id,
+            [int(i) for i in item_ids_req] if item_ids_req else None,
+            conn, _creds.get("gmail", {})
+        )
+        items_sent = len(item_ids_req) if item_ids_req else 0
+        conn.close()
+        if ok:
+            return jsonify({"status": "sent", "items_sent": items_sent})
+        else:
+            return jsonify({"status": "error", "message": "Send failed — check server logs"}), 500
+    except Exception as e:
+        conn.close()
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 # ── Legal Repo ──────────────────────────────────────────────────────────────

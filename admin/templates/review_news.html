@@ -126,6 +126,13 @@
         <div class="fchip gap" data-dim="lob" data-val="gap" onclick="setFilter(this)">&#9888; Gap — needs confirmation</div>
       </div>
     </div>
+    <div class="filter-row">
+      <span class="filter-label">Email</span>
+      <div class="chip-group">
+        <div class="fchip active" data-dim="email" data-val="all" onclick="setFilter(this)">All</div>
+        <div class="fchip" data-dim="email" data-val="unsent" onclick="setFilter(this)" style="border-color:#e9730c;color:#e9730c;" data-active-style="background:#e9730c;color:#fff;">✉ Unsent only</div>
+      </div>
+    </div>
   </div>
 
   <div class="review-toolbar">
@@ -134,6 +141,12 @@
       Accepted <strong>{{ accepted_unscored_count }}</strong> · Filtered <strong>{{ filtered_unscored_count }}</strong> · Reviewed <strong>{{ reviewed_count }}</strong>
     </span>
     <span class="items-count" id="itemCount">{{ items|length }} items</span>
+    <button id="sendEmailBtn" onclick="sendEmailSelected()" disabled
+            style="font-size:11px;padding:4px 10px;border-radius:4px;border:1px solid #0070b1;
+                   background:#fff;color:#0070b1;cursor:pointer;opacity:0.5;"
+            title="Send V2 digest for selected items">
+      ✉ Send Email (<span id="sendEmailCount">0</span> selected)
+    </button>
   </div>
 
   <div class="item-list" id="itemList">
@@ -144,8 +157,10 @@
          data-rank="{{ score if score >= 1 else '' }}"
          data-tag="{{ item.tag|default('') }}"
          data-src="{{ item.item_source|default('') }}"
-         data-lob="{% if item.is_gap %}gap{% else %}matched{% endif %}">
-      <input type="checkbox" class="item-check" onchange="onCardSel(this)">
+         data-lob="{% if item.is_gap %}gap{% else %}matched{% endif %}"
+         data-email="{{ 'sent' if item.email_sent else 'unsent' }}"
+         data-item-id="{{ item.id }}">
+      <input type="checkbox" class="item-check" onchange="onCardSel(this)" data-item-id="{{ item.id }}">
       <div class="rank-badge {% if score >= 1 %}rank-{{ score }}{% else %}rank-d{% endif %}">{% if score == 0 %}D{% elif score >= 1 %}{{ score }}{% else %}?{% endif %}</div>
       <div class="item-main">
         <div class="item-meta">
@@ -154,6 +169,13 @@
           {% if item.publisher %}<span style="font-size:10px;color:#6a6d70;">{{ item.publisher }}{% if item.authority_status == 'inferred' %} <span title="Authority inferred by AI" style="color:#e9730c;font-weight:700;">✦</span>{% endif %}</span>{% endif %}
           <span class="pub-date">{{ item.published_at|default(item.created_at)|default('')|truncate(16, True, '') }}</span>
           {% if item.is_gap %}<span class="gap-badge">&#9888; Gap — no LoB match</span>{% endif %}
+          {% if score != 0 %}
+            {% if item.email_sent %}
+              <span style="font-size:10px;background:#e8f5e9;color:#107e3e;padding:1px 6px;border-radius:8px;font-weight:600;">✓ Sent</span>
+            {% else %}
+              <span style="font-size:10px;background:#fff4e5;color:#e07b00;padding:1px 6px;border-radius:8px;font-weight:600;">✉ Unsent</span>
+            {% endif %}
+          {% endif %}
           <span style="font-size:10px;color:#aaa;">{{ 'Accepted' if item.item_source == 'accepted' else 'Filtered' }}</span>
         </div>
         <div class="item-title">{{ item.title or '(no title)' }}</div>
@@ -209,32 +231,72 @@
 </div>
 
 <script>
-  var filters = { rank: 'all', tag: 'all', src: 'all', lob: 'all' };
+  var filters = { rank: 'all', tag: 'all', src: 'all', lob: 'all', email: 'all' };
+  var _profileId = {{ profile_id }};
   function setFilter(chip) {
     var dim = chip.dataset.dim;
     filters[dim] = chip.dataset.val;
     chip.parentElement.querySelectorAll('.fchip').forEach(function(c){ c.classList.remove('active'); });
     chip.classList.add('active');
+    if (chip.dataset.activeStyle) { chip.style.cssText += ';' + chip.dataset.activeStyle; }
     applyFilters();
   }
   function applyFilters() {
     var vis = 0;
     document.querySelectorAll('.item-card').forEach(function(c) {
-      var show = (filters.rank === 'all' || filters.rank === c.dataset.rank) &&
-                 (filters.tag  === 'all' || filters.tag  === c.dataset.tag) &&
-                 (filters.src  === 'all' || filters.src  === c.dataset.src) &&
-                 (filters.lob  === 'all' || filters.lob  === c.dataset.lob);
+      var show = (filters.rank  === 'all' || filters.rank  === c.dataset.rank) &&
+                 (filters.tag   === 'all' || filters.tag   === c.dataset.tag) &&
+                 (filters.src   === 'all' || filters.src   === c.dataset.src) &&
+                 (filters.lob   === 'all' || filters.lob   === c.dataset.lob) &&
+                 (filters.email === 'all' || filters.email === c.dataset.email);
       c.style.display = show ? 'flex' : 'none';
       if (show) vis++;
     });
     var el = document.getElementById('itemCount');
     if (el) el.textContent = vis + ' items';
   }
-  function onCardSel(cb) { cb.closest('.item-card').classList.toggle('selected', cb.checked); }
+  function _updateSendBtn() {
+    var sel = document.querySelectorAll('.item-check:checked').length;
+    var btn = document.getElementById('sendEmailBtn');
+    var cnt = document.getElementById('sendEmailCount');
+    if (btn) { btn.disabled = sel === 0; btn.style.opacity = sel === 0 ? '0.5' : '1'; }
+    if (cnt) cnt.textContent = sel;
+  }
+  function onCardSel(cb) {
+    cb.closest('.item-card').classList.toggle('selected', cb.checked);
+    _updateSendBtn();
+  }
   function toggleAll(cb) {
     document.querySelectorAll('.item-check').forEach(function(c) {
       c.checked = cb.checked;
       c.closest('.item-card').classList.toggle('selected', cb.checked);
+    });
+    _updateSendBtn();
+  }
+  function sendEmailSelected() {
+    var ids = Array.from(document.querySelectorAll('.item-check:checked'))
+                   .map(function(c){ return parseInt(c.dataset.itemId); })
+                   .filter(Boolean);
+    if (!ids.length) return;
+    var btn = document.getElementById('sendEmailBtn');
+    btn.textContent = '✉ Sending…';
+    btn.disabled = true;
+    fetch('/admin/send-email', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({item_ids: ids, profile_id: _profileId})
+    }).then(function(r){ return r.json(); }).then(function(d){
+      if (d.status === 'sent') {
+        alert('Digest sent! Reload to see updated pills.');
+        location.reload();
+      } else {
+        alert('Send failed: ' + (d.message || 'unknown error'));
+        btn.textContent = '✉ Send Email (' + ids.length + ' selected)';
+        btn.disabled = false;
+      }
+    }).catch(function(e){
+      alert('Network error: ' + e);
+      btn.disabled = false;
     });
   }
   // UI-only override preview (persistence deferred to a later version)

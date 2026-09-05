@@ -46,9 +46,26 @@ def _check_item_outcome(conn, profile_id, needle, expect_table, fields, not_null
     return True, ""
 
 
+def _load_spec(version: str) -> dict:
+    """Load a fixture spec, recursively merging delta files (base: <version> chain)."""
+    fixtures_dir = Path(__file__).parent / "fixtures" / "expected"
+    spec = json.loads((fixtures_dir / f"{version}.json").read_text())
+    base_version = spec.get("base")
+    if not base_version:
+        return spec
+    base_spec = _load_spec(base_version)
+    # Delta: base assertions first, then override/extend with this version's assertions.
+    # Deduplication key: (type, table?, column?, title_contains?) — delta entries win.
+    def _key(a: dict) -> tuple:
+        return (a.get("type"), a.get("table"), a.get("column"), a.get("title_contains"))
+    merged: dict[tuple, dict] = {_key(a): a for a in base_spec["assertions"]}
+    for a in spec["assertions"]:
+        merged[_key(a)] = a  # delta entry overrides base
+    return {**spec, "assertions": list(merged.values())}
+
+
 def run_assertions(conn: sqlite3.Connection, profile_id: int, version: str, ai_available: bool = True) -> bool:
-    spec_path = Path(__file__).parent / "fixtures" / "expected" / f"{version}.json"
-    spec = json.loads(spec_path.read_text())
+    spec = _load_spec(version)
     tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
     results = []
     skipped = []

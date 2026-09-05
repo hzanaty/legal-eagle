@@ -58,6 +58,15 @@
   .log-panel { flex: 1; background: #1e1e1e; overflow-y: auto; padding: 14px 16px; font-family: 'Menlo','Consolas',monospace; font-size: 11px; line-height: 1.7; min-height: 0; }
   .log-idle { color: #555; text-align: center; padding-top: 50px; line-height: 2.2; }
   .log-idle-icon { font-size: 28px; margin-bottom: 6px; }
+  .email-status-bar { background: white; border-bottom: 1px solid #e5e5e5; padding: 6px 14px; display: flex; align-items: center; gap: 10px; font-size: 11px; flex-shrink: 0; }
+  .email-badge { display: flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  .email-badge.pending  { background: #f0f0f0; color: #6a6d70; }
+  .email-badge.sending  { background: #e8f1fb; color: #0a6ed1; }
+  .email-badge.sent     { background: #e8f5e9; color: #107e3e; }
+  .email-badge.failed   { background: #ffeaea; color: #bb0000; }
+  .email-badge.skipped  { background: #fff4e5; color: #c4600a; }
+  .btn-resend { background: none; border: 1px solid #bb0000; color: #bb0000; border-radius: 4px; padding: 2px 10px; font-size: 11px; cursor: pointer; font-weight: 600; }
+  .btn-resend:hover { background: #ffeaea; }
 </style>
 
 <div class="run-body">
@@ -172,6 +181,24 @@
       &#10007; <strong>{{ selected_run.error_step|default('pipeline') }}</strong>: {{ selected_run.error_message }}
     </div>
     {% endif %}
+    {% if selected_run %}
+    {% set estatus = selected_run.email_status|default('PENDING')|upper %}
+    <div class="email-status-bar">
+      <span style="font-size:10px;font-weight:700;color:#6a6d70;text-transform:uppercase;letter-spacing:0.06em;">Email</span>
+      {% if estatus == 'SENDING' %}
+        <span class="email-badge sending">&#9993; Composing and sending digest&hellip;</span>
+      {% elif estatus == 'SENT' %}
+        <span class="email-badge sent">&#10003; Digest sent</span>
+      {% elif estatus == 'FAILED' %}
+        <span class="email-badge failed">&#9993; Digest failed</span>
+        <button class="btn-resend" onclick="resendDigest({{ selected_run.id }}, {{ selected_profile.id }})">&#8635; Resend</button>
+      {% elif estatus == 'SKIPPED' %}
+        <span class="email-badge skipped">&#9993; Email skipped (test mode)</span>
+      {% else %}
+        <span class="email-badge pending">&#9993; Preparing digest&hellip;</span>
+      {% endif %}
+    </div>
+    {% endif %}
     <div class="right-toolbar">
       <span class="history-label">History</span>
       <div class="history-pills">
@@ -229,6 +256,18 @@
       cb.checked = false;
       cb.closest('.chip').classList.add('deselected');
     });
+  }
+  function resendDigest(runId, profileId) {
+    var btn = document.querySelector('.btn-resend');
+    if (btn) { btn.textContent = '⏳ Sending…'; btn.disabled = true; }
+    fetch('/admin/send-email', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({run_id: runId, profile_id: profileId})
+    }).then(function(r){ return r.json(); }).then(function(d){
+      if (d.status === 'sent') { location.reload(); }
+      else { alert('Resend failed: ' + (d.message || 'unknown error')); if (btn) { btn.textContent = '↻ Resend'; btn.disabled = false; } }
+    }).catch(function(e){ alert('Network error: ' + e); if (btn) { btn.disabled = false; } });
   }
 </script>
 {% endblock %}

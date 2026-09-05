@@ -47,6 +47,15 @@ def _inject_baseline(conn, pid):
     except Exception as e:
         print(f"⚠️ Could not load baseline.json: {e}")
         return 0
+    # v3.3: topic_label pre-assigned for seed items (glossary match simulation)
+    _seed_topic_labels = {
+        "S1": '["Labour Law"]',
+        "S2": '["Social Insurance"]',
+        "S3": '["Social Insurance"]',
+        "S4": '["Social Insurance"]',
+        "S5": '["Payroll"]',
+        "S6": '["Employment Contracts"]',
+    }
     n = 0
     for r in rows:
         rec = {
@@ -60,6 +69,7 @@ def _inject_baseline(conn, pid):
             "hash_signature": r.get("hash_signature"),
             "dedup_status": "new",
             "repetition_count": r.get("repetition_count"),
+            "topic_label": _seed_topic_labels.get(r.get("id_label", ""), None),
         }
         upsert_news_item(conn, pid, rec)
         n += 1
@@ -84,7 +94,8 @@ def reset_and_seed():
         aid = auth_ids.get(f["authority_name"]) if f["authority_name"] else None
         upsert_rss_feed(conn, pid, f["url"], publisher_name=f["publisher_name"], authority_id=aid)
     for term in ["social insurance", "payroll", "employment contract", "maternity leave",
-                 "pension fund", "minimum wage", "termination notice"]:
+                 "pension fund", "minimum wage", "termination notice",
+                 "health insurance", "labour law"]:
         conn.execute("INSERT OR IGNORE INTO glossary_terms(profile_id,term,lang) VALUES(?,?,?)", (pid, term, "en"))
     # v3.2: seed bootstrap Tier 1 ranking signals
     for s in RANKING_SIGNALS:

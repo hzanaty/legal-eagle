@@ -170,7 +170,7 @@
 <body>
 
 <h1>Legal Eagle — System Lifecycle</h1>
-<p class="tagline">v3.2 shipped &nbsp;·&nbsp; v3.3 in progress &nbsp;·&nbsp; Click any step for details</p>
+<p class="tagline">v3.3 shipped &nbsp;·&nbsp; v3.4 planned &nbsp;·&nbsp; Click any step for details</p>
 
 <div class="legend">
   <span style="font-size:11px;color:#484f58;text-transform:uppercase;letter-spacing:1px;margin-right:4px;">Phases</span>
@@ -284,7 +284,7 @@
         <div class="step-sub">3-tier engine · v3.2 ✓</div>
       </div>
       <div class="inner-arrow">›</div>
-      <div class="substep blue" onclick="showDetail('tag')">
+      <div class="substep green" onclick="showDetail('tag')">
         <div class="step-name">Tag</div>
         <div class="step-sub">Glossary labels · v3.3</div>
       </div>
@@ -310,9 +310,9 @@
     <!-- ④ Finish -->
     <div class="substep-group">
       <div class="substep-label">④ Finish</div>
-      <div class="substep yellow" onclick="showDetail('email-send')">
+      <div class="substep green" onclick="showDetail('email-send')">
         <div class="step-name">Send Email</div>
-        <div class="step-sub">HTML digest · v3.3</div>
+        <div class="step-sub">V2 digest · v3.3</div>
       </div>
       <div class="inner-arrow">›</div>
       <div class="substep green" onclick="showDetail('baseline')">
@@ -631,11 +631,11 @@ const details = {
   'tag': {
     title: 'News Tagger',
     subtitle: 'NEW in v3 Phase 3 (v3.3) — deterministic glossary keyword matching + email rank gate',
-    tag: 'blue', tagLabel: 'New in v3.3',
+    tag: 'green', tagLabel: 'Shipped v3.3',
     cols: [
-      { heading: 'What it does', items: ['Matches item text against glossary_terms table', 'Assigns Topic Labels (matched terms) as JSON array', 'Calculates LoB Relevance score', 'Sets email_eligible = 1 for significance_rank ≥ 3 (configurable threshold)', 'Fires Glossary Gap Alert if rank 3+ with zero matches (v3.5)'] },
-      { heading: 'Key file', items: ['agents/news_tagger.py (to be created)', 'configurations/config_loader.py (glossary helpers)', 'configurations/db.py (glossary_terms, glossary_patterns)'] },
-      { heading: 'Dependencies', items: ['SQLite glossary_terms + glossary_patterns', 'glossary_synonyms', 'No external API needed — fully deterministic'] },
+      { heading: 'What it does', items: ['Matches item text against glossary_terms table', 'Assigns Topic Labels (matched terms) as JSON array', 'Sets email_eligible = 1 for significance_rank ≥ 3 (configurable threshold, non-duplicate)', 'Persists topic_label + email_eligible to news_items via source_id/url/hash lookup'] },
+      { heading: 'Key file', items: ['agents/news_tagger.py', 'configurations/config_loader.py (glossary helpers)', 'agents/agents_controller.py (Stage 4.4 + email gate)'] },
+      { heading: 'Dependencies', items: ['SQLite glossary_terms', 'No external API needed — fully deterministic'] },
     ]
   },
   'group': {
@@ -660,18 +660,17 @@ const details = {
   },
   'save-db': {
     title: 'Save to DB',
-    subtitle: 'Partly shipped v3.2 — attribution + dedup_status + rank done; topic_label/email_eligible v3.3',
-    tag: 'blue', tagLabel: 'Partial — v3.3',
+    subtitle: 'Fully shipped v3.3 — all pipeline writes complete',
+    tag: 'green', tagLabel: 'Shipped v3.3',
     cols: [
-      { heading: 'Shipped (v3.1–v3.2)', items: ['publisher / authority_id / authority_status columns (ATTRIBUTE stage)', 'dedup_status (new / update / duplicate) persisted', 'significance_rank + rank_tier + rank_reasoning (v3.2)', 'repetition_tag + repetition_count (v3.2)'] },
-      { heading: 'Pending (v3.3)', items: ['topic_label (JSON array) from Tagger', 'email_eligible (0/1) from rank gate', 'email_sent (0/1) on news_items', 'email_status on runs'] },
-      { heading: 'Key file', items: ['configurations/db.py (news_items INSERT/UPDATE)', 'agents/authority_attributor.py (v3.1)', 'agents/compare_news.py (dedup_status)', 'agents/news_ranker.py (v3.2)'] },
+      { heading: 'Shipped (v3.1–v3.3)', items: ['publisher / authority_id / authority_status columns (ATTRIBUTE stage)', 'dedup_status (new / update / duplicate) persisted', 'significance_rank + rank_tier + rank_reasoning (v3.2)', 'repetition_tag + repetition_count (v3.2)', 'topic_label (JSON array) from Tagger (v3.3)', 'email_eligible (0/1) from rank gate (v3.3)', 'email_sent (0/1) on news_items (v3.3)', 'email_status on runs (v3.3)'] },
+      { heading: 'Key file', items: ['configurations/db.py (news_items INSERT/UPDATE)', 'agents/authority_attributor.py (v3.1)', 'agents/compare_news.py (dedup_status)', 'agents/news_ranker.py (v3.2)', 'agents/news_tagger.py (v3.3)'] },
     ]
   },
   'email-send': {
     title: 'Send Email — V2 AI Digest',
     subtitle: 'Modified in v3.3 — AI digest grouped by Authority → Topic Label, decoupled from run',
-    tag: 'yellow', tagLabel: 'Modified in v3.3',
+    tag: 'green', tagLabel: 'Shipped v3.3',
     cols: [
       { heading: 'What it does', items: ['Run marks SUCCESS first — email is a follow-on step (never blocks run status)', 'Collects all email_eligible items (significance_rank ≥ 3, non-duplicate)', 'Groups by Authority → Topic Label; one AI call per authority+topic group', 'AI detects aspects per group → title + collective summary + source links', 'Writes news_aspects rows; assembles inline-CSS HTML digest (640px, SAP blue)', 'Sends via Gmail SMTP; sets email_sent = 1 on all included items'] },
       { heading: 'email_status lifecycle', items: ['PENDING → run complete, digest not yet started', 'SENDING → digest generation + send in progress', 'SENT → digest sent successfully', 'FAILED → Resend button appears in run log', 'SKIPPED → test mode run, no auto-send'] },

@@ -486,6 +486,38 @@ def create_schema_if_needed(conn: sqlite3.Connection) -> None:
             """
         )
 
+        # Tagging + email gate columns (v3.3)
+        # topic_label: JSON array of glossary terms matching item text
+        # email_eligible: 1 if significance_rank >= threshold and not duplicate
+        # email_sent: 1 once item has been included in a sent digest
+        for _col, _decl in (
+            ("topic_label", "TEXT"),
+            ("email_eligible", "INTEGER NOT NULL DEFAULT 0"),
+            ("email_sent", "INTEGER NOT NULL DEFAULT 0"),
+        ):
+            try:
+                conn.execute(f"ALTER TABLE news_items ADD COLUMN {_col} {_decl}")
+            except Exception:
+                pass
+
+        # Digest aspects table (v3.3) — one row per AI-detected aspect per run
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS news_aspects (
+                id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id             INTEGER NOT NULL REFERENCES runs(id),
+                topic_label        TEXT NOT NULL,
+                title              TEXT NOT NULL,
+                announcement_md    TEXT NOT NULL,
+                impact_analysis_md TEXT,
+                first_published    TEXT,
+                source_links_json  TEXT NOT NULL,
+                item_ids_json      TEXT NOT NULL,
+                created_at         TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            """
+        )
+
         # Legal Repository
         conn.execute(
             """
@@ -930,6 +962,10 @@ def upsert_news_item(conn: sqlite3.Connection, profile_id: int, item: Dict[str, 
     rank_reasoning = item.get("rank_reasoning")
     repetition_tag = item.get("repetition_tag")
     repetition_count = item.get("repetition_count")
+    # v3.3 tagging + email gate (optional; stamped by tagger/gate stages; also used by seed)
+    topic_label = item.get("topic_label")
+    email_eligible = item.get("email_eligible") or 0
+    email_sent = item.get("email_sent") or 0
 
     with conn:
         # 1) Locate existing row by strongest identifiers first
@@ -974,7 +1010,10 @@ def upsert_news_item(conn: sqlite3.Connection, profile_id: int, item: Dict[str, 
                     rank_tier=COALESCE(?, rank_tier),
                     rank_reasoning=COALESCE(?, rank_reasoning),
                     repetition_tag=COALESCE(?, repetition_tag),
-                    repetition_count=COALESCE(?, repetition_count)
+                    repetition_count=COALESCE(?, repetition_count),
+                    topic_label=COALESCE(?, topic_label),
+                    email_eligible=COALESCE(?, email_eligible),
+                    email_sent=COALESCE(?, email_sent)
                 WHERE id=?
                 """,
                 (
@@ -995,6 +1034,9 @@ def upsert_news_item(conn: sqlite3.Connection, profile_id: int, item: Dict[str, 
                     rank_reasoning,
                     repetition_tag,
                     repetition_count,
+                    topic_label,
+                    email_eligible,
+                    email_sent,
                     news_id,
                 ),
             )
@@ -1003,8 +1045,8 @@ def upsert_news_item(conn: sqlite3.Connection, profile_id: int, item: Dict[str, 
         # 3) Insert new
         conn.execute(
             """
-            INSERT INTO news_items(profile_id, source_type, source_id, url, domain, title, content, published_at, first_seen_at, last_seen_at, hash_signature, publisher, authority_id, authority_status, dedup_status, significance_rank, rank_tier, rank_reasoning, repetition_tag, repetition_count)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            INSERT INTO news_items(profile_id, source_type, source_id, url, domain, title, content, published_at, first_seen_at, last_seen_at, hash_signature, publisher, authority_id, authority_status, dedup_status, significance_rank, rank_tier, rank_reasoning, repetition_tag, repetition_count, topic_label, email_eligible, email_sent)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """,
             (
                 profile_id,
@@ -1027,6 +1069,9 @@ def upsert_news_item(conn: sqlite3.Connection, profile_id: int, item: Dict[str, 
                 rank_reasoning,
                 repetition_tag,
                 repetition_count,
+                topic_label,
+                email_eligible,
+                email_sent,
             ),
         )
         row = conn.execute(
@@ -1514,7 +1559,8 @@ def list_all_news_for_review(
                    relevance_score, reviewed_at,
                    publisher, authority_id, authority_status, dedup_status,
                    significance_rank, rank_tier, rank_reasoning,
-                   repetition_tag, repetition_count
+                   repetition_tag, repetition_count,
+                   topic_label, email_eligible, email_sent
             FROM news_items
             WHERE profile_id = ?
         """
