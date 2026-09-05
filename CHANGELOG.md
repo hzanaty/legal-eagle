@@ -1,5 +1,57 @@
 # CHANGELOG
 
+## v3.4 — 2026-09-05
+### Challenge + Grounding loop
+
+- **Challenge modal** (`admin/app.py`, `admin/templates/review_news.html`): inline Challenge button per item; Challenge Agent calls GPT-4o with counter-argument prompt; result stored in `news_items.challenge_result`.
+- **Grounding loop**: after Challenge the Tier 2 ranker re-runs on the challenged item; updated rank stored back. Re-rank action (F6) available on all items.
+- **Topic→Announcement→Sources hierarchy** in Review tab: Level 1 = Topic, Level 2 = Announcement (`news_announcements` table, renamed from `news_aspects`), Level 3 = Sources. Clicking an Announcement renders `announcement_md` inline as markdown.
+- **Email wired into pipeline**: `email_composer.generate_digest()` replaces old `email_sender` call in `agents_controller.py`.
+- **Xanadu HCM demo profile** added to production DB (`configurations/config.db`); `scripts/refresh_xanadu_demo.py` copies latest harness run data from `tests/test.db` with full ID remapping.
+- **Test Harness v3.4**: 32/32 pass (4 skipped — AI).
+- **New DB**: `human_rank_override` + `challenge_result` columns on `news_items`; `news_announcements` table (renamed from `news_aspects`).
+
+**Files Changed:**
+- `admin/app.py` — challenge POST route, re-rank route, Xanadu review fix
+- `admin/templates/review_news.html` — Topic→Announcement→Sources UI, challenge button
+- `agents/agents_controller.py` — email wired into pipeline
+- `agents/news_ranker.py` — re-rank on challenge
+- `configurations/db.py` — new columns + table rename migration
+- `scripts/refresh_xanadu_demo.py` — NEW Xanadu demo refresh script
+- `tests/fixtures/expected/v3.4.json` — NEW harness assertions
+- `tests/run_harness.py` — v3.4 harness function
+- `docs/lifecycle.html` — Challenge step + Announcement → green
+
+---
+
+## v3.3 — 2026-09-05
+### Tagging + Email V2 digest
+
+- **Keyword tagging replaces AI grouping** (`agents/news_tagger.py` — new): deterministic glossary keyword matching assigns `topic_label` (JSON array) to every pipeline item; no LLM call for grouping.
+- **Email gated on rank ≥ 3**: `email_eligible = 1` for rank ≥ 3 non-duplicate items (configurable threshold).
+- **Email V2 digest format** (`agents/email_composer.py` — new): AI newsletter grouped by Authority → Topic Label; one cached AI call per group detects aspects; writes `news_aspects` rows; SAP Blue inline-CSS HTML.
+- **`email_sender.py`** (`send_digest()`): calls composer, sends via SMTP, updates `email_sent` + `runs.email_status` (PENDING→SENDING→SENT/FAILED/SKIPPED).
+- **Review UI**: email filter chip (All / Unsent only), Sent/Unsent pills, Send Email toolbar button with live count.
+- **Run status page**: email stage bar + Resend button (FAILED state).
+- **Publish dates** surfaced on review cards.
+- **Test Harness v3.3**: 24/24 pass (26/26 after post-ship additions).
+- **New DB**: `glossary_terms` table; `topic_label` + `email_eligible` columns on `news_items`; `news_aspects` table.
+
+**Files Changed:**
+- `agents/news_tagger.py` — NEW keyword tagger
+- `agents/email_composer.py` — NEW V2 digest composer
+- `agents/email_sender.py` — NEW `send_digest()` SMTP sender
+- `agents/agents_controller.py` — TAGGING stage; digest wired post-SUCCESS
+- `admin/app.py` — POST `/admin/send-email` route; email filter
+- `admin/templates/review_news.html` — email filter chip, pills, toolbar button
+- `admin/templates/run_status.html` — email stage bar + Resend
+- `configurations/db.py` — `glossary_terms` table; new `news_items` columns
+- `tests/fixtures/expected/v3.3.json` — NEW
+- `tests/run_harness.py` — v3.3 harness function
+- `docs/lifecycle.html` — Tag + Email Send + Save DB steps → green
+
+---
+
 ## v3.2 — 2026-09-05
 ### Ranking Engine + Attribution AI
 

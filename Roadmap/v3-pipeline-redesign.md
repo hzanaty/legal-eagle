@@ -1,7 +1,7 @@
 # Legal Eagle v3.0 — Pipeline Redesign Specification
 
 **Date:** 2026-06-29  
-**Status:** Design Complete — Pending Implementation Plan  
+**Status:** v3.4 Shipped — v3.5 (Glossary Gap Alert) next  
 **Version Jump:** v2.32 → v3.0  
 **Author:** Brainstorming session (I077750 + Claude)
 

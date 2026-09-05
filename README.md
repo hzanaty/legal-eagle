@@ -4,6 +4,8 @@
 
 > AI-powered platform that monitors legal changes, interprets their meaning, and helps SAP Localization teams respond faster with higher intelligence.
 
+**Current version: v3.4** — Challenge + Grounding loop · [CHANGELOG](CHANGELOG.md)
+
 ---
 
 ## 🎯 The Vision
@@ -43,7 +45,7 @@ Legal Eagle automatically:
 | **Smart Deduplication** | Detects duplicate news and updates to previously reported items; REPEATED tag for persistent signals |
 | **Three-Tier Ranking Engine** | Deterministic rules (Tier 1) + GPT-4o AI scoring (Tier 2); 1=Noise → 5=Urgent; REPEATED tag elevates rank for recurring topics |
 | **Source Attribution** | Publisher + Authority stamped per item from feed config; AI inference for unconfigured feeds; ✦ icon + manual override UI |
-| **Intelligent Grouping** | AI clusters related news by regulatory theme (replaced by keyword tagging in v3.3) |
+| **Intelligent Grouping** | AI clusters related news by regulatory theme (replaced by keyword tagging, shipped v3.3) |
 | **Multi-Profile Support** | Country + Line of Business combinations (SA/HCM, TR/HCM, ES/HCM, GR/HCM, etc.) |
 | **Bilingual Digests** | Native language + English translation in single email |
 | **Human-in-the-Loop** | Review/score workflow continuously improves accuracy |
@@ -284,7 +286,7 @@ Each profile allows you to configure:
        Tier 2 GPT-4o AI scoring (1=Noise → 5=Urgent)
 
 5. GROUP (AI)
-   └─> Cluster related items by theme (replaced by keyword tagging in v3.3)
+   └─> Cluster related items by theme (replaced by keyword tagging, shipped v3.3)
 
 6. EMAIL (Conditional)
    └─> Bilingual HTML digest (native + English)
