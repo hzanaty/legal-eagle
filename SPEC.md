@@ -1,7 +1,7 @@
-# Legal Eagle 2.32 — Technical Specification
+# Legal Eagle 3.5 — Technical Specification
 
-**Version:** 2.32 (ANS Disabled + ANS OAuth Fix + Legal Repository + Greece Profile + v2.31 Enhancements)  
-**Last Updated:** 2026-06-28
+**Version:** 3.5 (Pipeline Redesign — 3-tier ranking, glossary tagging, challenge+grounding loop, glossary gap alert)  
+**Last Updated:** 2026-09-06
 
 This document provides the technical specification for Legal Eagle, an AI-powered regulatory compliance monitoring system for SAP Localization.
 
@@ -40,8 +40,14 @@ Legal Eagle monitors government sources for legal updates in chosen countries an
 ### 1.3 Key Design Principles
 
 - **Multi-profile**: Each profile is a Country + LoB combination with isolated configuration
-- **AI-first filtering**: Semantic understanding via LLM, not keyword matching
-- **Human-in-the-loop**: Reviewed items improve future filtering accuracy
+- **Four-dimensional item model** (v3): every news item carries four independent dimensions, stored in the DB and shown in the Review UI:
+  - **Significance Rank (1–5)** — how legally important, assigned by the three-tier ranking engine (`significance_rank`; DUPLICATEs carry the special value 0, outside the 1–5 scale)
+  - **LoB Relevance** — matched glossary terms (or blank → glossary gap alert)
+  - **Topic Label** — what the item is about, from glossary keyword tagging (`topic_label`, JSON array; `["General"]` when no term matches)
+  - **Repetition Tag** — NEW · UPDATE · REPEATED · DUPLICATE, from cross-run frequency counting (`repetition_tag` / `repetition_count`)
+  These dimensions are independent: a rank-4 item with blank LoB Relevance is valid — it means the ranker found a significant item the current glossary cannot explain, which raises a Glossary Gap Alert (v3.5).
+- **Ranking as the quality gate** (v3): the old binary relevance filter is gone; noise is Rank 1 and simply not emailed. Email is gated on rank ≥ 3 (configurable per profile).
+- **Confirm-not-author human loop** (v3): the human never writes rules. On Challenge → override → confirm, the AI re-evaluates, auto-populates the reason, reflects the understood signal back, and a single confirmation writes both a Tier-2 grounding example (`ranking_grounding`) and a Tier-1 deterministic rule (`ranking_signals`) — so the system gets faster and smarter from every interaction.
 - **Environment-based secrets**: No credentials in database or code
 
 ---
@@ -50,7 +56,7 @@ Legal Eagle monitors government sources for legal updates in chosen countries an
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                           LEGAL EAGLE 2.32 ARCHITECTURE                      │
+│                           LEGAL EAGLE 3.5 ARCHITECTURE                       │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
@@ -65,21 +71,26 @@ Legal Eagle monitors government sources for legal updates in chosen countries an
 │            └────────────────┼────────────────┘                  │            │
 │                             ▼                                   │            │
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
-│  │                      PROCESSING PIPELINE                              │   │
+│  │                   PROCESSING PIPELINE (v3)                            │   │
 │  │                                                                       │   │
-│  │  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐   │   │
-│  │  │   news_filter   │───▶│  compare_news   │───▶│  news_grouper   │   │   │
-│  │  │ (AI Relevance)  │    │ (Dedup/Updates) │    │ (AI Grouping)   │   │   │
-│  │  └─────────────────┘    └─────────────────┘    └────────┬────────┘   │   │
-│  │                                                          │            │   │
-│  │  ┌──────────────────────────────────────────────────────┘            │   │
-│  │  │                                                                    │   │
-│  │  │  ┌──────────────────────┐                                         │   │
-│  │  └─▶│ email_inbox_parser   │ (Monitor Updates from Law-to-Spec)      │   │
-│  │     │ (Gmail IMAP)         │                                         │   │
-│  │     └──────────┬───────────┘                                         │   │
-│  │                │                                                     │   │
-│  └────────────────┼─────────────────────────────────────────────────────┘   │
+│  │  HEALTH CHECK ─▶ FETCH ─▶ ATTRIBUTE ─▶ ANNOTATE ─▶ RANK ─▶ TAG ─▶    │   │
+│  │  TRANSLATE ─▶ SAVE ──────────────────────────────────────────────┐   │   │
+│  │                                                                   │   │   │
+│  │  health_check  authority_     compare_news   news_ranker          │   │   │
+│  │  (hard/warn)   attributor     (NEW/UPDATE/    (3-tier: Tier1 kw    │   │   │
+│  │                (publisher +   REPEATED/       /regex → Tier2 gpt-4o│   │   │
+│  │                authority)     DUPLICATE→rank0) grounded)           │   │   │
+│  │                                                                   │   │   │
+│  │  news_tagger (topic_label + glossary_gap) · news_translator       │   │   │
+│  │                                                                   │   │   │
+│  │  ┌──────────────────────┐                                        │   │   │
+│  │  │ email_inbox_parser   │ (Monitor Updates from Law-to-Spec)      │   │   │
+│  │  │ (Gmail IMAP)         │                                         │   │   │
+│  │  └──────────────────────┘                                        │   │   │
+│  │                                                                   │   │   │
+│  │  EMAIL FILTER + SEND (decoupled — after run marks SUCCESS)        │◀──┘   │   │
+│  │  email_composer.generate_digest() → email_sender.send_digest()   │       │   │
+│  └──────────────────────────────────────────────────────────────────────┘   │
 │                   ▼                                                          │
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
 │  │                         OUTPUT                                        │   │
@@ -114,7 +125,7 @@ Legal Eagle monitors government sources for legal updates in chosen countries an
 - **Language**: Python 3.11+
 - **Framework**: Flask 3.0+ (Admin UI)
 - **Database**: SQLite 3 (configuration storage)
-- **AI/LLM**: SAP AI Core (gpt-4o, text-embedding-ada-002)
+- **AI/LLM**: SAP AI Core (gpt-4o for chat/ranking/attribution, text-embedding-3-small for embeddings). All chat + embedding calls are wrapped by `agents/ai_cache.py` for deterministic replay in the test harness.
 
 ### 3.2 Frontend (Current)
 
@@ -249,6 +260,11 @@ CREATE TABLE url_sources (
 - `last_successful_fetch`: ISO 8601 timestamp of last successful fetch (used for delta mode)
 - `use_proxy`: 1 = use BrightData proxy, 0 = direct connection
 
+**Source Simulator columns (v3.1, F9)** — added via `ALTER TABLE`; populated by `agents/source_simulator.py` and read by the runtime scraper so selectors are discovered once, not per run:
+- `simulation_status` (`pending` \| `success` \| `failed`, default `pending`), `simulated_at`
+- `container_selector`, `field_selectors` (JSON), `read_more_selector`
+- `pagination_type`, `pagination_selector`, `depth_level`, `requires_js`
+
 #### Table: `email_receivers`
 
 Email recipients for daily digest per profile.
@@ -312,33 +328,49 @@ CREATE TABLE settings (
 
 #### Table: `news_items`
 
-Historical news items (weekly baseline).
+Baseline store for accepted items and the four-dimensional v3 item model. The base columns are created by `create_schema_if_needed()`; v3 dimensions are added idempotently via `ALTER TABLE`.
 
 ```sql
 CREATE TABLE news_items (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY,
     profile_id INTEGER NOT NULL,
-    source TEXT NOT NULL,
-    source_type TEXT,
-    title TEXT NOT NULL,
-    link TEXT,
-    date TEXT,
+    source_type TEXT NOT NULL,          -- rss | tweet | crawl | snap
+    source_id TEXT,                     -- rss: guid, tweet: tweet_id
+    url TEXT,
+    domain TEXT,
+    title TEXT,
     content TEXT,
-    created_at TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
+    published_at TEXT,                  -- ISO timestamp if available
+    first_seen_at TEXT NOT NULL,        -- ISO now() on insert
+    last_seen_at TEXT NOT NULL,         -- ISO now() updated on repeat/update
+    hash_signature TEXT NOT NULL,       -- normalized text hash for quick fuzzy match
+    FOREIGN KEY(profile_id) REFERENCES profiles(id) ON DELETE CASCADE
 );
 ```
 
-**Columns:**
-- `id`: Auto-increment primary key
-- `profile_id`: Foreign key to profiles table
-- `source`: Source name (e.g., RSS feed URL, Twitter handle)
-- `source_type`: Type ('RSS', 'Twitter', 'URL_Static', 'URL_Dynamic')
-- `title`: News item title
-- `link`: URL to full article
-- `date`: Publication date (ISO 8601)
-- `content`: Article content or summary
-- `created_at`: Timestamp when added to database
+**Base columns:** `source_type` (rss/tweet/crawl/snap), `source_id`, `url`, `domain`, `title`, `content`, `published_at` (publication date), `first_seen_at` / `last_seen_at` (fetch bookkeeping), `hash_signature` (exact-dedup fingerprint; a unique index on `(profile_id, source_type, hash_signature)` enforces exact dedup).
+
+**v3 columns added by `ALTER TABLE` (idempotent):**
+
+| Column | Added | Meaning |
+|--------|-------|---------|
+| `publisher` | v3.1 | Display name of the source (stamped by ATTRIBUTE) |
+| `authority_id` | v3.1 | FK to `authorities` |
+| `authority_status` | v3.1 | `configured` \| `inferred` (AI, v3.2+) \| `unknown` |
+| `dedup_status` | v3.1 | `new` \| `update` \| `duplicate` (set by `compare_news`; duplicates never dropped) |
+| `significance_rank` | v3.2 | 0 = duplicate (not evaluated), 1–5 = ranked significance |
+| `rank_tier` | v3.2 | `tier1` \| `tier2` \| `duplicate` |
+| `rank_reasoning` | v3.2 | One-line rationale from the ranker |
+| `repetition_tag` | v3.2 | `new` \| `update` \| `repeated` \| `duplicate` |
+| `repetition_count` | v3.2 | Times same entity fingerprint seen across runs |
+| `topic_label` | v3.3 | JSON array of matched glossary terms (`["General"]` if none) |
+| `email_eligible` | v3.3 | 1 if `significance_rank ≥ threshold` and not duplicate |
+| `email_sent` | v3.3 | 1 once included in a sent digest |
+| `human_rank_override` | v3.4 | Manual rank set via confirm-challenge (NULL if not overridden) |
+| `human_override_reason` | v3.4 | Reason text captured with the override |
+| `glossary_gap` | v3.5 | 1 when `significance_rank ≥ 3` AND `topic_label == ["General"]` |
+
+> **Note:** the same v3 attribution/dedup columns (`publisher`, `authority_id`, `authority_status`, `dedup_status`) are also added to `filtered_news`. There is no `canonical_fingerprint` column — exact dedup uses `hash_signature`. Translation is rendered at send time (see `news_translator.py`); translated text is not persisted as `news_items` columns.
 
 #### Table: `filtered_news`
 
@@ -407,6 +439,8 @@ CREATE TABLE runs (
 - `items_updated`: Updated items
 - `email_sent`: 1 = email sent, 0 = not sent
 - `error_message`: Error details if failed
+
+> **v3 columns** (added via `ALTER TABLE`): `origin` (`manual` \| default), `error_step` and `error_message` (F3 — the specific failing pipeline step + human-readable reason, surfaced in the run status UI), and `email_status` (`PENDING → SENDING → SENT / FAILED / SKIPPED`, tracking the decoupled digest stage). The live schema also uses `duration_ms`, `rss_count`, `tweet_count`, `url_count`, `filtered_count`, `grouped_count`, and `cancel_requested`.
 
 #### Table: `run_logs`
 
@@ -536,6 +570,81 @@ CREATE TABLE repo_assets (
 - `reference`: External ID (JIRA ticket ID, SAP Note number, etc.)
 - `url`: Link to asset
 - `created_at`: Timestamp
+
+#### Table: `authorities` (v3.0)
+
+Legislative bodies per profile; targets of the `authority_id` FK on feeds and news items.
+
+```sql
+CREATE TABLE authorities (
+    id INTEGER PRIMARY KEY,
+    profile_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    aliases TEXT,
+    UNIQUE(profile_id, name),
+    FOREIGN KEY(profile_id) REFERENCES profiles(id) ON DELETE CASCADE
+);
+```
+
+#### Table: `glossary_terms` (+ `glossary_synonyms`, `glossary_patterns`)
+
+Normalized per-profile glossary. `glossary_terms` holds the term (`term`, `lang`, `category`, `product`, `weight`, `notes`); `glossary_synonyms` and `glossary_patterns` hold child synonym strings and regex patterns keyed by `term_id`. The glossary tagger and the Glossary Gap enrichment flow both read/write this table. (Supersedes the flat `glossary` table.)
+
+#### Table: `ranking_signals` (v3.2)
+
+Tier-1 deterministic ranking rules per profile — grown by the confirm-challenge loop.
+
+```sql
+CREATE TABLE ranking_signals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    profile_id INTEGER,
+    signal_type TEXT,        -- e.g. gazette_number, human_confirmed
+    pattern TEXT,            -- keyword/regex
+    min_rank INTEGER,
+    confidence REAL,
+    created_from TEXT        -- initial_setup | challenge_modal
+);
+```
+> `insert_ranking_signal()` also adds `reason` and `created_at` columns idempotently.
+
+#### Table: `ranking_grounding` (v3.2)
+
+Tier-2 few-shot grounding examples per profile (capped at the 10 most recent when building the prompt).
+
+```sql
+CREATE TABLE ranking_grounding (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    profile_id INTEGER,
+    rank INTEGER,
+    summary TEXT,            -- AI-confirmed understanding of the override
+    source_item_id INTEGER   -- item that triggered this grounding
+);
+```
+> `insert_ranking_grounding()` also adds `source_label` and `created_at` columns idempotently.
+
+#### Table: `news_announcements` (v3.4 — renamed from `news_aspects`)
+
+One row per AI-detected announcement per run; backs the Topic → Announcement → Sources hierarchy in the Review tab.
+
+```sql
+CREATE TABLE news_announcements (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id             INTEGER NOT NULL REFERENCES runs(id),
+    topic_label        TEXT NOT NULL,
+    title              TEXT NOT NULL,
+    announcement_md    TEXT NOT NULL,      -- Law2Spec-aligned markdown, rendered inline
+    impact_analysis_md TEXT,               -- populated in v3.6
+    first_published    TEXT,
+    source_links_json  TEXT NOT NULL,
+    item_ids_json      TEXT NOT NULL,      -- backing news_items ids (Level 3 = Sources)
+    created_at         TEXT NOT NULL DEFAULT (datetime('now'))
+);
+```
+> A migration renames any legacy `news_aspects` table to `news_announcements` on schema init.
+
+#### Table Count
+
+`create_schema_if_needed()` creates 22 tables (`profiles`, `settings`, `rss_feeds`, `tweet_accounts`, `crawl_urls`, `snap_urls`, `email_receivers`, `glossary_terms`, `glossary_synonyms`, `glossary_patterns`, `news_items`, `url_sources`, `audit_log`, `filtered_news`, `runs`, `run_logs`, `authorities`, `ranking_signals`, `ranking_grounding`, `news_announcements`, `repo_nodes`, `repo_assets`). A 23rd, `monitor_updates_processed`, is created by the monitor-updates migration script.
 
 ---
 
@@ -672,41 +781,11 @@ def check_inbox_for_updates(
 
 ---
 
-### 5.5 News Filter (`agents/news_filter.py`)
+### 5.5 News Filter (`agents/news_filter.py`) — REMOVED (v3.1)
 
-**Purpose**: AI-powered relevance filtering using LLM.
+**Status:** Deleted in v3.1 (bug B6). The binary keep/drop relevance filter was the sole quality gate and let noise through while dropping useful items. It is replaced by the three-tier ranker, where **Rank 1 = Noise** is the quality gate (noise is scored, saved, and simply not emailed — never deleted).
 
-**Key Functions**:
-```python
-def filter_news_items(
-    items: List[Dict],
-    country_code: str,
-    lob: str,
-    glossary: List[str],
-    api_key: str,
-    language: str = "en"
-) -> Tuple[List[Dict], List[Dict]]
-```
-
-**Input**:
-- `items`: Raw news items from sources
-- `country_code`: Profile country code
-- `lob`: Profile Line of Business
-- `glossary`: Custom terms for context
-- `api_key`: SAP AI Core API key
-- `language`: Analysis language
-
-**Output**:
-- Tuple of (filtered_items, rejected_items)
-- Filtered items include `score` field (0.0-1.0)
-
-**AI Prompt**:
-- Evaluates legal relevance to country/LoB
-- Considers SAP product scope (HCM, Payroll, SuccessFactors, S/4HANA)
-- Uses glossary terms for domain context
-- Returns structured JSON with score and reasoning
-
----
+Useful pieces were migrated: publication-date parsing → `agents/text_utils.py`; the age gate → the ANNOTATE step in `compare_news.py` (driven by per-source `last_successful_fetch`, not a hardcoded constant); the cross-language semantic prompt structure → the `news_ranker.py` Tier-2 prompt. The `skip_filter` controller parameter is retained for API compatibility but is now a no-op.
 
 ### 5.6 Compare News (`agents/compare_news.py`)
 
@@ -735,34 +814,62 @@ def compare_with_baseline(
 - Content hash comparison for updates
 - Link matching as fallback
 
+**v3 role — ANNOTATE stage:** `compare_news.py` is the annotator. It classifies every item as **NEW / UPDATE (with delta) / REPEATED (with count) / DUPLICATE** and stamps `dedup_status`. DUPLICATE items are **never dropped** — they are saved with `significance_rank = 0` and shown in a collapsed section of the Review UI (F7). Items whose fingerprint has recurred across runs get `repetition_tag='repeated'` / `repetition_count`, feeding the ranker's REPEATED elevation rules. The age gate migrated here from the deleted `news_filter.py`, anchored to each source's `last_successful_fetch`. The controller invokes it via `run_compare_news_agent(...)`, which returns `new_items` and `update_items`.
+
 ---
 
-### 5.7 News Grouper (`agents/news_grouper.py`)
+### 5.7 News Grouper (`agents/news_grouper.py`) — REPLACED by News Tagger (v3.3)
 
-**Purpose**: Group related news items using AI clustering.
+**Status:** Superseded in v3.3. LLM theme-grouping obscured individual items and their ranks, and assigned OTHER/wrong-LoB categories (bugs B3/B4). It is replaced by deterministic glossary tagging (`news_tagger.py`) plus the AI digest composer (`email_composer.py`). The file still exists and `group_and_summarize_news()` is reachable only through the legacy `skip_grouping`/preview path in the controller; it is no longer part of the v3 pipeline. Email organization is now structural (by Topic Label), not editorial.
 
-**Key Functions**:
-```python
-def group_news_items(
-    items: List[Dict],
-    api_key: str,
-    language: str = "en"
-) -> List[Dict]
-```
+---
 
-**Input**:
-- `items`: New/updated items to group
-- `api_key`: SAP AI Core API key
-- `language`: Analysis language
+### 5.7a News Ranker (`agents/news_ranker.py`) — NEW (v3.2)
 
-**Output**:
-- List of group dicts with `theme`, `items`, `summary`
+**Purpose**: Assign `significance_rank` (0–5) via a three-tier engine. `rank_items(items, profile_id, db_conn)` mutates each item in place with `significance_rank`, `rank_tier`, `rank_reasoning`.
 
-**AI Prompt**:
-- Identifies common themes across items
-- Groups related items together
-- Generates concise summary per group
-- Returns structured JSON
+- **Tier 0 — DUPLICATE passthrough**: items with `dedup_status='duplicate'` are stamped rank 0, `rank_tier='duplicate'`, and skip both tiers.
+- **Tier 1 — Deterministic**: keyword/regex rules loaded from `ranking_signals` (ordered by `min_rank` DESC). No AI call; fully explainable. A Tier-1 match at rank ≥ 4 short-circuits and skips Tier 2.
+- **Tier 2 — AI**: gpt-4o via `sap_ai_client`, fired when Tier 1 gives rank < 4 or no match. The prompt includes up to 10 `ranking_grounding` summaries as few-shot examples (plus profile bootstrap examples). The call is wrapped in `ai_cache` for offline harness determinism. Falls back to rank 2 on AI-unavailable/parse error.
+- **REPEATED elevation** (`_apply_boosts`): REPEATED ×3+ with rank ≥ 2 auto-elevates +1 (cap 5); rank-1 noise is not elevated.
+- **Re-rank (F6)**: `rerank_items_for_profile(profile_id, db_conn)` re-runs the ranker over existing DB rows without re-fetching, updating the rank columns.
+
+---
+
+### 5.7b News Tagger (`agents/news_tagger.py`) — NEW (v3.3)
+
+**Purpose**: Deterministic glossary-keyword tagging (no LLM). 
+
+- `tag_items(items, conn, profile_id)`: matches item text against profile glossary terms and sets `topic_label` to a JSON array of matched terms, or `["General"]` when none match.
+- `save_topic_labels(items, conn, profile_id)`: persists `topic_label` to `news_items`, resolving each row by id → source_id → url → hash_signature fallback.
+- `flag_glossary_gaps(items, conn, profile_id)` (v3.5): runs after `save_topic_labels`; sets `glossary_gap = 1` for items with `significance_rank ≥ 3` AND `topic_label == ["General"]` (a rank-significant item the glossary cannot explain). NULL `topic_label` (never tagged) is not flagged. Same id/source_id/url/hash fallback persistence.
+
+---
+
+### 5.7c News Translator (`agents/news_translator.py`) — NEW (v3)
+
+**Purpose**: Translation extracted out of the email sender (bug B8) into its own step. `translate_grouped_summary(...)` translates title + content for non-English profiles via SAP AI Core, wrapped in `ai_cache`. The email sender renders only; it no longer makes translation calls.
+
+---
+
+### 5.7d Health Check (`agents/health_check.py`) — NEW (v3.1, F2)
+
+**Purpose**: Parallel pre-run reachability checks that complete in seconds, before any fetching. `run_health_checks(profile_id, check_email=True)` returns a list of results; `summarize()` renders them; `hard_failures()` extracts blockers.
+
+- **Hard blocks** (abort the run): DB writability, SAP AI Core, and Gmail SMTP (when actually sending).
+- **Warnings** (log + proceed/skip): per-URL and per-RSS HTTP HEAD reachability, Twitter auth (`GET /2/users/me`, zero quota cost).
+
+---
+
+### 5.7e Authority Attributor (`agents/authority_attributor.py`) — NEW (v3.1)
+
+**Purpose**: The ATTRIBUTE stage — stamp `publisher`, `authority_id`, `authority_status` onto items. `build_feed_config(rss_feeds)` maps feeds to publisher/authority; `attribute_items(items, feed_cfg, db_conn, profile_id)` stamps `authority_status='configured'` from feed config (no AI). Feeds with no configured authority take the v3.2 **inferred** path: gpt-4o picks the best match from the profile's authorities list (`authority_status='inferred'`, ✦ spark icon in Review), wrapped in `ai_cache`.
+
+---
+
+### 5.7f Source Simulator (`agents/source_simulator.py`) — NEW (v3.1, F9)
+
+**Purpose**: One-time, AI-assisted auto-discovery of a URL source's structure so the add form is a single URL field. `run_simulation(url, ai_client, max_depth=5)` fetches (static → Playwright fallback), detects repeating containers, maps title/link/date field selectors, detects read-more buttons and pagination, follows nav links a level deeper via LLM when needed, and captures a proof article. Results are saved to the `url_sources` simulator columns (`simulation_status='success'`, `container_selector`, `field_selectors`, etc.) and read at runtime by `scrape_url_source_with_config()`.
 
 ---
 
@@ -811,6 +918,14 @@ def send_email(
 - Caches translations per language
 - Sends one email per language group
 - Subject includes profile: "🦅 Legal Eagle Daily Digest — SA/HCM — 2026-04-24"
+
+**v3 role — render + SMTP only:** `send_email()` (the legacy bilingual grouped-summary path) remains for the preview/`skip_grouping` flow, but the v3 pipeline uses **`send_digest(profile_id, run_id, item_ids, db_conn, gmail_creds)`**. `send_digest()` selects email-eligible items (or explicit `item_ids` for manual/Resend), calls `email_composer.generate_digest()` to build the HTML, sends via Gmail SMTP, sets `email_sent = 1` on included items, and updates `runs.email_status` (PENDING → SENDING → SENT / FAILED / SKIPPED). All AI/translation calls were removed from this module (bug B8).
+
+---
+
+### 5.8a Email Composer (`agents/email_composer.py`) — NEW (v3.3)
+
+**Purpose**: Build the V2 AI digest. `generate_digest(items, profile_id, db_conn, run_id, profile_name)` groups items by **Authority → Topic Label**, makes one cached AI call per group to detect distinct announcements (title + 2–4 sentence Law2Spec-aligned summary + first publish date + source links), writes one `news_announcements` row per announcement, and returns SAP-Blue inline-CSS HTML with per-item rank badges. Existing announcements for the run are cleared first (Resend idempotency).
 
 ---
 
@@ -887,22 +1002,20 @@ def run_profile_once(
 - `selected_url_sources`: Optional list of URL sources to crawl (None = all)
 - `lookback_override`: Per-run date_scope override ('force_full', 'delta', 'today', 'last_7_days', 'last_30_days')
 
-**Execution Flow**:
-1. **Load Configuration**: Profile, sources, receivers, glossary
-2. **Load Date Scope**: Read `profiles.date_scope`; apply `lookback_override` if provided
-3. **Filter Sources** (v2.14): Apply source selection filters if provided
-   - Filter RSS feeds to selected URLs only
-   - Filter Twitter accounts to selected handles only
-   - Filter URL sources to selected URLs only
-4. **Validate Twitter**: Pre-flight check, skip if error flag set
-5. **Collect Data**: RSS feeds, tweets, URL sources (with delta/full mode per source), email inbox
-6. **Apply Date Filter**: RSS and Twitter items filtered by profile date_scope
-7. **Filter** (optional): AI-powered relevance filtering; skip if `skip_filter=True`
-8. **Compare** (optional): Deduplicate and detect updates against baseline; skip if `skip_comparison=True`
-9. **Group** (optional): AI clustering of related items; skip if `skip_grouping=True` (each item wrapped as single-item group)
-10. **Email**: Send digest to receivers (if new/updated items found and not `skip_email`)
-11. **Update Baseline**: Store new items in database
-12. **Log**: Record execution metrics and logs
+**Execution Flow (v3 pipeline)**:
+1. **Load Configuration**: Profile, sources, receivers, glossary; resolve `date_scope` (+ `lookback_override`)
+2. **HEALTH CHECK** (v3.1, F2): parallel reachability checks; hard-fail on DB / AI Core / Gmail aborts before any fetch
+3. **FETCH**: RSS, tweets, URL sources — each source anchored to its own `last_successful_fetch` (null → fall back to `date_scope` window); force-fetch treats the anchor as null but stays bounded by `date_scope`; anchor written immediately on each source's success (F1/F4/F5)
+4. **ATTRIBUTE** (`authority_attributor.py`): stamp `publisher` / `authority_id` / `authority_status` (configured, else AI-inferred)
+5. **ANNOTATE** (`compare_news.py`): classify NEW / UPDATE / REPEATED / DUPLICATE; DUPLICATEs saved (rank 0), never dropped
+6. **RANK** (`news_ranker.py`): three-tier engine scores all items 1–5 (duplicates stay 0); rank fields upserted to DB
+7. **TAG** (`news_tagger.py`): glossary keyword matching → `topic_label`; `flag_glossary_gaps()` sets `glossary_gap` for rank ≥ 3 items with no match (v3.5)
+8. **EMAIL RANK GATE**: `email_eligible = 1` for rank ≥ threshold (default 3) non-duplicate items
+9. **TRANSLATE** (`news_translator.py`): non-English profiles, rendered at send time
+10. **SAVE**: all four dimensions persisted; items available immediately in Review UI
+11. **Finish run** as SUCCESS, then **EMAIL FILTER + SEND (decoupled)**: a follow-on digest thread calls `send_digest()` → `email_composer.generate_digest()` (skipped in test mode; Resend on FAILED)
+
+> The binary relevance filter is gone (v3.1, B6). `skip_filter` is a retained no-op. The legacy `group_and_summarize_news()` runs only in the `skip_grouping`/preview path, not the v3 send path.
 
 **Skip Flags**:
 - `skip_filter`: Bypass LLM relevance check — all collected items treated as relevant
@@ -1006,6 +1119,16 @@ def run_profile_once(
 - `POST /admin/profiles/<id>/review/<item_id>/reject` - Reject filtered item
 - `POST /admin/profiles/<id>/review/<item_id>/score` - Update relevance score
 - `POST /admin/profiles/<id>/review/clear` - Clear all filtered news
+
+#### v3 Pipeline Redesign Routes (verified)
+- `POST /admin/run-all` · `GET /admin/run-all/status` · `GET /admin/run-all/stream` — Run All Active (background sequential runner + SSE)
+- `POST /admin/profiles/<id>/urls/simulate` · `POST /admin/profiles/<id>/urls/simulate/save` — Source Simulator (⚡) discover + persist (v3.1, F9)
+- `POST /admin/profiles/<id>/news/<item_id>/authority` — authority override on inferred items (v3.2)
+- `POST /admin/send-email` — send digest for `item_ids` (manual) or `run_id` (Resend) (v3.3)
+- `POST /admin/news/<item_id>/challenge` · `POST /admin/news/<item_id>/confirm-challenge` — Challenge modal + confirm (writes `human_rank_override`, `ranking_grounding`, `ranking_signals`) (v3.4)
+- `POST /admin/news/<item_id>/rerank` · `POST /admin/profiles/<id>/rerank-all` — Re-rank one / all items (F6)
+- `POST /admin/profiles/<id>/glossary/suggest` — AI keyword suggestions (regex fallback) (v3.5)
+- `POST /admin/news/<item_id>/add-to-glossary` — add term + re-tag + clear gap flag (v3.5)
 
 #### ANS Email (v2.26+, currently disabled)
 - `POST /admin/profiles/<id>/ans/provision` - Re-provision ANS Actions for all receivers — **route disabled; re-enable for BTP deployment**
@@ -1233,9 +1356,30 @@ Each node advances one step at a time via the `advance-status` action.
 - Added "Skip filtering" checkbox to Run Options
 - All run option states persisted in localStorage per profile
 
+### 7.10 v3 Review UI (Pipeline Redesign)
+
+The Review tab (`admin/templates/review_news.html`) is the human surface for the four-dimensional item model:
+
+- **Rank badges**: colour-coded 0–5 circles (0 = grey DUPLICATE, 3 = yellow, 4 = orange, 5 = red). DUPLICATE items sit in a collapsed section — never dropped.
+- **Attribution**: Channel / Publisher / Authority columns; ✦ spark icon on AI-inferred authority items with an inline authority-override dropdown.
+- **Challenge + Re-rank** (v3.4/F6): a Challenge button re-evaluates an item with full grounding context and auto-populates an override reason; confirm writes the override plus a Tier-2 grounding example and a Tier-1 rule simultaneously. Re-rank re-runs the ranker on existing items (no re-fetch), per-item or profile-wide.
+- **Topic → Announcement → Sources hierarchy** (v3.4): Level 1 = Topic (`topic_label`), Level 2 = Announcement (`news_announcements`), Level 3 = Sources (backing `news_items` via `item_ids_json`). Clicking an Announcement renders `announcement_md` inline as markdown.
+- **Glossary Gap Alert** (v3.5): a `⚠ N glossary gaps` toolbar strip with a "Show only gaps" filter, and a `⚠ Gap — no LoB match` badge per flagged card (driven by `item.is_gap`). An inline **+ Add to Glossary** panel AI-suggests keywords; confirming a term + LoB saves the term, re-tags the item, and clears the gap flag with no navigation away.
+- **Email controls** (v3.3): All / Unsent-only filter chip, ✉ Unsent / ✓ Sent pill per item, and a "✉ Send Email (N)" toolbar button. Publish dates surface on every card.
+
+### 7.11 Run All Active (v3.0 UI / v3.1 backend)
+
+Dashboard one-click multi-profile runner. `POST /admin/run-all` spawns a background thread that runs each active profile sequentially (skip-on-failure), pushing live status pills to profile rows via `GET /admin/run-all/stream` (SSE); `GET /admin/run-all/status` supports reconnect recovery after reload.
+
+### 7.12 Source Simulator (v3.1, F9)
+
+The URL-source add form is a single URL field. A saved source shows a `⏳ Pending` badge and a **⚡ Simulate** button; clicking it calls `POST /admin/profiles/<id>/urls/simulate` (SSE progress through fetch → container detect → depth loop → field map → button/pagination detect → sample capture) and `.../simulate/save` persists discovered selectors to the `url_sources` simulator columns. The runtime scraper then reads stored selectors instead of re-discovering.
+
 ---
 
 ## 8. Configuration
+
+> **v3 lookback change:** the unbounded `date_scope` values `all` / `full` / `unlimited` were removed. `parse_date_scope()` resolves only `delta` / `today` / `last_7_days` / `last_30_days`, and **force-fetch is bounded by `date_scope`** — it treats each source's `last_successful_fetch` as null for the run but never fetches beyond the profile window. (Legacy `all`/`force_full` rows are still tolerated for backward compatibility.)
 
 ### 8.1 Environment Variables
 
@@ -1310,68 +1454,49 @@ def load_global_credentials() -> Dict[str, str]
 
 ## 9. Data Flow
 
-### 9.1 Daily Digest Flow
+### 9.1 Daily Digest Flow (v3)
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        DAILY DIGEST FLOW                         │
+│                    DAILY DIGEST FLOW (v3)                        │
 └─────────────────────────────────────────────────────────────────┘
 
-1. TRIGGER (Manual or External Scheduler)
+1. TRIGGER (Manual, Run All Active, or External Scheduler)
    └─> agents_controller.run_profile_once(profile_id)
 
-2. LOAD CONFIGURATION
-   ├─> Profile settings (country, LoB, language)
-   ├─> Data sources (RSS, Twitter, URLs)
-   ├─> Email receivers
-   └─> Glossary terms
+2. HEALTH CHECK  (health_check.run_health_checks)
+   └─> DB / AI Core / Gmail hard-block; source + Twitter warnings
 
-3. COLLECT DATA (Parallel)
-   ├─> RSS Parser → parse_rss_feeds()
-   ├─> Tweet Feed → search_tweets_multi_account()
-   ├─> URL Sources → run_url_sources()
-   └─> Email Inbox → check_inbox_for_updates()
-   
-   Result: List[Dict] raw items
+3. FETCH  (per-source last_successful_fetch anchor)
+   ├─> RSS Parser · Tweet Feed · URL Sources (simulated + legacy)
+   └─> Email Inbox (Monitor Updates)
 
-4. FILTER (AI)
-   └─> news_filter.filter_news_items()
-       ├─> LLM evaluates relevance (0.0-1.0)
-       ├─> Uses country/LoB context
-       └─> Applies glossary terms
-   
-   Result: List[Dict] filtered items (score >= 0.6)
+4. ATTRIBUTE  (authority_attributor.attribute_items)
+   └─> publisher / authority_id / authority_status (configured | inferred)
 
-5. COMPARE (Deduplication)
-   └─> compare_news.compare_with_baseline()
-       ├─> Load 7-day baseline from DB
-       ├─> Match by title/link
-       └─> Detect content updates
-   
-   Result: {new: [], updated: [], unchanged: []}
+5. ANNOTATE  (compare_news → run_compare_news_agent)
+   └─> NEW | UPDATE | REPEATED | DUPLICATE (rank 0, never dropped)
 
-6. GROUP (AI)
-   └─> news_grouper.group_news_items()
-       ├─> LLM identifies themes
-       ├─> Clusters related items
-       └─> Generates summaries
-   
-   Result: List[Dict] grouped items
+6. RANK  (news_ranker.rank_items)
+   └─> Tier 0 duplicate → Tier 1 signals → Tier 2 gpt-4o (grounded)
+       significance_rank 1–5, REPEATED elevation
 
-7. EMAIL (Conditional)
-   └─> email_sender.send_email()
-       ├─> Skip if no new/updated items
-       ├─> Translate per receiver language
-       ├─> Send bilingual HTML email
-       └─> Log sent status
-   
-   Result: Boolean (email sent)
+7. TAG  (news_tagger)
+   └─> topic_label + flag_glossary_gaps (glossary_gap)
 
-8. UPDATE BASELINE
-   └─> Add new items to news_items table
+8. EMAIL RANK GATE
+   └─> email_eligible = 1 for rank ≥ threshold (default 3), non-duplicate
 
-9. RECORD METRICS
-   └─> Update runs table with stats
+9. TRANSLATE (news_translator) + SAVE TO DB
+   └─> all four dimensions persisted; visible in Review UI immediately
+
+10. FINISH RUN = SUCCESS  →  EMAIL FILTER + SEND (decoupled thread)
+    └─> email_sender.send_digest() → email_composer.generate_digest()
+        writes news_announcements, sets email_sent, updates runs.email_status
+        (SKIPPED in test mode; Resend on FAILED)
+
+Human review is ASYNC — it happens after the email, never blocking the run.
+Challenge → confirm feeds ranking_grounding + ranking_signals for the next run.
 ```
 
 ### 9.2 Monitor Updates Flow
@@ -1596,6 +1721,49 @@ def prune_old_filtered_news(
 ) -> int
 ```
 
+### 10.2 v3 Database Functions (`configurations/db.py`, verified)
+
+```python
+# Authorities (v3.0)
+def create_authority(conn, profile_id, name, aliases="") -> int
+def list_authorities(conn, profile_id) -> List[Dict]
+def get_authority(conn, authority_id) -> Optional[Dict]
+def update_authority(conn, authority_id, name, aliases="") -> None
+def delete_authority(conn, authority_id) -> None
+
+# Glossary
+def add_glossary_term(conn, profile_id, term, lang="en", category=None,
+                      product=None, weight=1.0, notes=None) -> int
+def list_glossary_terms(conn, profile_id) -> List[Dict]
+
+# Review (both news_items + filtered_news; sets item['is_gap'] from glossary_gap)
+def list_all_news_for_review(conn, profile_id, source=None, reviewed=None,
+                             limit=50, offset=0) -> List[Dict]
+def count_all_news_for_review(conn, profile_id, source=None, reviewed=None) -> int
+
+# Source Simulator (v3.1, F9)
+def save_simulation_result(conn, profile_id, url, *, sample_link=None,
+    container_selector=None, field_selectors=None, read_more_selector=None,
+    pagination_type=None, pagination_selector=None, depth_level=None,
+    requires_js=0, simulation_status="success") -> None
+def update_url_source_last_fetch(conn, profile_id, url, timestamp) -> None
+
+# Ranking engine (v3.2 / self-improving loop v3.4)
+def insert_ranking_signal(conn, profile_id, pattern, rank, reason=None) -> int
+def insert_ranking_grounding(conn, profile_id, item_id, example_md,
+                             source_label=None) -> int
+
+# Announcements (v3.4) — Level 2/3 of the Review hierarchy
+def get_announcements_for_run_with_sources(conn, run_id) -> List[Dict]
+def reset_review_data(conn, profile_id=None) -> Dict[str, int]
+
+# Audit + runs (finish_run takes a metrics dict in v3)
+def add_audit_log(conn, entity, action, details=None, profile_id=None) -> None
+def create_run(conn, profile_id, origin="manual") -> int
+def start_run(conn, run_id) -> None
+def finish_run(conn, run_id, status, metrics=None) -> None
+```
+
 ---
 
 ## 11. File Structure
@@ -1604,21 +1772,39 @@ def prune_old_filtered_news(
 legal-eagle/
 ├── agents/                          # Processing pipeline
 │   ├── __init__.py
-│   ├── agents_controller.py         # Main orchestrator
+│   ├── agents_controller.py         # Main orchestrator (v3 stage sequence)
+│   ├── health_check.py              # Pre-run reachability checks (v3.1, F2)
 │   ├── rss_parser.py                # RSS feed parser
 │   ├── tweet_feed.py                # Twitter/X integration
-│   ├── url_sources_runner.py        # Website crawler
+│   ├── url_sources_runner.py        # Website crawler (+ scrape_url_source_with_config)
+│   ├── source_simulator.py          # Zero-config URL source auto-discovery (v3.1, F9)
 │   ├── email_inbox_parser.py        # Gmail inbox monitor
-│   ├── news_filter.py               # AI relevance filter
-│   ├── compare_news.py              # Deduplication
-│   ├── news_grouper.py              # AI clustering
-│   ├── email_sender.py              # Email delivery
+│   ├── date_filter.py               # Publication-date windowing
+│   ├── authority_attributor.py      # ATTRIBUTE stage: publisher/authority (v3.1/3.2)
+│   ├── compare_news.py              # ANNOTATE: NEW/UPDATE/REPEATED/DUPLICATE
+│   ├── news_ranker.py               # Three-tier ranking engine (v3.2)
+│   ├── news_tagger.py               # Glossary tagging + flag_glossary_gaps (v3.3/3.5)
+│   ├── news_translator.py           # Post-save translation step (v3)
+│   ├── news_filter.py               # DELETED in v3.1 (replaced by ranker Rank 1 = Noise)
+│   ├── news_grouper.py              # LEGACY — replaced by news_tagger (v3.3)
+│   ├── email_composer.py            # V2 AI digest → news_announcements (v3.3)
+│   ├── email_sender.py              # Render + SMTP (send_digest / legacy send_email)
+│   ├── ai_cache.py                  # Deterministic chat/embedding cache for the harness
+│   ├── rcm_checker.py               # RCM lookup helper
 │   ├── ans_sender.py                # SAP BTP ANS email sender (v2.26, disabled — re-enable for BTP)
 │   ├── sap_ai_client.py             # SAP AI Core client
 │   ├── loka_agent.py                # LOKA integration
 │   ├── loka_client.py               # LOKA HTTP client
 │   ├── mcp_client.py                # MCP protocol client
-│   └── text_utils.py                # Text utilities
+│   └── text_utils.py                # Text utilities (+ publication-date parsing)
+│
+├── tests/                           # Deterministic integration harness (v3.0+)
+│   ├── run_harness.py               # Entry point — python tests/run_harness.py --version vX.Y
+│   ├── reset_and_seed.py            # Seeds Xanadu (XN/HCM) profile + ranking_signals
+│   ├── assertions.py                # Assertion runner
+│   ├── server.py                    # localhost:9999 fixture feed server
+│   ├── ai_cache/                    # Recorded chat/embedding responses for replay
+│   └── fixtures/                    # feeds/ · articles/ · seed/ · expected/vX.Y.json
 │
 ├── admin/                           # Flask admin UI
 │   ├── app.py                       # Flask application
@@ -1653,6 +1839,7 @@ legal-eagle/
 │   ├── resend_email_from_html.py    # Email resend utility
 │   ├── seed_greece_profile.py       # Greece profile seed (idempotent, v2.30)
 │   ├── seed_greece_repo.py          # Greece repo nodes seed (idempotent, v2.30)
+│   ├── refresh_xanadu_demo.py       # Copy latest harness run → config.db, remap IDs (v3.4)
 │   ├── export_config.py             # Export DB config to JSON (v2.31)
 │   ├── import_config.py             # Import DB config from JSON (v2.31)
 │   ├── launchd/                     # macOS launchd configs
@@ -1680,7 +1867,8 @@ legal-eagle/
 │   └── projectbrief.md              # Project overview
 │
 ├── docs/                            # Documentation
-│   └── README.md                    # User guide
+│   ├── README.md                    # User guide
+│   └── lifecycle.html               # Pipeline lifecycle diagram (updated each version)
 │
 ├── Resources/                       # Static assets served via /Resources/<path>
 │   ├── ERGANI_II_MindMap_v2.html    # Greece ERGANI II MindMap (v2.30)

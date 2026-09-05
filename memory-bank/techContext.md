@@ -18,7 +18,7 @@ The v3 line replaced the linear collect→filter→group→send flow with:
 - **Removed:** `agents/news_filter.py` (binary gate → ranker); `agents/news_grouper.py` (LLM grouping → tagger)
 
 **Database**: SQLite — ~20 tables. v3 additions:
-- `news_items` new columns: `significance_rank`, `rank_tier`, `rank_reasoning`, `repetition_tag`, `repetition_count`, `topic_label`, `email_eligible`, `email_sent`, `human_rank_override`, `human_override_reason`, `glossary_gap`, `publisher`, `authority_id`, `authority_status`, `dedup_status`, `published_at`, `canonical_fingerprint`, translation columns (`title_translated`/`content_translated`/`translation_lang`)
+- `news_items` new columns: `significance_rank`, `rank_tier`, `rank_reasoning`, `repetition_tag`, `repetition_count`, `topic_label`, `email_eligible`, `email_sent`, `human_rank_override`, `human_override_reason`, `glossary_gap`, `publisher`, `authority_id`, `authority_status`, `dedup_status`, `published_at` (exact dedup uses the existing `hash_signature` — there is no `canonical_fingerprint` column; translation is rendered at send time, not persisted on `news_items`)
 - New tables: `ranking_signals`, `ranking_grounding`, `news_announcements` (renamed from `news_aspects` in v3.4), `authorities`, `glossary_terms`
 - `url_sources` simulator columns (`simulation_status`, `container_selector`, `field_selectors`, `pagination_*`, `requires_js`, …); `runs.error_step`/`error_message`/`email_status`
 
