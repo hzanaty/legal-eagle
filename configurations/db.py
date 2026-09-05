@@ -511,6 +511,16 @@ def create_schema_if_needed(conn: sqlite3.Connection) -> None:
             except Exception:
                 pass
 
+        # Glossary gap flag (v3.5) — set by Tag stage when significance_rank >= 3
+        # AND topic_label == '["General"]' (rank-significant item with no glossary match)
+        for _col, _decl in (
+            ("glossary_gap", "INTEGER NOT NULL DEFAULT 0"),
+        ):
+            try:
+                conn.execute(f"ALTER TABLE news_items ADD COLUMN {_col} {_decl}")
+            except Exception:
+                pass
+
         # Announcements table (v3.4) — one row per AI-detected announcement per run
         # (renamed from news_aspects in v3.4)
         try:
@@ -1576,7 +1586,7 @@ def list_all_news_for_review(
                    publisher, authority_id, authority_status, dedup_status,
                    significance_rank, rank_tier, rank_reasoning,
                    repetition_tag, repetition_count,
-                   topic_label, email_eligible, email_sent
+                   topic_label, email_eligible, email_sent, glossary_gap
             FROM news_items
             WHERE profile_id = ?
         """
@@ -1597,6 +1607,8 @@ def list_all_news_for_review(
             # v3.2: unified rank/tag fields for template
             item['rank'] = r['significance_rank'] if 'significance_rank' in r.keys() else None
             item['tag'] = (r['repetition_tag'] or '').upper() if 'repetition_tag' in r.keys() else ''
+            # v3.5: glossary gap flag — consumed by review_news.html (item.is_gap)
+            item['is_gap'] = bool(int(item.get('glossary_gap') or 0))
             results.append(item)
     
     # Fetch from filtered_news if requested
