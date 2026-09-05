@@ -2124,7 +2124,7 @@ def add_news_item_to_glossary(item_id: int):
 
 @app.route("/admin/announcements/<int:ann_id>/template", methods=["GET"])
 def announcement_template(ann_id: int):
-    """v3.6: JSON for the Preview-for-RCM modal — rendered announcement + source links + status + L2S URL."""
+    """v3.6: JSON for the Preview-for-RCM modal. Fills RCM template via AI on first call, cached thereafter."""
     import json as _json
     conn = get_connection()
     try:
@@ -2152,6 +2152,19 @@ def announcement_template(ann_id: int):
                     "published_at": s.get("published_at"),
                     "significance_rank": s.get("significance_rank"),
                 })
+
+        # RCM template fill — lazy, once per announcement
+        rcm_json_str = ann.get("announcement_rcm_json")
+        if not rcm_json_str:
+            from agents.rcm_filler import fill_rcm_template
+            from configurations.db import save_announcement_rcm
+            filled = fill_rcm_template(ann, sources)
+            rcm_json_str = _json.dumps(filled)
+            save_announcement_rcm(conn, ann_id, rcm_json_str)
+        try:
+            rcm = _json.loads(rcm_json_str)
+        except Exception:
+            rcm = None
     finally:
         conn.close()
 
@@ -2159,7 +2172,8 @@ def announcement_template(ann_id: int):
     return jsonify({
         "ok": True,
         "title": ann.get("title"),
-        "announcement_html": render_md(ann.get("announcement_md") or ""),
+        "announcement_md": ann.get("announcement_md") or "",
+        "rcm": rcm,
         "sources": sources,
         "jira_legal_change": ann.get("jira_legal_change"),
         "status": ann.get("status") or "draft",
