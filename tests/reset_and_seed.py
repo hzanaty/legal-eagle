@@ -35,6 +35,11 @@ RANKING_SIGNALS = [
     {"signal_type": "keyword", "pattern": "contribution rate",      "min_rank": 3, "confidence": 1.0, "created_from": "bootstrap"},
     {"signal_type": "keyword", "pattern": "payroll compliance",     "min_rank": 3, "confidence": 1.0, "created_from": "bootstrap"},
     {"signal_type": "keyword", "pattern": "employment contract",    "min_rank": 2, "confidence": 1.0, "created_from": "bootstrap"},
+    # v3.5: "workplace safety" is NOT in the seeded glossary, so an item matching it
+    # ranks >= 3 with topic_label ["General"] → a deterministic glossary gap.
+    # min_rank=4 keeps Tier 1 authoritative (>=4 short-circuits the AI Tier 2), so the
+    # A5 gap item stays fully deterministic in the harness (no AI cache dependency).
+    {"signal_type": "keyword", "pattern": "workplace safety",        "min_rank": 4, "confidence": 1.0, "created_from": "bootstrap"},
 ]
 
 
