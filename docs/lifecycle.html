@@ -672,9 +672,10 @@ const details = {
     subtitle: 'Modified in v3.3 — AI digest grouped by Authority → Topic Label, decoupled from run',
     tag: 'green', tagLabel: 'Shipped v3.3',
     cols: [
-      { heading: 'What it does', items: ['Run marks SUCCESS first — email is a follow-on step (never blocks run status)', 'Collects all email_eligible items (significance_rank ≥ 3, non-duplicate)', 'Groups by Authority → Topic Label; one AI call per authority+topic group', 'AI detects aspects per group → title + collective summary + source links', 'Writes news_aspects rows; assembles inline-CSS HTML digest (640px, SAP blue)', 'Sends via Gmail SMTP; sets email_sent = 1 on all included items'] },
+      { heading: 'What it does', items: ['Run marks SUCCESS first — email is a follow-on step (never blocks run status)', 'Collects all email_eligible items (significance_rank ≥ 3, non-duplicate)', 'Groups by Authority → Topic Label; one AI call per authority+topic group', 'AI detects aspects per group → title + collective summary + source links', 'Writes news_aspects rows; assembles inline-CSS HTML digest (640px, SAP blue)', 'Rank badge on each topic block: green (rank ≥ 4) · amber (rank 3) · hidden below 3', 'Sends via Gmail SMTP; sets email_sent = 1 on all included items'] },
       { heading: 'email_status lifecycle', items: ['PENDING → run complete, digest not yet started', 'SENDING → digest generation + send in progress', 'SENT → digest sent successfully', 'FAILED → Resend button appears in run log', 'SKIPPED → test mode run, no auto-send'] },
       { heading: 'Key files', items: ['agents/email_composer.py (NEW — digest AI generation + HTML assembly + news_aspects write)', 'agents/email_sender.py (refactored — pure SMTP send, no HTML assembly)', 'admin/app.py — POST /send-email + follow-on thread after run SUCCESS', 'admin/templates/run_status.html — email stage indicator + Resend button'] },
+      { heading: 'Post-ship fixes (v3.3)', items: ['433c040 — profile_id missing from review_news render_template (JS syntax error var _profileId = ;)', '691ad09 — news_aspects harness assertions added; 26/26 passing (was 24/24 at ship)', 'd4e775d — rank badge added to email topic block (_rank_badge helper)'] },
     ]
   },
   'baseline': {
