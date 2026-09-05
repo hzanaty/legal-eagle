@@ -85,6 +85,48 @@
   .pagination { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 8px 0; border-top: 1px solid #e5e5e5; background: white; flex-shrink: 0; }
   .pagination a, .pagination span { font-size: 12px; color: #6a6d70; text-decoration: none; }
   .pagination a { color: #0a6ed1; }
+
+  /* ── View toggle ── */
+  .view-toggle { background: white; border-bottom: 1px solid #e5e5e5; padding: 6px 16px; display: flex; gap: 6px; flex-shrink: 0; }
+  .vtab { padding: 4px 12px; border-radius: 12px; font-size: 11px; font-weight: 600; border: 1px solid #e5e5e5; background: white; color: #6a6d70; cursor: pointer; }
+  .vtab.active { background: #0a6ed1; color: white; border-color: #0a6ed1; }
+
+  /* ── Announcement hierarchy (v3.4) ── */
+  .ann-container { flex: 1; overflow-y: auto; padding: 10px 12px; min-height: 0; }
+  .topic-block { margin-bottom: 14px; }
+  .topic-header { background: #1e3a5f; color: white; padding: 8px 12px; border-radius: 4px; display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
+  .topic-toggle-icon { font-size: 10px; transition: transform 0.15s; }
+  .topic-toggle-icon.collapsed { transform: rotate(-90deg); }
+  .topic-name { font-size: 12px; font-weight: 700; letter-spacing: 0.4px; flex: 1; }
+  .topic-meta-badge { font-size: 10px; background: rgba(255,255,255,0.15); padding: 1px 7px; border-radius: 10px; white-space: nowrap; }
+  .topic-body { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; padding-left: 8px; }
+
+  .ann-row { background: #eaf1fb; border-left: 3px solid #0a6ed1; border-radius: 0 4px 4px 0; margin-left: 0; }
+  .ann-header { padding: 7px 10px; display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
+  .ann-toggle-icon { font-size: 10px; color: #0a6ed1; transition: transform 0.15s; flex-shrink: 0; }
+  .ann-toggle-icon.collapsed { transform: rotate(-90deg); }
+  .ann-title { font-size: 11px; font-weight: 600; color: #1a4060; flex: 1; }
+  .ann-src-count { font-size: 10px; color: #6a6d70; white-space: nowrap; }
+  .ann-body { display: none; padding: 0 10px 10px 10px; }
+  .ann-body.open { display: block; }
+  .ann-md-section { background: white; border: 1px solid #cce0f7; border-radius: 4px; padding: 12px 14px; margin-bottom: 8px; font-size: 12px; line-height: 1.65; color: #32363a; }
+  .ann-md-section h1, .ann-md-section h2, .ann-md-section h3 { font-size: 12px; font-weight: 700; margin: 8px 0 4px; color: #1a4060; }
+  .ann-md-section p { margin: 4px 0; }
+  .ann-md-section ul, .ann-md-section ol { margin: 4px 0; padding-left: 18px; }
+  .ann-md-section a { color: #0a6ed1; }
+
+  .src-list { display: flex; flex-direction: column; gap: 4px; }
+  .src-card { background: white; border: 1px solid #e5e5e5; border-radius: 4px; padding: 8px 10px; display: flex; align-items: flex-start; gap: 8px; }
+  .src-rank-badge { flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: white; margin-top: 1px; }
+  .src-card-body { flex: 1; min-width: 0; }
+  .src-title { font-size: 11px; font-weight: 600; color: #32363a; margin-bottom: 2px; }
+  .src-meta { font-size: 10px; color: #6a6d70; display: flex; gap: 6px; flex-wrap: wrap; }
+  .src-actions { flex-shrink: 0; display: flex; gap: 4px; }
+  .btn-challenge { background: #fff0f0; border: 1px solid #f5c0c0; color: #bb0000; font-size: 10px; font-weight: 700; border-radius: 3px; padding: 3px 7px; cursor: pointer; }
+  .btn-challenge:hover { background: #ffeaea; }
+  .btn-rerank { background: white; border: 1px solid #d9d9d9; color: #6a6d70; font-size: 10px; font-weight: 700; border-radius: 3px; padding: 3px 7px; cursor: pointer; }
+  .btn-rerank:hover { background: #f5f5f5; }
+  .ann-empty { text-align: center; color: #6a6d70; padding: 40px 0; font-size: 12px; }
 </style>
 
 <div class="review-body">
@@ -149,6 +191,73 @@
     </button>
   </div>
 
+  {% if topics %}
+  <div class="view-toggle">
+    <button class="vtab active" id="vtab-ann" onclick="showView('ann')">&#127758; Announcements ({{ topics|length }} topics)</button>
+    <button class="vtab" id="vtab-items" onclick="showView('items')">&#128240; All Items</button>
+  </div>
+  {% endif %}
+
+  <!-- v3.4: Announcement hierarchy view -->
+  <div class="ann-container" id="annView" {% if not topics %}style="display:none"{% endif %}>
+    {% if topics %}
+      {% for topic in topics %}
+      <div class="topic-block">
+        <div class="topic-header" onclick="toggleTopic(this)">
+          <span class="topic-toggle-icon">&#9660;</span>
+          <span class="topic-name">{{ topic.topic_label|upper }}</span>
+          <span class="topic-meta-badge">{{ topic.announcements|length }} announcement{{ 's' if topic.announcements|length != 1 }} · {{ topic.source_count }} source{{ 's' if topic.source_count != 1 }}</span>
+        </div>
+        <div class="topic-body">
+          {% for ann in topic.announcements %}
+          <div class="ann-row">
+            <div class="ann-header" onclick="toggleAnn(this)">
+              <span class="ann-toggle-icon">&#9660;</span>
+              <span class="ann-title">{{ ann.title or '(untitled)' }}</span>
+              <span class="ann-src-count">{{ ann.sources|length }} source{{ 's' if ann.sources|length != 1 }}</span>
+            </div>
+            <div class="ann-body open">
+              {% if ann.announcement_md %}
+              <div class="ann-md-section">{{ ann.announcement_md|render_md }}</div>
+              {% endif %}
+              <div class="src-list">
+                {% for src in ann.sources %}
+                {% set r = src.significance_rank|default(0)|int %}
+                <div class="src-card">
+                  <div class="src-rank-badge {% if r >= 5 %}rank-5{% elif r >= 4 %}rank-4{% elif r >= 3 %}rank-3{% elif r >= 2 %}rank-2{% elif r >= 1 %}rank-1{% else %}rank-d{% endif %}">
+                    {{ r if r > 0 else 'D' }}
+                  </div>
+                  <div class="src-card-body">
+                    <div class="src-title">{{ src.title or '(no title)' }}</div>
+                    <div class="src-meta">
+                      {% if src.publisher %}<span>{{ src.publisher }}</span>{% endif %}
+                      {% if src.published_at %}<span>{{ src.published_at|truncate(16, True, '') }}</span>{% endif %}
+                      {% if src.url %}<a href="{{ src.url }}" target="_blank" style="color:#0a6ed1;">Link</a>{% endif %}
+                    </div>
+                  </div>
+                  <div class="src-actions">
+                    <button class="btn-rerank" onclick="rerankItem({{ src.id }}, this)" title="Re-rank this item">&#8635;</button>
+                    <button class="btn-challenge" onclick="openChallenge({{ src.id }}, '{{ src.title|replace("'", "\\'") }}')" title="Challenge AI rank">&#9889;</button>
+                  </div>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="ann-empty">
+        <div style="font-size:28px;margin-bottom:8px">&#128240;</div>
+        <div>No announcements yet — run the pipeline to generate them.</div>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Existing flat item list -->
+  <div id="itemsView" {% if topics %}style="display:none"{% endif %}>
   <div class="item-list" id="itemList">
     {% for item in items %}
     {% set raw = item.rank if item.rank is not none else item.relevance_score %}
@@ -228,11 +337,57 @@
     {% if page < total_pages %}<a href="{{ url_for('admin_review_news', profile_id=selected_profile.id, page=page+1) }}">Next &#8594;</a>{% endif %}
   </div>
   {% endif %}
+  </div>{# end itemsView #}
 </div>
 
 <script>
   var filters = { rank: 'all', tag: 'all', src: 'all', lob: 'all', email: 'all' };
   var _profileId = {{ profile_id }};
+
+  // ── View toggle ──
+  function showView(which) {
+    document.getElementById('annView').style.display = which === 'ann' ? 'flex' : 'none';
+    document.getElementById('itemsView').style.display = which === 'items' ? 'flex' : 'none';
+    document.getElementById('vtab-ann') && document.getElementById('vtab-ann').classList.toggle('active', which === 'ann');
+    document.getElementById('vtab-items') && document.getElementById('vtab-items').classList.toggle('active', which === 'items');
+  }
+  // Ann view needs flex direction
+  var _av = document.getElementById('annView');
+  if (_av && _av.style.display !== 'none') { _av.style.display = 'flex'; _av.style.flexDirection = 'column'; }
+
+  // ── Collapse / expand ──
+  function toggleTopic(header) {
+    var icon = header.querySelector('.topic-toggle-icon');
+    var body = header.nextElementSibling;
+    var collapsed = body.style.display === 'none';
+    body.style.display = collapsed ? 'flex' : 'none';
+    icon.classList.toggle('collapsed', !collapsed);
+  }
+  function toggleAnn(header) {
+    var icon = header.querySelector('.ann-toggle-icon');
+    var body = header.nextElementSibling;
+    var collapsed = !body.classList.contains('open');
+    body.classList.toggle('open', collapsed);
+    icon.classList.toggle('collapsed', !collapsed);
+  }
+
+  // ── Placeholder stubs (wired in Tasks 6 & 7) ──
+  function openChallenge(itemId, title) {
+    alert('Challenge modal coming in Task 6 for item ' + itemId + ': ' + title);
+  }
+  function rerankItem(itemId, btn) {
+    btn.textContent = '…';
+    fetch('/admin/news/' + itemId + '/rerank', { method: 'POST' })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        btn.textContent = '↺';
+        if (d.new_rank) {
+          var badge = btn.closest('.src-card').querySelector('.src-rank-badge');
+          if (badge) { badge.textContent = d.new_rank; badge.className = 'src-rank-badge rank-' + d.new_rank; }
+        }
+      }).catch(function(){ btn.textContent = '↺'; });
+  }
+
   function setFilter(chip) {
     var dim = chip.dataset.dim;
     filters[dim] = chip.dataset.val;

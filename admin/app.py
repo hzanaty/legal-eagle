@@ -152,6 +152,19 @@ def format_date(value: str, tz_name: str = "Asia/Dubai") -> str:
 app.jinja_env.filters["format_ts"] = format_ts
 app.jinja_env.filters["format_date"] = format_date
 
+
+def render_md(text: str) -> str:
+    try:
+        import markdown as _md
+        from markupsafe import Markup
+        return Markup(_md.markdown(text or "", extensions=["extra", "nl2br"]))
+    except Exception:
+        from markupsafe import Markup, escape
+        return Markup("<pre>" + escape(text or "") + "</pre>")
+
+
+app.jinja_env.filters["render_md"] = render_md
+
 EMAIL_REGEX = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 

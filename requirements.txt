@@ -12,3 +12,4 @@ numpy
 Flask
 gunicorn
 gevent
+markdown>=3.5
