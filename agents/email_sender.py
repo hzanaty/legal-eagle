@@ -393,7 +393,7 @@ def send_digest(
         items = db_conn.execute(
             """SELECT n.* FROM news_items n
                JOIN runs r ON n.profile_id = r.profile_id
-               WHERE r.id=? AND n.email_eligible=1""",
+               WHERE r.id=?""",
             (run_id,),
         ).fetchall()
 

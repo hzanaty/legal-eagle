@@ -151,8 +151,7 @@ def run_v3_3():
         _conn.row_factory = _sqlite3.Row
         _run_id = create_run(_conn, pid, origin="harness")
         _items = _conn.execute(
-            "SELECT * FROM news_items WHERE profile_id=? AND email_eligible=1", (pid,)
-        ).fetchall()
+            "SELECT * FROM news_items WHERE profile_id=?", (pid,)        ).fetchall()
         if _items:
             from agents.email_composer import generate_digest
             print(f"[RUN] generate_digest({len(_items)} eligible items) for news_announcements…")
@@ -210,8 +209,7 @@ def run_v3_4():
         _conn.row_factory = _sqlite3.Row
         _run_id = create_run(_conn, pid, origin="harness")
         _items = _conn.execute(
-            "SELECT * FROM news_items WHERE profile_id=? AND email_eligible=1", (pid,)
-        ).fetchall()
+            "SELECT * FROM news_items WHERE profile_id=?", (pid,)        ).fetchall()
         if _items:
             from agents.email_composer import generate_digest
             print(f"[RUN] generate_digest({len(_items)} eligible items) for news_announcements…")

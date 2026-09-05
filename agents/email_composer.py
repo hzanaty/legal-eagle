@@ -243,6 +243,8 @@ def generate_digest(
         )
 
         for topic_label, topic_items in sorted_topics:
+            if not any(it.get("email_eligible") for it in topic_items):
+                continue  # no eligible anchor — skip announcement and HTML block
             print(f"  🤖 Composing: {auth_name} / {topic_label} ({len(topic_items)} items)…")
             aspects = _call_ai_for_group(topic_items, language)
 
