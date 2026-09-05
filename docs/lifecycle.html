@@ -170,7 +170,7 @@
 <body>
 
 <h1>Legal Eagle — System Lifecycle</h1>
-<p class="tagline">v3.1 shipped &nbsp;·&nbsp; v3.2+ roadmap impact &nbsp;·&nbsp; Click any step for details</p>
+<p class="tagline">v3.2 shipped &nbsp;·&nbsp; v3.3 in progress &nbsp;·&nbsp; Click any step for details</p>
 
 <div class="legend">
   <span style="font-size:11px;color:#484f58;text-transform:uppercase;letter-spacing:1px;margin-right:4px;">Phases</span>
@@ -269,6 +269,11 @@
         <div class="step-sub">removed ✓ v3.1</div>
       </div>
       <div class="inner-arrow">›</div>
+      <div class="substep green" onclick="showDetail('attribute')">
+        <div class="step-name">Attribute</div>
+        <div class="step-sub">Publisher + Authority · v3.2 ✓</div>
+      </div>
+      <div class="inner-arrow">›</div>
       <div class="substep green" onclick="showDetail('compare')">
         <div class="step-name">Compare</div>
         <div class="step-sub">Dedup + classify · v3.1</div>
@@ -350,40 +355,50 @@
       <div class="db-tag db-r">R glossary</div>
       <div class="db-tag db-w" style="background:#0d2b13;color:#3fb950;border-color:#1a4a22;">filtered_news <span style="font-size:9px;">(removed ✓ v3.1)</span></div>
     </div>
+    <div class="db-cell" onclick="showDetail('attribute')">
+      <div class="db-step">④ Attribute</div>
+      <div class="db-tag db-r">R authorities</div>
+      <div class="db-tag db-w">W publisher</div>
+      <div class="db-tag db-w">W authority_id</div>
+    </div>
     <div class="db-cell" onclick="showDetail('compare')">
-      <div class="db-step">④ Compare</div>
+      <div class="db-step">⑤ Compare</div>
       <div class="db-tag db-r">R news_items</div>
       <div class="db-tag db-rw">R/W baseline</div>
     </div>
     <div class="db-cell" onclick="showDetail('rank')">
-      <div class="db-step">⑤ Rank</div>
+      <div class="db-step">⑥ Rank</div>
       <div class="db-tag db-r">R ranking_signals</div>
       <div class="db-tag db-r">R ranking_grounding</div>
     </div>
     <div class="db-cell" onclick="showDetail('tag')">
-      <div class="db-step">⑥ Tag</div>
+      <div class="db-step">⑦ Tag</div>
       <div class="db-tag db-r">R glossary_terms</div>
-      <div class="db-tag db-r">R glossary_patterns</div>
+      <div class="db-tag db-w">W topic_label</div>
+      <div class="db-tag db-w">W email_eligible</div>
     </div>
     <div class="db-cell" onclick="showDetail('group')">
-      <div class="db-step">⑦ Group</div>
-      <div class="db-tag db-w" style="background:#2b0d0d;color:#f85149;border-color:#f85149;">W summaries <span style="font-size:9px;">(removed v3)</span></div>
+      <div class="db-step">⑧ Group</div>
+      <div class="db-tag db-w" style="background:#2b0d0d;color:#f85149;border-color:#f85149;">W summaries <span style="font-size:9px;">(removed v3.3)</span></div>
     </div>
     <div class="db-cell" onclick="showDetail('translate')">
-      <div class="db-step">⑧ Translate</div>
+      <div class="db-step">⑨ Translate</div>
       <div class="db-tag db-w">W translations</div>
     </div>
     <div class="db-cell" onclick="showDetail('save-db')" style="border-color:#58a6ff;">
-      <div class="db-step" style="color:#58a6ff;">⑨ Save</div>
+      <div class="db-step" style="color:#58a6ff;">⑩ Save</div>
       <div class="db-tag db-w">W news_items</div>
       <div class="db-tag db-w">W rank, labels</div>
       <div class="db-tag db-w">W status, class</div>
     </div>
     <div class="db-cell" onclick="showDetail('email-send')">
-      <div class="db-step">⑩ Finish</div>
+      <div class="db-step">⑪ Finish</div>
       <div class="db-tag db-r">R news_items</div>
       <div class="db-tag db-w">W last_fetch_date</div>
       <div class="db-tag db-w">W runs</div>
+      <div class="db-tag db-w">W email_status</div>
+      <div class="db-tag db-w">W email_sent</div>
+      <div class="db-tag db-w">W news_aspects</div>
     </div>
 
   </div>
@@ -583,6 +598,16 @@ const details = {
       { heading: 'Why removed', items: ['Binary gate loses borderline items permanently', 'No explainability — black box decision', 'Cannot learn from human overrides', 'Replaced by graded 1–5 rank with full audit trail'] },
     ]
   },
+  'attribute': {
+    title: 'Source Attributor',
+    subtitle: 'Shipped v3.1 (configured path) + v3.2 (AI inference path)',
+    tag: 'green', tagLabel: 'Shipped v3.2',
+    cols: [
+      { heading: 'What it does', items: ['Stamps publisher + authority_id + authority_status per item', 'Configured path (v3.1): reads authority_id directly from feed config', 'AI path (v3.2): infers authority for mixed-publisher feeds (authority_status=inferred)', '✦ spark icon + override UI in Review for inferred items', 'Same-authority items get lowered dedup cosine threshold (v3.1)'] },
+      { heading: 'Key file', items: ['agents/authority_attributor.py', 'configurations/db.py (authorities table, publisher/authority_id/authority_status on news_items)', 'admin/templates/review_news.html (authority override dropdown)'] },
+      { heading: 'Dependencies', items: ['SQLite authorities table', 'SAP AI Core chat completions (AI path only)', 'agents/ai_cache.py (record/replay for AI path)'] },
+    ]
+  },
   'compare': {
     title: 'Compare / Deduplication',
     subtitle: 'Shipped v3.1 — DUPLICATEs preserved, entity + cosine dedup',
@@ -605,10 +630,10 @@ const details = {
   },
   'tag': {
     title: 'News Tagger',
-    subtitle: 'NEW in v3 Phase 4 — deterministic glossary keyword matching',
-    tag: 'blue', tagLabel: 'New in v3',
+    subtitle: 'NEW in v3 Phase 3 (v3.3) — deterministic glossary keyword matching + email rank gate',
+    tag: 'blue', tagLabel: 'New in v3.3',
     cols: [
-      { heading: 'What it does', items: ['Matches item text against glossary_terms table', 'Assigns Topic Labels (matched terms)', 'Calculates LoB Relevance score', 'Fires Glossary Gap Alert if rank 3+ with zero matches'] },
+      { heading: 'What it does', items: ['Matches item text against glossary_terms table', 'Assigns Topic Labels (matched terms) as JSON array', 'Calculates LoB Relevance score', 'Sets email_eligible = 1 for significance_rank ≥ 3 (configurable threshold)', 'Fires Glossary Gap Alert if rank 3+ with zero matches (v3.5)'] },
       { heading: 'Key file', items: ['agents/news_tagger.py (to be created)', 'configurations/config_loader.py (glossary helpers)', 'configurations/db.py (glossary_terms, glossary_patterns)'] },
       { heading: 'Dependencies', items: ['SQLite glossary_terms + glossary_patterns', 'glossary_synonyms', 'No external API needed — fully deterministic'] },
     ]
@@ -635,22 +660,22 @@ const details = {
   },
   'save-db': {
     title: 'Save to DB',
-    subtitle: 'Partly shipped v3.1 — attribution + dedup_status done; rank/labels v3.2+',
-    tag: 'blue', tagLabel: 'Partial — v3.2+',
+    subtitle: 'Partly shipped v3.2 — attribution + dedup_status + rank done; topic_label/email_eligible v3.3',
+    tag: 'blue', tagLabel: 'Partial — v3.3',
     cols: [
-      { heading: 'Shipped v3.1', items: ['publisher / authority_id / authority_status columns (ATTRIBUTE stage)', 'dedup_status (new / update / duplicate) persisted', 'Per-source save during compare'] },
-      { heading: 'Pending v3.2+', items: ['rank (1–5) from Ranker', 'topic_labels from Tagger (v3.3)', 'Full 4D model per item'] },
-      { heading: 'Key file', items: ['configurations/db.py (news_items INSERT/UPDATE)', 'agents/authority_attributor.py (v3.1)', 'agents/compare_news.py (dedup_status)'] },
+      { heading: 'Shipped (v3.1–v3.2)', items: ['publisher / authority_id / authority_status columns (ATTRIBUTE stage)', 'dedup_status (new / update / duplicate) persisted', 'significance_rank + rank_tier + rank_reasoning (v3.2)', 'repetition_tag + repetition_count (v3.2)'] },
+      { heading: 'Pending (v3.3)', items: ['topic_label (JSON array) from Tagger', 'email_eligible (0/1) from rank gate', 'email_sent (0/1) on news_items', 'email_status on runs'] },
+      { heading: 'Key file', items: ['configurations/db.py (news_items INSERT/UPDATE)', 'agents/authority_attributor.py (v3.1)', 'agents/compare_news.py (dedup_status)', 'agents/news_ranker.py (v3.2)'] },
     ]
   },
   'email-send': {
-    title: 'Email Sender',
-    subtitle: 'Modified in v3 — rank threshold gate replaces filter gate',
-    tag: 'yellow', tagLabel: 'Modified in v3',
+    title: 'Send Email — V2 AI Digest',
+    subtitle: 'Modified in v3.3 — AI digest grouped by Authority → Topic Label, decoupled from run',
+    tag: 'yellow', tagLabel: 'Modified in v3.3',
     cols: [
-      { heading: 'What it does', items: ['Composes HTML email digest', 'Organizes by Topic Label (v3) vs LLM group (v2)', 'Bilingual layout (native + English)', 'Sends via Gmail SMTP (smtplib)'] },
-      { heading: 'v3 change', items: ['Rank threshold gate (default: rank ≥ 3)', 'REPEATED suppression rules (decision table)', 'Rank badges on each card', 'Publish dates on every card (bug fix from v2)'] },
-      { heading: 'Key file', items: ['agents/email_sender.py', 'agents/sap_ai_client.py (translation)', 'configurations/config_loader.py'] },
+      { heading: 'What it does', items: ['Run marks SUCCESS first — email is a follow-on step (never blocks run status)', 'Collects all email_eligible items (significance_rank ≥ 3, non-duplicate)', 'Groups by Authority → Topic Label; one AI call per authority+topic group', 'AI detects aspects per group → title + collective summary + source links', 'Writes news_aspects rows; assembles inline-CSS HTML digest (640px, SAP blue)', 'Sends via Gmail SMTP; sets email_sent = 1 on all included items'] },
+      { heading: 'email_status lifecycle', items: ['PENDING → run complete, digest not yet started', 'SENDING → digest generation + send in progress', 'SENT → digest sent successfully', 'FAILED → Resend button appears in run log', 'SKIPPED → test mode run, no auto-send'] },
+      { heading: 'Key files', items: ['agents/email_composer.py (NEW — digest AI generation + HTML assembly + news_aspects write)', 'agents/email_sender.py (refactored — pure SMTP send, no HTML assembly)', 'admin/app.py — POST /send-email + follow-on thread after run SUCCESS', 'admin/templates/run_status.html — email stage indicator + Resend button'] },
     ]
   },
   'baseline': {
@@ -685,8 +710,8 @@ const details = {
   },
   'challenge': {
     title: 'Challenge Rank (Human Override + Grounding Loop)',
-    subtitle: 'NEW in v3 Phase 5 — self-improvement mechanism',
-    tag: 'blue', tagLabel: 'New in v3',
+    subtitle: 'NEW in v3 Phase 4 (v3.4) — self-improvement mechanism',
+    tag: 'blue', tagLabel: 'New in v3.4',
     cols: [
       { heading: 'What it does', items: ['Reviewer overrides rank on any item', 'AI reflects signal back: "I understood: [signal]. Correct?"', 'Human confirms once — single action', 'W ranking_grounding: validated summary → Tier 2 few-shot example', 'W ranking_signals: extracted pattern → Tier 1 deterministic rule'] },
       { heading: 'Key tables', items: ['ranking_signals (Tier 1 — regex/keyword rules, no AI call)', 'ranking_grounding (Tier 2 — few-shot grounding examples for LLM)'] },
