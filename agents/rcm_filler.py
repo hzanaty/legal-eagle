@@ -13,8 +13,8 @@ from agents.ai_cache import cached_chat
 
 
 def _get_ai_client():
-    from configurations.creds import creds
-    from configurations.sap_ai_core_client import SAPAICoreClient
+    from configurations.config_loader import creds
+    from agents.sap_ai_client import SAPAICoreClient
     sap_cfg = creds.get("sap_aicore", {})
     return SAPAICoreClient(
         base_url=sap_cfg["base_url"],
@@ -53,7 +53,13 @@ def fill_rcm_template(ann: dict, sources: list) -> dict:
     )
 
     def _call():
-        return _get_ai_client().chat(prompt)
+        client = _get_ai_client()
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": prompt}],
+            timeout=30.0,
+        )
+        return response.choices[0].message.content.strip()
 
     try:
         raw = cached_chat(prompt, _call)

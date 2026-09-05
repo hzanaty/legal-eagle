@@ -769,9 +769,7 @@ def admin_start_run(profile_id: int):
                 def _digest_worker(run_id_d=rid, pid_d=pid):
                     try:
                         from agents.email_sender import send_digest
-                        from configurations.creds import creds as _creds
-                        d_conn = get_connection()
-                        create_schema_if_needed(d_conn)
+                        from configurations.config_loader import creds as _creds
                         send_digest(pid_d, run_id_d, None, d_conn, _creds.get("gmail", {}))
                         d_conn.close()
                     except Exception as _de:
@@ -2521,7 +2519,7 @@ def send_email_v2():
 
     try:
         from agents.email_sender import send_digest
-        from configurations.creds import creds as _creds
+        from configurations.config_loader import creds as _creds
         ok = send_digest(
             profile_id_req, effective_run_id,
             [int(i) for i in item_ids_req] if item_ids_req else None,
