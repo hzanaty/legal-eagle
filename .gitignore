@@ -46,6 +46,7 @@ mcp/
 outputs/server.pid
 server.pid
 outputs/GR_HCM/
+outputs/XN_HCM/
 
 # BTP seed data (contains email addresses — not for git, but deployed via cf push)
 scripts/btp_seed_data.json
