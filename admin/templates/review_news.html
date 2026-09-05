@@ -138,7 +138,7 @@
 
   <div class="item-list" id="itemList">
     {% for item in items %}
-    {% set raw = item.relevance_score %}
+    {% set raw = item.rank if item.rank is not none else item.relevance_score %}
     {% set score = raw|int if raw is not none else -1 %}
     <div class="item-card {% if score == 0 %}dup-card{% endif %} {% if item.is_gap %}gap-card{% endif %}"
          data-rank="{{ score if score >= 1 else '' }}"
@@ -151,6 +151,7 @@
         <div class="item-meta">
           <span class="source-tag">{{ item.source_type|upper if item.source_type else 'RSS' }}</span>
           {% if item.tag %}<span class="tag-pill tag-{{ item.tag|lower }}">{{ item.tag }}</span>{% endif %}
+          {% if item.publisher %}<span style="font-size:10px;color:#6a6d70;">{{ item.publisher }}{% if item.authority_status == 'inferred' %} <span title="Authority inferred by AI" style="color:#e9730c;font-weight:700;">✦</span>{% endif %}</span>{% endif %}
           <span class="pub-date">{{ item.published_at|default(item.created_at)|default('')|truncate(16, True, '') }}</span>
           {% if item.is_gap %}<span class="gap-badge">&#9888; Gap — no LoB match</span>{% endif %}
           <span style="font-size:10px;color:#aaa;">{{ 'Accepted' if item.item_source == 'accepted' else 'Filtered' }}</span>
@@ -173,6 +174,16 @@
         <div class="override-label">{% if score >= 1 %}AI rank · no override{% else %}Not yet scored{% endif %}</div>
         {% else %}
         <div style="font-size:10px;color:#aaa;text-align:right;line-height:1.8">Rank 0<br>Not evaluated</div>
+        {% endif %}
+        {% if item.authority_status == 'inferred' and item.item_source == 'accepted' %}
+        <form method="POST" action="{{ url_for('set_news_item_authority', profile_id=selected_profile.id, item_id=item.id) }}" style="text-align:right;">
+          <select name="authority_id" style="font-size:10px;max-width:120px;border:1px solid #e5e5e5;border-radius:3px;padding:2px 4px;" onchange="this.form.submit()">
+            <option value="">✦ AI pick</option>
+            {% for auth in authorities_for_override %}
+            <option value="{{ auth.id }}" {% if item.authority_id == auth.id %}selected{% endif %}>{{ auth.name }}</option>
+            {% endfor %}
+          </select>
+        </form>
         {% endif %}
         <form method="POST" action="{{ url_for('delete_filtered_news_item', profile_id=selected_profile.id) }}">
           <input type="hidden" name="item_id" value="{{ item.id }}:{{ item.item_source|default('filtered') }}">

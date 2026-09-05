@@ -23,10 +23,25 @@ RSS_FEEDS = [
     {"url": "http://localhost:9999/feeds/xn_feed_d_repeated.xml",   "publisher_name": "XNSO Official Feed",   "authority_name": "Xanadu Social Insurance Organization"},
 ]
 
+# Bootstrap Tier 1 ranking signals for the XN/HCM profile (v3.2).
+# These deterministic keyword rules let the harness assert ranks without AI.
+RANKING_SIGNALS = [
+    {"signal_type": "keyword", "pattern": "maternity leave",        "min_rank": 4, "confidence": 1.0, "created_from": "bootstrap"},
+    {"signal_type": "keyword", "pattern": "termination notice",     "min_rank": 4, "confidence": 1.0, "created_from": "bootstrap"},
+    {"signal_type": "keyword", "pattern": "employment law",         "min_rank": 4, "confidence": 1.0, "created_from": "bootstrap"},
+    {"signal_type": "keyword", "pattern": "pension fund",           "min_rank": 3, "confidence": 1.0, "created_from": "bootstrap"},
+    {"signal_type": "keyword", "pattern": "social insurance",       "min_rank": 3, "confidence": 1.0, "created_from": "bootstrap"},
+    {"signal_type": "keyword", "pattern": "health insurance",       "min_rank": 3, "confidence": 1.0, "created_from": "bootstrap"},
+    {"signal_type": "keyword", "pattern": "contribution rate",      "min_rank": 3, "confidence": 1.0, "created_from": "bootstrap"},
+    {"signal_type": "keyword", "pattern": "payroll compliance",     "min_rank": 3, "confidence": 1.0, "created_from": "bootstrap"},
+    {"signal_type": "keyword", "pattern": "employment contract",    "min_rank": 2, "confidence": 1.0, "created_from": "bootstrap"},
+]
+
 
 def _inject_baseline(conn, pid):
     """Load historical baseline rows into news_items so dedup has prior context
-    (C1 exact-dup vs S2, C2 near-dup vs S3, R1-R3 vs S4-S6)."""
+    (C1 exact-dup vs S2, C2 near-dup vs S3, R1-R3 vs S4-S6).
+    S4-S6 carry repetition_count=3 to exercise the REPEATED tag logic (v3.2)."""
     try:
         rows = json.loads(open(BASELINE_PATH, encoding="utf-8").read())
     except Exception as e:
@@ -44,6 +59,7 @@ def _inject_baseline(conn, pid):
             "published_at": None,
             "hash_signature": r.get("hash_signature"),
             "dedup_status": "new",
+            "repetition_count": r.get("repetition_count"),
         }
         upsert_news_item(conn, pid, rec)
         n += 1
@@ -70,6 +86,12 @@ def reset_and_seed():
     for term in ["social insurance", "payroll", "employment contract", "maternity leave",
                  "pension fund", "minimum wage", "termination notice"]:
         conn.execute("INSERT OR IGNORE INTO glossary_terms(profile_id,term,lang) VALUES(?,?,?)", (pid, term, "en"))
+    # v3.2: seed bootstrap Tier 1 ranking signals
+    for s in RANKING_SIGNALS:
+        conn.execute(
+            "INSERT INTO ranking_signals(profile_id, signal_type, pattern, min_rank, confidence, created_from) VALUES(?,?,?,?,?,?)",
+            (pid, s["signal_type"], s["pattern"], s["min_rank"], s["confidence"], s["created_from"])
+        )
     conn.commit()
     n = _inject_baseline(conn, pid)
     conn.commit()

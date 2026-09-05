@@ -181,7 +181,31 @@ def _build_item_record(item: Dict[str, Any]) -> Dict[str, Any]:
         "authority_id": item.get("authority_id"),
         "authority_status": item.get("authority_status"),
         "dedup_status": item.get("dedup_status"),
+        # v3.2: repetition tracking
+        "repetition_tag": item.get("repetition_tag"),
+        "repetition_count": item.get("repetition_count"),
+        # v3.2: rank fields (populated by news_ranker after compare; upsert updates them)
+        "significance_rank": item.get("significance_rank"),
+        "rank_tier": item.get("rank_tier"),
+        "rank_reasoning": item.get("rank_reasoning"),
     }
+
+
+def _find_matched_baseline(item, by_source_id, by_url, by_sig, by_fp):
+    """Return the matched baseline row for a classified item, or None."""
+    source_id = item.get("tweet_id") or item.get("guid") or item.get("id")
+    url = item.get("link") or item.get("url")
+    curr_sig = hash_signature(item.get("title", ""), item.get("content", ""))
+    curr_fp = entity_fingerprint(item.get("title", ""), item.get("content", ""))
+    if source_id and str(source_id) in by_source_id:
+        return by_source_id[str(source_id)]
+    if url and str(url) in by_url:
+        return by_url[str(url)]
+    if curr_sig and curr_sig in by_sig:
+        return by_sig[curr_sig]
+    if curr_fp and curr_fp in by_fp:
+        return by_fp[curr_fp]
+    return None
 
 
 # --- Entity-based canonical fingerprint (B7) ------------------------------
@@ -383,6 +407,18 @@ def run_compare_news_agent(
                     classification = "new"
 
         item["dedup_status"] = classification
+        # v3.2: REPEATED tag — set based on how many times this entity has appeared
+        matched = _find_matched_baseline(item, by_source_id, by_url, by_sig, by_fp)
+        prior_count = int((matched or {}).get("repetition_count") or 0)
+        item["repetition_count"] = prior_count
+        if prior_count >= 3:
+            item["repetition_tag"] = "repeated"
+        elif classification == "duplicate":
+            item["repetition_tag"] = "duplicate"
+        elif classification == "update":
+            item["repetition_tag"] = "update"
+        else:
+            item["repetition_tag"] = "new"
         if classification == "new":
             new_items.append(item)
             # register as a comparison target for the rest of this run

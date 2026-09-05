@@ -1903,6 +1903,9 @@ def admin_review_news(profile_id: int):
     profile["language_name"] = LANGUAGE_NAMES.get(profile["language"], profile["language"])
     review_badge_count = count_all_news_for_review(conn, profile_id)
 
+    # v3.2: authority list for inferred-authority override dropdown
+    authorities_for_override = list_authorities(conn, profile_id)
+
     conn.close()
 
     return render_template(
@@ -1927,16 +1930,27 @@ def admin_review_news(profile_id: int):
         review_total=shell["review_total"],
         recently_run_count=shell["recently_run_count"],
         never_run_count=shell["never_run_count"],
+        authorities_for_override=authorities_for_override,
     )
+
+
+@app.route("/admin/profiles/<int:profile_id>/news/<int:item_id>/authority", methods=["POST"])
+def set_news_item_authority(profile_id: int, item_id: int):
+    """v3.2: Override authority attribution for an inferred-status news item."""
+    auth_raw = request.form.get("authority_id", "").strip()
+    authority_id = int(auth_raw) if auth_raw.isdigit() else None
+    conn = get_connection()
+    with conn:
+        conn.execute(
+            "UPDATE news_items SET authority_id=?, authority_status='manual' WHERE id=? AND profile_id=?",
+            (authority_id, item_id, profile_id),
+        )
+    conn.close()
+    return redirect(url_for("admin_review_news", profile_id=profile_id))
 
 
 @app.route("/admin/profiles/<int:profile_id>/review/score", methods=["POST"])
 def score_filtered_news(profile_id: int):
-    """
-    Update the relevance score for a news item (accepted or filtered).
-    Score scale: 1 (not relevant) to 5 (highly relevant)
-    Format: item_id can be "123" (legacy) or "123:source" (new format)
-    """
     item_id_str = request.form.get("item_id", "").strip()
     item_source = request.form.get("item_source", "").strip()  # Optional explicit source
     score = request.form.get("score", "").strip()

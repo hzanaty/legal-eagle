@@ -66,6 +66,51 @@ def run_v3_1():
     sys.exit(0 if ok else 1)
 
 
+def run_v3_2():
+    """Ranking engine live: fetch → attribute → dedup → rank, then assert outcomes.
+
+    Extends v3.1: ranking_signals seeded with bootstrap Tier 1 keywords so rank
+    assertions are deterministic offline. Attribution AI assertions are AI-gated.
+    """
+    os.environ["LEGAL_EAGLE_DB"] = TEST_DB_PATH
+    os.environ["LEGAL_EAGLE_AI_CACHE"] = AI_CACHE_DIR
+    os.environ["DISABLE_TWEETS"] = "1"
+
+    from tests.server import start_server, stop_server
+    from tests.reset_and_seed import reset_and_seed
+    from tests.assertions import run_assertions
+    from configurations.db import get_connection
+
+    print("[TEST] v3.2 harness — ranking engine live (Tier 1 deterministic + Tier 2 AI + REPEATED tag)")
+    server = start_server(FIXTURES_DIR)
+    print(f"[OK]  Fixture server on :9999 (root={FIXTURES_DIR})")
+    try:
+        conn, pid = reset_and_seed()
+        conn.close()
+        print(f"[OK]  DB reset + seeded (id={pid}), pointing pipeline at test.db")
+
+        from agents.agents_controller import run_profile_once
+        print("[RUN] run_profile_once(skip_grouping, skip_email)...")
+        run_profile_once(
+            pid,
+            skip_filter=True,
+            skip_grouping=True,
+            skip_email=True,
+        )
+
+        conn = get_connection(TEST_DB_PATH)
+        import glob
+        ai_available = (
+            bool(glob.glob(os.path.join(AI_CACHE_DIR, "emb_*.json")))
+            and bool(glob.glob(os.path.join(AI_CACHE_DIR, "chat_*.json")))
+        )
+        ok = run_assertions(conn, pid, "v3.2", ai_available=ai_available)
+        conn.close()
+    finally:
+        stop_server(server)
+    sys.exit(0 if ok else 1)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--version", required=True)
@@ -74,6 +119,8 @@ if __name__ == "__main__":
         run_v3_0()
     elif args.version == "v3.1":
         run_v3_1()
+    elif args.version == "v3.2":
+        run_v3_2()
     else:
         print(f"Version {args.version} not yet in harness")
         sys.exit(1)

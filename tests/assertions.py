@@ -97,6 +97,16 @@ def run_assertions(conn: sqlite3.Connection, profile_id: int, version: str, ai_a
                                           a.get("fields"), a.get("not_null"),
                                           a.get("absent_from"))
             results.append((ok, desc, err))
+        elif t == "rank_min":
+            # Assert significance_rank >= min_rank for the named item.
+            row = _find_item(conn, profile_id, a.get("table", "news_items"), a["title_contains"])
+            if row is None:
+                results.append((False, desc, f"'{a['title_contains']}' not found in news_items"))
+            else:
+                val = row["significance_rank"] if "significance_rank" in row.keys() else None
+                ok = val is not None and int(val) >= a["min_rank"]
+                msg = f"significance_rank={val}, expected >= {a['min_rank']}" if not ok else ""
+                results.append((ok, desc, msg))
 
     print(f"\n[TEST] Legal Eagle {version} — Xanadu (XN/HCM)")
     all_pass = True

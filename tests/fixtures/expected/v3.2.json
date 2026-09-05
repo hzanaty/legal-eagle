@@ -1,0 +1,56 @@
+{
+  "version": "v3.2",
+  "description": "Ranking engine live — 3-tier ranker wired, REPEATED tag, attribution AI inference path. Harness uses bootstrap Tier 1 signals so rank assertions pass without AI.",
+  "assertions": [
+    {"type": "column_exists", "table": "news_items", "column": "significance_rank",  "description": "news_items.significance_rank column exists"},
+    {"type": "column_exists", "table": "news_items", "column": "rank_tier",          "description": "news_items.rank_tier column exists"},
+    {"type": "column_exists", "table": "news_items", "column": "rank_reasoning",     "description": "news_items.rank_reasoning column exists"},
+    {"type": "column_exists", "table": "news_items", "column": "repetition_tag",     "description": "news_items.repetition_tag column exists"},
+    {"type": "column_exists", "table": "news_items", "column": "repetition_count",   "description": "news_items.repetition_count column exists"},
+    {"type": "table_exists",  "table": "ranking_signals",   "description": "ranking_signals table exists"},
+    {"type": "table_exists",  "table": "ranking_grounding", "description": "ranking_grounding table exists"},
+
+    {"type": "rank_min", "title_contains": "maternity leave",              "min_rank": 4, "description": "A1 maternity leave → rank ≥ 4 (Tier 1 keyword: maternity leave)"},
+    {"type": "rank_min", "title_contains": "contribution rates effective", "min_rank": 3, "description": "A2 social insurance rates → rank ≥ 3 (Tier 1 keyword: contribution rate)"},
+    {"type": "rank_min", "title_contains": "termination notice period",   "min_rank": 4, "description": "A3 termination notice → rank ≥ 4 (Tier 1 keyword: termination notice)"},
+    {"type": "rank_min", "title_contains": "pension fund reform",         "min_rank": 3, "description": "A4 pension fund reform → rank ≥ 3 (Tier 1 keyword: pension fund)"},
+
+    {"type": "rank_min", "title_contains": "mandatory health insurance for part-time", "min_rank": 3,
+     "description": "C4 health insurance for part-time → rank ≥ 3 (Tier 1 keyword: health insurance)"},
+
+    {"type": "item_outcome", "title_contains": "updated social insurance contribution schedule", "expect_table": "news_items",
+     "fields": {"significance_rank": "0", "rank_tier": "duplicate"},
+     "description": "C1 (guid == S2) → duplicate, rank 0"},
+    {"type": "item_outcome", "title_contains": "circular: updated contribution table published", "expect_table": "news_items",
+     "fields": {"significance_rank": "0", "rank_tier": "duplicate", "repetition_tag": "repeated"},
+     "description": "R1 (guid == S4, repetition_count=3) → duplicate rank 0, tagged repeated"},
+    {"type": "item_outcome", "title_contains": "payroll compliance deadline extended",           "expect_table": "news_items",
+     "fields": {"significance_rank": "0", "rank_tier": "duplicate", "repetition_tag": "repeated"},
+     "description": "R2 (guid == S5, repetition_count=3) → duplicate rank 0, tagged repeated"},
+    {"type": "item_outcome", "title_contains": "employment contract registration portal",        "expect_table": "news_items",
+     "fields": {"significance_rank": "0", "rank_tier": "duplicate", "repetition_tag": "repeated"},
+     "description": "R3 (guid == S6, repetition_count=3) → duplicate rank 0, tagged repeated"},
+
+    {"type": "item_outcome", "title_contains": "mandatory health insurance for part-time", "expect_table": "news_items",
+     "fields": {"authority_status": "inferred"}, "not_null": ["authority_id"],
+     "requires_ai": true,
+     "description": "C4 (XN Official Gazette, no configured authority) → authority_status=inferred (AI path)"},
+
+    {"type": "item_outcome", "title_contains": "maternity leave",              "expect_table": "news_items",
+     "fields": {"rank_tier": "tier1", "dedup_status": "new", "authority_status": "configured"},
+     "description": "A1 maternity leave → Tier 1 rank, dedup=new, authority configured"},
+    {"type": "item_outcome", "title_contains": "termination notice period",   "expect_table": "news_items",
+     "fields": {"rank_tier": "tier1", "dedup_status": "new"},
+     "description": "A3 termination notice → Tier 1 rank"},
+    {"type": "item_outcome", "title_contains": "pension fund reform",         "expect_table": "news_items",
+     "fields": {"rank_tier": "tier1", "dedup_status": "new"},
+     "description": "A4 pension fund reform → Tier 1 rank"},
+
+    {"type": "item_outcome", "title_contains": "set to increase next quarter", "expect_table": "news_items",
+     "fields": {"dedup_status": "duplicate", "significance_rank": "0"}, "requires_ai": true,
+     "description": "C2 near-dup of S3 → semantic duplicate, rank 0 (requires embedding cache)"},
+    {"type": "item_outcome", "title_contains": "official circular on contribution table update", "expect_table": "news_items",
+     "fields": {"dedup_status": "duplicate", "significance_rank": "0"}, "requires_ai": true,
+     "description": "C3 intra-run dup → semantic duplicate, rank 0 (requires embedding cache)"}
+  ]
+}

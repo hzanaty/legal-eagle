@@ -442,6 +442,50 @@ def create_schema_if_needed(conn: sqlite3.Connection) -> None:
                 except Exception:
                     pass
 
+        # Ranking columns on news_items (v3.2)
+        # significance_rank: 0=duplicate, 1-5 scored by news_ranker
+        # rank_tier: 'tier1' (deterministic) | 'tier2' (AI) | 'duplicate'
+        # rank_reasoning: one-line rationale from ranker
+        # repetition_tag: 'new' | 'update' | 'repeated' | 'duplicate'
+        # repetition_count: times same entity fingerprint seen across runs
+        for _col, _decl in (
+            ("significance_rank", "INTEGER DEFAULT 0"),
+            ("rank_tier", "TEXT"),
+            ("rank_reasoning", "TEXT"),
+            ("repetition_tag", "TEXT"),
+            ("repetition_count", "INTEGER DEFAULT 0"),
+        ):
+            try:
+                conn.execute(f"ALTER TABLE news_items ADD COLUMN {_col} {_decl}")
+            except Exception:
+                pass
+
+        # Ranking engine tables (v3.2)
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS ranking_signals (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                profile_id INTEGER,
+                signal_type TEXT,
+                pattern TEXT,
+                min_rank INTEGER,
+                confidence REAL,
+                created_from TEXT
+            );
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS ranking_grounding (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                profile_id INTEGER,
+                rank INTEGER,
+                summary TEXT,
+                source_item_id INTEGER
+            );
+            """
+        )
+
         # Legal Repository
         conn.execute(
             """
@@ -880,6 +924,12 @@ def upsert_news_item(conn: sqlite3.Connection, profile_id: int, item: Dict[str, 
     authority_id = item.get("authority_id")
     authority_status = item.get("authority_status")
     dedup_status = item.get("dedup_status")
+    # v3.2 ranking + repetition (optional; stamped by ranker/compare stages; also used by seed)
+    significance_rank = item.get("significance_rank")
+    rank_tier = item.get("rank_tier")
+    rank_reasoning = item.get("rank_reasoning")
+    repetition_tag = item.get("repetition_tag")
+    repetition_count = item.get("repetition_count")
 
     with conn:
         # 1) Locate existing row by strongest identifiers first
@@ -919,7 +969,12 @@ def upsert_news_item(conn: sqlite3.Connection, profile_id: int, item: Dict[str, 
                     publisher=COALESCE(?, publisher),
                     authority_id=COALESCE(?, authority_id),
                     authority_status=COALESCE(?, authority_status),
-                    dedup_status=COALESCE(?, dedup_status)
+                    dedup_status=COALESCE(?, dedup_status),
+                    significance_rank=COALESCE(?, significance_rank),
+                    rank_tier=COALESCE(?, rank_tier),
+                    rank_reasoning=COALESCE(?, rank_reasoning),
+                    repetition_tag=COALESCE(?, repetition_tag),
+                    repetition_count=COALESCE(?, repetition_count)
                 WHERE id=?
                 """,
                 (
@@ -935,6 +990,11 @@ def upsert_news_item(conn: sqlite3.Connection, profile_id: int, item: Dict[str, 
                     authority_id,
                     authority_status,
                     dedup_status,
+                    significance_rank,
+                    rank_tier,
+                    rank_reasoning,
+                    repetition_tag,
+                    repetition_count,
                     news_id,
                 ),
             )
@@ -943,8 +1003,8 @@ def upsert_news_item(conn: sqlite3.Connection, profile_id: int, item: Dict[str, 
         # 3) Insert new
         conn.execute(
             """
-            INSERT INTO news_items(profile_id, source_type, source_id, url, domain, title, content, published_at, first_seen_at, last_seen_at, hash_signature, publisher, authority_id, authority_status, dedup_status)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            INSERT INTO news_items(profile_id, source_type, source_id, url, domain, title, content, published_at, first_seen_at, last_seen_at, hash_signature, publisher, authority_id, authority_status, dedup_status, significance_rank, rank_tier, rank_reasoning, repetition_tag, repetition_count)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """,
             (
                 profile_id,
@@ -962,6 +1022,11 @@ def upsert_news_item(conn: sqlite3.Connection, profile_id: int, item: Dict[str, 
                 authority_id,
                 authority_status,
                 dedup_status,
+                significance_rank,
+                rank_tier,
+                rank_reasoning,
+                repetition_tag,
+                repetition_count,
             ),
         )
         row = conn.execute(
@@ -990,7 +1055,7 @@ def list_baseline_items(conn: sqlite3.Connection, profile_id: int, days: int = 7
     window_iso = (datetime.utcnow() - timedelta(days=days)).isoformat()
     rows = conn.execute(
         """
-        SELECT id, profile_id, source_type, source_id, url, domain, title, content, published_at, first_seen_at, last_seen_at, hash_signature
+        SELECT id, profile_id, source_type, source_id, url, domain, title, content, published_at, first_seen_at, last_seen_at, hash_signature, repetition_count
         FROM news_items
         WHERE profile_id = ?
           AND (first_seen_at >= ? OR last_seen_at >= ?)
@@ -1444,10 +1509,13 @@ def list_all_news_for_review(
     # Fetch from news_items (accepted/baseline) if requested
     if source is None or source == 'accepted':
         sql_accepted = """
-            SELECT id, profile_id, source_type, source_id, url, domain, title, content, 
-                   published_at, first_seen_at, last_seen_at, hash_signature, 
-                   relevance_score, reviewed_at
-            FROM news_items 
+            SELECT id, profile_id, source_type, source_id, url, domain, title, content,
+                   published_at, first_seen_at, last_seen_at, hash_signature,
+                   relevance_score, reviewed_at,
+                   publisher, authority_id, authority_status, dedup_status,
+                   significance_rank, rank_tier, rank_reasoning,
+                   repetition_tag, repetition_count
+            FROM news_items
             WHERE profile_id = ?
         """
         params_accepted: List[Any] = [profile_id]
@@ -1463,7 +1531,10 @@ def list_all_news_for_review(
         for r in rows_accepted:
             item = {k: r[k] for k in r.keys()}
             item['item_source'] = 'accepted'
-            item['created_at'] = r['first_seen_at']  # Map to common field
+            item['created_at'] = r['first_seen_at']
+            # v3.2: unified rank/tag fields for template
+            item['rank'] = r['significance_rank'] if 'significance_rank' in r.keys() else None
+            item['tag'] = (r['repetition_tag'] or '').upper() if 'repetition_tag' in r.keys() else ''
             results.append(item)
     
     # Fetch from filtered_news if requested

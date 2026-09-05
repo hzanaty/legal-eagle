@@ -562,12 +562,16 @@ def run_profile_once(
         all_news_items = rss_items + tweet_items + url_items
         print(f"\n📦 Total collected items (pre-filter): {len(all_news_items)}")
 
-        # 4.1) ATTRIBUTE stage (v3.1): stamp publisher / authority_id / authority_status
-        # from feed config onto each item (configured path — no AI call).
+        # 4.1) ATTRIBUTE stage (v3.2): stamp publisher / authority_id / authority_status.
+        # Configured path: authority comes from feed config (no AI call).
+        # Inferred path (v3.2): feeds without a configured authority_id → AI picks best
+        # match from profile authorities list (wrapped in ai_cache for harness replay).
         try:
             feed_cfg = build_feed_config(RSS_FEED_URLS)
-            attribute_items(all_news_items, feed_cfg)
-            print(f"🏷️  Attribution stamped from feed config ({len(feed_cfg)} feed(s))")
+            attr_conn = get_connection()
+            attribute_items(all_news_items, feed_cfg, db_conn=attr_conn, profile_id=profile_id)
+            attr_conn.close()
+            print(f"🏷️  Attribution stamped ({len(feed_cfg)} configured feed(s), AI inference enabled)")
         except Exception as e:
             print(f"⚠️ Attribution stage failed: {e}")
 
@@ -604,7 +608,28 @@ def run_profile_once(
         # Combine new and updates for the next stage
         final_items = new_items + update_items
 
-        # Group
+        # v3.2: RANK stage — three-tier engine scores all items (duplicates get rank 0).
+        # Runs on ALL items (filtered_items = new + updates + duplicates) so duplicates
+        # are stamped rank_tier='duplicate' before the UI reads the DB.
+        try:
+            from agents.news_ranker import rank_items
+            rank_conn = get_connection()
+            rank_items(filtered_items, profile_id, rank_conn)
+            rank_conn.close()
+            ranked = sum(1 for i in filtered_items if (i.get("significance_rank") or 0) > 0)
+            print(f"📊 Rank stage complete — {ranked}/{len(filtered_items)} items scored > 0")
+            # Persist rank fields back to DB (compare stage wrote rows without rank fields;
+            # upsert on source_id/url/hash_signature updates just the rank columns).
+            from configurations.config_loader import add_news_item as _add_item
+            from agents.compare_news import _build_item_record
+            for _it in filtered_items:
+                try:
+                    _rec = _build_item_record(_it)
+                    _add_item(_it.get("profile_id") or profile_id, _rec)
+                except Exception:
+                    pass
+        except Exception as e:
+            print(f"⚠️ Rank stage failed: {e}")
         if skip_grouping:
             print("⏭ Skipping grouping — each item treated as its own group")
             grouped_summary = [
