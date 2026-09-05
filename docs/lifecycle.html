@@ -421,13 +421,13 @@
     </div>
     <div class="inner-arrow">›</div>
     <div class="step blue" onclick="showDetail('rcm-publish')">
-      <div class="step-name">RCM Publish</div>
-      <div class="step-sub">Announcement template · v3.6</div>
+      <div class="step-name">Preview for RCM</div>
+      <div class="step-sub">RCM template popup · v3.6</div>
     </div>
     <div class="inner-arrow">›</div>
     <div class="step blue" onclick="showDetail('impact-analysis')">
       <div class="step-name">Impact Analysis</div>
-      <div class="step-sub">AI per aspect · v3.6</div>
+      <div class="step-sub">AI per aspect · V4</div>
     </div>
     <div class="inner-arrow">›</div>
     <div class="step grey" onclick="showDetail('legal-repo')">
@@ -732,21 +732,21 @@ const details = {
     ]
   },
   'rcm-publish': {
-    title: 'RCM Publish',
-    subtitle: 'Planned v3.6 — RCM-branded announcement template + JIRA Legal Change creation',
+    title: 'Preview for RCM',
+    subtitle: 'Planned v3.6 — read-only RCM-template popup + source links + Open-L2S link',
     tag: 'blue', tagLabel: 'Planned v3.6',
     cols: [
-      { heading: 'What it does', items: ['Full RCM-branded template page per announcement', 'Publish action → sends announcement to RCM', 'JIRA Legal Change creation directly from announcement', 'Announcement editing before publish'] },
-      { heading: 'Key files (planned)', items: ['admin/templates/review_news.html — announcement template UI', 'admin/app.py — POST /admin/announcements/&lt;id&gt;/publish'] },
+      { heading: 'What it does', items: ['"Preview for RCM" button per Announcement row (sends nothing — not "Publish")', 'Read-only modal renders announcement_md in the RCM / Law2Spec template', 'Lists source links resolved from news_announcements.item_ids_json', '"Open L2S" link opens L2S in a new tab — user copies/pastes manually (as today)', 'No API call, no JIRA, no external send — integration is deferred to V4 (Announce Agent)'] },
+      { heading: 'Key files (planned)', items: ['admin/app.py — GET /admin/announcement-template/&lt;id&gt;', 'admin/templates/review_news.html — Preview modal'] },
     ]
   },
   'impact-analysis': {
-    title: 'Impact Analysis Agent',
-    subtitle: 'Planned v3.6 — AI product impact analysis per legal change aspect',
-    tag: 'blue', tagLabel: 'Planned v3.6',
+    title: 'Impact + Announce Agents',
+    subtitle: 'Planned V4 — new Impact Agent (AI impact) + Announce Agent (JIRA hand-off)',
+    tag: 'blue', tagLabel: 'Planned V4',
     cols: [
-      { heading: 'What it does', items: ['AI call (claude-sonnet-latest) per aspect → structured markdown impact report', 'Affected Products table + before/after situation + expected solution', 'Two-level virtual rows in Review: Topic → Aspect → Item cards', 'Preview Announcement + Preview Analysis buttons per aspect row', 'Cached to news_announcements.impact_analysis_md on first use', 'Law2Spec workflow: pre-fills epic fields from aspect + announcement + impact'] },
-      { heading: 'Key files (planned)', items: ['agents/impact_analyzer.py (new)', 'admin/templates/review_news.html — two-level virtual rows', 'admin/app.py — POST /admin/aspects/&lt;id&gt;/analyze'] },
+      { heading: 'What it does', items: ['Impact Agent: AI call per announcement → structured impact report (affected products, before/after, expected solution)', 'Cached to news_announcements.impact_analysis_md (new V4 column) on first use', '"Preview Analysis" button: AI first click, cached thereafter, Copy MD → Law2Spec Prompt field', 'Announce Agent: JIRA Legal Change creation via L2S or direct API — governance decision made at V4 start', 'Announcement editing before hand-off'] },
+      { heading: 'Key files (planned)', items: ['agents/impact_analyzer.py (new)', 'agents/announce_agent.py (new)', 'admin/app.py — impact + announce routes', 'Spec: docs/superpowers/specs/2026-07-03-impact-analysis-agent.md (rename news_aspects→news_announcements)'] },
     ]
   },
   'legal-repo': {
