@@ -1,4 +1,27 @@
-## Current State: v3.1 — First Pipeline-Touching Release (2026-09-05)
+## Current State: v3.5 — Glossary Gap Alert (2026-09-05)
+
+### ✅ v3.5 COMPLETE (harness-verified, tagged, pushed)
+**Completion Date**: 2026-09-05
+
+v3.5 is the current shipped version. `python3 tests/run_harness.py --version v3.5` → **34/34 assertions pass** (4 skipped — embedding/AI cache unavailable offline). Tagged `v3.5` and pushed to `origin/main`.
+
+**v3.5 — Glossary Gap Alert:**
+- `news_items.glossary_gap` column, set by the Tag stage when `significance_rank ≥ 3` AND `topic_label = ["General"]` — a rank-significant item the glossary cannot explain.
+- `flag_glossary_gaps()` in `agents/news_tagger.py`, called after `save_topic_labels()` in the TAG stage (`agents/agents_controller.py`).
+- Review tab: `⚠ N glossary gaps` toolbar strip with "Show only gaps" (reuses the existing LoB=gap filter chip); `⚠ Gap — no LoB match` badge per gap card; inline **+ Add to Glossary** panel (AI suggests keywords → confirm → term saved + item re-tagged + gap cleared).
+- Routes: `POST /admin/profiles/<id>/glossary/suggest`, `POST /admin/news/<id>/add-to-glossary`.
+- Harness: A5 `workplace safety` item (Tier-1 signal `min_rank=4` so it stays deterministic — a `min_rank=3` would escalate a new item into the AI tier) → `glossary_gap=1`; maternity-leave item → `glossary_gap=0`.
+
+**Recap of the v3.2 → v3.5 arc** (per-version detail in `CHANGELOG.md`):
+- **v3.2 — Ranking + Attribution AI**: three-tier ranking engine (`agents/news_ranker.py` — Tier 0 DUPLICATE passthrough rank 0 / Tier 1 deterministic `ranking_signals` keyword+regex / Tier 2 GPT-4o with few-shot grounding from `ranking_grounding`); REPEATED tag + auto-elevation in `compare_news.py`; AI authority inference (`authority_status='inferred'`). New columns: `significance_rank`, `rank_tier`, `rank_reasoning`, `repetition_tag`, `repetition_count`.
+- **v3.3 — Tagging + Email V2**: deterministic glossary keyword tagger (`agents/news_tagger.py`) assigns `topic_label`, replacing AI grouping; email gated on rank ≥ 3 (`email_eligible`); Email V2 digest (`agents/email_composer.py`) grouped by Authority → Topic, decoupled from the run (`runs.email_status` PENDING→SENDING→SENT/FAILED/SKIPPED); Review email filter + Sent/Unsent pills + manual send. New: `glossary_terms` table, `topic_label`/`email_eligible`/`email_sent` columns, `news_aspects` table.
+- **v3.4 — Challenge + grounding loop**: inline Challenge (GPT-4o counter-argument) + confirm→grounding write-back; Re-rank action (F6); Review restructured into **Topic → Announcement → Sources** hierarchy (`news_announcements`, renamed from `news_aspects`), announcement markdown rendered inline; V2 digest wired into the pipeline. New: `human_rank_override` + `human_override_reason` columns.
+
+**Deferred (v3.6):** Impact Analysis agent (`agents/impact_analyzer.py`) + Announcement view enhancement (full RCM-branded template, publish action, JIRA Legal Change creation). **Open governance decision:** no sanctioned direct L2S/RCM integration exists yet; direct JIRA-via-REST is technically trivial but politically unsanctioned. The lifecycle diagram was corrected in v3.5 so the RCM Publish card reads v3.6 (was mislabeled v3.5). This needs a dedicated brainstorm before any v3.6 code.
+
+---
+
+## Historical: v3.1 — First Pipeline-Touching Release (2026-09-05)
 
 ### ✅ v3.1 COMPLETE (harness-verified)
 **Completion Date**: 2026-09-05

@@ -1,3 +1,34 @@
+## v3.0–v3.5 (2026-09-04 → 2026-09-05) — Pipeline Redesign (consolidated catch-up)
+
+> **Consolidated entry.** The memory-bank drifted after v2.32 — v3.0–v3.5 were never recorded here while they shipped (tracked instead in `CHANGELOG.md`, `Roadmap/v3-pipeline-redesign.md`, `docs/lifecycle.html`, and auto-memory). This single entry brings `progress.md` current; per-version bullet detail + file lists live in `CHANGELOG.md`.
+
+**v3.0 (2026-09-04) — Admin UI Overhaul + Source Attribution Config + Test Harness Foundation:**
+- FCL 3-state Admin UI (Configure / Run / Review tabs); Run All Active UI button + per-profile pills; `authorities` table + Authorities CRUD; "Channel" rename in Review.
+- Test Harness foundation (`tests/run_harness.py`, `reset_and_seed.py`, `assertions.py`) — v3.0 verifies schema only against the XN/HCM "Xanadu" imaginary profile. `docs/lifecycle.html` + `Roadmap/` added.
+
+**v3.1 (2026-09-05) — First Pipeline-Touching Release (harness-first):**
+- Structural fixes B1–B8 (age anchor, baseline anchor, category/OTHER, publish date, binary filter removed, hash dedup, translation decoupled); F1–F5 (per-source `last_successful_fetch`, health check, `runs.error_step`/`error_message`, immediate stop, force-fetch bounded by `date_scope`).
+- Fixture server (`tests/server.py`, localhost:9999); Run All Active backend (SSE); ATTRIBUTE stage (`authority_attributor.py`, configured path). Harness 23/23.
+
+**v3.2 (2026-09-05) — Ranking Engine + Attribution AI:**
+- Three-tier ranker (`agents/news_ranker.py`): Tier 0 DUPLICATE passthrough (rank 0), Tier 1 deterministic `ranking_signals`, Tier 2 GPT-4o grounded by `ranking_grounding` (all AI via `ai_cache.py`). REPEATED tag + auto-elevation. AI authority inference (`authority_status='inferred'`).
+- New columns: `significance_rank`, `rank_tier`, `rank_reasoning`, `repetition_tag`, `repetition_count`. New tables: `ranking_signals`, `ranking_grounding`. Review rank badges + ✦ inferred icon + override. Harness 19/19 (3 skipped — AI).
+
+**v3.3 (2026-09-05) — Tagging + Email V2 digest:**
+- `agents/news_tagger.py` deterministic glossary keyword tagging assigns `topic_label`, replacing AI grouping. Email gated on rank ≥ 3 (`email_eligible`). Email V2 digest (`agents/email_composer.py`) grouped by Authority → Topic; decoupled from run (`runs.email_status`). Review email filter + Sent/Unsent pills + manual send; run-status email bar + Resend.
+- New: `glossary_terms` table; `topic_label`/`email_eligible`/`email_sent` columns; `news_aspects` table. Harness 24/24 (26/26 post-ship).
+
+**v3.4 (2026-09-05) — Challenge + Grounding loop:**
+- Inline Challenge (GPT-4o counter-argument) + confirm → writes `ranking_grounding` + `ranking_signals`; Re-rank action (F6). Review restructured into **Topic → Announcement → Sources** hierarchy; `news_aspects` renamed to `news_announcements`; announcement markdown rendered inline. V2 digest wired into pipeline. Xanadu demo profile added to `config.db` + `scripts/refresh_xanadu_demo.py`.
+- New columns: `human_rank_override`, `human_override_reason`. Harness 32/32 (4 skipped — AI).
+
+**v3.5 (2026-09-05) — Glossary Gap Alert:**
+- `news_items.glossary_gap` column; `flag_glossary_gaps()` (`agents/news_tagger.py`) called after TAG stage — set when `rank ≥ 3` AND `topic_label = ["General"]`. Review `⚠ N glossary gaps` strip + gap badge + inline **+ Add to Glossary** panel (AI suggest → confirm → re-tag → clear). Routes `/glossary/suggest`, `/add-to-glossary`.
+- Harness: A5 `workplace safety` (Tier-1 `min_rank=4`, deterministic) → `glossary_gap=1`; maternity leave → `glossary_gap=0`. **34/34** (4 skipped — AI). Lifecycle card corrected: RCM Publish → v3.6, Glossary Gap = v3.5.
+- **Deferred v3.6:** Impact Analysis agent + RCM-branded publish/JIRA — open governance decision (no sanctioned L2S/RCM integration; direct JIRA-via-REST unsanctioned). Needs dedicated brainstorm.
+
+---
+
 ## v2.32 (2026-06-28) — ANS Disabled + ANS OAuth Fix + Documentation Sync
 
 **ANS Disabled** (BTP environment torn down):

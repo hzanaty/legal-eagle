@@ -1,3 +1,31 @@
+## Update v3.5 (2026-09-05)
+
+### v3 Pipeline (current)
+
+The v3 line replaced the linear collect→filter→group→send flow with:
+**HEALTH CHECK → FETCH (per-source anchor) → ANNOTATE (NEW/UPDATE/REPEATED/DUPLICATE) → RANK (3-tier) → TAG (glossary keywords + gap flag) → TRANSLATE → SAVE → EMAIL FILTER+SEND (decoupled)**.
+
+**AI**: SAP AI Core — gpt-4o (chat/rank/attribution/digest) + text-embedding-3-small (embeddings deployment `dbfeb291d5081b88`; the earlier 404 was a stopped deployment id, not a token). All ranking/digest AI calls are wrapped by `agents/ai_cache.py` for deterministic harness replay.
+
+**New agents (v3):**
+- `agents/news_ranker.py` — three-tier ranking (Tier 0 DUPLICATE rank 0 / Tier 1 `ranking_signals` keyword+regex / Tier 2 gpt-4o grounded by `ranking_grounding`)
+- `agents/news_tagger.py` — deterministic glossary keyword tagging (`topic_label`) + `flag_glossary_gaps()` (`glossary_gap`)
+- `agents/news_translator.py` — post-save translation (extracted from email_sender)
+- `agents/health_check.py` — parallel pre-run reachability checks
+- `agents/authority_attributor.py` — publisher/authority stamping (configured + AI-inferred paths)
+- `agents/source_simulator.py` — zero-config URL source discovery
+- `agents/email_composer.py` — Email V2 digest (`generate_digest()`), grouped by Authority → Topic
+- **Removed:** `agents/news_filter.py` (binary gate → ranker); `agents/news_grouper.py` (LLM grouping → tagger)
+
+**Database**: SQLite — ~20 tables. v3 additions:
+- `news_items` new columns: `significance_rank`, `rank_tier`, `rank_reasoning`, `repetition_tag`, `repetition_count`, `topic_label`, `email_eligible`, `email_sent`, `human_rank_override`, `human_override_reason`, `glossary_gap`, `publisher`, `authority_id`, `authority_status`, `dedup_status`, `published_at`, `canonical_fingerprint`, translation columns (`title_translated`/`content_translated`/`translation_lang`)
+- New tables: `ranking_signals`, `ranking_grounding`, `news_announcements` (renamed from `news_aspects` in v3.4), `authorities`, `glossary_terms`
+- `url_sources` simulator columns (`simulation_status`, `container_selector`, `field_selectors`, `pagination_*`, `requires_js`, …); `runs.error_step`/`error_message`/`email_status`
+
+**Harness**: `python3 tests/run_harness.py --version v3.5` → 34/34 (4 skipped when embedding/AI cache absent). Test profile = Xanadu (XN/HCM).
+
+---
+
 ## Update v2.32 (2026-06-28)
 
 ### Current Technical Stack
