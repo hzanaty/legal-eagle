@@ -26,8 +26,9 @@ scripts/test_runs/
 scripts/archive/
 Restore/
 
-# Generated outputs (keep latest_all_news.json tracked by workflow; ignore dated dumps)
-outputs/all_news_*.json
+# Generated outputs — runtime output dir (snapshots, email previews, scrape caches).
+# The app only writes here; nothing under outputs/ is source. Ignore the whole dir.
+outputs/
 # SQLite DB files (do not commit local config databases)
 configurations/*.db
 
@@ -43,10 +44,7 @@ archive/
 mcp/
 
 # Runtime files
-outputs/server.pid
 server.pid
-outputs/GR_HCM/
-outputs/XN_HCM/
 
 # BTP seed data (contains email addresses — not for git, but deployed via cf push)
 scripts/btp_seed_data.json
