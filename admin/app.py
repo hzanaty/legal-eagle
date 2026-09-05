@@ -1942,6 +1942,29 @@ def admin_review_news(profile_id: int):
     profile["language_name"] = LANGUAGE_NAMES.get(profile["language"], profile["language"])
     review_badge_count = count_all_news_for_review(conn, profile_id)
 
+    # v3.4: Build Topic→Announcement→Sources hierarchy from latest run
+    from configurations.db import get_announcements_for_run_with_sources
+    topics = []
+    latest_run_id = None
+    latest_run_row = conn.execute(
+        "SELECT id FROM runs WHERE profile_id=? ORDER BY id DESC LIMIT 1",
+        (profile_id,),
+    ).fetchone()
+    if latest_run_row:
+        latest_run_id = latest_run_row["id"]
+        announcements = get_announcements_for_run_with_sources(conn, latest_run_id)
+        # Group by topic_label
+        topic_map: dict = {}
+        for ann in announcements:
+            lbl = ann.get("topic_label") or "General"
+            topic_map.setdefault(lbl, []).append(ann)
+        for lbl, anns in topic_map.items():
+            topics.append({
+                "topic_label": lbl,
+                "announcements": anns,
+                "source_count": sum(len(a.get("sources", [])) for a in anns),
+            })
+
     # v3.2: authority list for inferred-authority override dropdown
     authorities_for_override = list_authorities(conn, profile_id)
 
@@ -1971,6 +1994,8 @@ def admin_review_news(profile_id: int):
         never_run_count=shell["never_run_count"],
         authorities_for_override=authorities_for_override,
         profile_id=profile_id,
+        topics=topics,
+        latest_run_id=latest_run_id,
     )
 
 
