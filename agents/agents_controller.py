@@ -39,9 +39,10 @@ from configurations.db import get_connection, create_schema_if_needed, insert_fi
 
 from agents.rss_parser import parse_rss_feed
 from agents.tweet_feed import search_tweets_multi_account, check_twitter_rate_limit
-from agents.url_sources_runner import run_unified_sources
+from agents.url_sources_runner import run_unified_sources, scrape_url_source_with_config
 from agents.compare_news import run_compare_news_agent
-from agents.news_filter import get_relevant_news
+from agents.authority_attributor import build_feed_config, attribute_items
+from agents.health_check import run_health_checks, summarize, hard_failures
 from agents.news_grouper import group_and_summarize_news
 from agents.email_sender import send_email
 from agents.date_filter import filter_items_by_date
@@ -214,21 +215,15 @@ def run_controller():
         all_news_items = rss_items + tweet_items + url_items + snap_items
         print(f"\n📦 Total collected items (pre-filter): {len(all_news_items)}")
 
-        # 5.1. Filter FIRST (optimization: reduces items before expensive comparison)
-        # Load high-score baseline for "second chance" rescue in filter
-        high_score_baseline = get_reviewed_baseline(profile_id, min_score=4)
-        print(f"\n🧹 Filtering for relevance (before comparison)... (high-score baseline: {len(high_score_baseline)} items)")
-        filter_result = get_relevant_news(
-            all_news_items, "", GLOSSARY, LANGUAGE_PREFERENCE, lob,
-            high_score_baseline=high_score_baseline
-        )
-        filtered_items = filter_result.get("items", [])
-        filter_errors = filter_result.get("errors", [])
-        print(f"✅ Relevant items after filtering: {len(filtered_items)}")
-        if filter_errors:
-            print(f"⚠️ {len(filter_errors)} filtering errors:")
-            for err in filter_errors:
-                print(f"   - {err}")
+        # 5.1. ATTRIBUTE stage (v3.1): stamp publisher / authority from feed config.
+        try:
+            attribute_items(all_news_items, build_feed_config(RSS_FEED_URLS))
+        except Exception as e:
+            print(f"⚠️ Attribution stage failed: {e}")
+
+        # 5.2. Relevance filter DELETED in v3.1 (B6) — all in-date items pass through.
+        filtered_items = all_news_items
+        print(f"🧹 Relevance filter removed (v3.1) — {len(filtered_items)} items pass to comparison")
 
         # 5.2. Compare AFTER filtering (only relevant items are processed)
         outputs_dir = f"outputs/{profile_slug}"
@@ -277,6 +272,7 @@ def run_profile_once(
     selected_url_sources: Optional[List[str]] = None,
     lookback_override: Optional[str] = None,
     skip_grouping: bool = False,
+    should_cancel: Optional[callable] = None,
 ) -> bool:
     """
     Run the full workflow for a single profile id (even if inactive).
@@ -365,26 +361,67 @@ def run_profile_once(
         _profile_days = parse_date_scope(PROFILE_DATE_SCOPE)
         print(f"📅 News lookback window: {PROFILE_DATE_SCOPE} → {_profile_days} days")
 
+        # 0) HEALTH CHECK stage (v3.1, F2): parallel pre-run reachability checks.
+        # A HARD failure (DB, or Gmail when actually sending) aborts before fetch.
+        # AI Core / source warnings are logged and the run proceeds.
+        health = run_health_checks(profile_id, check_email=not skip_email)
+        print(summarize(health))
+        _hard = hard_failures(health)
+        if _hard:
+            print("❌ Aborting run — hard dependency check failed: "
+                  + ", ".join(f"{h['name']} ({h['detail']})" for h in _hard))
+            return False
+
         conn = get_connection()
         create_schema_if_needed(conn)
-        
-        # 1) RSS Agent (always runs)
+
+        # 1) RSS Agent (always runs) — F1 per-source anchor + F4 per-source save + F5 force redefine.
+        # Each feed's lookback anchors to its own last_fetch_date; new feeds (or force_run)
+        # fall back to the profile date_scope window. The anchor is written immediately after
+        # each feed succeeds, so a mid-run stop still records completed feeds.
         rss_items = []
         print("📰 Running RSS Parser Agent...")
+        _now_iso = datetime.utcnow().isoformat()
         for feed in RSS_FEED_URLS:
+            if should_cancel and should_cancel():
+                print("⛔ Stop requested — halting before next RSS feed.")
+                break
             feed_url = feed["url"] if isinstance(feed, dict) else feed
+            last_fetch = feed.get("last_fetch_date") if isinstance(feed, dict) else None
             print(f"   ↳ RSS: {feed_url}: fetching...")
-            feed_items = parse_rss_feed(feed_url)
-            print(f"   ↳ RSS: {feed_url}: {len(feed_items)} items")
+            try:
+                feed_items = parse_rss_feed(feed_url)
+            except Exception as e:
+                print(f"   ⚠️ RSS: {feed_url}: fetch failed ({e}); anchor left intact")
+                continue
+
+            # Determine this feed's since-date (F1/F5)
+            if _profile_days == 0:
+                since = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+                feed_items = filter_items_by_date(feed_items, since_date=since)
+            elif force_run or not last_fetch:
+                # Force run OR new feed → bounded by profile date_scope (never unlimited)
+                if _profile_days is not None:
+                    feed_items = filter_items_by_date(feed_items, days=_profile_days)
+            else:
+                # DELTA: anchor to this feed's last successful fetch, capped at date_scope
+                try:
+                    since = datetime.fromisoformat(last_fetch)
+                    if _profile_days is not None:
+                        since = max(since, datetime.utcnow() - timedelta(days=_profile_days))
+                    feed_items = filter_items_by_date(feed_items, since_date=since)
+                except Exception:
+                    if _profile_days is not None:
+                        feed_items = filter_items_by_date(feed_items, days=_profile_days)
+
+            print(f"   ↳ RSS: {feed_url}: {len(feed_items)} items in window")
             rss_items.extend(feed_items)
+            # F4: write anchor immediately on this feed's success
+            try:
+                update_rss_feed_last_fetch_timestamp(profile_id, feed_url, _now_iso)
+            except Exception:
+                pass
         print(f"✅ Total RSS items collected: {len(rss_items)}")
-        # Apply date filter
-        if _profile_days == 0:
-            _rss_since = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-            rss_items = filter_items_by_date(rss_items, since_date=_rss_since)
-        elif _profile_days is not None:
-            rss_items = filter_items_by_date(rss_items, days=_profile_days)
-        # _profile_days is None = no filter (all time)
 
         # 2) Tweets (with 15-minute rate limit, Search API for all accounts)
         disable_tweets = os.environ.get("DISABLE_TWEETS")
@@ -484,11 +521,26 @@ def run_profile_once(
                     print(f"   ↳ {source['url']}: FULL mode (parse error: {e})")
 
             url_sources_with_delta.append(source_copy)
-        
-        # Run unified sources with delta information
-        url_result = run_unified_sources(url_sources_with_delta, profile_slug=profile_slug)
-        url_items = url_result.get("items", [])
-        url_errors = url_result.get("errors", [])
+
+        # v3.1 (F9): route simulated sources (stored selectors) to the fast config
+        # scraper; un-simulated sources fall through to the legacy unified runner.
+        simulated = [s for s in url_sources_with_delta
+                     if s.get("simulation_status") == "success" and s.get("container_selector")]
+        legacy = [s for s in url_sources_with_delta if s not in simulated]
+        url_items = []
+        url_errors = []
+        for s in simulated:
+            try:
+                got = scrape_url_source_with_config(s)
+                print(f"   ↳ {s['url']}: simulated scrape → {len(got)} items")
+                url_items.extend(got)
+            except Exception as e:
+                url_errors.append(f"{s['url']}: {e}")
+
+        # Run unified (legacy) sources with delta information
+        url_result = run_unified_sources(legacy, profile_slug=profile_slug)
+        url_items.extend(url_result.get("items", []))
+        url_errors.extend(url_result.get("errors", []))
         
         print(f"✅ Total monitored site items collected: {len(url_items)}")
         if url_errors:
@@ -510,35 +562,27 @@ def run_profile_once(
         all_news_items = rss_items + tweet_items + url_items
         print(f"\n📦 Total collected items (pre-filter): {len(all_news_items)}")
 
-        # Filter FIRST (optimization: reduces items before expensive comparison)
-        # Load high-score baseline for "second chance" rescue in filter
-        # Save filtered items to DB for manual review
-        if skip_filter:
-            print(f"\n⚠️ Skip filtering enabled: treating all items as relevant")
-            filtered_items = all_news_items
-            filtered_count = 0
-        else:
-            high_score_baseline = get_reviewed_baseline(profile_id, min_score=4)
-            print(f"\n🧹 Filtering for relevance (before comparison)... (high-score baseline: {len(high_score_baseline)} items)")
-            
-            def _save_filtered_item(item, reason):
-                """Callback to save filtered items to DB for manual review."""
-                try:
-                    conn_f = get_connection()
-                    create_schema_if_needed(conn_f)
-                    insert_filtered_news(conn_f, profile_id, item, reason)
-                    conn_f.close()
-                except Exception as e:
-                    print(f"   ⚠️ Failed to save filtered item: {e}")
-            
-            filter_result = get_relevant_news(
-                all_news_items, "", GLOSSARY, LANGUAGE_PREFERENCE, lob,
-                high_score_baseline=high_score_baseline, on_filtered=_save_filtered_item
-            )
-            filtered_items = filter_result.get("items", [])
-            filtered_count = len(filter_result.get("filtered", []))
-            print(f"✅ Relevant items after filtering: {len(filtered_items)}")
-            print(f"📋 Saved {filtered_count} filtered items for manual review")
+        # 4.1) ATTRIBUTE stage (v3.1): stamp publisher / authority_id / authority_status
+        # from feed config onto each item (configured path — no AI call).
+        try:
+            feed_cfg = build_feed_config(RSS_FEED_URLS)
+            attribute_items(all_news_items, feed_cfg)
+            print(f"🏷️  Attribution stamped from feed config ({len(feed_cfg)} feed(s))")
+        except Exception as e:
+            print(f"⚠️ Attribution stage failed: {e}")
+
+        # Relevance filter DELETED in v3.1 (B6): the binary keep/drop filter is
+        # replaced by the ranker in v3.2. Until then every fetched, in-date item
+        # flows to comparison and on to Review. `skip_filter` is retained in the
+        # signature for API compatibility but is now a no-op.
+        filtered_items = all_news_items
+        filtered_count = 0
+        print(f"\n🧹 Relevance filter removed (v3.1) — {len(filtered_items)} items pass to comparison")
+
+        # F4: cancel checkpoint before the expensive comparison/embedding stage.
+        if should_cancel and should_cancel():
+            print("⛔ Stop requested — halting before comparison. Fetched sources were saved.")
+            return False
 
         # Compare AFTER filtering (only relevant items are processed)
         # CRITICAL: Attach profile_id to all items so compare_news loads the correct baseline

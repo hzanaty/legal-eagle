@@ -130,7 +130,7 @@ from .db import (
     update_tweet_account_last_fetch,
 )
 
-DB_PATH_DEFAULT = os.path.join(os.path.dirname(__file__), "config.db")
+DB_PATH_DEFAULT = os.environ.get("LEGAL_EAGLE_DB") or os.path.join(os.path.dirname(__file__), "config.db")
 
 
 def _get_conn() -> Any:

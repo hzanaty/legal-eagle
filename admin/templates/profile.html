@@ -239,8 +239,15 @@
       {% for s in urls %}
       <div class="row-item">
         <span class="mono">{{ s.url }}</span>
-        <span class="row-pub">{{ (s.mode or 'auto')|replace('force_','')|capitalize }}{% if s.mode == 'recursive' %} · d{{ s.max_depth or 2 }}{% endif %}</span>
+        {% if s.simulation_status == 'success' %}
+        <span class="sim-badge sim-ok" title="depth {{ s.depth_level }}{% if s.pagination_type %} · {{ s.pagination_type }}{% endif %}{% if s.requires_js %} · JS{% endif %}">&#10003; Simulated</span>
+        {% elif s.simulation_status == 'failed' %}
+        <span class="sim-badge sim-fail">&#10007; Failed</span>
+        {% else %}
+        <span class="sim-badge sim-pending">&#9203; Pending</span>
+        {% endif %}
         <span class="row-date">{% if s.last_successful_fetch_relative %}{{ s.last_successful_fetch_relative }}{% else %}Never{% endif %}</span>
+        <button type="button" class="btn-sm" style="background:#7c3aed;color:#fff;" onclick="startSimulation('{{ s.url|e }}')">&#9889; Simulate</button>
         <button type="button" class="btn-sm" onclick="toggleEditRow('urledit-{{ loop.index }}')">Edit</button>
         {% if s.last_successful_fetch %}
         <form method="post" action="{{ url_for('reset_url_source_fetch', profile_id=profile.id) }}" onsubmit="return confirm('Reset to FULL mode? Clears last-fetch timestamp so the next run fetches the full lookback window.');">
@@ -286,6 +293,78 @@
       <div class="empty-note">No URL sources yet</div>
       {% endfor %}
       </div>
+
+      <!-- Source Simulator panel (v3.1, F9) -->
+      <div id="simulator-panel" style="display:none;border:2px solid #7c3aed;border-radius:10px;margin-top:16px;">
+        <div style="background:#7c3aed;color:#fff;padding:10px 16px;font-weight:700;border-radius:8px 8px 0 0;display:flex;justify-content:space-between;">
+          <span>&#9889; Source Simulator</span>
+          <span style="cursor:pointer;" onclick="document.getElementById('simulator-panel').style.display='none'">&#10005;</span>
+        </div>
+        <div id="simulator-body" style="padding:16px;background:#faf5ff;font-size:13px;"></div>
+      </div>
+      <style>
+        .sim-badge { font-size:10px;font-weight:700;padding:1px 7px;border-radius:9px; }
+        .sim-ok { background:#e3f5e9;color:#1a7f43; }
+        .sim-fail { background:#fde8e8;color:#b42318; }
+        .sim-pending { background:#f0f0f0;color:#888; }
+      </style>
+      <script>
+        var _sim = {url:null, container:null, depth:0, requiresJs:false, profileId:{{ profile.id }}};
+        function _simPost(payload, onEvent) {
+          fetch("/admin/profiles/" + _sim.profileId + "/urls/simulate", {
+            method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)
+          }).then(function(resp){
+            var reader = resp.body.getReader(), dec = new TextDecoder(), buf = '';
+            (function read(){ reader.read().then(function(r){
+              if (r.done) return;
+              buf += dec.decode(r.value, {stream:true});
+              var parts = buf.split('\n\n'); buf = parts.pop();
+              parts.forEach(function(p){ var m=p.match(/^data: (.*)$/m); if(m){ try{ onEvent(JSON.parse(m[1])); }catch(e){} } });
+              read();
+            }); })();
+          });
+        }
+        function startSimulation(url) {
+          _sim.url = url;
+          document.getElementById('simulator-panel').style.display='block';
+          var body = document.getElementById('simulator-body');
+          body.innerHTML = '<p>&#128260; Starting simulation for <code>'+url+'</code>…</p>';
+          document.getElementById('simulator-panel').scrollIntoView({behavior:'smooth'});
+          _simPost({action:'start', url:url}, _handleSimEvent);
+        }
+        function _handleSimEvent(ev) {
+          var body = document.getElementById('simulator-body');
+          if (ev.type==='fetch_done') { body.innerHTML += '<p>&#10003; Page fetched ('+(ev.data.requires_js?'JS-rendered':'static')+')</p>'; _sim.requiresJs=ev.data.requires_js; }
+          else if (ev.type==='fetch_failed'||ev.type==='failed') { body.innerHTML += '<p style="color:#b42318">&#10007; '+ev.data.error+'</p>'; }
+          else if (ev.type==='navigating_deeper') { body.innerHTML += '<p>&#128269; AI navigating to depth '+ev.data.depth+': '+ev.data.url+'</p>'; }
+          else if (ev.type==='containers_found') {
+            _sim.container=ev.data.selector; _sim.depth=ev.data.depth;
+            body.innerHTML += '<div style="background:#f0fdf4;border:1px solid #6ee7b7;border-radius:8px;padding:12px;margin:8px 0;">'
+              + '<strong>&#128240; '+ev.data.count+' articles at depth '+ev.data.depth+'</strong><br><small>Container: <code>'+ev.data.selector+'</code></small>'
+              + '<ul style="margin:8px 0 8px 16px;">'+ev.data.sample_texts.map(function(t){return '<li>'+t+'</li>';}).join('')+'</ul>'
+              + '<button class="btn-sm" style="background:#1a7f43;color:#fff;" onclick="_confirmDepth()">&#10003; Confirm</button></div>';
+          }
+          else if (ev.type==='fields_mapped') { body.innerHTML += '<p>&#10003; Fields: '+Object.keys(ev.data.fields).filter(function(k){return ev.data.fields[k];}).join(', ')+'</p>'; }
+          else if (ev.type==='buttons_found') { body.innerHTML += '<p>&#10003; Read-more button: <code>'+ev.data.buttons[0].selector+'</code></p>'; }
+          else if (ev.type==='pagination_found') { body.innerHTML += '<p>&#10003; Pagination: '+ev.data.pagination_type+'</p>'; }
+          else if (ev.type==='sample_captured') { body.innerHTML += '<p>&#10003; Sample: <a href="'+ev.data.sample_link+'" target="_blank">'+ev.data.sample_link+'</a></p>'; }
+          else if (ev.type==='complete') {
+            window._simResult = ev.data;
+            body.innerHTML += '<div style="background:#d1fae5;border:1px solid #6ee7b7;border-radius:8px;padding:12px;margin:8px 0;">'
+              + '<strong>&#10003; Simulation complete</strong><br>'
+              + '<button class="btn-save" style="margin-top:8px;" onclick="_saveSimulation()">&#10003; Save &amp; Activate</button></div>';
+          }
+        }
+        function _confirmDepth() {
+          document.getElementById('simulator-body').innerHTML += '<p>&#128260; Mapping fields…</p>';
+          _simPost({action:'confirm', url:_sim.url, container_selector:_sim.container, depth_level:_sim.depth, requires_js:_sim.requiresJs, html:''}, _handleSimEvent);
+        }
+        function _saveSimulation() {
+          fetch("/admin/profiles/" + _sim.profileId + "/urls/simulate/save", {
+            method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(window._simResult)
+          }).then(function(){ location.reload(); });
+        }
+      </script>
     </div>
   </div>
 

@@ -1,4 +1,29 @@
-## Current State: v2.32 — ANS Disabled + ANS OAuth Fix + Documentation Sync (2026-06-28)
+## Current State: v3.1 — First Pipeline-Touching Release (2026-09-05)
+
+### ✅ v3.1 COMPLETE (harness-verified)
+**Completion Date**: 2026-09-05
+
+v3.1 is the first release that changes pipeline behaviour (v3.0 was UI + schema only). Built harness-first: `python tests/run_harness.py --version v3.1` → **23/23 assertions pass, 0 skipped** (offline, embeddings replayed from `tests/ai_cache/`). A full manual run through the admin app also succeeds end-to-end.
+
+**Delivered:**
+- **Harness foundation**: `LEGAL_EAGLE_DB` env isolation, `item_outcome` assertions, `run_v3_1()`, baseline injection, `fixtures/expected/v3.1.json`.
+- **B1/B2/B4 Age anchor**: per-feed `last_fetch_date` anchor; RSS dates normalised to ISO so the date filter works (B4 @ 3 Aug dropped, R1–R3 @ 15 Aug kept via 30-day window).
+- **B6 Filter deleted**: `agents/news_filter.py` removed; all in-date items pass.
+- **B7/F7/F8 Entity dedup**: canonical fingerprint + cosine-tiered semantic dedup (DUP ≥ 0.80, UPDATE ≥ 0.72; Jaccard AND-gate dropped); duplicates preserved with `dedup_status` (never dropped); intra-run dedup; graceful degradation if embeddings unavailable.
+- **Attribution stage**: `agents/authority_attributor.py` stamps `publisher`/`authority_id`/`authority_status` (configured path, no AI) onto `news_items`/`filtered_news`.
+- **B8 Translator**: extracted to `agents/news_translator.py` (behaviour-preserving, AI-cache ready).
+- **F2 Health check**: `agents/health_check.py` — parallel pre-run checks (DB hard-block, Gmail hard-block when sending, AI Core warn, sources warn), surfaced in Run log.
+- **Run All Active**: `POST /admin/run-all` + SSE + reconnect; dashboard button enabled with live per-profile pills; skip-on-failure. Verified end-to-end.
+- **F9 Source Simulator**: `agents/source_simulator.py` (fetch→containers→fields→buttons→pagination→sample + LLM depth nav); `/simulate` SSE routes; 1-field add + ⚡ Simulate panel; `scrape_url_source_with_config` runtime + pipeline routing; 12 unit tests; live SSE flow verified.
+- **F1/F3/F4/F5 Control-flow**: per-source anchor + write-on-success; `should_cancel` checkpoints (immediate stop); force-fetch redefined (anchor→null bounded by date_scope); `runs.error_step`/`error_message` + UI banner.
+
+**Key infra fix**: SAP AI Core embeddings 404 was a STOPPED deployment ID, not a token — repointed `.env` `EMBEDDINGS_DEPLOYMENT_ID` to `dbfeb291d5081b88` (text-embedding-3-small). See auto-memory `project_ai_core_down`.
+
+**Deferred**: ranking engine + REPEATED tag (v3.2), tagger/email format (v3.3).
+
+---
+
+## Historical: v2.32 — ANS Disabled + ANS OAuth Fix + Documentation Sync (2026-06-28)
 
 ### ✅ v2.32 COMPLETE
 **Completion Date**: 2026-06-28

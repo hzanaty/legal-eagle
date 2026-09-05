@@ -1,8 +1,16 @@
-import sys, os
+import sys, os, json
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from configurations.db import get_connection, create_schema_if_needed, create_authority, upsert_rss_feed
+from configurations.db import (
+    get_connection, create_schema_if_needed, create_authority,
+    upsert_rss_feed, upsert_news_item,
+)
 
 TEST_DB_PATH = os.path.join(os.path.dirname(__file__), "test.db")
+BASELINE_PATH = os.path.join(os.path.dirname(__file__), "fixtures", "seed", "baseline.json")
+
+# 30-day lookback: window includes the Aug-15 repeated items (R1-R3) but excludes
+# the Aug-3 minimum-wage item (B4), which must be dropped by the age filter.
+PROFILE_DATE_SCOPE = "last_30_days"
 
 AUTHORITIES = [
     {"name": "Ministry of Human Resources", "aliases": "MoHR"},
@@ -15,14 +23,41 @@ RSS_FEEDS = [
     {"url": "http://localhost:9999/feeds/xn_feed_d_repeated.xml",   "publisher_name": "XNSO Official Feed",   "authority_name": "Xanadu Social Insurance Organization"},
 ]
 
+
+def _inject_baseline(conn, pid):
+    """Load historical baseline rows into news_items so dedup has prior context
+    (C1 exact-dup vs S2, C2 near-dup vs S3, R1-R3 vs S4-S6)."""
+    try:
+        rows = json.loads(open(BASELINE_PATH, encoding="utf-8").read())
+    except Exception as e:
+        print(f"⚠️ Could not load baseline.json: {e}")
+        return 0
+    n = 0
+    for r in rows:
+        rec = {
+            "source_type": r.get("source_type", "RSS"),
+            "source_id": r.get("guid"),
+            "url": r.get("url"),
+            "domain": None,
+            "title": r.get("title"),
+            "content": r.get("content"),
+            "published_at": None,
+            "hash_signature": r.get("hash_signature"),
+            "dedup_status": "new",
+        }
+        upsert_news_item(conn, pid, rec)
+        n += 1
+    return n
+
+
 def reset_and_seed():
     if os.path.exists(TEST_DB_PATH):
         os.remove(TEST_DB_PATH)
     conn = get_connection(TEST_DB_PATH)
     create_schema_if_needed(conn)
     conn.execute(
-        "INSERT INTO profiles(country_code, lob, name, language, active) VALUES(?,?,?,?,?)",
-        ("XN", "HCM", "Test Country HCM", "en", 1)
+        "INSERT INTO profiles(country_code, lob, name, language, active, date_scope) VALUES(?,?,?,?,?,?)",
+        ("XN", "HCM", "Test Country HCM", "en", 1, PROFILE_DATE_SCOPE)
     )
     conn.commit()
     pid = conn.execute("SELECT id FROM profiles WHERE country_code='XN' AND lob='HCM'").fetchone()[0]
@@ -36,6 +71,9 @@ def reset_and_seed():
                  "pension fund", "minimum wage", "termination notice"]:
         conn.execute("INSERT OR IGNORE INTO glossary_terms(profile_id,term,lang) VALUES(?,?,?)", (pid, term, "en"))
     conn.commit()
+    n = _inject_baseline(conn, pid)
+    conn.commit()
+    print(f"[OK]  Injected {n} baseline items into news_items")
     return conn, pid
 
 if __name__ == "__main__":

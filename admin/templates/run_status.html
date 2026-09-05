@@ -167,6 +167,11 @@
       </div>
       {% endfor %}
     </div>
+    {% if selected_run and selected_run.status in ('Failed','failed') and selected_run.error_message %}
+    <div style="background:#fde8e8;border:1px solid #f5b5b0;color:#b42318;padding:8px 14px;font-size:12px;">
+      &#10007; <strong>{{ selected_run.error_step|default('pipeline') }}</strong>: {{ selected_run.error_message }}
+    </div>
+    {% endif %}
     <div class="right-toolbar">
       <span class="history-label">History</span>
       <div class="history-pills">

@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime, timedelta
 
 
-DB_PATH_DEFAULT = os.path.join(os.path.dirname(__file__), "config.db")
+DB_PATH_DEFAULT = os.environ.get("LEGAL_EAGLE_DB") or os.path.join(os.path.dirname(__file__), "config.db")
 
 
 def get_connection(db_path: Optional[str] = None) -> sqlite3.Connection:
@@ -322,6 +322,15 @@ def create_schema_if_needed(conn: sqlite3.Connection) -> None:
             conn.execute("ALTER TABLE runs ADD COLUMN origin TEXT DEFAULT 'manual'")
         except Exception:
             pass
+        # F3 (v3.1): structured failure info surfaced in the run status UI
+        try:
+            conn.execute("ALTER TABLE runs ADD COLUMN error_step TEXT")
+        except Exception:
+            pass
+        try:
+            conn.execute("ALTER TABLE runs ADD COLUMN error_message TEXT")
+        except Exception:
+            pass
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS run_logs (
@@ -388,6 +397,50 @@ def create_schema_if_needed(conn: sqlite3.Connection) -> None:
             conn.execute("ALTER TABLE url_sources ADD COLUMN authority_id INTEGER")
         except Exception:
             pass
+
+        # url_sources recursive-crawl + delta columns (ensure present on fresh schema;
+        # list_url_sources SELECTs these, so they must exist even with no rows).
+        for _col, _decl in (
+            ("max_depth", "INTEGER"),
+            ("allowed_domains", "TEXT"),
+            ("path_filter", "TEXT"),
+            ("max_results", "INTEGER"),
+            ("date_scope", "TEXT DEFAULT 'all'"),
+            ("last_successful_fetch", "TEXT"),
+            # Source Simulator columns (v3.1, F9). Old mode/crawl columns are left in
+            # place (SQLite can't easily drop) but ignored by simulated sources.
+            ("simulation_status", "TEXT DEFAULT 'pending'"),
+            ("simulated_at", "TEXT"),
+            ("container_selector", "TEXT"),
+            ("field_selectors", "TEXT"),
+            ("read_more_selector", "TEXT"),
+            ("pagination_type", "TEXT"),
+            ("pagination_selector", "TEXT"),
+            ("depth_level", "INTEGER"),
+            ("requires_js", "INTEGER DEFAULT 0"),
+        ):
+            try:
+                conn.execute(f"ALTER TABLE url_sources ADD COLUMN {_col} {_decl}")
+            except Exception:
+                pass
+
+        # Item-level source attribution columns (v3.1)
+        # Stamped by the ATTRIBUTE stage (agents/authority_attributor.py).
+        # publisher: display name of the source; authority_id: FK to authorities;
+        # authority_status: 'configured' (from feed config) | 'inferred' (AI, v3.2+) | 'unknown'
+        # dedup_status: 'new' | 'update' | 'duplicate' — set by compare_news (F7: duplicates
+        # are preserved, never dropped, so they stay queryable/visible in Review).
+        for _tbl in ("news_items", "filtered_news"):
+            for _col, _type in (
+                ("publisher", "TEXT"),
+                ("authority_id", "INTEGER"),
+                ("authority_status", "TEXT"),
+                ("dedup_status", "TEXT"),
+            ):
+                try:
+                    conn.execute(f"ALTER TABLE {_tbl} ADD COLUMN {_col} {_type}")
+                except Exception:
+                    pass
 
         # Legal Repository
         conn.execute(
@@ -822,6 +875,11 @@ def upsert_news_item(conn: sqlite3.Connection, profile_id: int, item: Dict[str, 
     content = item.get("content")
     published_at = item.get("published_at")
     hash_sig = item.get("hash_signature")
+    # v3.1 source attribution + dedup marker (optional; stamped by attributor/compare stages)
+    publisher = item.get("publisher")
+    authority_id = item.get("authority_id")
+    authority_status = item.get("authority_status")
+    dedup_status = item.get("dedup_status")
 
     with conn:
         # 1) Locate existing row by strongest identifiers first
@@ -857,7 +915,11 @@ def upsert_news_item(conn: sqlite3.Connection, profile_id: int, item: Dict[str, 
                     published_at=COALESCE(?, published_at),
                     url=COALESCE(url, ?),
                     source_id=COALESCE(source_id, ?),
-                    hash_signature=COALESCE(?, hash_signature)
+                    hash_signature=COALESCE(?, hash_signature),
+                    publisher=COALESCE(?, publisher),
+                    authority_id=COALESCE(?, authority_id),
+                    authority_status=COALESCE(?, authority_status),
+                    dedup_status=COALESCE(?, dedup_status)
                 WHERE id=?
                 """,
                 (
@@ -869,6 +931,10 @@ def upsert_news_item(conn: sqlite3.Connection, profile_id: int, item: Dict[str, 
                     url,
                     source_id,
                     hash_sig,
+                    publisher,
+                    authority_id,
+                    authority_status,
+                    dedup_status,
                     news_id,
                 ),
             )
@@ -877,8 +943,8 @@ def upsert_news_item(conn: sqlite3.Connection, profile_id: int, item: Dict[str, 
         # 3) Insert new
         conn.execute(
             """
-            INSERT INTO news_items(profile_id, source_type, source_id, url, domain, title, content, published_at, first_seen_at, last_seen_at, hash_signature)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?)
+            INSERT INTO news_items(profile_id, source_type, source_id, url, domain, title, content, published_at, first_seen_at, last_seen_at, hash_signature, publisher, authority_id, authority_status, dedup_status)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """,
             (
                 profile_id,
@@ -892,6 +958,10 @@ def upsert_news_item(conn: sqlite3.Connection, profile_id: int, item: Dict[str, 
                 now_iso,
                 now_iso,
                 hash_sig,
+                publisher,
+                authority_id,
+                authority_status,
+                dedup_status,
             ),
         )
         row = conn.execute(
@@ -947,7 +1017,9 @@ def list_url_sources(conn: sqlite3.Connection, profile_id: int) -> List[Dict[str
         "url_date_template": Optional[str], "last_successful_fetch": Optional[str], "created_at": str}]
     """
     rows = conn.execute(
-        "SELECT url, mode, sample_link, read_more_label, crawl_version, max_depth, allowed_domains, path_filter, max_results, date_scope, url_date_template, last_successful_fetch, created_at FROM url_sources WHERE profile_id = ? ORDER BY url",
+        "SELECT url, mode, sample_link, read_more_label, crawl_version, max_depth, allowed_domains, path_filter, max_results, date_scope, url_date_template, last_successful_fetch, created_at, "
+        "simulation_status, simulated_at, container_selector, field_selectors, read_more_selector, pagination_type, pagination_selector, depth_level, requires_js "
+        "FROM url_sources WHERE profile_id = ? ORDER BY url",
         (profile_id,)
     ).fetchall()
     return [
@@ -965,6 +1037,16 @@ def list_url_sources(conn: sqlite3.Connection, profile_id: int) -> List[Dict[str
             "url_date_template": r["url_date_template"],
             "last_successful_fetch": r["last_successful_fetch"],
             "created_at": r["created_at"],
+            # Source Simulator (v3.1, F9)
+            "simulation_status": r["simulation_status"],
+            "simulated_at": r["simulated_at"],
+            "container_selector": r["container_selector"],
+            "field_selectors": r["field_selectors"],
+            "read_more_selector": r["read_more_selector"],
+            "pagination_type": r["pagination_type"],
+            "pagination_selector": r["pagination_selector"],
+            "depth_level": r["depth_level"],
+            "requires_js": r["requires_js"],
         }
         for r in rows
     ]
@@ -1018,6 +1100,50 @@ def delete_url_source(conn: sqlite3.Connection, profile_id: int, url: str) -> No
     """
     with conn:
         conn.execute("DELETE FROM url_sources WHERE profile_id = ? AND url = ?", (profile_id, url))
+
+
+def save_simulation_result(
+    conn: sqlite3.Connection,
+    profile_id: int,
+    url: str,
+    *,
+    sample_link: Optional[str] = None,
+    container_selector: Optional[str] = None,
+    field_selectors: Optional[str] = None,
+    read_more_selector: Optional[str] = None,
+    pagination_type: Optional[str] = None,
+    pagination_selector: Optional[str] = None,
+    depth_level: Optional[int] = None,
+    requires_js: int = 0,
+    simulation_status: str = "success",
+) -> None:
+    """Persist Source Simulator output onto a url_source row (v3.1, F9).
+    Inserts the row if missing (URL-only add), else updates the simulator columns."""
+    now_iso = datetime.utcnow().isoformat()
+    with conn:
+        conn.execute(
+            """
+            INSERT INTO url_sources(profile_id, url, mode, simulation_status, simulated_at,
+                container_selector, field_selectors, read_more_selector,
+                pagination_type, pagination_selector, depth_level, requires_js, sample_link, created_at)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ON CONFLICT(profile_id, url) DO UPDATE SET
+                simulation_status=excluded.simulation_status,
+                simulated_at=excluded.simulated_at,
+                container_selector=excluded.container_selector,
+                field_selectors=excluded.field_selectors,
+                read_more_selector=excluded.read_more_selector,
+                pagination_type=excluded.pagination_type,
+                pagination_selector=excluded.pagination_selector,
+                depth_level=excluded.depth_level,
+                requires_js=excluded.requires_js,
+                sample_link=COALESCE(excluded.sample_link, url_sources.sample_link)
+            """,
+            (profile_id, url, "auto", simulation_status, now_iso,
+             container_selector, field_selectors, read_more_selector,
+             pagination_type, pagination_selector, depth_level, int(requires_js or 0),
+             sample_link, now_iso),
+        )
 
 
 def update_url_source_last_fetch(conn: sqlite3.Connection, profile_id: int, url: str, timestamp: str) -> None:
@@ -1096,7 +1222,7 @@ def finish_run(conn: sqlite3.Connection, run_id: int, status: str, metrics: Opti
                 duration_ms = None
         fields = ["status", "finished_at", "duration_ms"]
         values: List[Any] = [status, now_iso, duration_ms]
-        metric_fields = ["rss_count","tweet_count","url_count","filtered_count","grouped_count","email_status"]
+        metric_fields = ["rss_count","tweet_count","url_count","filtered_count","grouped_count","email_status","error_step","error_message"]
         if metrics:
             for k in metric_fields:
                 if k in metrics:

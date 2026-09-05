@@ -33,6 +33,57 @@ DEFAULT_HEADERS = {
 }
 
 
+def scrape_url_source_with_config(source: dict) -> list:
+    """Scrape a URL source using stored simulator config (v3.1, F9).
+
+    Reads container_selector + field_selectors discovered by the Source Simulator
+    instead of re-detecting structure each run. Returns a list of item dicts
+    ({title, link, date, author, source, source_type}). Returns [] when the source
+    has no stored config (un-simulated) — the caller then uses the legacy runner.
+    """
+    import json as _json
+
+    url = source.get("url")
+    container_selector = source.get("container_selector")
+    if not container_selector:
+        return []  # not simulated → caller falls back to legacy path
+
+    if bool(source.get("requires_js")):
+        from agents.source_simulator import fetch_page_playwright
+        html = fetch_page_playwright(url)
+    else:
+        resp = requests.get(url, headers=DEFAULT_HEADERS, timeout=20)
+        resp.raise_for_status()
+        html = resp.text
+
+    field_selectors = _json.loads(source.get("field_selectors") or "{}")
+
+    def _extract(container, base_url):
+        item = {"source": base_url, "source_type": "URL_Static"}
+        t_sel = field_selectors.get("title")
+        t_el = container.select_one(t_sel) if t_sel else container.find(["h1", "h2", "h3", "h4", "a"])
+        item["title"] = t_el.get_text(strip=True) if t_el else ""
+        l_sel = field_selectors.get("link")
+        l_el = container.select_one(l_sel) if l_sel else container.find("a", href=True)
+        item["link"] = urljoin(base_url, l_el["href"]) if (l_el and l_el.get("href")) else base_url
+        d_sel = field_selectors.get("date")
+        d_el = container.select_one(d_sel) if d_sel else container.find("time")
+        item["date"] = d_el.get_text(strip=True) if d_el else ""
+        a_sel = field_selectors.get("author")
+        a_el = container.select_one(a_sel) if a_sel else None
+        item["author"] = a_el.get_text(strip=True) if a_el else ""
+        item["content"] = f"{item['title']}\n{item['link']}\n{item['date']}"
+        return item
+
+    items = []
+    soup = BeautifulSoup(html, "html.parser")
+    for c in soup.select(container_selector):
+        it = _extract(c, url)
+        if it["title"] or it["link"] != url:
+            items.append(it)
+    return items
+
+
 def http_get(url: str, timeout: int = 20, retries: int = 3, backoff_sec: float = 1.0) -> Tuple[int, str]:
     last_err = None
     for attempt in range(retries):

@@ -26,6 +26,14 @@
     .sum-num.gray { color: #aaa; }
     .sum-label { font-size: 11px; color: #6a6d70; }
     .btn-run-all-placeholder { margin-left: auto; background: #f5f5f5; color: #aaa; border: 1px dashed #ccc; border-radius: 4px; padding: 7px 14px; font-size: 12px; font-weight: 700; cursor: not-allowed; display: flex; align-items: center; gap: 7px; white-space: nowrap; flex-shrink: 0; }
+    .btn-run-all { margin-left: auto; background: #0a6ed1; color: #fff; border: none; border-radius: 4px; padding: 7px 14px; font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 7px; white-space: nowrap; flex-shrink: 0; }
+    .btn-run-all:hover { background: #085aad; }
+    .btn-run-all:disabled { background: #7fb4e6; cursor: progress; }
+    .run-all-pill { font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 9px; margin-left: 6px; display: none; }
+    .run-all-pill.pending { display: inline-block; background: #eee; color: #888; }
+    .run-all-pill.running { display: inline-block; background: #fff3cd; color: #8a6d00; }
+    .run-all-pill.success { display: inline-block; background: #e3f5e9; color: #1a7f43; }
+    .run-all-pill.failed  { display: inline-block; background: #fde8e8; color: #b42318; }
     .soon-badge { background: #e8f1fb; color: #0a6ed1; font-size: 9px; font-weight: 700; border-radius: 3px; padding: 1px 5px; text-transform: uppercase; }
 
     /* ── Flash ── */
@@ -125,7 +133,7 @@
     <div class="sum-item"><span class="sum-num green">{{ recently_run_count|default(0) }}</span><span class="sum-label">run recently</span></div>
     <div class="sum-divider"></div>
     <div class="sum-item"><span class="sum-num gray">{{ never_run_count|default(0) }}</span><span class="sum-label">never run</span></div>
-    <div class="btn-run-all-placeholder" title="Coming in v3.1">&#9654;&#9654; Run All Active <span class="soon-badge">Soon</span></div>
+    <button type="button" id="runAllBtn" class="btn-run-all" onclick="startRunAll()">&#9654;&#9654; Run All Active <span id="runAllCounter"></span></button>
   </div>
 
   {% with messages = get_flashed_messages(with_categories=true) %}
@@ -147,11 +155,12 @@
         {% for p in profiles %}
         <a class="profile-row {% if selected_profile and selected_profile.id == p.id %}selected{% endif %}"
            href="{{ url_for('admin_profile_detail', profile_id=p.id) }}?tab=configure"
+           data-profile-id="{{ p.id }}"
            data-name="{{ (p.name or (p.country_code ~ ' / ' ~ p.lob))|lower }}">
           <div class="row-left">
             <div class="row-avatar">{{ p.country_code }}</div>
             <div class="row-text">
-              <div class="row-name">{{ p.name or (p.country_code ~ ' / ' ~ p.lob) }}</div>
+              <div class="row-name">{{ p.name or (p.country_code ~ ' / ' ~ p.lob) }}<span class="run-all-pill" data-run-all-pill="{{ p.id }}"></span></div>
               <div class="row-desc">{{ p.lob }}{% if p.source_count is defined %} · {{ p.source_count }} sources{% endif %}</div>
               <div class="row-meta">
                 <span class="meta-item">{% if p.active %}<span class="meta-dot">●</span>Active{% else %}Inactive{% endif %}</span>
@@ -242,6 +251,51 @@
       row.style.display = name.indexOf(q) !== -1 ? '' : 'none';
     });
   }
+
+  // ── Run All Active (v3.1) ──
+  function _applyRunAllState(st) {
+    var btn = document.getElementById('runAllBtn');
+    var counter = document.getElementById('runAllCounter');
+    if (!btn) return;
+    if (st.profiles) {
+      Object.keys(st.profiles).forEach(function(pid) {
+        var pill = document.querySelector('[data-run-all-pill="' + pid + '"]');
+        if (pill) {
+          var s = st.profiles[pid].status;
+          pill.className = 'run-all-pill ' + s;
+          pill.textContent = s === 'running' ? 'running…' : s;
+          if (st.profiles[pid].detail) pill.title = st.profiles[pid].detail;
+        }
+      });
+    }
+    if (st.running) {
+      btn.disabled = true;
+      if (counter) counter.textContent = '(' + st.done + ' / ' + st.total + ')';
+    } else {
+      btn.disabled = false;
+      if (counter) counter.textContent = st.finished_at ? '(done ' + st.done + '/' + st.total + ')' : '';
+    }
+  }
+  function _connectRunAllStream() {
+    if (!window.EventSource) return;
+    var es = new EventSource("{{ url_for('admin_run_all_stream') }}");
+    es.onmessage = function(e) { try { _applyRunAllState(JSON.parse(e.data)); } catch (_) {} };
+    es.addEventListener('done', function() { es.close(); });
+    es.onerror = function() { es.close(); };
+  }
+  function startRunAll() {
+    var btn = document.getElementById('runAllBtn');
+    if (btn && btn.disabled) return;
+    if (!confirm('Run all ACTIVE profiles sequentially now?')) return;
+    fetch("{{ url_for('admin_run_all') }}", {method: 'POST', headers: {'X-Requested-With': 'fetch'}})
+      .finally(function() { _connectRunAllStream(); });
+  }
+  // On load: resume live view if a session is already running (reconnect recovery)
+  (function() {
+    fetch("{{ url_for('admin_run_all_status') }}").then(function(r){return r.json();})
+      .then(function(st){ _applyRunAllState(st); if (st.running) _connectRunAllStream(); })
+      .catch(function(){});
+  })();
 </script>
 </body>
 </html>

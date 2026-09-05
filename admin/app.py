@@ -692,6 +692,8 @@ def admin_start_run(profile_id: int):
         email_status = "Failed"
         metrics: Dict[str, Any] = {}
         status_final = "Success"
+        error_step = None
+        error_message = None
         try:
             from agents.agents_controller import run_profile_once
 
@@ -707,15 +709,17 @@ def admin_start_run(profile_id: int):
                                 selected_rss_urls=sel_rss, selected_twitter_handles=sel_twitter,
                                 selected_url_sources=sel_urls,
                                 lookback_override=lookback_override if lookback_override != 'force_full' else None,
-                                skip_grouping=skip_grp)
+                                skip_grouping=skip_grp, should_cancel=_cancel)
             status_final = "Success" if ok else "Failed"
             email_status = "Sent" if ok else "Failed"
-            
+
             # Override email status if skip_email was used
             if skip_mail:
                 email_status = "Skipped (test mode)"
         except Exception as e:
             status_final = "Failed"
+            error_step = "pipeline"
+            error_message = f"{type(e).__name__}: {e}"[:500]
             conn_e = get_connection()
             create_schema_if_needed(conn_e)
             append_run_log(conn_e, rid, "ERROR", f"Exception: {e}")
@@ -733,7 +737,12 @@ def admin_start_run(profile_id: int):
             status_mark = status_final
             if is_cancel_requested(fconn, rid) and status_final == "Success":
                 status_mark = "Canceled"
-            finish_run(fconn, rid, status_mark, metrics={"email_status": email_status})
+            # F3: record structured failure info (surfaced in run status UI)
+            _metrics = {"email_status": email_status}
+            if status_mark == "Failed":
+                _metrics["error_step"] = error_step or "pipeline"
+                _metrics["error_message"] = error_message or "Run returned failure — see log above."
+            finish_run(fconn, rid, status_mark, metrics=_metrics)
             append_run_log(fconn, rid, "INFO", f"🏁 Run {rid} finished with status {status_mark}")
             fconn.close()
 
@@ -769,7 +778,100 @@ def stream_run_logs(run_id: int):
     return Response(stream_with_context(_event_stream()), mimetype="text/event-stream")
 
 
-# Cancel a run (cooperative)
+# ── Run All Active (v3.1, Group 7) ─────────────────────────────────────────
+# Sequentially runs every active profile in a background thread. Skip-on-failure:
+# a failed profile is recorded and the next one starts immediately. One session at
+# a time. Live state is held in memory and pushed via SSE (run_all_status).
+_run_all_lock = threading.Lock()
+_run_all_state: Dict[str, Any] = {
+    "running": False, "total": 0, "done": 0, "current_pid": None,
+    "started_at": None, "finished_at": None, "profiles": {},
+}
+
+
+def _run_all_worker(profiles: List[Dict[str, Any]]):
+    try:
+        from agents.agents_controller import run_profile_once
+        for p in profiles:
+            pid = int(p["id"])
+            with _run_all_lock:
+                _run_all_state["current_pid"] = pid
+                _run_all_state["profiles"][str(pid)]["status"] = "running"
+            ok = False
+            detail = ""
+            try:
+                ok = run_profile_once(pid, force_run=False, skip_email=False)
+                if not ok:
+                    detail = "run returned failure"
+            except Exception as e:
+                detail = f"{type(e).__name__}: {e}"[:200]
+                ok = False
+            with _run_all_lock:
+                _run_all_state["profiles"][str(pid)]["status"] = "success" if ok else "failed"
+                _run_all_state["profiles"][str(pid)]["detail"] = detail
+                _run_all_state["done"] += 1
+    finally:
+        with _run_all_lock:
+            _run_all_state["running"] = False
+            _run_all_state["current_pid"] = None
+            _run_all_state["finished_at"] = datetime.utcnow().isoformat()
+
+
+@app.route("/admin/run-all", methods=["POST"])
+def admin_run_all():
+    _ensure_schema()
+    with _run_all_lock:
+        if _run_all_state["running"]:
+            flash("A Run-All session is already in progress.", "error")
+            return redirect(url_for("admin_dashboard"))
+        profiles = list_active_profiles() or []
+        if not profiles:
+            flash("No active profiles to run.", "error")
+            return redirect(url_for("admin_dashboard"))
+        _run_all_state.update({
+            "running": True, "total": len(profiles), "done": 0, "current_pid": None,
+            "started_at": datetime.utcnow().isoformat(), "finished_at": None,
+            "profiles": {
+                str(int(p["id"])): {
+                    "name": p.get("name") or f'{p.get("country_code")}/{p.get("lob")}',
+                    "status": "pending", "detail": "",
+                } for p in profiles
+            },
+        })
+        snapshot = list(profiles)
+    try:
+        conn = get_connection(); create_schema_if_needed(conn)
+        add_audit_log(conn, entity="profiles", action="run_all_requested",
+                      details=f"{len(snapshot)} active profile(s)", profile_id=None)
+        conn.close()
+    except Exception:
+        pass
+    threading.Thread(target=_run_all_worker, args=(snapshot,), daemon=True).start()
+    flash(f"Run-All started for {len(snapshot)} active profile(s).", "success")
+    return redirect(url_for("admin_dashboard"))
+
+
+@app.route("/admin/run-all/status")
+def admin_run_all_status():
+    from flask import jsonify
+    with _run_all_lock:
+        return jsonify(dict(_run_all_state))
+
+
+@app.route("/admin/run-all/stream")
+def admin_run_all_stream():
+    import json as _json
+    def _stream():
+        while True:
+            with _run_all_lock:
+                st = dict(_run_all_state)
+            yield f"data: {_json.dumps(st)}\n\n"
+            if not st["running"]:
+                yield "event: done\ndata: end\n\n"
+                break
+            time.sleep(1.0)
+    return Response(stream_with_context(_stream()), mimetype="text/event-stream")
+
 @app.route("/admin/runs/<int:run_id>/cancel", methods=["POST"])
 def cancel_run(run_id: int):
     conn = get_connection()
@@ -1074,7 +1176,67 @@ def add_url_source_route(profile_id: int):
     return redirect(url_for("admin_profile_detail", profile_id=profile_id))
 
 
-@app.route("/admin/profiles/<int:profile_id>/urls/update", methods=["POST"])
+# ── Source Simulator (v3.1, F9) ─────────────────────────────────────────────
+@app.route("/admin/profiles/<int:profile_id>/urls/simulate", methods=["POST"])
+def simulate_url_source(profile_id: int):
+    """SSE endpoint — streams Source Simulator progress events as JSON lines.
+    action: 'start' (fetch + depth loop → containers_found) or 'confirm'
+    (map fields → buttons → pagination → sample → complete)."""
+    import json as _json
+    data = request.get_json(force=True, silent=True) or {}
+    action = data.get("action", "start")
+    url = data.get("url", "")
+
+    from agents.source_simulator import run_simulation, run_simulation_from_confirmed_container
+    try:
+        from agents.sap_ai_client import create_sap_aicore_client
+        ai_client = create_sap_aicore_client()
+    except Exception:
+        ai_client = None
+
+    def generate():
+        if action == "confirm":
+            gen = run_simulation_from_confirmed_container(
+                html=data.get("html", ""), url=url,
+                container_selector=data.get("container_selector", ""),
+                depth_level=data.get("depth_level", 0),
+                requires_js=bool(data.get("requires_js", False)),
+                ai_client=ai_client,
+            )
+        else:
+            gen = run_simulation(url, ai_client=ai_client, max_depth=data.get("max_depth", 5))
+        for event in gen:
+            yield f"data: {_json.dumps(event)}\n\n"
+
+    return Response(stream_with_context(generate()), mimetype="text/event-stream",
+                    headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@app.route("/admin/profiles/<int:profile_id>/urls/simulate/save", methods=["POST"])
+def save_url_simulation(profile_id: int):
+    """Persist a completed simulation result onto the url_source row."""
+    from flask import jsonify
+    from configurations.db import save_simulation_result
+    data = request.get_json(force=True, silent=True) or {}
+    url = data.get("url", "")
+    if not url:
+        return jsonify({"error": "url required"}), 400
+    conn = get_connection()
+    create_schema_if_needed(conn)
+    save_simulation_result(
+        conn, profile_id, url,
+        sample_link=data.get("sample_link"),
+        container_selector=data.get("container_selector"),
+        field_selectors=data.get("field_selectors"),
+        read_more_selector=data.get("read_more_selector"),
+        pagination_type=data.get("pagination_type"),
+        pagination_selector=data.get("pagination_selector"),
+        depth_level=data.get("depth_level"),
+        requires_js=int(bool(data.get("requires_js", False))),
+    )
+    add_audit_log(conn, entity="url_sources", action="simulate", details=f"url={url}", profile_id=profile_id)
+    conn.close()
+    return jsonify({"ok": True})
 def update_url_source_route(profile_id: int):
     url = request.form.get("url", "").strip()          # original URL (identity key)
     new_url = request.form.get("new_url", "").strip()  # updated URL (may differ)

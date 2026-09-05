@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 
 from configurations.config_loader import creds, add_news_item, get_weekly_baseline
 from agents.sap_ai_client import SAPAICoreClient
+from agents.ai_cache import cached_embeddings
 import numpy as np
 import os
 import time
@@ -35,9 +36,14 @@ def _get_ai_client():
 MAX_CHARS_PER_ITEM = 1000  # ~250 tokens heuristic
 BATCH_SIZE = 10            # smaller batches reduce TLS/frame issues on strict networks
 
-# Fixed thresholds (as agreed)
-DEDUP_COSINE_DUP = 0.92
-DEDUP_COSINE_UPDATE = 0.85
+# Dedup thresholds (v3.1). Duplicate detection is cosine-primary: paraphrased
+# legal-news items share few exact tokens (link/date noise tanks Jaccard), so the
+# embedding cosine is the reliable signal. Measured on the Xanadu fixtures, true
+# duplicates score ≥0.85 while distinct same-topic items sit ≤0.75, so 0.80 is the
+# separating threshold (matches the roadmap's 0.92→0.80 lowering). Jaccard is kept
+# only as a weak floor to reject pure-coincidence cosine matches.
+DEDUP_COSINE_DUP = 0.80
+DEDUP_COSINE_UPDATE = 0.72
 JACCARD_DUP_MIN = 0.70
 JACCARD_UPDATE_MIN = 0.40
 WEEKLY_BASELINE_DAYS = 7
@@ -170,7 +176,33 @@ def _build_item_record(item: Dict[str, Any]) -> Dict[str, Any]:
         "content": content,
         "published_at": published_at,
         "hash_signature": hash_signature(title or "", content or ""),
+        # v3.1: carry attribution + dedup marker through to persistence
+        "publisher": item.get("publisher"),
+        "authority_id": item.get("authority_id"),
+        "authority_status": item.get("authority_status"),
+        "dedup_status": item.get("dedup_status"),
     }
+
+
+# --- Entity-based canonical fingerprint (B7) ------------------------------
+# Replaces the brittle exact-text hash for duplicate detection: two items whose
+# significant domain tokens match (ignoring word order, casing, stopwords and
+# short filler words) collapse to the same fingerprint, so trivially reworded
+# headlines are recognised as the same story without an AI call.
+_FP_STOPWORDS = {
+    "the", "and", "for", "with", "from", "that", "this", "will", "has", "have",
+    "are", "was", "were", "its", "into", "over", "under", "new", "set", "next",
+    "announces", "announced", "release", "released", "releases", "update",
+    "updated", "updates", "published", "publishes", "to", "of", "in", "on",
+    "a", "an", "as", "at", "by", "is", "be",
+}
+
+
+def entity_fingerprint(title: str, content: str) -> str:
+    """Canonical fingerprint = sorted set of significant (>3 char, non-stopword) tokens."""
+    text = normalize_arabic(f"{title or ''} {content or ''}")
+    toks = [t for t in tokenize(text) if len(t) > 3 and t not in _FP_STOPWORDS]
+    return " ".join(sorted(set(toks)))
 
 
 def run_compare_news_agent(
@@ -210,6 +242,7 @@ def run_compare_news_agent(
         print("🗃️ Persisting current items to DB baseline...")
         for item in current_items:
             try:
+                item["dedup_status"] = "new"
                 rec = _build_item_record(item)
                 add_news_item(item.get("profile_id") or 1, rec)
             except Exception as e:
@@ -246,20 +279,11 @@ def run_compare_news_agent(
     # They are only used in news_filter.py for the "second chance" rescue mechanism.
     # Merging them here would cause incoming items to be marked as duplicates of themselves.
 
-    # Persist current items to DB (upsert) - these become part of next run's baseline
-    print("🗃️ Persisting current items to DB baseline...")
-    for item in current_items:
-        try:
-            rec = _build_item_record(item)
-            add_news_item(item.get("profile_id") or 1, rec)
-        except Exception as e:
-            print(f"⚠️ Failed to upsert news item to DB: {e}")
-
-    # Build quick lookup maps for exact/fuzzy
-    by_source_id: Dict[str, Dict[str, Any]] = {}
-    by_url: Dict[str, Dict[str, Any]] = {}
-    by_sig: Dict[str, Dict[str, Any]] = {}
-
+    # Build baseline lookup maps for exact/canonical matching (incl. entity fingerprint, B7)
+    by_source_id: Dict[str, Any] = {}
+    by_url: Dict[str, Any] = {}
+    by_sig: Dict[str, Any] = {}
+    by_fp: Dict[str, Any] = {}
     for b in baseline_items:
         if b.get("source_id"):
             by_source_id[str(b["source_id"])] = b
@@ -267,88 +291,123 @@ def run_compare_news_agent(
             by_url[str(b["url"])] = b
         if b.get("hash_signature"):
             by_sig[str(b["hash_signature"])] = b
+        fp = entity_fingerprint(b.get("title", ""), b.get("content", ""))
+        if fp:
+            by_fp[fp] = b
 
-    # --- Optimization: Skip embeddings entirely if no baseline history ---
-    if not baseline_items:
-        print("📭 No baseline history found. Treating all items as new (skipping embeddings).")
-        # Save snapshot for manual inspection
-        try:
-            with open(snapshot_path, "w", encoding="utf-8") as f:
-                json.dump(current_items, f, ensure_ascii=False, indent=2)
-            print(f"💾 Updated snapshot → {snapshot_path}")
-        except Exception as e:
-            print(f"⚠️ Failed to write snapshot: {e}")
-        return {"new_items": list(current_items), "update_items": []}
-
-    # --- Full comparison path (baseline exists) ---
-    # Prepare semantic structures
-    baseline_texts = [_get_text_signature(b) for b in baseline_items]
+    # Semantic structures. Embeddings are only needed when there is something to
+    # compare against (a non-empty baseline) or when the AI cache is active for
+    # deterministic replay. First-ever runs with no baseline stay AI-free.
     curr_texts = [_get_text_signature(i) for i in current_items]
-
-    # Token sets for Jaccard
+    glossary_terms = _extract_glossary_terms(glossary)
+    use_embeddings = bool(baseline_items) or bool(os.environ.get("LEGAL_EAGLE_AI_CACHE"))
+    baseline_texts = [_get_text_signature(b) for b in baseline_items]
     baseline_tokens = [tokenize(t) for t in baseline_texts]
-
-    # Embeddings for cosine similarity
-    print("🔍 Generating embeddings for semantic comparison (weekly baseline)...")
-    client = _get_ai_client()
-    baseline_emb = _embed_texts(baseline_texts, client)
-    curr_emb = _embed_texts(curr_texts, client)
+    baseline_emb: List[Any] = []
+    curr_emb: List[Any] = []
+    if use_embeddings:
+        print("🔍 Generating embeddings for semantic comparison (weekly baseline)...")
+        try:
+            client = _get_ai_client()
+            if baseline_texts:
+                baseline_emb = cached_embeddings(baseline_texts, lambda t: _embed_texts(t, client))
+            curr_emb = cached_embeddings(curr_texts, lambda t: _embed_texts(t, client))
+        except Exception as e:
+            # Embeddings unavailable (AI Core down / no cache) — degrade to
+            # deterministic dedup (exact id/url/hash/fingerprint) rather than
+            # aborting the whole run. Near-duplicates fall through as 'new'.
+            print(f"⚠️ Embeddings unavailable ({type(e).__name__}); using deterministic dedup only.")
+            use_embeddings = False
+            baseline_emb = []
+            curr_emb = []
 
     new_items: List[Dict[str, Any]] = []
     update_items: List[Dict[str, Any]] = []
-    glossary_terms = _extract_glossary_terms(glossary)
+
+    # Intra-run state: items kept so far this run become comparison targets too,
+    # so a second occurrence of the same story within one run is caught (C3).
+    seen_source_ids = set(by_source_id.keys())
+    seen_urls = set(by_url.keys())
+    seen_fps = set(by_fp.keys())
+    kept_current: List[Dict[str, Any]] = []  # {vec, tokens, text}
+
+    def _best_semantic(curr_vec, targets):
+        best_cos, best_j = -1.0, -1
+        for j, tv in enumerate(targets):
+            denom = (np.linalg.norm(curr_vec) * np.linalg.norm(tv))
+            if denom == 0:
+                continue
+            cos = float(np.dot(curr_vec, tv) / denom)
+            if cos > best_cos:
+                best_cos, best_j = cos, j
+        return best_cos, best_j
 
     for i, item in enumerate(current_items):
         curr_text = curr_texts[i]
         curr_sig = hash_signature(item.get("title", ""), item.get("content", ""))
+        curr_fp = entity_fingerprint(item.get("title", ""), item.get("content", ""))
         url = item.get("link") or item.get("url")
         source_id = item.get("tweet_id") or item.get("guid") or item.get("id")
 
-        # Exact checks (skip duplicates)
-        if source_id and source_id in by_source_id:
-            continue
-        if url and url in by_url:
-            continue
-        if curr_sig and curr_sig in by_sig:
-            continue
+        # 1) Exact / canonical duplicate (vs baseline AND already-kept current items)
+        is_dup = (
+            (source_id and str(source_id) in seen_source_ids)
+            or (url and str(url) in seen_urls)
+            or (curr_sig and curr_sig in by_sig)
+            or (curr_fp and curr_fp in seen_fps)
+        )
 
-        # Compute best semantic match against baseline
-        curr_vec = np.array(curr_emb[i].embedding)
-        best_cos = -1.0
-        best_idx = -1
-        for j, b in enumerate(baseline_emb):
-            b_vec = np.array(b.embedding)
-            # cosine similarity
-            cos_sim = float(np.dot(curr_vec, b_vec) / (np.linalg.norm(curr_vec) * np.linalg.norm(b_vec)))
-            if cos_sim > best_cos:
-                best_cos = cos_sim
-                best_idx = j
+        classification = "new"
+        if is_dup:
+            classification = "duplicate"
+        elif use_embeddings and i < len(curr_emb):
+            # 2) Semantic comparison vs baseline + kept-current embeddings
+            curr_vec = np.array(curr_emb[i].embedding)
+            base_vecs = [np.array(b.embedding) for b in baseline_emb]
+            cur_vecs = [k["vec"] for k in kept_current]
+            all_texts = baseline_texts + [k["text"] for k in kept_current]
+            best_cos, best_j = _best_semantic(curr_vec, base_vecs + cur_vecs)
+            # Cosine-tiered classification (Jaccard AND-gate dropped — unreliable on
+            # paraphrased news). High cosine ⇒ duplicate; mid cosine with a genuine
+            # glossary-bearing delta ⇒ update; otherwise new.
+            if best_cos >= DEDUP_COSINE_DUP:
+                classification = "duplicate"
+            elif best_cos >= DEDUP_COSINE_UPDATE:
+                baseline_text = all_texts[best_j] if 0 <= best_j < len(all_texts) else ""
+                deltas = _compute_delta(curr_text, baseline_text, glossary_terms)
+                if deltas:
+                    classification = "update"
+                    item["is_update"] = True
+                    item["delta"] = deltas
+                else:
+                    classification = "new"
 
-        # Jaccard token overlap vs best baseline item
-        jac_sim = 0.0
-        if best_idx >= 0 and best_idx < len(baseline_tokens):
-            jac_sim = jaccard(tokenize(curr_text), baseline_tokens[best_idx])
-
-        # Classification
-        if best_cos >= DEDUP_COSINE_DUP and jac_sim >= JACCARD_DUP_MIN:
-            # Duplicate
-            continue
-        elif (best_cos >= DEDUP_COSINE_UPDATE) and (JACCARD_UPDATE_MIN <= jac_sim < JACCARD_DUP_MIN):
-            # Update candidate: extract delta sentences
-            baseline_text = baseline_texts[best_idx] if (best_idx >= 0) else ""
-            deltas = _compute_delta(curr_text, baseline_text, glossary_terms)
-            if deltas:
-                item["is_update"] = True
-                item["delta"] = deltas
-                update_items.append(item)
-            else:
-                # No meaningful delta → treat as repeat (omit)
-                continue
-        else:
-            # New item
+        item["dedup_status"] = classification
+        if classification == "new":
             new_items.append(item)
+            # register as a comparison target for the rest of this run
+            seen_source_ids.add(str(source_id)) if source_id else None
+            seen_urls.add(str(url)) if url else None
+            seen_fps.add(curr_fp) if curr_fp else None
+            if use_embeddings and i < len(curr_emb):
+                kept_current.append({"vec": np.array(curr_emb[i].embedding),
+                                     "tokens": tokenize(curr_text), "text": curr_text})
+        elif classification == "update":
+            update_items.append(item)
+            seen_fps.add(curr_fp) if curr_fp else None
 
-    print(f"✅ New items: {len(new_items)} | Updates: {len(update_items)} (thresholds: cosine dup={DEDUP_COSINE_DUP}, update={DEDUP_COSINE_UPDATE})")
+    # Persist ALL current items (with dedup_status) — duplicates are preserved (F7),
+    # never dropped, so they remain queryable and visible (collapsed) in Review.
+    print("🗃️ Persisting current items to DB baseline (with dedup_status)...")
+    for item in current_items:
+        try:
+            rec = _build_item_record(item)
+            add_news_item(item.get("profile_id") or 1, rec)
+        except Exception as e:
+            print(f"⚠️ Failed to upsert news item to DB: {e}")
+
+    dup_count = sum(1 for it in current_items if it.get("dedup_status") == "duplicate")
+    print(f"✅ New: {len(new_items)} | Updates: {len(update_items)} | Duplicates (kept): {dup_count}")
 
     # Save single rolling snapshot for manual inspection
     try:
