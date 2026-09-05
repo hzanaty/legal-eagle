@@ -423,7 +423,7 @@
     <div class="step future" onclick="showDetail('rcm-publish')">
       <span class="actor human" title="Human"><svg class="ic"><use href="#ic-human"/></svg></span>
       <div class="step-name">Preview for RCM</div>
-      <div class="step-sub">RCM template popup · v3.6</div>
+      <div class="step-sub">Popup + JIRA link → Done · v3.6</div>
     </div>
     <div class="inner-arrow">›</div>
     <div class="step future" onclick="showDetail('announce-agent')">
@@ -438,10 +438,10 @@
       <div class="step-sub">AI per aspect · V4</div>
     </div>
     <div class="inner-arrow">›</div>
-    <div class="step built" onclick="showDetail('legal-repo')">
+    <div class="step future" onclick="showDetail('legal-repo')">
       <span class="actor human" title="Human"><svg class="ic"><use href="#ic-human"/></svg></span>
       <div class="step-name">Legal Repo</div>
-      <div class="step-sub">Map to JIRA / SAP Notes</div>
+      <div class="step-sub">deprecating · v3.7</div>
     </div>
   </div>
 </div>
@@ -731,40 +731,39 @@ const details = {
     ]
   },
   'rcm-publish': {
-    title: 'Preview for RCM',
-    subtitle: 'Planned v3.6 — read-only RCM-template popup + source links + Open-L2S link (human verify step)',
+    title: 'Preview for RCM + Close the Loop',
+    subtitle: 'Planned v3.6 — read-only RCM-template popup + Open-L2S link, then link JIRA → mark Done',
     tag: 'red', tagLabel: 'Planned v3.6',
     cols: [
-      { heading: 'What it does', items: ['Human-in-the-loop verification step — precedes the V4 Announce Agent write', '"Preview for RCM" button per Announcement row (sends nothing — not "Publish")', 'Read-only modal renders announcement_md in the RCM / Law2Spec template', 'Lists source links resolved from news_announcements.item_ids_json', '"Open L2S" link opens L2S in a new tab — user copies/pastes manually (as today)', 'No API call, no JIRA, no external send — integration is deferred to V4 (Announce Agent)'] },
-      { heading: 'Key files (planned)', items: ['admin/app.py — GET /admin/announcement-template/&lt;id&gt;', 'admin/templates/review_news.html — Preview modal'] },
+      { heading: 'What it does', items: ['"Preview for RCM" button per Announcement row (sends nothing — not "Publish")', 'Read-only modal renders announcement_md in the RCM / Law2Spec template + source links (from item_ids_json)', '"Open L2S" opens L2S in a new tab — LPM copies/pastes manually (as today)', 'Close the loop: LPM pastes the JIRA Legal Change # onto the announcement and marks it DONE — the LPM finish line', 'No JIRA API — manual paste. V4 Announce Agent automates create + link + stamp'] },
+      { heading: 'Key files (planned)', items: ['admin/app.py — GET /admin/announcement-template/&lt;id&gt; + POST save JIRA #/status', 'configurations/db.py — news_announcements.jira_legal_change + status', 'admin/templates/review_news.html — Preview modal + Done control'] },
     ]
   },
   'announce-agent': {
     title: 'Announce Agent',
-    subtitle: 'Planned V4 — agent write step: create JIRA Legal Change from the announcement',
+    subtitle: 'Planned V4 — automates the JIRA Legal Change via the sanctioned L2S path',
     tag: 'red', tagLabel: 'Planned V4',
     cols: [
-      { heading: 'What it does', items: ['Runs AFTER the human "Preview for RCM" verification step (human-in-loop → agent write)', 'Creates a JIRA Legal Change from the announcement content', 'Path (L2S vs direct JIRA REST) is the governance decision made at V4 start', 'Announcement editing before hand-off'] },
-      { heading: 'Key files (planned)', items: ['agents/announce_agent.py (new)', 'admin/app.py — announce route', 'admin/templates/review_news.html — Announce button (after Preview)'] },
+      { heading: 'What it does', items: ['Automates the v3.6 manual step: create JIRA Legal Change + auto-link + auto-stamp Done', 'Uses the SANCTIONED L2S/GLO path — resolves the raw-JIRA-REST governance concern', 'Announcement editing before hand-off'] },
+      { heading: 'Resources (L2A hub — verify at V4)', items: ['l2s-prd-mcp (auth-proxy .../l2s-prd-mcp/mcp)', 'glo-requirements-setup skill (l2a-capability-hub)', 'agents/announce_agent.py (new)'] },
     ]
   },
   'impact-analysis': {
     title: 'Impact Agent',
-    subtitle: 'Planned V4 — AI product impact analysis per announcement',
+    subtitle: 'Planned V4 — AI impact report, grounded on external SAP legal + technical knowledge',
     tag: 'red', tagLabel: 'Planned V4',
     cols: [
-      { heading: 'What it does', items: ['AI call per announcement → structured impact report (affected products, before/after, expected solution)', 'Cached to news_announcements.impact_analysis_md (new V4 column) on first use', '"Preview Analysis" button: AI first click, cached thereafter, Copy MD → Law2Spec Prompt field'] },
-      { heading: 'Key files (planned)', items: ['agents/impact_analyzer.py (new)', 'admin/app.py — impact route', 'Spec: docs/superpowers/specs/2026-07-03-impact-analysis-agent.md (rename news_aspects→news_announcements)'] },
+      { heading: 'What it does', items: ['AI call per announcement → impact report (affected products, before/after, expected solution)', 'Cached to news_announcements.impact_analysis_md (new V4 column)', '"Preview Analysis" button: AI first click, cached thereafter, Copy MD → Law2Spec Prompt', 'Grounding is external — NOT the deprecated in-app Legal Repo'] },
+      { heading: 'Resources (L2A hub — verify at V4)', items: ['glo-functional-spec-fitgap-generator skill (law→product fit/gap)', 'glo-taxonomy-kg + sap-mcp-glorep-kg (legal/requirements KGs)', 'SAP ABAP MCP + SAP Enterprise Knowledge Graph (technical)', 'agents/impact_analyzer.py (new)'] },
     ]
   },
   'legal-repo': {
     title: 'Legal Repository',
-    subtitle: 'Admin UI — global knowledge base, unchanged in v3',
-    tag: 'grey', tagLabel: 'UI Only',
+    subtitle: 'Deprecating v3.7 — out of Legal Eagle scope (predates v3, bundled in by mistake)',
+    tag: 'red', tagLabel: 'Deprecating v3.7',
     cols: [
-      { heading: 'What it does', items: ['3-column layout: Countries → Topics → Node detail', 'Links news items to JIRA EPICs, SAP Notes, PRDs', 'Notes and context per regulatory topic', 'Cross-profile knowledge base'] },
-      { heading: 'Key file', items: ['admin/app.py — /admin/legal-repo', 'admin/templates/legal_repo.html'] },
-      { heading: 'Dependencies', items: ['SQLite (legal repo tables)', 'LOKA integration (loka_client.py)', 'JIRA links (external)'] },
+      { heading: 'What it is', items: ['Pre-v3 (v2.30) regs → JIRA EPIC / SAP Notes knowledge base', '3-column Countries → Topics → Node detail', 'Unrelated to the monitor→announce pipeline — being retired'] },
+      { heading: 'v3.7 plan', items: ['Retire legal_repo.html + repo routes + repo_nodes/repo_assets', 'Export/migrate any real data first (decide at v3.7 start)', 'Remove from this lifecycle once shipped'] },
     ]
   },
 };

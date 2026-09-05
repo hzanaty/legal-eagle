@@ -1,7 +1,7 @@
 # Legal Eagle v3.0 — Pipeline Redesign Specification
 
 **Date:** 2026-06-29  
-**Status:** v3.5 Shipped — v3.6 (Preview for RCM popup) next; V4 = Announce Agent + Impact Agent  
+**Status:** v3.5 Shipped — v3.6 (Preview for RCM + JIRA-link/Done) next; v3.7 (deprecate Legal Repository); V4 = Announce + Impact Agents on L2A MCPs  
 **Version Jump:** v2.32 → v3.0  
 **Author:** Brainstorming session (I077750 + Claude)
 
@@ -467,32 +467,49 @@ Follows lifecycle order: final Review enhancement, depends on Tag (Phase 3) bein
 - "+ Add to Glossary" inline action in Review UI
 - AI pre-suggests keywords; user confirms; glossary updated immediately without navigation
 
-### Phase 6 (v3.6) — Preview for RCM Announcement Popup
+### Phase 6 (v3.6) — Preview for RCM + Close-the-Loop (JIRA link → Done)
 
-A read-only presentation layer over data v3.4 already stores. **No external integration** — the user still hands off to L2S manually, exactly as today. This deliberately excludes JIRA creation and Impact Analysis, which move to V4 (see Phase 7).
+A presentation layer over data v3.4 already stores, plus the LPM's manual finish line. **No external integration** — the LPM still hands off to L2S manually, exactly as today.
 
-- **"Preview for RCM" button** on each Announcement row in the Review tab (label is intentionally *not* "Publish" — the action sends nothing).
-- Opens a **read-only modal** rendering `news_announcements.announcement_md` in the RCM / Law2Spec announcement template, with its **source links** resolved from `news_announcements.item_ids_json`.
-- An **"Open L2S"** link inside the modal opens L2S in a new browser tab (`target="_blank"`); the user copies/pastes manually. No API call, no JIRA, no external send.
-- **New route:** `GET /admin/announcement-template/<id>` (renders the template page/modal) — reuses existing `news_announcements` + source data; **no new DB columns**.
-- **Deferred to V4 (Phase 7):** JIRA Legal Change creation, announcement editing before hand-off, and Impact Analysis.
+- **"Preview for RCM" button** on each Announcement row (label is intentionally *not* "Publish" — it sends nothing).
+- Opens a **read-only modal** rendering `news_announcements.announcement_md` in the RCM / Law2Spec announcement template, with **source links** resolved from `news_announcements.item_ids_json`.
+- An **"Open L2S"** link opens L2S in a new browser tab (`target="_blank"`); the LPM copies/pastes manually.
+- **Close the loop (LPM finish line):** after publishing to RCM, the LPM pastes the **JIRA Legal Change number** onto the announcement and marks it **Done**. This *stamps the announcement complete* — the LPM's job is finished. Announcement status flows Published → Done.
+- **New DB (small):** `news_announcements.jira_legal_change TEXT` + `news_announcements.status TEXT` (e.g. draft/published/done). **New route:** `GET /admin/announcement-template/<id>` (template modal) + a small `POST` to save the JIRA number / status. No API to JIRA — manual paste.
+- **Deferred to V4:** automated JIRA Legal Change creation + auto-link + auto-stamp (the Announce Agent), announcement editing, and Impact Analysis.
 
 ---
 
-### Phase 7 (V4) — Announce Agent + Impact Agent
+### Phase 6.5 (v3.7) — Deprecate Legal Repository
 
-Two new agents that carry the work deliberately kept out of v3.6.
+The **Legal Repository** (regs → JIRA EPIC / SAP Notes knowledge base: `repo_nodes`/`repo_assets`, `admin/templates/legal_repo.html`, repo routes in `admin/app.py`, `loka_client.py`) predates v3 (shipped v2.30) and is **out of Legal Eagle's scope**. It is unrelated to the monitor→announce pipeline and was bundled in by mistake.
 
-- **Announce Agent** (`agents/announce_agent.py`, new): creates a JIRA Legal Change from announcement content — via **L2S or direct JIRA REST**. **The governance decision (which path is sanctioned) is made at V4 start** — there is no agreed direct L2S/RCM integration today, and direct JIRA-via-REST, while technically trivial, is politically unsanctioned. Also handles announcement editing before hand-off.
-- **Impact Agent** (`agents/impact_analyzer.py`, new): one AI call per announcement → structured impact report (affected products, before/after, expected solution) saved to `news_announcements.impact_analysis_md` (**new column, V4 migration**). **"Preview Analysis"** button on each Announcement row: AI on first click, cached thereafter, Copy MD → paste into the Law2Spec "Prompt" field.
-- **Spec:** `docs/superpowers/specs/2026-07-03-impact-analysis-agent.md` (update at V4 start — still references `news_aspects`, must be renamed to `news_announcements`).
-- Together with the v3.6 Preview and the v3.4 Announcement view, LPMs get both halves needed to author a Law2Spec epic.
+- **Retire it from Legal Eagle:** remove the Legal Repo UI + routes; drop it from the lifecycle diagram.
+- **Data first:** if any real repo data exists, export/migrate it before dropping the tables (or keep the tables dormant and only remove the UI — decide at v3.7 start).
+- Independent of the v3.6 announce/close-the-loop work.
+
+---
+
+### Phase 7 (V4) — Announce Agent + Impact Agent (on L2A capability-hub MCPs)
+
+Two new agents that automate what v3.6 does manually — built on **existing SAP L2A capability-hub MCPs/skills**, not from scratch, and **not** the deprecated in-app Legal Repo.
+
+- **Announce Agent** (`agents/announce_agent.py`, new): creates the JIRA Legal Change from the announcement and auto-links/stamps it Done (automating the v3.6 manual step). Uses the **sanctioned L2S/GLO path** — `l2s-prd-mcp` + the `glo-requirements-setup` skill — which resolves the earlier governance concern (no raw, unsanctioned JIRA REST). Also handles announcement editing before hand-off.
+- **Impact Agent** (`agents/impact_analyzer.py`, new): one AI call per announcement → structured impact report (affected products, before/after, expected solution) saved to `news_announcements.impact_analysis_md` (new column, V4 migration); **"Preview Analysis"** button (AI first click, cached thereafter, Copy MD). Grounded on **legal + technical knowledge from external SAP sources**, not the in-app Legal Repo.
+
+**Resources (owner-supplied; SAP-internal — verify/confirm mapping at V4 start):**
+- Announce / L2S write: `https://auth-proxy.daf98e7.kyma.ondemand.com/l2s-prd-mcp/mcp` (L2S PRD MCP); `glo-requirements-setup` skill (`github.tools.sap/law-to-action/l2a-capability-hub/blob/main/skills/glo-requirements-setup/SKILL.md`)
+- Impact / fit-gap: `glo-functional-spec-fitgap-generator` skill (`.../skills/glo-functional-spec-fitgap-generator/SKILL.md`)
+- Legal/requirements grounding: `https://glo-taxonomy-kg-mcp-server.daf98e7.kyma.ondemand.com/mcp` (GLO taxonomy KG); `https://sap-mcp-glorep-kg.cfapps.eu12.hana.ondemand.com/mcp-http` (GLO repo KG)
+- Technical grounding: SAP ABAP MCP; SAP Enterprise Knowledge Graph
+- Catalog: `https://pages.github.tools.sap/law-to-action/l2a-capability-hub/#mcp-servers`
+- **Spec:** write a fresh V4 spec at start (the old `docs/superpowers/specs/2026-07-03-impact-analysis-agent.md` references `news_aspects` and predates this MCP direction).
 
 ---
 
 ## 14. Version Naming
 
-Versions v3.0–v3.5 are **shipped**. v3.6 and V4 are targets — each is reached when its phase is fully delivered and tested.
+Versions v3.0–v3.5 are **shipped**. v3.6, v3.7, and V4 are targets — each is reached when its phase is fully delivered and tested.
 
 | Version | Phase | What it delivers |
 |---|---|---|
@@ -502,8 +519,9 @@ Versions v3.0–v3.5 are **shipped**. v3.6 and V4 are targets — each is reache
 | **v3.3** | Phase 3 | Email gated on rank ≥ 3; tagging replaces grouping; publish dates on cards. **Email V2 digest format** — AI newsletter grouped by Authority then Topic Label; Law2Spec Announcement-aligned structure; decoupled from run; Resend button; manual send from Review. **Test Harness v3.3:** adds `expected_email_eligible: true` assertions for rank ≥ 3 items; adds `expected_authority_group` assertions matching digest grouping. |
 | **v3.4** | Phase 4 | Challenge + grounding loop; self-improving Tier 1 rules; Re-rank action (F6). **Also pulled forward from Phase 6:** V2 digest wired into pipeline (`email_composer.generate_digest()` replaces old `email_sender` call); Review tab restructured into **Topic→Announcement→Sources** nested hierarchy (Option A: nested indent); clicking an Announcement renders `announcement_md` as markdown inline (intro, business need, sources). Terminology locked: Level 1 = Topic, Level 2 = Announcement (`news_announcements` table — renamed from `news_aspects`), Level 3 = Sources. **Test Harness v3.4:** pre-seeds one `ranking_grounding` row in baseline; asserts `news_announcements` table exists + has rows after run; asserts `human_rank_override` column exists. **Spec:** `docs/superpowers/specs/2026-09-05-v3-4-challenge-grounding-design.md` |
 | **v3.5** | Phase 5 | Glossary gap alert; inline "+ Add to Glossary" in Review UI. **Test Harness v3.5:** adds one item to `xn_feed_a_relevant.xml` with rank ≥ 3 + no glossary keyword match; asserts `expected_gap_badge: true` on that item. |
-| **v3.6** | Phase 6 | **Preview for RCM popup** — read-only modal rendering `announcement_md` in the RCM/Law2Spec template + source links (from `item_ids_json`) + an "Open L2S" link (new tab; manual paste). Button labelled "Preview for RCM" (not "Publish" — sends nothing). New route `GET /admin/announcement-template/<id>`; no new DB columns; no external integration. **Test Harness v3.6:** assert the template route returns the announcement and resolves its source links. |
-| **V4** | Phase 7 | **Announce Agent + Impact Agent.** *Announce Agent* (`agents/announce_agent.py`): JIRA Legal Change creation via L2S or direct JIRA REST — **governance decision made at V4 start** — plus announcement editing. *Impact Agent* (`agents/impact_analyzer.py`): per-announcement AI impact report saved to new `news_announcements.impact_analysis_md`; "Preview Analysis" button (AI first click, cached, Copy MD). Spec: `docs/superpowers/specs/2026-07-03-impact-analysis-agent.md` (update + rename `news_aspects`→`news_announcements` at V4 start). |
+| **v3.6** | Phase 6 | **Preview for RCM + close-the-loop.** Read-only modal rendering `announcement_md` in the RCM/Law2Spec template + source links (from `item_ids_json`) + an "Open L2S" link (new tab; manual paste). Button "Preview for RCM" (not "Publish"). **Close the loop:** LPM pastes the JIRA Legal Change # onto the announcement and marks it **Done** (status Published→Done) — the LPM's finish line. New: `news_announcements.jira_legal_change` + `status` columns; `GET /admin/announcement-template/<id>` + a POST to save JIRA #/status. No JIRA API — manual. **Test Harness v3.6:** template route returns announcement + resolves sources; JIRA #/status persist. |
+| **v3.7** | Phase 6.5 | **Deprecate Legal Repository.** Retire the out-of-scope regs→JIRA/SAP-Notes knowledge base (`repo_nodes`/`repo_assets`, `legal_repo.html`, repo routes, `loka_client.py`) from Legal Eagle; remove from the lifecycle diagram. Export/migrate any real data first (or keep tables dormant, remove UI only — decide at start). |
+| **V4** | Phase 7 | **Announce Agent + Impact Agent on L2A capability-hub MCPs.** *Announce Agent* (`agents/announce_agent.py`): auto-creates the JIRA Legal Change + auto-links/stamps Done via the **sanctioned L2S path** (`l2s-prd-mcp` + `glo-requirements-setup` skill) — resolves the raw-JIRA-REST governance concern. *Impact Agent* (`agents/impact_analyzer.py`): per-announcement AI impact report → `news_announcements.impact_analysis_md`; grounded on external SAP sources (`glo-functional-spec-fitgap-generator`, `glo-taxonomy-kg`, `sap-mcp-glorep-kg`, SAP ABAP MCP, SAP Enterprise KG) — **not** the in-app Legal Repo. Fresh V4 spec written at start. |
 
 ---
 
