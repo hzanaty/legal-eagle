@@ -82,7 +82,7 @@
   .yellow::before { background: #d29922; }
   .red::before    { background: #f85149; }
   .blue::before   { background: #58a6ff; }
-  .grey::before   { background: #484f58; }
+  .grey::before   { background: #e6edf3; }
 
   /* Substep group container */
   .substep-group {
@@ -274,11 +274,6 @@
     <!-- ③ Process -->
     <div class="substep-group">
       <div class="substep-label">③ Process</div>
-      <div class="substep grey" style="opacity:0.55" onclick="showDetail('filter')">
-        <div class="step-name">Filter</div>
-        <div class="step-sub">removed ✓ v3.1</div>
-      </div>
-      <div class="inner-arrow">›</div>
       <div class="substep green" onclick="showDetail('attribute')">
         <span class="actor agent" title="Agent"><svg class="ic"><use href="#ic-agent"/></svg></span>
         <div class="step-name">Attribute</div>
@@ -370,45 +365,40 @@
       <div class="db-tag db-r">R tweet_accounts</div>
       <div class="db-tag db-r">R crawl_urls</div>
     </div>
-    <div class="db-cell" onclick="showDetail('filter')">
-      <div class="db-step">③ Filter</div>
-      <div class="db-tag db-r">R glossary</div>
-      <div class="db-tag db-w" style="background:#0d2b13;color:#3fb950;border-color:#1a4a22;">filtered_news <span style="font-size:9px;">(removed ✓ v3.1)</span></div>
-    </div>
     <div class="db-cell" onclick="showDetail('attribute')">
-      <div class="db-step">④ Attribute</div>
+      <div class="db-step">③ Attribute</div>
       <div class="db-tag db-r">R authorities</div>
       <div class="db-tag db-w">W publisher</div>
       <div class="db-tag db-w">W authority_id</div>
     </div>
     <div class="db-cell" onclick="showDetail('compare')">
-      <div class="db-step">⑤ Compare</div>
+      <div class="db-step">④ Compare</div>
       <div class="db-tag db-r">R news_items</div>
       <div class="db-tag db-rw">R/W baseline</div>
     </div>
     <div class="db-cell" onclick="showDetail('rank')">
-      <div class="db-step">⑥ Rank</div>
+      <div class="db-step">⑤ Rank</div>
       <div class="db-tag db-r">R ranking_signals</div>
       <div class="db-tag db-r">R ranking_grounding</div>
     </div>
     <div class="db-cell" onclick="showDetail('tag')">
-      <div class="db-step">⑦ Tag</div>
+      <div class="db-step">⑥ Tag</div>
       <div class="db-tag db-r">R glossary_terms</div>
       <div class="db-tag db-w">W topic_label</div>
       <div class="db-tag db-w">W email_eligible</div>
     </div>
     <div class="db-cell" onclick="showDetail('translate')">
-      <div class="db-step">⑧ Translate</div>
+      <div class="db-step">⑦ Translate</div>
       <div class="db-tag db-w">W translations</div>
     </div>
     <div class="db-cell" onclick="showDetail('save-db')">
-      <div class="db-step">⑨ Save</div>
+      <div class="db-step">⑧ Save</div>
       <div class="db-tag db-w">W news_items</div>
       <div class="db-tag db-w">W rank, labels</div>
       <div class="db-tag db-w">W status, class</div>
     </div>
     <div class="db-cell" onclick="showDetail('email-send')">
-      <div class="db-step">⑩ Finish</div>
+      <div class="db-step">⑨ Finish</div>
       <div class="db-tag db-r">R news_items</div>
       <div class="db-tag db-w">W last_fetch_date</div>
       <div class="db-tag db-w">W runs</div>
@@ -629,16 +619,6 @@ const details = {
       { heading: 'What it does', items: ['Monitors Gmail inbox via IMAP', 'Looks for Law-to-Spec regulatory updates', 'Parses email body into structured news items'] },
       { heading: 'Key file', items: ['agents/email_inbox_parser.py', 'fetch_monitor_updates() → items'] },
       { heading: 'Dependencies', items: ['imaplib (IMAP protocol)', 'email (Python stdlib)', 'LEGAL_EAGLE_GMAIL_EMAIL_SENDER + APP_PASSWORD'] },
-    ]
-  },
-  'filter': {
-    title: 'News Filter (Binary AI Gate)',
-    subtitle: 'Removed ✓ v3.1 — replaced by 3-tier Ranker (v3.2)',
-    tag: 'green', tagLabel: 'Removed ✓ v3.1',
-    cols: [
-      { heading: 'What it did (v2)', items: ['Sent each item to GPT-4o for yes/no relevance', 'Used glossary keywords as context', 'Hard dropped irrelevant items — no audit trail', '8 known bugs flagged in v3 spec'] },
-      { heading: 'v3.1 shipped', items: ['agents/news_filter.py DELETED', 'All in-date items now pass to comparison → Review', 'Ranker (agents/news_ranker.py) replaces it in v3.2'] },
-      { heading: 'Why removed', items: ['Binary gate loses borderline items permanently', 'No explainability — black box decision', 'Cannot learn from human overrides', 'Replaced by graded 1–5 rank with full audit trail'] },
     ]
   },
   'attribute': {
