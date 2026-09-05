@@ -1935,6 +1935,9 @@ def admin_review_news(profile_id: int):
     
     # Get news items with combined view
     items = list_all_news_for_review(conn, profile_id, source=source, reviewed=reviewed, limit=per_page, offset=offset)
+
+    # v3.5: count glossary-gap items on this page (drives the gap alert strip)
+    gap_count = sum(1 for i in items if i.get("is_gap"))
     
     # Calculate pagination
     filtered_count_for_pagination = count_all_news_for_review(conn, profile_id, source=source, reviewed=reviewed)
@@ -2011,6 +2014,7 @@ def admin_review_news(profile_id: int):
         profile_id=profile_id,
         topics=topics,
         latest_run_id=latest_run_id,
+        gap_count=gap_count,
     )
 
 
@@ -2027,6 +2031,93 @@ def set_news_item_authority(profile_id: int, item_id: int):
         )
     conn.close()
     return redirect(url_for("admin_review_news", profile_id=profile_id))
+
+
+@app.route("/admin/profiles/<int:profile_id>/glossary/suggest", methods=["POST"])
+def suggest_glossary_keywords(profile_id: int):
+    """v3.5: Return AI-suggested glossary terms for a glossary-gap item.
+
+    Best-effort: falls back to capitalized-phrase extraction from the title if
+    the AI call fails or is unavailable.
+    """
+    data = request.get_json(force=True, silent=True) or {}
+    item_id = data.get("item_id")
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            "SELECT title, content FROM news_items WHERE id=? AND profile_id=?",
+            (item_id, profile_id),
+        ).fetchone()
+    finally:
+        conn.close()
+    if not row:
+        return jsonify({"ok": False, "error": "item not found"}), 404
+
+    text = f"{row['title'] or ''} {row['content'] or ''}"[:1500]
+    suggestions = []
+    try:
+        import json as _json
+        from agents.sap_ai_client import create_sap_aicore_client
+        client = create_sap_aicore_client()
+        prompt = (
+            "You are a glossary curator for HR/Labour-law compliance monitoring.\n"
+            "Extract 3-5 short glossary terms (2-4 words each) from the article below "
+            "that could classify this article for future monitoring.\n"
+            'Return ONLY a JSON array of strings, e.g. ["term one", "term two"].\n\n'
+            f"Article: {text}"
+        )
+        resp = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=200,
+        )
+        raw = (resp.choices[0].message.content or "").strip()
+        import re as _re
+        match = _re.search(r"\[.*\]", raw, _re.DOTALL)
+        parsed = _json.loads(match.group()) if match else _json.loads(raw)
+        suggestions = [str(s).strip() for s in parsed if str(s).strip()][:5]
+    except Exception:
+        import re as _re
+        suggestions = list(dict.fromkeys(
+            _re.findall(r"\b[A-Z][a-z]+(?: [A-Z][a-z]+)*\b", row["title"] or "")
+        ))[:5]
+
+    return jsonify({"ok": True, "suggestions": suggestions})
+
+
+@app.route("/admin/news/<int:item_id>/add-to-glossary", methods=["POST"])
+def add_news_item_to_glossary(item_id: int):
+    """v3.5: Add a term, re-tag the item, and clear its glossary_gap flag atomically."""
+    from configurations.db import add_glossary_term
+    from agents.news_tagger import tag_items, save_topic_labels
+    data = request.get_json(force=True, silent=True) or {}
+    term = (data.get("term") or "").strip()
+    category = (data.get("category") or "").strip() or None
+    if not term:
+        return jsonify({"ok": False, "error": "term required"}), 400
+
+    conn = get_connection()
+    try:
+        row = conn.execute("SELECT * FROM news_items WHERE id=?", (item_id,)).fetchone()
+        if not row:
+            return jsonify({"ok": False, "error": "item not found"}), 404
+        item = dict(row)
+        pid = item["profile_id"]
+
+        term_id = add_glossary_term(conn, pid, term, "en", category)
+        tag_items([item], conn, pid)
+        save_topic_labels([item], conn, pid)
+        conn.execute("UPDATE news_items SET glossary_gap=0 WHERE id=?", (item_id,))
+        conn.commit()
+        add_audit_log(conn, entity="glossary_terms", action="add_from_gap",
+                      details=f"term={term} item_id={item_id} term_id={term_id}",
+                      profile_id=pid)
+        return jsonify({"ok": True, "term_id": term_id, "new_topic_label": item.get("topic_label")})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"ok": False, "error": str(e)}), 500
+    finally:
+        conn.close()
 
 
 @app.route("/admin/profiles/<int:profile_id>/review/score", methods=["POST"])
