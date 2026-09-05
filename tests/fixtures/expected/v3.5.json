@@ -1,0 +1,27 @@
+{
+  "version": "v3.5",
+  "base": "v3.4",
+  "description": "Glossary Gap Alert. Delta over v3.4 — glossary_gap column + pipeline gap detection.",
+  "assertions": [
+    {
+      "type": "column_exists",
+      "table": "news_items",
+      "column": "glossary_gap",
+      "description": "news_items.glossary_gap column exists"
+    },
+    {
+      "type": "item_outcome",
+      "title_contains": "workplace safety compliance update",
+      "expect_table": "news_items",
+      "fields": {"glossary_gap": "1"},
+      "description": "A5 workplace safety — rank >= 3 (Tier-1 min_rank=4) + no glossary match -> glossary_gap=1"
+    },
+    {
+      "type": "item_outcome",
+      "title_contains": "maternity leave",
+      "expect_table": "news_items",
+      "fields": {"glossary_gap": "0"},
+      "description": "A1 maternity leave — has glossary match -> glossary_gap=0"
+    }
+  ]
+}
