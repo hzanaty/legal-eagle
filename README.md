@@ -40,13 +40,16 @@ Legal Eagle automatically:
 |------------|-------------|
 | **Multi-Source Collection** | RSS feeds, Twitter/X, government websites (static + dynamic), email monitoring |
 | **AI-Powered Filtering** | SAP AI Core (GPT-4o) semantic relevance evaluation |
-| **Smart Deduplication** | Detects duplicate news and updates to previously reported items |
-| **Intelligent Grouping** | AI clusters related news by regulatory theme |
+| **Smart Deduplication** | Detects duplicate news and updates to previously reported items; REPEATED tag for persistent signals |
+| **Three-Tier Ranking Engine** | Deterministic rules (Tier 1) + GPT-4o AI scoring (Tier 2); 1=Noise → 5=Urgent; REPEATED tag elevates rank for recurring topics |
+| **Source Attribution** | Publisher + Authority stamped per item from feed config; AI inference for unconfigured feeds; ✦ icon + manual override UI |
+| **Intelligent Grouping** | AI clusters related news by regulatory theme (replaced by keyword tagging in v3.3) |
 | **Multi-Profile Support** | Country + Line of Business combinations (SA/HCM, TR/HCM, ES/HCM, GR/HCM, etc.) |
 | **Bilingual Digests** | Native language + English translation in single email |
 | **Human-in-the-Loop** | Review/score workflow continuously improves accuracy |
 | **Specialized Scrapers** | Custom support for Turkey Official Gazette, Saudi GOSI, and more |
 | **Legal Repository** | Global knowledge base linking regulations → SAP delivery artifacts (JIRA, Notes, PRDs) |
+| **Test Harness** | Deterministic integration tests (XN/HCM imaginary profile, localhost fixture server, AI cache replay) |
 | **BTP Email via ANS** | SAP Alert Notification Service handles outbound email on BTP Cloud Foundry *(disabled — re-enable on next BTP deployment)* |
 
 ### Supported Regions & Domains
@@ -58,7 +61,7 @@ Legal Eagle automatically:
 
 **Current Deployments**: Saudi Arabia, Turkey, Spain, UAE, Greece (more countries being added)
 
-📋 **Technical Details**: See [SPEC.md](SPEC.md) for complete v2.32 architecture
+📋 **Technical Details**: See [SPEC.md](SPEC.md) for complete technical architecture
 
 ---
 
@@ -269,23 +272,25 @@ Each profile allows you to configure:
    ├─> Websites (static + dynamic with Playwright)
    └─> Email Inbox (Law-to-Spec monitoring)
 
-2. FILTER (AI)
-   └─> SAP AI Core evaluates relevance (0.0-1.0 score)
-       Uses country/LoB context + glossary terms
+2. ATTRIBUTE
+   └─> Publisher + Authority stamped from feed config or AI inference
 
 3. COMPARE (Deduplication)
-   └─> Match against 7-day baseline
-       Detect: new items, updated items, unchanged
+   └─> Match against baseline
+       Detect: new items, updated items, repeated (×3+), duplicates
 
-4. GROUP (AI)
-   └─> Cluster related items by theme
-       Generate summaries per group
+4. RANK
+   └─> Three-tier engine: Tier 0 duplicate (rank 0), Tier 1 keyword rules,
+       Tier 2 GPT-4o AI scoring (1=Noise → 5=Urgent)
 
-5. EMAIL (Conditional)
+5. GROUP (AI)
+   └─> Cluster related items by theme (replaced by keyword tagging in v3.3)
+
+6. EMAIL (Conditional)
    └─> Bilingual HTML digest (native + English)
        Skip if no new/updated items
 
-6. BASELINE UPDATE
+7. BASELINE UPDATE
    └─> Store new items for future comparison
 ```
 

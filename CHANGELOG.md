@@ -1,5 +1,76 @@
 # CHANGELOG
 
+## v3.2 — 2026-09-05
+### Ranking Engine + Attribution AI
+
+- **Three-tier ranking engine** (`agents/news_ranker.py` — new): Tier 0 DUPLICATE passthrough (rank 0, skips both tiers); Tier 1 deterministic keyword/regex rules from `ranking_signals` DB table; Tier 2 GPT-4o AI scoring (1–5) with few-shot grounding from `ranking_grounding` table. All AI calls wrapped via `ai_cache.py` for deterministic harness replay.
+- **REPEATED tag** (`agents/compare_news.py`): items whose entity fingerprint has appeared in ≥3 prior runs get `repetition_tag='repeated'`; rank auto-elevated +1 (cap 5).
+- **Attribution AI inference path** (`agents/authority_attributor.py`): feeds with no configured `authority_id` call GPT-4o with (title, content, authorities list) → best-match authority stamped as `authority_status='inferred'`.
+- **Review UI**: rank badges (0–5 colour-coded circles), ✦ spark icon on inferred-attribution items, inline authority override dropdown on inferred items.
+- **RANK pipeline stage** (`agents/agents_controller.py`): inserted after COMPARE; runs on all items including duplicates; upserts rank fields back to DB via `add_news_item()` upsert pattern.
+- **Test Harness v3.2**: 19/19 pass (3 skipped — pending AI cache recording run for attribution + semantic-dedup assertions).
+- **New DB**: 5 new columns on `news_items` (`significance_rank`, `rank_tier`, `rank_reasoning`, `repetition_tag`, `repetition_count`); 2 new tables (`ranking_signals`, `ranking_grounding`).
+
+**Files Changed:**
+- `agents/news_ranker.py` — NEW three-tier ranking engine
+- `agents/compare_news.py` — REPEATED tag + repetition_count
+- `agents/authority_attributor.py` — AI inference path (authority_status='inferred')
+- `agents/agents_controller.py` — ATTRIBUTE wires db_conn; RANK stage after COMPARE
+- `configurations/db.py` — 5 new columns + 2 new tables
+- `admin/app.py` — authority override POST route
+- `admin/templates/review_news.html` — rank badges, ✦ icon, authority override dropdown
+- `tests/fixtures/expected/v3.2.json` — NEW (22 assertions)
+- `tests/run_harness.py` — ai_available requires both emb + chat cache
+- `docs/lifecycle.html` — Rank step resolved to green
+
+---
+
+## v3.1 — 2026-09-05
+### First Pipeline-Touching Release — Harness-First
+
+- **Structural fixes B1–B8**: age gate restored (was filtering in-date items), baseline anchor fixed, category bug resolved, OTHER category suppressed, missing publish date surfaced (`published_at` field), binary filter removed (items scored not deleted), hash fingerprint for exact dedup, translation layer decoupled.
+- **F1–F5 features**: per-source `last_successful_fetch` (null = new source → fallback to date_scope), pre-run health check (parallel Gmail/AI Core/DB — hard block on failure), `runs.error_step`/`error_message` for per-stage error capture, immediate stop via threading event, force-fetch bounded by `date_scope` (re-fetched items score as DUPLICATE rank 0).
+- **Source Simulator** (`tests/server.py` — new): localhost:9999 static HTTP server serving fixture XML feeds; enables fully offline harness runs.
+- **Run All Active backend**: sequential profile thread with SSE live-row status updates per profile; skip-on-failure.
+- **ATTRIBUTE pipeline stage** (`agents/authority_attributor.py` — new): stamps `publisher` + `authority_id` from feed config onto every collected item (`authority_status='configured'`).
+- **Test Harness v3.1**: 23/23 pass — first full pipeline run against XN/HCM imaginary profile with real dedup + attribution assertions.
+
+**Files Changed:**
+- `agents/agents_controller.py` — structural fixes; ATTRIBUTE stage; Run All Active backend
+- `agents/compare_news.py` — B1/B3/B6/B8 fixes; publisher/authority fields in item record
+- `agents/authority_attributor.py` — NEW configured attribution path
+- `configurations/db.py` — publisher/authority columns on news_items; authorities table
+- `configurations/config_loader.py` — authority config helpers
+- `admin/app.py` — Run All Active SSE; F3 error capture
+- `tests/run_harness.py` — v3.1 harness function
+- `tests/server.py` — NEW fixture server
+- `tests/reset_and_seed.py` — XN/HCM profile + ranking_signals seed
+- `tests/assertions.py` — publisher/authority/dedup assertion types
+- `tests/fixtures/` — 4 RSS feed XML files + expected/v3.1.json
+
+---
+
+## v3.0 — 2026-09-04
+### Admin UI Overhaul + Source Attribution Config + Test Harness Foundation
+
+- **Admin UI redesign**: FCL 3-state layout — Configure / Run / Review tabs replace the previous single-page scroll. Per-tab content panels with persistent tab state.
+- **Run All Active UI**: one-click multi-profile runner button on the dashboard; per-profile status pills; toast notification on trigger (backend wired in v3.1).
+- **Source Attribution config**: new `authorities` DB table + Authorities CRUD section in Configure tab; RSS feed add/edit forms extended with Publisher and Authority dropdowns; "Channel" replaces "Source Type" label in Review UI.
+- **Test Harness v3.0** (`tests/run_harness.py` — new): DB schema verification only — seeds XN/HCM imaginary profile (Xanadu, Finland/HCM) and asserts required tables + columns exist.
+- **Repo cleanup**: `Roadmap/` directory for pipeline redesign spec; `docs/lifecycle.html` pipeline lifecycle diagram added; `.claude/` added to `.gitignore`.
+
+**Files Changed:**
+- `admin/app.py` — FCL tab routing; authorities CRUD routes; Run All Active trigger
+- `admin/templates/` — base.html FCL layout; profile.html Configure tab; run_status.html Run tab; review_news.html Review tab (Channel rename)
+- `configurations/db.py` — authorities table
+- `tests/run_harness.py` — NEW (v3.0 schema assertions)
+- `tests/reset_and_seed.py` — NEW (XN/HCM profile seed)
+- `tests/assertions.py` — NEW (assertion runner)
+- `docs/lifecycle.html` — NEW pipeline lifecycle diagram
+- `Roadmap/v3-pipeline-redesign.md` — NEW pipeline redesign spec
+
+---
+
 ## v2.32 — 2026-06-28
 ### ANS Disabled (Non-BTP Mode) + ANS OAuth Fix + Gitignore Cleanup
 
