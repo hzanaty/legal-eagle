@@ -56,7 +56,7 @@
   .step {
     border-radius: 8px;
     border: 1.5px solid #21262d;
-    padding: 10px 12px;
+    padding: 19px 12px 10px;
     cursor: pointer;
     transition: all 0.15s ease;
     flex-shrink: 0;
@@ -78,7 +78,7 @@
     height: 3px;
     border-radius: 6px 6px 0 0;
   }
-  .green::before  { background: #3fb950; }
+  .green::before  { background: #e6edf3; }
   .yellow::before { background: #d29922; }
   .red::before    { background: #f85149; }
   .blue::before   { background: #58a6ff; }
@@ -112,7 +112,7 @@
   .substep {
     border-radius: 6px;
     border: 1px solid #30363d;
-    padding: 6px 9px;
+    padding: 19px 9px 6px;
     cursor: pointer;
     transition: all 0.15s;
     text-align: center;
@@ -123,6 +123,13 @@
   .substep:hover { border-color: #58a6ff; transform: translateY(-1px); }
   .substep .step-name { font-size: 11px; }
   .substep .step-sub  { font-size: 9px; }
+
+  /* Actor badge — Human / Agent / System / Database (v3.6 doc) */
+  .actor { position:absolute; top:3px; right:4px; padding:1px; border-radius:5px;
+           background:#161b22; border:1px solid #30363d; display:inline-flex; line-height:0; }
+  .actor .ic { width:11px; height:11px; fill:none; stroke:currentColor; stroke-width:2;
+               stroke-linecap:round; stroke-linejoin:round; }
+  .actor.human{color:#c77dff}.actor.agent{color:#58a6ff}.actor.system{color:#7d8590}.actor.db{color:#3fb950}
 
   .inner-arrow { font-size: 14px; color: #484f58; flex-shrink: 0; }
 
@@ -169,43 +176,40 @@
 </head>
 <body>
 
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="ic-human" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></symbol>
+  <symbol id="ic-agent" viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="11" rx="3"/><circle cx="9.5" cy="13.5" r="1.4"/><circle cx="14.5" cy="13.5" r="1.4"/><path d="M12 4v4"/><circle cx="12" cy="3" r="1"/><path d="M4 12.5H2.5M20 12.5h1.5"/></symbol>
+  <symbol id="ic-system" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.1 5.1l2.1 2.1M16.8 16.8l2.1 2.1M18.9 5.1l-2.1 2.1M7.2 16.8l-2.1 2.1"/></symbol>
+  <symbol id="ic-db" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="7.5" ry="3"/><path d="M4.5 5v14c0 1.66 3.36 3 7.5 3s7.5-1.34 7.5-3V5"/><path d="M4.5 12c0 1.66 3.36 3 7.5 3s7.5-1.34 7.5-3"/></symbol>
+</defs></svg>
+
 <h1>Legal Eagle — System Lifecycle</h1>
 <p class="tagline">v3.5 shipped &nbsp;·&nbsp; v3.6 planned &nbsp;·&nbsp; Click any step for details</p>
-
-<div class="legend">
-  <span style="font-size:11px;color:#484f58;text-transform:uppercase;letter-spacing:1px;margin-right:4px;">Phases</span>
-  <div class="leg"><div class="dot" style="background:#c77dff"></div> Setup</div>
-  <div class="leg"><div class="dot" style="background:#4a6fa5"></div> Run</div>
-  <div class="leg"><div class="dot" style="background:#80b9ad"></div> Review</div>
-  <span style="width:1px;background:#30363d;height:14px;margin:0 8px;display:inline-block"></span>
-  <span style="font-size:11px;color:#484f58;text-transform:uppercase;letter-spacing:1px;margin-right:4px;">v3 Status</span>
-  <div class="leg"><div class="dot green"></div> Stable / shipped</div>
-  <div class="leg"><div class="dot yellow"></div> Modified (pending)</div>
-  <div class="leg"><div class="dot red"></div> Removed (pending)</div>
-  <div class="leg"><div class="dot blue"></div> New (pending)</div>
-  <div class="leg"><div class="dot grey"></div> UI only</div>
-</div>
 
 <!-- SETUP -->
 <div class="phase-block">
   <div class="phase-header setup">Setup</div>
   <div class="steps">
     <div class="step grey" onclick="showDetail('profile-config')">
+      <span class="actor human" title="Human"><svg class="ic"><use href="#ic-human"/></svg></span>
       <div class="step-name">Profile Config</div>
       <div class="step-sub">Admin UI</div>
     </div>
     <div class="inner-arrow">›</div>
     <div class="step grey" onclick="showDetail('glossary')">
+      <span class="actor human" title="Human"><svg class="ic"><use href="#ic-human"/></svg></span>
       <div class="step-name">Glossary</div>
       <div class="step-sub">Terms &amp; synonyms</div>
     </div>
     <div class="inner-arrow">›</div>
     <div class="step grey" onclick="showDetail('sources')">
+      <span class="actor human" title="Human"><svg class="ic"><use href="#ic-human"/></svg></span>
       <div class="step-name">Sources</div>
       <div class="step-sub">RSS / Twitter / URL</div>
     </div>
     <div class="inner-arrow">›</div>
     <div class="step grey" onclick="showDetail('receivers')">
+      <span class="actor human" title="Human"><svg class="ic"><use href="#ic-human"/></svg></span>
       <div class="step-name">Email Receivers</div>
       <div class="step-sub">Language per recipient</div>
     </div>
@@ -223,11 +227,13 @@
     <div class="substep-group">
       <div class="substep-label">① Start</div>
       <div class="substep grey" onclick="showDetail('run-select')">
+        <span class="actor human" title="Human"><svg class="ic"><use href="#ic-human"/></svg></span>
         <div class="step-name">Select Profile</div>
         <div class="step-sub">Manual / Scheduled</div>
       </div>
       <div class="inner-arrow">›</div>
       <div class="substep green" onclick="showDetail('health-check')">
+        <span class="actor system" title="System"><svg class="ic"><use href="#ic-system"/></svg></span>
         <div class="step-name">Health Check</div>
         <div class="step-sub">APIs + Gmail + DB · v3.1</div>
       </div>
@@ -239,21 +245,25 @@
     <div class="substep-group">
       <div class="substep-label">② Collect</div>
       <div class="substep green" onclick="showDetail('rss')">
+        <span class="actor agent" title="Agent"><svg class="ic"><use href="#ic-agent"/></svg></span>
         <div class="step-name">RSS</div>
         <div class="step-sub">feedparser</div>
       </div>
       <div class="inner-arrow">›</div>
       <div class="substep green" onclick="showDetail('twitter')">
+        <span class="actor agent" title="Agent"><svg class="ic"><use href="#ic-agent"/></svg></span>
         <div class="step-name">Twitter</div>
         <div class="step-sub">API v2</div>
       </div>
       <div class="inner-arrow">›</div>
       <div class="substep green" onclick="showDetail('url-scrape')">
+        <span class="actor agent" title="Agent"><svg class="ic"><use href="#ic-agent"/></svg></span>
         <div class="step-name">URL Scrape</div>
         <div class="step-sub">req + Playwright · v3.1</div>
       </div>
       <div class="inner-arrow">›</div>
       <div class="substep green" onclick="showDetail('email-inbox')">
+        <span class="actor agent" title="Agent"><svg class="ic"><use href="#ic-agent"/></svg></span>
         <div class="step-name">Email Inbox</div>
         <div class="step-sub">IMAP / Gmail</div>
       </div>
@@ -264,37 +274,43 @@
     <!-- ③ Process -->
     <div class="substep-group">
       <div class="substep-label">③ Process</div>
-      <div class="substep green" onclick="showDetail('filter')">
+      <div class="substep grey" style="opacity:0.55" onclick="showDetail('filter')">
         <div class="step-name">Filter</div>
         <div class="step-sub">removed ✓ v3.1</div>
       </div>
       <div class="inner-arrow">›</div>
       <div class="substep green" onclick="showDetail('attribute')">
+        <span class="actor agent" title="Agent"><svg class="ic"><use href="#ic-agent"/></svg></span>
         <div class="step-name">Attribute</div>
         <div class="step-sub">Publisher + Authority · v3.2 ✓</div>
       </div>
       <div class="inner-arrow">›</div>
       <div class="substep green" onclick="showDetail('compare')">
+        <span class="actor agent" title="Agent"><svg class="ic"><use href="#ic-agent"/></svg></span>
         <div class="step-name">Compare</div>
         <div class="step-sub">Dedup + classify · v3.1</div>
       </div>
       <div class="inner-arrow">›</div>
       <div class="substep green" onclick="showDetail('rank')">
+        <span class="actor agent" title="Agent"><svg class="ic"><use href="#ic-agent"/></svg></span>
         <div class="step-name">Rank</div>
         <div class="step-sub">3-tier engine · v3.2 ✓</div>
       </div>
       <div class="inner-arrow">›</div>
       <div class="substep green" onclick="showDetail('tag')">
+        <span class="actor agent" title="Agent"><svg class="ic"><use href="#ic-agent"/></svg></span>
         <div class="step-name">Tag</div>
         <div class="step-sub">Glossary labels · v3.3</div>
       </div>
       <div class="inner-arrow">›</div>
       <div class="substep green" onclick="showDetail('translate')">
+        <span class="actor agent" title="Agent"><svg class="ic"><use href="#ic-agent"/></svg></span>
         <div class="step-name">Translate</div>
         <div class="step-sub">SAP AI Core · v3.1</div>
       </div>
       <div class="inner-arrow">›</div>
       <div class="substep green" onclick="showDetail('save-db')">
+        <span class="actor db" title="Database"><svg class="ic"><use href="#ic-db"/></svg></span>
         <div class="step-name">Save to DB</div>
         <div class="step-sub">items + announcements · v3.3</div>
       </div>
@@ -306,16 +322,19 @@
     <div class="substep-group">
       <div class="substep-label">④ Finish</div>
       <div class="substep green" onclick="showDetail('email-send')">
+        <span class="actor agent" title="Agent"><svg class="ic"><use href="#ic-agent"/></svg></span>
         <div class="step-name">Send Email</div>
         <div class="step-sub">V2 digest · v3.3</div>
       </div>
       <div class="inner-arrow">›</div>
       <div class="substep green" onclick="showDetail('baseline')">
+        <span class="actor db" title="Database"><svg class="ic"><use href="#ic-db"/></svg></span>
         <div class="step-name">Update Baseline</div>
         <div class="step-sub">SQLite store · v3.1</div>
       </div>
       <div class="inner-arrow">›</div>
       <div class="substep grey" onclick="showDetail('log-monitor')">
+        <span class="actor system" title="System"><svg class="ic"><use href="#ic-system"/></svg></span>
         <div class="step-name">Log Monitor</div>
         <div class="step-sub">Live SSE stream</div>
       </div>
@@ -406,31 +425,43 @@
   <div class="phase-header review">Review</div>
   <div class="steps">
     <div class="step grey" onclick="showDetail('review-news')">
+      <span class="actor human" title="Human"><svg class="ic"><use href="#ic-human"/></svg></span>
       <div class="step-name">Review News</div>
       <div class="step-sub">Score + bulk actions</div>
     </div>
     <div class="inner-arrow">›</div>
     <div class="step green" onclick="showDetail('challenge')">
+      <span class="actor human" title="Human"><svg class="ic"><use href="#ic-human"/></svg></span>
       <div class="step-name">Challenge Rank</div>
       <div class="step-sub">Override + grounding</div>
     </div>
     <div class="inner-arrow">›</div>
     <div class="step green" onclick="showDetail('glossary-gap')">
+      <span class="actor human" title="Human"><svg class="ic"><use href="#ic-human"/></svg></span>
       <div class="step-name">Glossary Gap</div>
       <div class="step-sub">Gap badge · v3.5</div>
     </div>
     <div class="inner-arrow">›</div>
-    <div class="step blue" onclick="showDetail('rcm-publish')">
+    <div class="step red" onclick="showDetail('rcm-publish')">
+      <span class="actor human" title="Human"><svg class="ic"><use href="#ic-human"/></svg></span>
       <div class="step-name">Preview for RCM</div>
       <div class="step-sub">RCM template popup · v3.6</div>
     </div>
     <div class="inner-arrow">›</div>
-    <div class="step blue" onclick="showDetail('impact-analysis')">
+    <div class="step red" onclick="showDetail('announce-agent')">
+      <span class="actor agent" title="Agent"><svg class="ic"><use href="#ic-agent"/></svg></span>
+      <div class="step-name">Announce Agent</div>
+      <div class="step-sub">Write → JIRA · V4</div>
+    </div>
+    <div class="inner-arrow">›</div>
+    <div class="step red" onclick="showDetail('impact-analysis')">
+      <span class="actor agent" title="Agent"><svg class="ic"><use href="#ic-agent"/></svg></span>
       <div class="step-name">Impact Analysis</div>
       <div class="step-sub">AI per aspect · V4</div>
     </div>
     <div class="inner-arrow">›</div>
     <div class="step grey" onclick="showDetail('legal-repo')">
+      <span class="actor human" title="Human"><svg class="ic"><use href="#ic-human"/></svg></span>
       <div class="step-name">Legal Repo</div>
       <div class="step-sub">Map to JIRA / SAP Notes</div>
     </div>
@@ -733,20 +764,29 @@ const details = {
   },
   'rcm-publish': {
     title: 'Preview for RCM',
-    subtitle: 'Planned v3.6 — read-only RCM-template popup + source links + Open-L2S link',
-    tag: 'blue', tagLabel: 'Planned v3.6',
+    subtitle: 'Planned v3.6 — read-only RCM-template popup + source links + Open-L2S link (human verify step)',
+    tag: 'red', tagLabel: 'Planned v3.6',
     cols: [
-      { heading: 'What it does', items: ['"Preview for RCM" button per Announcement row (sends nothing — not "Publish")', 'Read-only modal renders announcement_md in the RCM / Law2Spec template', 'Lists source links resolved from news_announcements.item_ids_json', '"Open L2S" link opens L2S in a new tab — user copies/pastes manually (as today)', 'No API call, no JIRA, no external send — integration is deferred to V4 (Announce Agent)'] },
+      { heading: 'What it does', items: ['Human-in-the-loop verification step — precedes the V4 Announce Agent write', '"Preview for RCM" button per Announcement row (sends nothing — not "Publish")', 'Read-only modal renders announcement_md in the RCM / Law2Spec template', 'Lists source links resolved from news_announcements.item_ids_json', '"Open L2S" link opens L2S in a new tab — user copies/pastes manually (as today)', 'No API call, no JIRA, no external send — integration is deferred to V4 (Announce Agent)'] },
       { heading: 'Key files (planned)', items: ['admin/app.py — GET /admin/announcement-template/&lt;id&gt;', 'admin/templates/review_news.html — Preview modal'] },
     ]
   },
-  'impact-analysis': {
-    title: 'Impact + Announce Agents',
-    subtitle: 'Planned V4 — new Impact Agent (AI impact) + Announce Agent (JIRA hand-off)',
-    tag: 'blue', tagLabel: 'Planned V4',
+  'announce-agent': {
+    title: 'Announce Agent',
+    subtitle: 'Planned V4 — agent write step: create JIRA Legal Change from the announcement',
+    tag: 'red', tagLabel: 'Planned V4',
     cols: [
-      { heading: 'What it does', items: ['Impact Agent: AI call per announcement → structured impact report (affected products, before/after, expected solution)', 'Cached to news_announcements.impact_analysis_md (new V4 column) on first use', '"Preview Analysis" button: AI first click, cached thereafter, Copy MD → Law2Spec Prompt field', 'Announce Agent: JIRA Legal Change creation via L2S or direct API — governance decision made at V4 start', 'Announcement editing before hand-off'] },
-      { heading: 'Key files (planned)', items: ['agents/impact_analyzer.py (new)', 'agents/announce_agent.py (new)', 'admin/app.py — impact + announce routes', 'Spec: docs/superpowers/specs/2026-07-03-impact-analysis-agent.md (rename news_aspects→news_announcements)'] },
+      { heading: 'What it does', items: ['Runs AFTER the human "Preview for RCM" verification step (human-in-loop → agent write)', 'Creates a JIRA Legal Change from the announcement content', 'Path (L2S vs direct JIRA REST) is the governance decision made at V4 start', 'Announcement editing before hand-off'] },
+      { heading: 'Key files (planned)', items: ['agents/announce_agent.py (new)', 'admin/app.py — announce route', 'admin/templates/review_news.html — Announce button (after Preview)'] },
+    ]
+  },
+  'impact-analysis': {
+    title: 'Impact Agent',
+    subtitle: 'Planned V4 — AI product impact analysis per announcement',
+    tag: 'red', tagLabel: 'Planned V4',
+    cols: [
+      { heading: 'What it does', items: ['AI call per announcement → structured impact report (affected products, before/after, expected solution)', 'Cached to news_announcements.impact_analysis_md (new V4 column) on first use', '"Preview Analysis" button: AI first click, cached thereafter, Copy MD → Law2Spec Prompt field'] },
+      { heading: 'Key files (planned)', items: ['agents/impact_analyzer.py (new)', 'admin/app.py — impact route', 'Spec: docs/superpowers/specs/2026-07-03-impact-analysis-agent.md (rename news_aspects→news_announcements)'] },
     ]
   },
   'legal-repo': {
