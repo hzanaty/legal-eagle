@@ -43,6 +43,13 @@
     {"type": "item_outcome", "title_contains": "payroll compliance deadline extended",
      "expect_table": "news_items",
      "fields": {"email_eligible": "0"},
-     "description": "R2 duplicate (rank 0) → email_eligible=0"}
+     "description": "R2 duplicate (rank 0) → email_eligible=0"},
+
+    {"type": "news_aspects_entry", "topic_label": "maternity leave",
+     "description": "news_aspects has maternity leave group (A1)"},
+    {"type": "news_aspects_entry", "topic_label": "pension fund",
+     "description": "news_aspects has pension fund group (A4)"},
+    {"type": "news_aspects_entry", "topic_label": "health insurance",
+     "description": "news_aspects has health insurance group (C4)", "requires_ai": true}
   ]
 }

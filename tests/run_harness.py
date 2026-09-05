@@ -144,6 +144,21 @@ def run_v3_3():
             skip_email=True,
         )
 
+        # Populate news_aspects so content assertions can run.
+        import sqlite3 as _sqlite3
+        from configurations.db import create_run
+        _conn = get_connection(TEST_DB_PATH)
+        _conn.row_factory = _sqlite3.Row
+        _run_id = create_run(_conn, pid, origin="harness")
+        _items = _conn.execute(
+            "SELECT * FROM news_items WHERE profile_id=? AND email_eligible=1", (pid,)
+        ).fetchall()
+        if _items:
+            from agents.email_composer import generate_digest
+            print(f"[RUN] generate_digest({len(_items)} eligible items) for news_aspects…")
+            generate_digest([dict(it) for it in _items], pid, _conn, _run_id)
+        _conn.close()
+
         conn = get_connection(TEST_DB_PATH)
         import glob
         ai_available = (

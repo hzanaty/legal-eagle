@@ -14,10 +14,10 @@ from datetime import datetime, timezone
 from typing import Any
 
 from agents.ai_cache import cached_chat
-from configurations.creds import creds
 
 
 def _get_ai_client():
+    from configurations.creds import creds
     from configurations.sap_ai_core_client import SAPAICoreClient
     sap_cfg = creds.get("sap_aicore", {})
     return SAPAICoreClient(
