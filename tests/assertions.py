@@ -132,6 +132,19 @@ def run_assertions(conn: sqlite3.Connection, profile_id: int, version: str, ai_a
             ).fetchone()[0]
             ok = count > 0
             results.append((ok, desc, f"no news_announcements row with topic_label '{a['topic_label']}'" if not ok else ""))
+        elif t == "table_has_rows":
+            # Assert a table has >= min_rows rows (profile-scoped if profile_id column exists).
+            table = a["table"]
+            min_rows = int(a.get("min_rows", 1))
+            cols = {r[1] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+            if "profile_id" in cols:
+                count = conn.execute(
+                    f"SELECT COUNT(*) FROM {table} WHERE profile_id=?", (profile_id,)
+                ).fetchone()[0]
+            else:
+                count = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+            ok = count >= min_rows
+            results.append((ok, desc, f"expected >= {min_rows} rows in {table}, got {count}" if not ok else ""))
 
     print(f"\n[TEST] Legal Eagle {version} — Xanadu (XN/HCM)")
     all_pass = True

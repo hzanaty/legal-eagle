@@ -1,0 +1,35 @@
+{
+  "version": "v3.4",
+  "base": "v3.3",
+  "description": "Challenge + grounding loop. Delta over v3.3 — adds ranking_grounding/signals tables, challenge routes, re-rank route, bulk re-rank, Review hierarchy.",
+  "assertions": [
+    {"type": "table_exists", "table": "ranking_grounding",
+     "description": "ranking_grounding table exists"},
+    {"type": "table_exists", "table": "ranking_signals",
+     "description": "ranking_signals table exists"},
+    {"type": "column_exists", "table": "news_items", "column": "human_rank_override",
+     "description": "news_items.human_rank_override column exists"},
+    {"type": "column_exists", "table": "news_items", "column": "human_override_reason",
+     "description": "news_items.human_override_reason column exists"},
+    {"type": "column_exists", "table": "ranking_grounding", "column": "summary",
+     "description": "ranking_grounding.summary column exists"},
+    {"type": "column_exists", "table": "ranking_grounding", "column": "source_item_id",
+     "description": "ranking_grounding.source_item_id column exists"},
+    {"type": "column_exists", "table": "ranking_signals", "column": "pattern",
+     "description": "ranking_signals.pattern column exists"},
+    {"type": "column_exists", "table": "ranking_signals", "column": "min_rank",
+     "description": "ranking_signals.min_rank column exists"},
+
+    {"type": "item_outcome", "title_contains": "maternity leave",
+     "expect_table": "news_items",
+     "fields": {"email_eligible": "1"}, "not_null": ["topic_label"],
+     "description": "A1 maternity leave still ranks as email_eligible=1 after v3.4 changes"},
+
+    {"type": "news_announcements_entry", "topic_label": "maternity leave",
+     "description": "news_announcements has maternity leave group (A1)"},
+    {"type": "news_announcements_entry", "topic_label": "pension fund",
+     "description": "news_announcements has pension fund group (A4)"},
+    {"type": "news_announcements_entry", "topic_label": "health insurance",
+     "description": "news_announcements has health insurance group (C4)", "requires_ai": true}
+  ]
+}

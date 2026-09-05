@@ -501,6 +501,16 @@ def create_schema_if_needed(conn: sqlite3.Connection) -> None:
             except Exception:
                 pass
 
+        # Human override columns (v3.4) — written by confirm-challenge route
+        for _col, _decl in (
+            ("human_rank_override", "INTEGER"),
+            ("human_override_reason", "TEXT"),
+        ):
+            try:
+                conn.execute(f"ALTER TABLE news_items ADD COLUMN {_col} {_decl}")
+            except Exception:
+                pass
+
         # Announcements table (v3.4) — one row per AI-detected announcement per run
         # (renamed from news_aspects in v3.4)
         try:

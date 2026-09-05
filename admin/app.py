@@ -98,6 +98,8 @@ from configurations.db import (
     update_authority,
     delete_authority,
     reset_review_data,
+    insert_ranking_grounding,
+    insert_ranking_signal,
 )
 
 # Flask app
@@ -2775,6 +2777,139 @@ def reset_review_data_route():
         counts = reset_review_data(conn, profile_id)
         conn.commit()
         return jsonify({"ok": True, "deleted": counts})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"ok": False, "error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/admin/news/<int:item_id>/challenge", methods=["POST"])
+def challenge_news_item(item_id: int):
+    """Re-run Tier 1 + Tier 2 ranking on this item; return comparison JSON."""
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            "SELECT * FROM news_items WHERE id=?", (item_id,)
+        ).fetchone()
+        if not row:
+            return jsonify({"ok": False, "error": "Item not found"}), 404
+        item = dict(row)
+        profile_id = item.get("profile_id")
+
+        from agents.news_ranker import _load_signals, _load_grounding, _tier1_score, _tier2_score
+        signals = _load_signals(conn, profile_id)
+        grounding = _load_grounding(conn, profile_id)
+
+        text = f"{item.get('title', '')} {item.get('content', '') or ''}"
+        t1_rank = _tier1_score(text, signals)
+        t2_rank, t2_reasoning = _tier2_score(item, grounding)
+        suggested_rank = max(t1_rank or 0, t2_rank)
+        original_rank = item.get("significance_rank") or item.get("human_rank_override") or 0
+
+        return jsonify({
+            "ok": True,
+            "item_id": item_id,
+            "title": item.get("title", ""),
+            "original_rank": original_rank,
+            "suggested_rank": suggested_rank,
+            "reasoning": t2_reasoning,
+            "agrees": (suggested_rank == original_rank),
+        })
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/admin/news/<int:item_id>/confirm-challenge", methods=["POST"])
+def confirm_challenge_news_item(item_id: int):
+    """Write human override + grounding/signal rows from a confirmed challenge."""
+    data = request.json or {}
+    override_rank = int(data.get("override_rank", 0))
+    override_reason = str(data.get("override_reason", "")).strip()
+
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            "SELECT * FROM news_items WHERE id=?", (item_id,)
+        ).fetchone()
+        if not row:
+            return jsonify({"ok": False, "error": "Item not found"}), 404
+        item = dict(row)
+        profile_id = item.get("profile_id")
+
+        # Write override back to news_items
+        conn.execute(
+            "UPDATE news_items SET human_rank_override=?, human_override_reason=? WHERE id=?",
+            (override_rank, override_reason, item_id),
+        )
+
+        # Write few-shot grounding example
+        title = item.get("title") or ""
+        summary = f"{title} — {override_reason}" if override_reason else title
+        grounding_id = insert_ranking_grounding(
+            conn, profile_id, item_id, summary, source_label=item.get("publisher") or None
+        )
+
+        # Write Tier 1 signal (keyword extracted from override_reason or title)
+        keyword = override_reason.split()[0].lower() if override_reason else (title.split()[0].lower() if title else "")
+        if keyword:
+            insert_ranking_signal(conn, profile_id, keyword, override_rank, reason=override_reason or None)
+
+        conn.commit()
+        return jsonify({
+            "ok": True,
+            "override_rank": override_rank,
+            "grounding_id": grounding_id,
+            "reflection": f"Understood — future items about \"{keyword}\" → Rank {override_rank}",
+        })
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"ok": False, "error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/admin/news/<int:item_id>/rerank", methods=["POST"])
+def rerank_news_item(item_id: int):
+    """Re-run the full ranking pipeline on a single item."""
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            "SELECT * FROM news_items WHERE id=?", (item_id,)
+        ).fetchone()
+        if not row:
+            return jsonify({"ok": False, "error": "Item not found"}), 404
+        item = dict(row)
+        profile_id = item.get("profile_id")
+
+        from agents.news_ranker import rank_items
+        rank_items([item], profile_id, conn)
+        new_rank = item.get("significance_rank", 0)
+
+        conn.execute(
+            "UPDATE news_items SET significance_rank=?, rank_tier=?, rank_reasoning=? WHERE id=?",
+            (new_rank, item.get("rank_tier", ""), item.get("rank_reasoning", ""), item_id),
+        )
+        conn.commit()
+        return jsonify({"ok": True, "new_rank": new_rank, "reasoning": item.get("rank_reasoning", "")})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"ok": False, "error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/admin/profiles/<int:profile_id>/rerank-all", methods=["POST"])
+def rerank_all_for_profile(profile_id: int):
+    """Re-run the full ranker over all items in the profile's latest run."""
+    conn = get_connection()
+    try:
+        from agents.news_ranker import rerank_items_for_profile
+        count = rerank_items_for_profile(profile_id, conn)
+        conn.commit()
+        return jsonify({"ok": True, "reranked": count})
     except Exception as e:
         conn.rollback()
         return jsonify({"ok": False, "error": str(e)}), 500

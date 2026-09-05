@@ -126,6 +126,29 @@
   .btn-challenge:hover { background: #ffeaea; }
   .btn-rerank { background: white; border: 1px solid #d9d9d9; color: #6a6d70; font-size: 10px; font-weight: 700; border-radius: 3px; padding: 3px 7px; cursor: pointer; }
   .btn-rerank:hover { background: #f5f5f5; }
+  /* Challenge modal */
+  .challenge-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:9000; align-items:center; justify-content:center; }
+  .challenge-overlay.open { display:flex; }
+  .challenge-modal { background:white; border-radius:8px; box-shadow:0 8px 32px rgba(0,0,0,0.22); width:520px; max-width:96vw; padding:28px 28px 22px; position:relative; }
+  .challenge-modal h3 { margin:0 0 4px; font-size:14px; color:#1a4060; }
+  .challenge-modal .ch-subtitle { font-size:11px; color:#6a6d70; margin:0 0 16px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ch-rank-row { display:flex; gap:16px; margin-bottom:16px; }
+  .ch-rank-cell { flex:1; background:#f5f7fa; border-radius:6px; padding:10px 12px; }
+  .ch-rank-cell label { display:block; font-size:10px; font-weight:700; color:#6a6d70; margin-bottom:4px; }
+  .ch-rank-cell .ch-rank-val { font-size:22px; font-weight:700; color:#1a4060; }
+  .ch-rank-cell.suggested .ch-rank-val { color:#0a6ed1; }
+  .ch-reasoning { font-size:12px; color:#32363a; background:#fffbe6; border:1px solid #ffe58f; border-radius:5px; padding:8px 10px; margin-bottom:14px; line-height:1.5; }
+  .ch-reason-label { font-size:11px; font-weight:700; color:#1a4060; margin-bottom:4px; }
+  .ch-reason-input { width:100%; box-sizing:border-box; border:1px solid #c8d6e5; border-radius:4px; padding:7px 9px; font-size:12px; color:#32363a; resize:vertical; min-height:56px; font-family:inherit; }
+  .ch-rank-select { width:100%; box-sizing:border-box; border:1px solid #c8d6e5; border-radius:4px; padding:5px 8px; font-size:12px; margin-top:8px; }
+  .ch-footer { display:flex; justify-content:flex-end; gap:10px; margin-top:16px; align-items:center; }
+  .ch-reflection { flex:1; font-size:11px; color:#1d6f42; font-style:italic; }
+  .ch-btn-cancel { background:white; border:1px solid #d9d9d9; color:#6a6d70; padding:7px 14px; border-radius:4px; cursor:pointer; font-size:12px; }
+  .ch-btn-cancel:hover { background:#f5f5f5; }
+  .ch-btn-confirm { background:#0a6ed1; border:none; color:white; padding:7px 16px; border-radius:4px; cursor:pointer; font-size:12px; font-weight:700; }
+  .ch-btn-confirm:hover { background:#085cb8; }
+  .ch-btn-confirm:disabled { background:#c8d6e5; cursor:default; }
+  .ch-loading { text-align:center; padding:24px 0; color:#6a6d70; font-size:13px; }
   .ann-empty { text-align: center; color: #6a6d70; padding: 40px 0; font-size: 12px; }
 </style>
 
@@ -191,10 +214,47 @@
     </button>
   </div>
 
+  <!-- Challenge modal (v3.4) -->
+  <div class="challenge-overlay" id="challengeOverlay">
+    <div class="challenge-modal" id="challengeModal">
+      <div class="ch-loading" id="chLoading">Analysing item…</div>
+      <div id="chContent" style="display:none">
+        <h3>&#9889; Challenge AI Ranking</h3>
+        <div class="ch-subtitle" id="chTitle"></div>
+        <div class="ch-rank-row">
+          <div class="ch-rank-cell">
+            <label>CURRENT RANK</label>
+            <div class="ch-rank-val" id="chOrigRank">—</div>
+          </div>
+          <div class="ch-rank-cell suggested">
+            <label>AI SUGGESTS</label>
+            <div class="ch-rank-val" id="chSugRank">—</div>
+          </div>
+        </div>
+        <div class="ch-reasoning" id="chReasoning"></div>
+        <div class="ch-reason-label">Override rank &amp; reason</div>
+        <select class="ch-rank-select" id="chOverrideRank">
+          <option value="1">1 — Off-topic / macro</option>
+          <option value="2">2 — Indirect implication</option>
+          <option value="3">3 — Operational impact</option>
+          <option value="4">4 — Upcoming regulatory change</option>
+          <option value="5">5 — Enacted / immediate obligation</option>
+        </select>
+        <textarea class="ch-reason-input" id="chOverrideReason" rows="2" placeholder="Why does this rank matter? (used as a future Tier 1 signal)"></textarea>
+        <div class="ch-footer">
+          <span class="ch-reflection" id="chReflection"></span>
+          <button class="ch-btn-cancel" onclick="closeChallenge()">Cancel</button>
+          <button class="ch-btn-confirm" id="chConfirmBtn" onclick="confirmChallenge()">Confirm &amp; Learn</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   {% if topics %}
   <div class="view-toggle">
     <button class="vtab active" id="vtab-ann" onclick="showView('ann')">&#127758; Announcements ({{ topics|length }} topics)</button>
     <button class="vtab" id="vtab-items" onclick="showView('items')">&#128240; All Items</button>
+    <button class="vtab" id="rerankAllBtn" onclick="rerankAll(this)" style="margin-left:auto;color:#0a6ed1;border-color:#0a6ed1;">&#9881; Re-rank All</button>
   </div>
   {% endif %}
 
@@ -223,7 +283,7 @@
               <div class="src-list">
                 {% for src in ann.sources %}
                 {% set r = src.significance_rank|default(0)|int %}
-                <div class="src-card">
+                <div class="src-card" data-item-id="{{ src.id }}">
                   <div class="src-rank-badge {% if r >= 5 %}rank-5{% elif r >= 4 %}rank-4{% elif r >= 3 %}rank-3{% elif r >= 2 %}rank-2{% elif r >= 1 %}rank-1{% else %}rank-d{% endif %}">
                     {{ r if r > 0 else 'D' }}
                   </div>
@@ -371,10 +431,70 @@
     icon.classList.toggle('collapsed', !collapsed);
   }
 
-  // ── Placeholder stubs (wired in Tasks 6 & 7) ──
+  // ── Challenge modal ──
+  var _challengeItemId = null;
   function openChallenge(itemId, title) {
-    alert('Challenge modal coming in Task 6 for item ' + itemId + ': ' + title);
+    _challengeItemId = itemId;
+    document.getElementById('challengeOverlay').classList.add('open');
+    document.getElementById('chLoading').style.display = 'block';
+    document.getElementById('chContent').style.display = 'none';
+    document.getElementById('chReflection').textContent = '';
+    document.getElementById('chConfirmBtn').disabled = false;
+    fetch('/admin/news/' + itemId + '/challenge', { method: 'POST' })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        document.getElementById('chLoading').style.display = 'none';
+        document.getElementById('chContent').style.display = 'block';
+        document.getElementById('chTitle').textContent = d.title || '';
+        document.getElementById('chOrigRank').textContent = d.original_rank || '?';
+        document.getElementById('chSugRank').textContent = d.suggested_rank || '?';
+        document.getElementById('chReasoning').textContent = d.reasoning || '';
+        var sel = document.getElementById('chOverrideRank');
+        sel.value = d.suggested_rank || 2;
+        document.getElementById('chOverrideReason').value = '';
+      })
+      .catch(function(e){
+        document.getElementById('chLoading').textContent = 'Error: ' + e;
+      });
   }
+  function closeChallenge() {
+    document.getElementById('challengeOverlay').classList.remove('open');
+    _challengeItemId = null;
+  }
+  function confirmChallenge() {
+    if (!_challengeItemId) return;
+    var rank = parseInt(document.getElementById('chOverrideRank').value);
+    var reason = document.getElementById('chOverrideReason').value.trim();
+    document.getElementById('chConfirmBtn').disabled = true;
+    fetch('/admin/news/' + _challengeItemId + '/confirm-challenge', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({override_rank: rank, override_reason: reason})
+    }).then(function(r){ return r.json(); })
+      .then(function(d){
+        if (d.ok) {
+          document.getElementById('chReflection').textContent = d.reflection || 'Saved.';
+          // Update rank badge on the source card
+          var card = document.querySelector('[data-item-id="' + _challengeItemId + '"]');
+          if (card) {
+            var badge = card.querySelector('.src-rank-badge');
+            if (badge) { badge.textContent = rank; badge.className = 'src-rank-badge rank-' + rank; }
+          }
+          setTimeout(closeChallenge, 1800);
+        } else {
+          document.getElementById('chReflection').textContent = 'Error: ' + (d.error || 'unknown');
+          document.getElementById('chConfirmBtn').disabled = false;
+        }
+      })
+      .catch(function(e){
+        document.getElementById('chReflection').textContent = 'Network error: ' + e;
+        document.getElementById('chConfirmBtn').disabled = false;
+      });
+  }
+  // Close on overlay click outside modal
+  document.getElementById('challengeOverlay').addEventListener('click', function(e){
+    if (e.target === this) closeChallenge();
+  });
   function rerankItem(itemId, btn) {
     btn.textContent = '…';
     fetch('/admin/news/' + itemId + '/rerank', { method: 'POST' })
@@ -386,6 +506,19 @@
           if (badge) { badge.textContent = d.new_rank; badge.className = 'src-rank-badge rank-' + d.new_rank; }
         }
       }).catch(function(){ btn.textContent = '↺'; });
+  }
+  function rerankAll(btn) {
+    if (!confirm('Re-rank all items in the latest run? This calls the AI tier.')) return;
+    btn.textContent = '⚙ Re-ranking…';
+    btn.disabled = true;
+    fetch('/admin/profiles/' + _profileId + '/rerank-all', { method: 'POST' })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        btn.textContent = '⚙ Re-rank All';
+        btn.disabled = false;
+        if (d.ok) { alert('Re-ranked ' + d.reranked + ' items. Reload to see updated badges.'); location.reload(); }
+        else { alert('Error: ' + (d.error || 'unknown')); }
+      }).catch(function(e){ btn.textContent = '⚙ Re-rank All'; btn.disabled = false; alert('Network error: ' + e); });
   }
 
   function setFilter(chip) {

@@ -76,7 +76,7 @@ def _load_grounding(db_conn, profile_id: int) -> List[Dict[str, Any]]:
         "SELECT rank, summary FROM ranking_grounding WHERE profile_id=? ORDER BY id DESC LIMIT 10",
         (profile_id,),
     ).fetchall()
-    return [{"rank": r["rank"], "summary": r["summary"]} for r in rows]
+    return [{"rank": r["rank"], "title": r["summary"] or "", "reasoning": ""} for r in rows]
 
 
 def _tier1_score(text: str, signals: List[Dict[str, Any]]) -> Optional[int]:
@@ -196,3 +196,32 @@ def _apply_boosts(item: Dict[str, Any]) -> None:
     ):
         item["significance_rank"] = min(5, item["significance_rank"] + 1)
         item["rank_reasoning"] = (item.get("rank_reasoning") or "") + " [repeated +1]"
+
+
+def rerank_items_for_profile(profile_id: int, db_conn) -> int:
+    """Re-run the full ranker over all news_items for the profile's latest run.
+
+    Returns the count of items re-ranked.
+    """
+    latest_run = db_conn.execute(
+        "SELECT id FROM runs WHERE profile_id=? ORDER BY id DESC LIMIT 1", (profile_id,)
+    ).fetchone()
+    if not latest_run:
+        return 0
+
+    run_id = latest_run["id"]
+    rows = db_conn.execute(
+        "SELECT * FROM news_items WHERE run_id=?", (run_id,)
+    ).fetchall()
+    if not rows:
+        return 0
+
+    items = [dict(r) for r in rows]
+    rank_items(items, profile_id, db_conn)
+
+    for item in items:
+        db_conn.execute(
+            "UPDATE news_items SET significance_rank=?, rank_tier=?, rank_reasoning=? WHERE id=?",
+            (item.get("significance_rank", 0), item.get("rank_tier", ""), item.get("rank_reasoning", ""), item["id"]),
+        )
+    return len(items)

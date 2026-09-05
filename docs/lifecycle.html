@@ -710,12 +710,13 @@ const details = {
   },
   'challenge': {
     title: 'Challenge Rank (Human Override + Grounding Loop)',
-    subtitle: 'NEW in v3 Phase 4 (v3.4) — self-improvement mechanism',
-    tag: 'blue', tagLabel: 'New in v3.4',
+    subtitle: 'Shipped v3.4 (2026-09-05) — self-improvement mechanism',
+    tag: 'green', tagLabel: 'Shipped v3.4',
     cols: [
-      { heading: 'What it does', items: ['Reviewer overrides rank on any item', 'AI reflects signal back: "I understood: [signal]. Correct?"', 'Human confirms once — single action', 'W ranking_grounding: validated summary → Tier 2 few-shot example', 'W ranking_signals: extracted pattern → Tier 1 deterministic rule'] },
-      { heading: 'Key tables', items: ['ranking_signals (Tier 1 — regex/keyword rules, no AI call)', 'ranking_grounding (Tier 2 — few-shot grounding examples for LLM)'] },
-      { heading: 'Key file', items: ['admin/app.py — /admin/review/&lt;id&gt;', 'agents/news_ranker.py (challenge handler)', 'admin/templates/review_news.html'] },
+      { heading: 'What it does', items: ['Reviewer clicks ⚡ on any Source card in Review tab', 'AI re-runs Tier 1 + Tier 2 and shows suggested rank vs current', 'Human sets override rank + reason → Confirm &amp; Learn', 'W ranking_grounding: title + reason → Tier 2 few-shot example', 'W ranking_signals: first keyword from reason → Tier 1 deterministic rule', 'Bulk Re-rank All button re-scores all items in latest run'] },
+      { heading: 'Key tables', items: ['ranking_signals (Tier 1 — regex/keyword rules, no AI call)', 'ranking_grounding (Tier 2 — few-shot grounding examples for LLM)', 'news_items.human_rank_override, human_override_reason (v3.4)'] },
+      { heading: 'Key file', items: ['admin/app.py — /admin/news/&lt;id&gt;/challenge + confirm-challenge + rerank', '/admin/profiles/&lt;id&gt;/rerank-all', 'agents/news_ranker.py — _load_grounding fix, rerank_items_for_profile()', 'admin/templates/review_news.html — Challenge modal + Re-rank All button'] },
+      { heading: 'Harness', items: ['python3 tests/run_harness.py --version v3.4 → 32/32 (4 skipped — AI)'] },
     ]
   },
   'legal-repo': {

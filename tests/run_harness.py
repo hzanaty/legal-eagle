@@ -172,6 +172,65 @@ def run_v3_3():
     sys.exit(0 if ok else 1)
 
 
+def run_v3_4():
+    """Challenge + grounding loop: all v3.3 assertions pass, plus new table/column schema checks.
+
+    New in v3.4: ranking_grounding + ranking_signals tables exist, human_rank_override column exists,
+    Review hierarchy (news_announcements) still populated. Challenge routes not tested here (HTTP flows).
+    """
+    os.environ["LEGAL_EAGLE_DB"] = TEST_DB_PATH
+    os.environ["LEGAL_EAGLE_AI_CACHE"] = AI_CACHE_DIR
+    os.environ["DISABLE_TWEETS"] = "1"
+
+    from tests.server import start_server, stop_server
+    from tests.reset_and_seed import reset_and_seed
+    from tests.assertions import run_assertions
+    from configurations.db import get_connection
+
+    print("[TEST] v3.4 harness — challenge + grounding loop")
+    server = start_server(FIXTURES_DIR)
+    print(f"[OK]  Fixture server on :9999 (root={FIXTURES_DIR})")
+    try:
+        conn, pid = reset_and_seed()
+        conn.close()
+        print(f"[OK]  DB reset + seeded (id={pid}), pointing pipeline at test.db")
+
+        from agents.agents_controller import run_profile_once
+        print("[RUN] run_profile_once(skip_grouping, skip_email)...")
+        run_profile_once(
+            pid,
+            skip_filter=True,
+            skip_grouping=True,
+            skip_email=True,
+        )
+
+        import sqlite3 as _sqlite3
+        from configurations.db import create_run
+        _conn = get_connection(TEST_DB_PATH)
+        _conn.row_factory = _sqlite3.Row
+        _run_id = create_run(_conn, pid, origin="harness")
+        _items = _conn.execute(
+            "SELECT * FROM news_items WHERE profile_id=? AND email_eligible=1", (pid,)
+        ).fetchall()
+        if _items:
+            from agents.email_composer import generate_digest
+            print(f"[RUN] generate_digest({len(_items)} eligible items) for news_announcements…")
+            generate_digest([dict(it) for it in _items], pid, _conn, _run_id)
+        _conn.close()
+
+        conn = get_connection(TEST_DB_PATH)
+        import glob
+        ai_available = (
+            bool(glob.glob(os.path.join(AI_CACHE_DIR, "emb_*.json")))
+            and bool(glob.glob(os.path.join(AI_CACHE_DIR, "chat_*.json")))
+        )
+        ok = run_assertions(conn, pid, "v3.4", ai_available=ai_available)
+        conn.close()
+    finally:
+        stop_server(server)
+    sys.exit(0 if ok else 1)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--version", required=True)
@@ -184,6 +243,8 @@ if __name__ == "__main__":
         run_v3_2()
     elif args.version == "v3.3":
         run_v3_3()
+    elif args.version == "v3.4":
+        run_v3_4()
     else:
         print(f"Version {args.version} not yet in harness")
         sys.exit(1)
