@@ -415,6 +415,16 @@
       <div class="step-sub">Override + grounding</div>
     </div>
     <div class="inner-arrow">›</div>
+    <div class="step blue" onclick="showDetail('rcm-publish')">
+      <div class="step-name">RCM Publish</div>
+      <div class="step-sub">Announcement template · v3.5</div>
+    </div>
+    <div class="inner-arrow">›</div>
+    <div class="step blue" onclick="showDetail('impact-analysis')">
+      <div class="step-name">Impact Analysis</div>
+      <div class="step-sub">AI per aspect · v3.6</div>
+    </div>
+    <div class="inner-arrow">›</div>
     <div class="step grey" onclick="showDetail('legal-repo')">
       <div class="step-name">Legal Repo</div>
       <div class="step-sub">Map to JIRA / SAP Notes</div>
@@ -704,6 +714,24 @@ const details = {
       { heading: 'Key tables', items: ['ranking_signals (Tier 1 — regex/keyword rules, no AI call)', 'ranking_grounding (Tier 2 — few-shot grounding examples for LLM)', 'news_items.human_rank_override, human_override_reason (v3.4)'] },
       { heading: 'Key file', items: ['admin/app.py — /admin/news/&lt;id&gt;/challenge + confirm-challenge + rerank', '/admin/profiles/&lt;id&gt;/rerank-all', 'agents/news_ranker.py — _load_grounding fix, rerank_items_for_profile()', 'admin/templates/review_news.html — Challenge modal + Re-rank All button'] },
       { heading: 'Harness', items: ['python3 tests/run_harness.py --version v3.4 → 32/32 (4 skipped — AI)'] },
+    ]
+  },
+  'rcm-publish': {
+    title: 'RCM Publish',
+    subtitle: 'Planned v3.5 — RCM-branded announcement template + JIRA Legal Change creation',
+    tag: 'blue', tagLabel: 'Planned v3.5',
+    cols: [
+      { heading: 'What it does', items: ['Full RCM-branded template page per announcement', 'Publish action → sends announcement to RCM', 'JIRA Legal Change creation directly from announcement', 'Announcement editing before publish', 'Glossary gap badge backend (gap alerts in Review tab)'] },
+      { heading: 'Key files (planned)', items: ['admin/templates/review_news.html — announcement template UI', 'admin/app.py — POST /admin/announcements/&lt;id&gt;/publish', 'agents/ — glossary gap detection'] },
+    ]
+  },
+  'impact-analysis': {
+    title: 'Impact Analysis Agent',
+    subtitle: 'Planned v3.6 — AI product impact analysis per legal change aspect',
+    tag: 'blue', tagLabel: 'Planned v3.6',
+    cols: [
+      { heading: 'What it does', items: ['AI call (claude-sonnet-latest) per aspect → structured markdown impact report', 'Affected Products table + before/after situation + expected solution', 'Two-level virtual rows in Review: Topic → Aspect → Item cards', 'Preview Announcement + Preview Analysis buttons per aspect row', 'Cached to news_announcements.impact_analysis_md on first use', 'Law2Spec workflow: pre-fills epic fields from aspect + announcement + impact'] },
+      { heading: 'Key files (planned)', items: ['agents/impact_analyzer.py (new)', 'admin/templates/review_news.html — two-level virtual rows', 'admin/app.py — POST /admin/aspects/&lt;id&gt;/analyze'] },
     ]
   },
   'legal-repo': {
