@@ -147,7 +147,19 @@ def _render_authority_row(name: str, is_inferred: bool) -> str:
     )
 
 
-def _render_topic_block(label: str, aspects: list[dict]) -> str:
+def _rank_badge(rank: int) -> str:
+    if rank >= 4:
+        return (' &nbsp;·&nbsp; <span style="background:#e8f5e9;color:#107e3e;'
+                'padding:1px 6px;border-radius:8px;font-size:10px;font-weight:600;">'
+                f'Rank {rank}</span>')
+    if rank == 3:
+        return (' &nbsp;·&nbsp; <span style="background:#fff3cd;color:#856404;'
+                'padding:1px 6px;border-radius:8px;font-size:10px;font-weight:600;">'
+                f'Rank {rank}</span>')
+    return ""
+
+
+def _render_topic_block(label: str, aspects: list[dict], max_rank: int = 0) -> str:
     header = (
         '<div style="background:#0070b1;color:#ffffff;padding:8px 14px;'
         'border-radius:4px 4px 0 0;font-weight:700;font-size:13px;letter-spacing:0.5px;">'
@@ -167,7 +179,7 @@ def _render_topic_block(label: str, aspects: list[dict]) -> str:
         <div {margin}>
           <div style="font-weight:700;font-size:14px;color:#0070b1;margin-bottom:4px;">{asp.get("title","")}</div>
           <div style="color:#333333;margin-bottom:8px;">{asp.get("summary","")}</div>
-          <div style="font-size:11px;color:#666666;margin-bottom:6px;">First published: {asp.get("first_publish_date","")}</div>
+          <div style="font-size:11px;color:#666666;margin-bottom:6px;">First published: {asp.get("first_publish_date","")}{_rank_badge(max_rank)}</div>
           <div style="font-size:12px;"><span style="font-weight:600;color:#555555;">Sources: </span>{links_html}</div>
         </div>"""
 
@@ -238,7 +250,8 @@ def generate_digest(
             for asp in aspects:
                 _save_aspect(conn, run_id, topic_label, asp, item_ids)
 
-            authority_block += _render_topic_block(topic_label, aspects)
+            max_rank = max((int(it.get("significance_rank") or 0) for it in topic_items), default=0)
+            authority_block += _render_topic_block(topic_label, aspects, max_rank=max_rank)
 
         authority_blocks_html += f'<div style="margin-bottom:16px;">{authority_block}</div>'
 
