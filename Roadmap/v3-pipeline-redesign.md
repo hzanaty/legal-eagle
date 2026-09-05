@@ -1,7 +1,7 @@
 # Legal Eagle v3.0 — Pipeline Redesign Specification
 
 **Date:** 2026-06-29  
-**Status:** v3.5 Shipped — v3.6 (Preview for RCM + JIRA-link/Done) next; v3.7 (deprecate Legal Repository); V4 = Announce + Impact Agents on L2A MCPs  
+**Status:** v3.6 Shipped — v3.7 (deprecate Legal Repository) next; V4 = Announce + Impact Agents on L2A MCPs  
 **Version Jump:** v2.32 → v3.0  
 **Author:** Brainstorming session (I077750 + Claude)
 

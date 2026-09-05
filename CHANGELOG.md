@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## v3.6 — 2026-09-06
+### Preview for RCM + Close-the-Loop
+
+- **`rcm_template.json`** (`configurations/rcm_template.json`): official RCM announcement template structure (Introduction, Business Background/Impact, Reference to Related Legislation, Additional Information) + AI prompt template — single source of truth for all RCM-format rendering.
+- **`announcement_rcm_json` column** on `news_announcements`: AI-filled RCM content (JSON), generated once on first Preview click and cached — never regenerated.
+- **`rcm_filler.py`** (`agents/rcm_filler.py`): `fill_rcm_template(ann, sources)` — one AI call returns `{introduction, business_background}`; sources auto-assembled as Related Legislation; falls back to wrapping `announcement_md` if AI unavailable.
+- **Preview for RCM modal** (`admin/templates/review_news.html`): "Preview for RCM" button per Announcement row; modal shows Title heading + Introduction bullets + Business Background bullets + Reference to Related Legislation links; Copy button copies full structured text to clipboard. First click triggers AI fill; all subsequent clicks read from DB.
+- **Close-the-loop**: JIRA Legal Change # field + Mark Done button in the same modal → saves to `jira_legal_change` + `status='done'` columns; row status pill shows `✓ Done · <JIRA#>` and persists.
+- **Hand-off**: per-profile L2S URL setting ("Open L2S" link in modal); set once, stored in `settings` table.
+- **New routes** (`admin/app.py`): `GET /admin/announcements/<id>/template` (fills + returns RCM content), `POST /admin/announcements/<id>/publish` (save JIRA#/status), `POST /admin/profiles/<id>/l2s-url` (save L2S URL).
+- **Test Harness v3.6**: 37/37 pass (4 skipped — AI). Three new `column_exists` assertions: `jira_legal_change`, `status`, `announcement_rcm_json`.
+
 ## v3.5 — 2026-09-05
 ### Glossary Gap Alert
 

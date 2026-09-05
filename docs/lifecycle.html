@@ -172,7 +172,7 @@
 </defs></svg>
 
 <h1>Legal Eagle — System Lifecycle</h1>
-<p class="tagline">v3.5 shipped &nbsp;·&nbsp; v3.6 planned &nbsp;·&nbsp; Click any step for details</p>
+<p class="tagline">v3.6 shipped &nbsp;·&nbsp; v3.7 planned &nbsp;·&nbsp; Click any step for details</p>
 
 <!-- SETUP -->
 <div class="phase-block">
@@ -420,10 +420,10 @@
       <div class="step-sub">Gap badge · v3.5</div>
     </div>
     <div class="inner-arrow">›</div>
-    <div class="step future" onclick="showDetail('rcm-publish')">
+    <div class="step built" onclick="showDetail('rcm-publish')">
       <span class="actor human" title="Human"><svg class="ic"><use href="#ic-human"/></svg></span>
       <div class="step-name">Preview for RCM</div>
-      <div class="step-sub">Popup + JIRA link → Done · v3.6</div>
+      <div class="step-sub">RCM-template fill + JIRA link → Done · v3.6</div>
     </div>
     <div class="inner-arrow">›</div>
     <div class="step future" onclick="showDetail('announce-agent')">
@@ -733,7 +733,7 @@ const details = {
   'rcm-publish': {
     title: 'Preview for RCM + Close the Loop',
     subtitle: 'Planned v3.6 — read-only RCM-template popup + Open-L2S link, then link JIRA → mark Done',
-    tag: 'red', tagLabel: 'Planned v3.6',
+    tag: 'green', tagLabel: 'Shipped v3.6',
     cols: [
       { heading: 'What it does', items: ['"Preview for RCM" button per Announcement row (sends nothing — not "Publish")', 'Read-only modal renders announcement_md in the RCM / Law2Spec template + source links (from item_ids_json)', '"Open L2S" opens L2S in a new tab — LPM copies/pastes manually (as today)', 'Close the loop: LPM pastes the JIRA Legal Change # onto the announcement and marks it DONE — the LPM finish line', 'No JIRA API — manual paste. V4 Announce Agent automates create + link + stamp'] },
       { heading: 'Key files (planned)', items: ['admin/app.py — GET /admin/announcement-template/&lt;id&gt; + POST save JIRA #/status', 'configurations/db.py — news_announcements.jira_legal_change + status', 'admin/templates/review_news.html — Preview modal + Done control'] },

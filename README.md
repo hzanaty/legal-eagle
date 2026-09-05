@@ -4,7 +4,7 @@
 
 > AI-powered platform that monitors legal changes, interprets their meaning, and helps SAP Localization teams respond faster with higher intelligence.
 
-**Current version: v3.5** — Glossary Gap Alert · [CHANGELOG](CHANGELOG.md)
+**Current version: v3.6** — Preview for RCM + Close-the-Loop · [CHANGELOG](CHANGELOG.md)
 
 ---
 
