@@ -1,0 +1,25 @@
+{
+  "version": "v3.6",
+  "base": "v3.5",
+  "description": "Preview for RCM + close-the-loop. Delta over v3.5 — news_announcements gains jira_legal_change, status, announcement_rcm_json.",
+  "assertions": [
+    {
+      "type": "column_exists",
+      "table": "news_announcements",
+      "column": "jira_legal_change",
+      "description": "news_announcements.jira_legal_change column exists"
+    },
+    {
+      "type": "column_exists",
+      "table": "news_announcements",
+      "column": "status",
+      "description": "news_announcements.status column exists"
+    },
+    {
+      "type": "column_exists",
+      "table": "news_announcements",
+      "column": "announcement_rcm_json",
+      "description": "news_announcements.announcement_rcm_json column exists (AI-filled RCM template, lazy on first Preview click)"
+    }
+  ]
+}
