@@ -172,7 +172,7 @@
 </defs></svg>
 
 <h1>Legal Eagle — System Lifecycle</h1>
-<p class="tagline">v3.6 shipped &nbsp;·&nbsp; v3.7 planned &nbsp;·&nbsp; Click any step for details</p>
+<p class="tagline">v3.7 shipped &nbsp;·&nbsp; V4 planned &nbsp;·&nbsp; Click any step for details</p>
 
 <!-- SETUP -->
 <div class="phase-block">
@@ -438,10 +438,10 @@
       <div class="step-sub">AI per aspect · V4</div>
     </div>
     <div class="inner-arrow">›</div>
-    <div class="step future" onclick="showDetail('legal-repo')">
+    <div class="step built" onclick="showDetail('legal-repo')">
       <span class="actor human" title="Human"><svg class="ic"><use href="#ic-human"/></svg></span>
       <div class="step-name">Legal Repo</div>
-      <div class="step-sub">deprecating · v3.7</div>
+      <div class="step-sub">Deprecated · v3.7</div>
     </div>
   </div>
 </div>
@@ -759,11 +759,11 @@ const details = {
   },
   'legal-repo': {
     title: 'Legal Repository',
-    subtitle: 'Deprecating v3.7 — out of Legal Eagle scope (predates v3, bundled in by mistake)',
-    tag: 'red', tagLabel: 'Deprecating v3.7',
+    subtitle: 'Deprecated v3.7 — retired, out of Legal Eagle scope (predates v3, bundled in by mistake)',
+    tag: 'green', tagLabel: 'Deprecated v3.7',
     cols: [
-      { heading: 'What it is', items: ['Pre-v3 (v2.30) regs → JIRA EPIC / SAP Notes knowledge base', '3-column Countries → Topics → Node detail', 'Unrelated to the monitor→announce pipeline — being retired'] },
-      { heading: 'v3.7 plan', items: ['Retire legal_repo.html + repo routes + repo_nodes/repo_assets', 'Export/migrate any real data first (decide at v3.7 start)', 'Remove from this lifecycle once shipped'] },
+      { heading: 'What it was', items: ['Pre-v3 (v2.30) regs → JIRA EPIC / SAP Notes knowledge base', '3-column Countries → Topics → Node detail', 'Unrelated to the monitor→announce pipeline'] },
+      { heading: 'What was removed', items: ['legal_repo.html + 8 routes + repo_nodes/repo_assets schema', '11 DB helpers + loka_client.py stub', 'Data exported to scripts/archive/repo_export_v3.7.json'] },
     ]
   },
 };

@@ -31,8 +31,6 @@ TABLES = [
     "glossary_terms",
     "glossary_synonyms",
     "glossary_patterns",
-    "repo_nodes",
-    "repo_assets",
 ]
 
 SEED_FILE = os.path.join(os.path.dirname(__file__), "btp_seed_data.json")

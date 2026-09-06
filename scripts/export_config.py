@@ -5,8 +5,7 @@ Run this locally whenever you make config changes, before cf push.
 
 Tables exported (no secrets, no runtime data):
   profiles, url_sources, rss_feeds, tweet_accounts, email_receivers,
-  glossary_terms, glossary_synonyms, glossary_patterns,
-  repo_nodes, repo_assets
+  glossary_terms, glossary_synonyms, glossary_patterns
 
 NOT exported (environment-specific or runtime):
   settings (ANS keys — BTP-only), runs, run_logs, news_items,
@@ -34,8 +33,6 @@ TABLES = [
     "glossary_terms",
     "glossary_synonyms",
     "glossary_patterns",
-    "repo_nodes",
-    "repo_assets",
 ]
 
 OUTPUT = os.path.join(os.path.dirname(__file__), "btp_seed_data.json")

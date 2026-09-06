@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## v3.7 — 2026-09-06
+### Deprecate Legal Repository
+Retired the Legal Repository subsystem that was bundled into Legal Eagle by mistake (predates v3, out of scope for the pipeline tool):
+- Removed `repo_nodes` + `repo_assets` table schema and all 11 DB helper functions from `configurations/db.py`
+- Removed 8 Flask routes (`/admin/legal-repo/*`, `/admin/.../to-legal-repo`) from `admin/app.py`
+- Deleted `admin/templates/legal_repo.html`
+- Removed "Send to Legal Repo" modal variables (`repo_node_map`, `repo_parent_options`) from the review route
+- Removed "Legal Repo ›" nav link from `admin/templates/base.html`
+- Deleted `agents/loka_client.py` (stub with zero callers)
+- Removed `repo_nodes`/`repo_assets` from `scripts/export_config.py` + `scripts/import_config.py`
+- Data archived to `scripts/archive/repo_export_v3.7.json` before removal
+
 ## v3.6 — 2026-09-06
 ### Preview for RCM + Close-the-Loop
 

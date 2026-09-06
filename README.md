@@ -4,7 +4,7 @@
 
 > AI-powered platform that monitors legal changes, interprets their meaning, and helps SAP Localization teams respond faster with higher intelligence.
 
-**Current version: v3.6** — Preview for RCM + Close-the-Loop · [CHANGELOG](CHANGELOG.md)
+**Current version: v3.7** — Deprecate Legal Repository · [CHANGELOG](CHANGELOG.md)
 
 ---
 
@@ -50,7 +50,7 @@ Legal Eagle automatically:
 | **Bilingual Digests** | Native language + English translation in single email |
 | **Human-in-the-Loop** | Review/score workflow continuously improves accuracy |
 | **Specialized Scrapers** | Custom support for Turkey Official Gazette, Saudi GOSI, and more |
-| **Legal Repository** | Global knowledge base linking regulations → SAP delivery artifacts (JIRA, Notes, PRDs) |
+| **Legal Repository** | ~~Global knowledge base linking regulations → SAP delivery artifacts~~ — *deprecated v3.7* |
 | **Test Harness** | Deterministic integration tests (XN/HCM imaginary profile, localhost fixture server, AI cache replay) |
 | **BTP Email via ANS** | SAP Alert Notification Service handles outbound email on BTP Cloud Foundry *(disabled — re-enable on next BTP deployment)* |
 
