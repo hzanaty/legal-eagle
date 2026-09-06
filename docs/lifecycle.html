@@ -437,12 +437,6 @@
       <div class="step-name">Impact Analysis</div>
       <div class="step-sub">AI per aspect · V4</div>
     </div>
-    <div class="inner-arrow">›</div>
-    <div class="step built" onclick="showDetail('legal-repo')">
-      <span class="actor human" title="Human"><svg class="ic"><use href="#ic-human"/></svg></span>
-      <div class="step-name">Legal Repo</div>
-      <div class="step-sub">Deprecated · v3.7</div>
-    </div>
   </div>
 </div>
 
@@ -755,15 +749,6 @@ const details = {
     cols: [
       { heading: 'What it does', items: ['AI call per announcement → impact report (affected products, before/after, expected solution)', 'Cached to news_announcements.impact_analysis_md (new V4 column)', '"Preview Analysis" button: AI first click, cached thereafter, Copy MD → Law2Spec Prompt', 'Grounding is external — NOT the deprecated in-app Legal Repo'] },
       { heading: 'Resources (L2A hub — verify at V4)', items: ['glo-functional-spec-fitgap-generator skill (law→product fit/gap)', 'glo-taxonomy-kg + sap-mcp-glorep-kg (legal/requirements KGs)', 'SAP ABAP MCP + SAP Enterprise Knowledge Graph (technical)', 'agents/impact_analyzer.py (new)'] },
-    ]
-  },
-  'legal-repo': {
-    title: 'Legal Repository',
-    subtitle: 'Deprecated v3.7 — retired, out of Legal Eagle scope (predates v3, bundled in by mistake)',
-    tag: 'green', tagLabel: 'Deprecated v3.7',
-    cols: [
-      { heading: 'What it was', items: ['Pre-v3 (v2.30) regs → JIRA EPIC / SAP Notes knowledge base', '3-column Countries → Topics → Node detail', 'Unrelated to the monitor→announce pipeline'] },
-      { heading: 'What was removed', items: ['legal_repo.html + 8 routes + repo_nodes/repo_assets schema', '11 DB helpers + loka_client.py stub', 'Data exported to scripts/archive/repo_export_v3.7.json'] },
     ]
   },
 };
