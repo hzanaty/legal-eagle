@@ -89,14 +89,6 @@
 
   .item-actions { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 7px; }
   .override-strip { display: flex; gap: 3px; }
-  .ov-btn { width: 26px; height: 26px; border-radius: 4px; border: 1px solid #e5e5e5; background: white; font-size: 11px; font-weight: 700; color: #d0d0d0; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.1s; }
-  .ov-btn:hover { border-color: #aaa; color: #6a6d70; background: #f5f5f5; }
-  .ov-btn.ai-rank { border-color: #e5e5e5; color: #aaa; background: white; }
-  .ov-btn.ov-1 { background: #ffeaea; color: #bb0000; border-color: #f5c0c0; }
-  .ov-btn.ov-2 { background: #fff3e0; color: #e9730c; border-color: #ffe0b2; }
-  .ov-btn.ov-3 { background: #fffde7; color: #f0ab00; border-color: #fff176; }
-  .ov-btn.ov-4 { background: #e3f2fd; color: #0a6ed1; border-color: #bbdefb; }
-  .ov-btn.ov-5 { background: #e8f5e9; color: #107e3e; border-color: #c8e6c9; }
   .override-label { font-size: 9px; color: #6a6d70; text-align: right; }
   .override-label.overridden { color: #e9730c; font-weight: 700; }
   .btn-delete { background: transparent; border: none; color: #bb0000; font-size: 10px; cursor: pointer; opacity: 0.4; }
@@ -153,12 +145,13 @@
   .act-btn { background: white; border: 1px solid #d9d9d9; border-radius: 4px; padding: 3px 7px; font-size: 12px; line-height: 1; cursor: pointer; }
   .act-btn:hover { background: #f0f7ff; border-color: #0a6ed1; }
   /* Side-by-side translation on a card */
-  .tr-cols { display: flex; gap: 10px; margin-top: 6px; }
-  .tr-col { flex: 1; min-width: 0; font-size: 11px; line-height: 1.5; }
-  .tr-col h5 { margin: 0 0 3px; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #6a6d70; }
-  .tr-col.orig { color: #6a6d70; }
-  .tr-col.tr { color: #32363a; background: #f5f9ff; border-left: 2px solid #c5d8f5; border-radius: 0 3px 3px 0; padding: 4px 8px; }
-  .tr-col .tr-title { font-weight: 600; margin-bottom: 2px; }
+  /* Translation splits the card: original stays in .item-main (left), this panel is the right half */
+  .item-tr { flex: 1; min-width: 0; align-self: stretch; background: #f5f9ff; border-left: 2px solid #c5d8f5; border-radius: 4px; padding: 8px 11px; }
+  .item-tr-head { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #6a6d70; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; }
+  .item-tr-x { cursor: pointer; color: #aaa; font-weight: 700; }
+  .item-tr-x:hover { color: #bb0000; }
+  .item-tr-title { font-size: 12px; font-weight: 600; color: #32363a; margin-bottom: 3px; line-height: 1.4; }
+  .item-tr-body { font-size: 11px; color: #6a6d70; line-height: 1.5; }
   /* Challenge modal */
   .challenge-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:9000; align-items:center; justify-content:center; }
   .challenge-overlay.open { display:flex; }
@@ -537,13 +530,14 @@
         {% endif %}
       </div>
       <div class="item-actions">
-        {% if score >= 1 or raw is none %}
-        <div class="override-strip">
-          {% for n in range(1, 6) %}
-          <button class="ov-btn {% if score == n %}ai-rank{% endif %}" onclick="setOverride(this, {{ n }})">{{ n }}</button>
-          {% endfor %}
-        </div>
-        <div class="override-label">{% if score >= 1 %}AI rank · no override{% else %}Not yet scored{% endif %}</div>
+        {% if score >= 1 %}
+          {% if item.override_rank %}
+          <div class="override-label overridden" title="{{ item.override_reason }}">AI: {{ score }} &rsaquo; You: {{ item.override_rank }}</div>
+          {% else %}
+          <div class="override-label">AI rank: {{ score }}</div>
+          {% endif %}
+        {% elif raw is none %}
+        <div class="override-label">Not yet scored</div>
         {% else %}
         <div style="font-size:10px;color:#aaa;text-align:right;line-height:1.8">Rank 0<br>Not evaluated</div>
         {% endif %}
@@ -669,13 +663,8 @@
       .then(function(d){
         if (d.ok) {
           document.getElementById('chReflection').textContent = d.reflection || 'Saved.';
-          // Update the rank badge on whichever card triggered this (flat or grouped)
-          var cards = document.querySelectorAll('[data-item-id="' + _challengeItemId + '"]');
-          cards.forEach(function(card){
-            var badge = card.querySelector('.src-rank-badge, .rank-badge');
-            if (badge) { badge.textContent = rank; badge.className = badge.className.replace(/rank-\S+/, 'rank-' + rank); }
-          });
-          setTimeout(closeChallenge, 1800);
+          // Reload so the AI › You label and effective rank render from the DB.
+          setTimeout(function(){ location.reload(); }, 1200);
         } else {
           document.getElementById('chReflection').textContent = 'Error: ' + (d.error || 'unknown');
           document.getElementById('chConfirmBtn').disabled = false;
@@ -710,10 +699,7 @@
   function translateItem(btn, itemId) {
     var lang = document.getElementById('reviewLang').value;
     var card = btn.closest('.item-card, .src-card');
-    var titleEl = card.querySelector('.item-title, .src-title');
-    var snipEl = card.querySelector('.item-snippet');
-    var origTitle = titleEl ? titleEl.textContent : '';
-    var origSnip = snipEl ? snipEl.textContent : '';
+    var main = card.querySelector('.item-main, .src-card-body');
     var old = btn.textContent; btn.textContent = '…'; btn.disabled = true;
     fetch('/admin/profiles/' + _profileId + '/review/translate', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -723,12 +709,18 @@
       var tr = (d.translations && d.translations[0]) || null;
       if (!tr) { alert('Translation failed.'); return; }
       var langName = document.getElementById('reviewLang').selectedOptions[0].textContent;
-      var host = card.querySelector('.item-main, .src-card-body');
-      var box = host.querySelector('.tr-cols');
-      if (!box) { box = document.createElement('div'); box.className = 'tr-cols'; host.appendChild(box); }
-      box.innerHTML =
-        '<div class="tr-col orig"><h5>Original</h5><div class="tr-title">' + _esc(origTitle) + '</div><div>' + _esc(origSnip) + '</div></div>' +
-        '<div class="tr-col tr"><h5>' + _esc(langName) + '</h5><div class="tr-title">' + _esc(tr.title || '') + '</div><div>' + _esc(tr.content || '') + '</div></div>';
+      // Split the card: original stays on the left (main), translation panel on the right.
+      var panel = card.querySelector('.item-tr');
+      if (!panel) {
+        panel = document.createElement('div');
+        panel.className = 'item-tr';
+        main.parentNode.insertBefore(panel, main.nextSibling);  // right of the original
+      }
+      panel.innerHTML =
+        '<div class="item-tr-head">' + _esc(langName) +
+        ' <span class="item-tr-x" title="Hide translation" onclick="this.closest(\'.item-tr\').remove()">✕</span></div>' +
+        '<div class="item-tr-title">' + _esc(tr.title || '') + '</div>' +
+        '<div class="item-tr-body">' + _esc(tr.content || '') + '</div>';
     }).catch(function(e){ btn.textContent = old; btn.disabled = false; alert('Network error: ' + e); });
   }
   function _esc(s){ var d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
@@ -992,16 +984,6 @@
       alert('Network error: ' + e);
       btn.disabled = false;
     });
-  }
-  // Clicking a 1–5 number no longer changes the rank silently — it opens the Re-rank
-  // modal pre-filled with that rank, so a reason is captured (saved as grounding).
-  function setOverride(btn, rank) {
-    var card = btn.closest('.item-card, .src-card');
-    var idEl = card ? card.querySelector('[data-item-id]') : null;
-    var itemId = idEl ? idEl.getAttribute('data-item-id') : (card ? card.getAttribute('data-item-id') : null);
-    var titleEl = card ? card.querySelector('.item-title, .src-title') : null;
-    var title = titleEl ? titleEl.textContent : '';
-    if (itemId) openChallenge(parseInt(itemId), title, rank);
   }
   function toggleTr(id) {
     var el = document.getElementById(id);

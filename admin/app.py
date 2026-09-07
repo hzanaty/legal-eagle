@@ -2804,7 +2804,7 @@ def admin_review_translate(profile_id: int):
     )
 
     try:
-        from agents.email_sender import _get_ai_client
+        from agents.email_composer import _get_ai_client
         client = _get_ai_client()
         response = client.chat.completions.create(
             model="gpt-4o",

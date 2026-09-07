@@ -23,9 +23,15 @@
   `target_lang`.
 - **Fix**: the `/challenge` route unpacked `_tier2_score` as 2 values but it returns 3 since
   v3.10 (rank, reasoning, effective_date) — the Re-rank/Challenge flow was erroring; now fixed.
+- **Override display**: the 1–5 override strip is replaced by an **`AI rank: N`** label that
+  shows **`AI: N › You: M`** (reason on hover) once overridden — the AI original stays visible.
+  `human_rank_override`/`human_override_reason` are now loaded into the Review list.
+- **Translate UX**: clicking 🌐 splits the card (original left, translation right) instead of
+  appending a duplicated block; fixed a broken AI-client import (`email_sender` →
+  `email_composer`) that made translation fail.
 - **Docs**: README "How It Works" pipeline rewritten from the v2-era flow (removed the legacy
-  `GROUP (AI)` step); SPEC §7.5 stage checklist and ranking sections refreshed; rank-scale table
-  is 1–5 with duplicates noted as a Compare dedup outcome.
+  `GROUP (AI)` step); SPEC §7.5 stage checklist and §7.10 Review UI refreshed; ranking sections
+  and rank-scale table aligned (1–5, duplicates noted as a Compare dedup outcome).
 - **Test Harness**: 22/22.
 
 ## v3.11 — 2026-09-08

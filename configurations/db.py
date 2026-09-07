@@ -1594,6 +1594,7 @@ def list_all_news_for_review(
                    relevance_score, reviewed_at,
                    publisher, authority_id, authority_status, dedup_status,
                    significance_rank, rank_tier, rank_reasoning,
+                   human_rank_override, human_override_reason,
                    repetition_status, repetition_count,
                    topic_label, email_eligible, email_sent, glossary_gap,
                    effective_date,
@@ -1617,6 +1618,8 @@ def list_all_news_for_review(
             item['created_at'] = r['first_seen_at']
             # v3.2: unified rank/tag fields for template
             item['rank'] = r['significance_rank'] if 'significance_rank' in r.keys() else None
+            item['override_rank'] = r['human_rank_override'] if 'human_rank_override' in r.keys() else None
+            item['override_reason'] = r['human_override_reason'] if 'human_override_reason' in r.keys() else None
             item['status'] = (r['repetition_status'] or '').upper() if 'repetition_status' in r.keys() else ''
             # v3.5: glossary gap flag — consumed by review_news.html (item.is_gap)
             item['is_gap'] = bool(int(item.get('glossary_gap') or 0))

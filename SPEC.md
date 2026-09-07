@@ -1066,8 +1066,9 @@ def run_profile_once(
 - `POST /admin/profiles/<id>/urls/simulate` · `POST /admin/profiles/<id>/urls/simulate/save` — Source Simulator (⚡) discover + persist (v3.1, F9)
 - `POST /admin/profiles/<id>/news/<item_id>/authority` — authority override on inferred items (v3.2)
 - `POST /admin/send-email` — send digest for `item_ids` (manual) or `run_id` (Resend) (v3.3)
-- `POST /admin/news/<item_id>/challenge` · `POST /admin/news/<item_id>/confirm-challenge` — Challenge modal + confirm (writes `human_rank_override`, `ranking_grounding`, `ranking_signals`) (v3.4)
-- `POST /admin/news/<item_id>/rerank` · `POST /admin/profiles/<id>/rerank-all` — Re-rank one / all items (F6)
+- `POST /admin/news/<item_id>/challenge` · `POST /admin/news/<item_id>/confirm-challenge` — 🚩 Re-rank modal + confirm (writes `human_rank_override`, `ranking_grounding`, `ranking_signals`) (v3.4)
+- `POST /admin/news/<item_id>/rematch` — per-item Glossary Match re-run (deterministic) (v3.12)
+- `POST /admin/news/<item_id>/rerank` — re-run ranker on one item (retained; the toolbar "Re-rank All" was removed in v3.12 in favour of per-item 🚩 Re-rank)
 - `POST /admin/profiles/<id>/glossary/suggest` — AI keyword suggestions (regex fallback) (v3.5)
 - `POST /admin/news/<item_id>/add-to-glossary` — add term + re-match + clear gap flag (v3.5)
 
@@ -1076,7 +1077,7 @@ def run_profile_once(
 
 #### v2.31 Routes
 - `GET /admin/preflight` - Pre-run checklist JSON (checks, ready)
-- `POST /admin/profiles/<id>/review/translate` - Batch translate review items to English
+- `POST /admin/profiles/<id>/review/translate` - Per-item translate into any `target_lang` (loads text from DB; side-by-side display in Review) (v3.12)
 - `GET /Resources/<path>` - Serve files from project Resources/ directory
 
 #### BTP Config Sync (v2.31)
@@ -1211,11 +1212,11 @@ Credentials go in the `Authorization: Basic` header (not the request body) — r
 - `new_url` form field: if different from original `url`, old row is deleted and new row inserted
 - Preserves all other fields (mode, sample_link, read_more_label, etc.)
 
-**Auto-translate in Review:**
-- Non-English profiles auto-translate all visible news items to English on page load
-- Uses SAP AI Core (gpt-4o) via `POST /admin/profiles/<id>/review/translate`
-- Translation shown inline below original text
-- Response format: `{"translations": {"<id>": {"title_en": "...", "content_en": "..."}}}`
+**Translate in Review (v3.12):**
+- Per-item, on demand: a header language picker (any `LANGUAGE_NAMES` code, remembered per browser in `localStorage`) + a 🌐 button on each card.
+- Clicking splits the card — original stays left, translation panel on the right (dismissible).
+- Uses SAP AI Core (gpt-4o) via `POST /admin/profiles/<id>/review/translate` (loads item text from the DB by id).
+- Request: `{"item_ids": [<id>], "target_lang": "de"}` · Response: `{"translations": [{"id", "title", "content"}]}`
 
 **Pre-run Preflight Checklist:**
 - `GET /admin/preflight?profile_id=<id>` returns JSON `{checks: [...], ready: bool}`
@@ -1261,7 +1262,10 @@ The Review tab (`admin/templates/review_news.html`) is the human surface for the
 
 - **Rank badges**: colour-coded 0–5 circles (0 = grey DUPLICATE, 3 = yellow, 4 = orange, 5 = red). DUPLICATE items sit in a collapsed section — never dropped.
 - **Attribution**: Channel / Publisher / Authority columns; ✦ spark icon on AI-inferred authority items with an inline authority-override dropdown.
-- **Challenge + Re-rank** (v3.4/F6): a Challenge button re-evaluates an item with full grounding context and auto-populates an override reason; confirm writes the override plus a Tier-2 grounding example and a Tier-1 rule simultaneously. Re-rank re-runs the ranker on existing items (no re-fetch), per-item or profile-wide.
+- **Per-item actions (v3.12)**: every card carries **🚩 Re-rank · 🔖 Re-match · 🌐 Translate** (both in the flat list and the grouped Sources view — no longer gated to the announcements view). The old 1–5 override strip is gone; each card shows an **`AI rank: N`** label that becomes **`AI: N › You: M`** (reason on hover) once overridden. `significance_rank` stays the AI original; `human_rank_override` holds the human value (loaded into the Review list).
+- **🚩 Re-rank = Challenge + grounding** (v3.4, relocated v3.12): re-runs the ranker on the item, shows the AI's rank + reasoning, and requires a reason to override; a single confirm writes `human_rank_override` + a Tier-2 grounding example (`ranking_grounding`) + a Tier-1 rule (`ranking_signals`). Editing a rank is only possible through this reason-gated flow.
+- **🔖 Re-match** (v3.12): `POST /admin/news/<id>/rematch` re-runs Glossary Match on the one item (deterministic, no AI) and refreshes its topic labels / gap flag.
+- **🌐 Translate** (v3.12): a header language picker (remembered per browser in `localStorage`) + a per-item Translate button that splits the card — original stays on the left, translation panel on the right. Backed by `POST /admin/profiles/<id>/review/translate` (any `target_lang`).
 - **Topic → Announcement → Sources hierarchy** (v3.4): Level 1 = Topic (`topic_label`), Level 2 = Announcement (`news_announcements`), Level 3 = Sources (backing `news_items` via `item_ids_json`). Clicking an Announcement renders `announcement_md` inline as markdown.
 - **Glossary Gap Alert** (v3.5): a `⚠ N glossary gaps` toolbar strip with a "Show only gaps" filter, and a `⚠ Gap — no LoB match` badge per flagged card (driven by `item.is_gap`). An inline **+ Add to Glossary** panel AI-suggests keywords; confirming a term + LoB saves the term, re-matches the item against the glossary, and clears the gap flag with no navigation away.
 - **Email controls** (v3.3): All / Unsent-only filter chip, ✉ Unsent / ✓ Sent pill per item, and a "✉ Send Email (N)" toolbar button. Publish dates surface on every card.
