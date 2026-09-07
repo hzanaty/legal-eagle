@@ -8,6 +8,8 @@
 - **UTF-8 decoding** (`agents/url_sources_runner.py`): fall back to `apparent_encoding` when a server omits charset — fixes Turkish mojibake (Güvenlik was rendering as GÃ¼venlik). Applied to both `scrape_url_source_with_config` and `http_get`.
 - **Glossary Turkish-İ matching + relevance floor** (`agents/news_tagger.py`, `agents/news_ranker.py`): `_norm()` strips the combining dot from `İ.lower()` so `istihdam` matches `İstihdam`; a real glossary match now floors significance at rank 2 so on-topic items aren't scored off-topic.
 - **Reset Data** (`configurations/db.py`, `admin/templates/review_news.html`): new review-screen button with confirmation modal; reset now also clears each URL source's `last_successful_fetch` so re-runs start from a clean window instead of a stale delta anchor.
+- **Rank scale documented**: the 1–5 significance scale — with labels Noise/Signal/Watch/Legal Change/Urgent (0 = Duplicate) — is now written up in SPEC.md §5.7a and surfaced in the Run-tab help modal via `configurations/pipeline_help.json` (`Analyzing.ranks`). Previously the per-level meaning lived only in the ranker's Tier-2 prompt.
+- **Review filter help**: "?" button on the Review filter bar opens a modal explaining all four dimensions (Rank / Tag / Glossary / Email). Tag/Glossary/Email text in new `configurations/review_help.json`; the Rank scale is reused from `pipeline_help.json` (single source, no duplication).
 - **Test Harness**: 22/22.
 
 ## v3.7 — 2026-09-06
