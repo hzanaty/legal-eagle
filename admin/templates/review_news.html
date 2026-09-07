@@ -7,6 +7,8 @@
   .filter-bar { background: white; border-bottom: 1px solid #e5e5e5; padding: 10px 16px; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; position: relative; }
   .filter-help-btn { position: absolute; top: 10px; right: 14px; width: 22px; height: 22px; border-radius: 50%; border: 1px solid #c5d8f5; background: #e8f1fb; color: #0a6ed1; font-size: 12px; font-weight: 700; cursor: pointer; line-height: 1; padding: 0; z-index: 1; }
   .filter-help-btn:hover { background: #d3e6fb; }
+  .review-lang { position: absolute; top: 8px; right: 44px; display: flex; align-items: center; gap: 4px; z-index: 1; }
+  .review-lang select { font-size: 11px; border: 1px solid #c5d8f5; border-radius: 4px; padding: 2px 4px; color: #0a6ed1; background: #e8f1fb; cursor: pointer; }
   .fhelp-group { padding: 12px 0; border-top: 1px solid #f0f0f0; }
   .fhelp-group:first-of-type { border-top: none; }
   .fhelp-group > .fhelp-dim { font-size: 11px; font-weight: 700; color: #6a6d70; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
@@ -145,6 +147,18 @@
   .btn-challenge:hover { background: #ffeaea; }
   .btn-rerank { background: white; border: 1px solid #d9d9d9; color: #6a6d70; font-size: 10px; font-weight: 700; border-radius: 3px; padding: 3px 7px; cursor: pointer; }
   .btn-rerank:hover { background: #f5f5f5; }
+  /* Item-level action buttons (Re-rank / Re-match / Translate) — shown on every card */
+  .item-act-row { display: flex; gap: 4px; justify-content: flex-end; margin-top: 6px; }
+  .src-actions { display: flex; gap: 4px; }
+  .act-btn { background: white; border: 1px solid #d9d9d9; border-radius: 4px; padding: 3px 7px; font-size: 12px; line-height: 1; cursor: pointer; }
+  .act-btn:hover { background: #f0f7ff; border-color: #0a6ed1; }
+  /* Side-by-side translation on a card */
+  .tr-cols { display: flex; gap: 10px; margin-top: 6px; }
+  .tr-col { flex: 1; min-width: 0; font-size: 11px; line-height: 1.5; }
+  .tr-col h5 { margin: 0 0 3px; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #6a6d70; }
+  .tr-col.orig { color: #6a6d70; }
+  .tr-col.tr { color: #32363a; background: #f5f9ff; border-left: 2px solid #c5d8f5; border-radius: 0 3px 3px 0; padding: 4px 8px; }
+  .tr-col .tr-title { font-weight: 600; margin-bottom: 2px; }
   /* Challenge modal */
   .challenge-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:9000; align-items:center; justify-content:center; }
   .challenge-overlay.open { display:flex; }
@@ -194,6 +208,14 @@
 <div class="review-body">
   <div class="filter-bar">
     <button type="button" class="filter-help-btn" onclick="openFilterHelp()" title="What do these filters mean?" aria-label="Filter help">?</button>
+    <div class="review-lang">
+      <span title="Language used when you click Translate on an item">&#127760;</span>
+      <select id="reviewLang" onchange="setReviewLang(this.value)" title="Translation target language">
+        {% for code, name in language_names.items() %}
+        <option value="{{ code }}">{{ name }}</option>
+        {% endfor %}
+      </select>
+    </div>
     <div class="filter-row">
       <span class="filter-label">Rank</span>
       <div class="chip-group">
@@ -308,12 +330,12 @@
     </div>
   </div>
 
-  <!-- Challenge modal (v3.4) -->
+  <!-- Re-rank modal (formerly Challenge, v3.4) -->
   <div class="challenge-overlay" id="challengeOverlay">
     <div class="challenge-modal" id="challengeModal">
-      <div class="ch-loading" id="chLoading">Analysing item…</div>
+      <div class="ch-loading" id="chLoading">Re-ranking item…</div>
       <div id="chContent" style="display:none">
-        <h3>&#9889; Challenge AI Ranking</h3>
+        <h3>&#128681; Re-rank</h3>
         <div class="ch-subtitle" id="chTitle"></div>
         <div class="ch-rank-row">
           <div class="ch-rank-cell">
@@ -326,15 +348,15 @@
           </div>
         </div>
         <div class="ch-reasoning" id="chReasoning"></div>
-        <div class="ch-reason-label">Override rank &amp; reason</div>
+        <div class="ch-reason-label">Override rank &amp; reason (required)</div>
         <select class="ch-rank-select" id="chOverrideRank">
-          <option value="1">1 — Off-topic / macro</option>
-          <option value="2">2 — Indirect implication</option>
-          <option value="3">3 — Operational impact</option>
-          <option value="4">4 — Upcoming regulatory change</option>
-          <option value="5">5 — Enacted / immediate obligation</option>
+          <option value="1">1 — Noise</option>
+          <option value="2">2 — Signal</option>
+          <option value="3">3 — Watch</option>
+          <option value="4">4 — Legal Change</option>
+          <option value="5">5 — Urgent</option>
         </select>
-        <textarea class="ch-reason-input" id="chOverrideReason" rows="2" placeholder="Why does this rank matter? (used as a future Tier 1 signal)"></textarea>
+        <textarea class="ch-reason-input" id="chOverrideReason" rows="2" oninput="_syncChConfirm()" placeholder="Why does this rank matter? (required — saved as a future Tier-1 signal)"></textarea>
         <div class="ch-footer">
           <span class="ch-reflection" id="chReflection"></span>
           <button class="ch-btn-cancel" onclick="closeChallenge()">Cancel</button>
@@ -380,7 +402,6 @@
   <div class="view-toggle">
     <button class="vtab active" id="vtab-ann" onclick="showView('ann')">&#127758; Announcements ({{ topics|length }} topics)</button>
     <button class="vtab" id="vtab-items" onclick="showView('items')">&#128240; All Items</button>
-    <button class="vtab" id="rerankAllBtn" onclick="rerankAll(this)" style="margin-left:auto;color:#0a6ed1;border-color:#0a6ed1;">&#9881; Re-rank All</button>
   </div>
   {% endif %}
 
@@ -426,8 +447,9 @@
                     </div>
                   </div>
                   <div class="src-actions">
-                    <button class="btn-rerank" onclick="rerankItem({{ src.id }}, this)" title="Re-rank this item">&#8635;</button>
-                    <button class="btn-challenge" onclick="openChallenge({{ src.id }}, '{{ src.title|replace("'", "\\'") }}')" title="Challenge AI rank">&#9889;</button>
+                    <button class="act-btn" onclick="openChallenge({{ src.id }}, '{{ src.title|replace("'", "\\'") }}')" title="Re-rank (dispute the AI rank with a reason)">&#128681;</button>
+                    <button class="act-btn" onclick="rematchItem(this, {{ src.id }})" title="Re-match against the glossary">&#128278;</button>
+                    <button class="act-btn" onclick="translateItem(this, {{ src.id }})" title="Translate this item">&#127760;</button>
                   </div>
                 </div>
                 {% endfor %}
@@ -525,6 +547,11 @@
         {% else %}
         <div style="font-size:10px;color:#aaa;text-align:right;line-height:1.8">Rank 0<br>Not evaluated</div>
         {% endif %}
+        <div class="item-act-row">
+          <button class="act-btn" onclick="openChallenge({{ item.id }}, '{{ item.title|replace("'", "\\'") }}')" title="Re-rank (dispute the AI rank with a reason)">&#128681;</button>
+          <button class="act-btn" onclick="rematchItem(this, {{ item.id }})" title="Re-match against the glossary">&#128278;</button>
+          <button class="act-btn" onclick="translateItem(this, {{ item.id }})" title="Translate this item">&#127760;</button>
+        </div>
         {% if item.authority_status == 'inferred' and item.item_source == 'accepted' %}
         <form method="POST" action="{{ url_for('set_news_item_authority', profile_id=selected_profile.id, item_id=item.id) }}" style="text-align:right;">
           <select name="authority_id" style="font-size:10px;max-width:120px;border:1px solid #e5e5e5;border-radius:3px;padding:2px 4px;" onchange="this.form.submit()">
@@ -590,15 +617,22 @@
     icon.classList.toggle('collapsed', !collapsed);
   }
 
-  // ── Challenge modal ──
+  // ── Re-rank modal (formerly Challenge) ──
   var _challengeItemId = null;
-  function openChallenge(itemId, title) {
+  var _challengePreRank = null;
+  function _syncChConfirm() {
+    // Reason is mandatory — Confirm stays disabled until a reason is typed.
+    var reason = (document.getElementById('chOverrideReason').value || '').trim();
+    document.getElementById('chConfirmBtn').disabled = reason.length === 0;
+  }
+  function openChallenge(itemId, title, preRank) {
     _challengeItemId = itemId;
+    _challengePreRank = preRank || null;
     document.getElementById('challengeOverlay').classList.add('open');
     document.getElementById('chLoading').style.display = 'block';
     document.getElementById('chContent').style.display = 'none';
     document.getElementById('chReflection').textContent = '';
-    document.getElementById('chConfirmBtn').disabled = false;
+    document.getElementById('chConfirmBtn').disabled = true;
     fetch('/admin/news/' + itemId + '/challenge', { method: 'POST' })
       .then(function(r){ return r.json(); })
       .then(function(d){
@@ -609,8 +643,9 @@
         document.getElementById('chSugRank').textContent = d.suggested_rank || '?';
         document.getElementById('chReasoning').textContent = d.reasoning || '';
         var sel = document.getElementById('chOverrideRank');
-        sel.value = d.suggested_rank || 2;
+        sel.value = _challengePreRank || d.suggested_rank || 2;
         document.getElementById('chOverrideReason').value = '';
+        _syncChConfirm();
       })
       .catch(function(e){
         document.getElementById('chLoading').textContent = 'Error: ' + e;
@@ -624,6 +659,7 @@
     if (!_challengeItemId) return;
     var rank = parseInt(document.getElementById('chOverrideRank').value);
     var reason = document.getElementById('chOverrideReason').value.trim();
+    if (!reason) { _syncChConfirm(); return; }  // reason is mandatory
     document.getElementById('chConfirmBtn').disabled = true;
     fetch('/admin/news/' + _challengeItemId + '/confirm-challenge', {
       method: 'POST',
@@ -633,12 +669,12 @@
       .then(function(d){
         if (d.ok) {
           document.getElementById('chReflection').textContent = d.reflection || 'Saved.';
-          // Update rank badge on the source card
-          var card = document.querySelector('[data-item-id="' + _challengeItemId + '"]');
-          if (card) {
-            var badge = card.querySelector('.src-rank-badge');
-            if (badge) { badge.textContent = rank; badge.className = 'src-rank-badge rank-' + rank; }
-          }
+          // Update the rank badge on whichever card triggered this (flat or grouped)
+          var cards = document.querySelectorAll('[data-item-id="' + _challengeItemId + '"]');
+          cards.forEach(function(card){
+            var badge = card.querySelector('.src-rank-badge, .rank-badge');
+            if (badge) { badge.textContent = rank; badge.className = badge.className.replace(/rank-\S+/, 'rank-' + rank); }
+          });
           setTimeout(closeChallenge, 1800);
         } else {
           document.getElementById('chReflection').textContent = 'Error: ' + (d.error || 'unknown');
@@ -654,31 +690,48 @@
   document.getElementById('challengeOverlay').addEventListener('click', function(e){
     if (e.target === this) closeChallenge();
   });
-  function rerankItem(itemId, btn) {
-    btn.textContent = '…';
-    fetch('/admin/news/' + itemId + '/rerank', { method: 'POST' })
+  // ── Re-match (glossary) per item ──
+  function rematchItem(btn, itemId) {
+    var old = btn.textContent;
+    btn.textContent = '…'; btn.disabled = true;
+    fetch('/admin/news/' + itemId + '/rematch', { method: 'POST' })
       .then(function(r){ return r.json(); })
       .then(function(d){
-        btn.textContent = '↺';
-        if (d.new_rank) {
-          var badge = btn.closest('.src-card').querySelector('.src-rank-badge');
-          if (badge) { badge.textContent = d.new_rank; badge.className = 'src-rank-badge rank-' + d.new_rank; }
-        }
-      }).catch(function(){ btn.textContent = '↺'; });
+        btn.textContent = old; btn.disabled = false;
+        if (d.ok) {
+          alert('Re-matched: ' + (d.topic_label && d.topic_label.length ? d.topic_label.join(', ') : 'no glossary match') + '. Reload to see updated tags.');
+          location.reload();
+        } else { alert('Re-match failed: ' + (d.error || 'unknown')); }
+      }).catch(function(e){ btn.textContent = old; btn.disabled = false; alert('Network error: ' + e); });
   }
-  function rerankAll(btn) {
-    if (!confirm('Re-rank all items in the latest run? This calls the AI tier.')) return;
-    btn.textContent = '⚙ Re-ranking…';
-    btn.disabled = true;
-    fetch('/admin/profiles/' + _profileId + '/rerank-all', { method: 'POST' })
-      .then(function(r){ return r.json(); })
-      .then(function(d){
-        btn.textContent = '⚙ Re-rank All';
-        btn.disabled = false;
-        if (d.ok) { alert('Re-ranked ' + d.reranked + ' items. Reload to see updated badges.'); location.reload(); }
-        else { alert('Error: ' + (d.error || 'unknown')); }
-      }).catch(function(e){ btn.textContent = '⚙ Re-rank All'; btn.disabled = false; alert('Network error: ' + e); });
+
+  // ── Translate per item (side-by-side, into the header-selected language) ──
+  function setReviewLang(v) { try { localStorage.setItem('reviewLang', v); } catch(e){} }
+  function translateItem(btn, itemId) {
+    var lang = document.getElementById('reviewLang').value;
+    var card = btn.closest('.item-card, .src-card');
+    var titleEl = card.querySelector('.item-title, .src-title');
+    var snipEl = card.querySelector('.item-snippet');
+    var origTitle = titleEl ? titleEl.textContent : '';
+    var origSnip = snipEl ? snipEl.textContent : '';
+    var old = btn.textContent; btn.textContent = '…'; btn.disabled = true;
+    fetch('/admin/profiles/' + _profileId + '/review/translate', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ item_ids: [parseInt(itemId)], target_lang: lang })
+    }).then(function(r){ return r.json(); }).then(function(d){
+      btn.textContent = old; btn.disabled = false;
+      var tr = (d.translations && d.translations[0]) || null;
+      if (!tr) { alert('Translation failed.'); return; }
+      var langName = document.getElementById('reviewLang').selectedOptions[0].textContent;
+      var host = card.querySelector('.item-main, .src-card-body');
+      var box = host.querySelector('.tr-cols');
+      if (!box) { box = document.createElement('div'); box.className = 'tr-cols'; host.appendChild(box); }
+      box.innerHTML =
+        '<div class="tr-col orig"><h5>Original</h5><div class="tr-title">' + _esc(origTitle) + '</div><div>' + _esc(origSnip) + '</div></div>' +
+        '<div class="tr-col tr"><h5>' + _esc(langName) + '</h5><div class="tr-title">' + _esc(tr.title || '') + '</div><div>' + _esc(tr.content || '') + '</div></div>';
+    }).catch(function(e){ btn.textContent = old; btn.disabled = false; alert('Network error: ' + e); });
   }
+  function _esc(s){ var d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
 
   function setFilter(chip) {
     var dim = chip.dataset.dim;
@@ -940,39 +993,15 @@
       btn.disabled = false;
     });
   }
-  // UI-only override preview (persistence deferred to a later version)
+  // Clicking a 1–5 number no longer changes the rank silently — it opens the Re-rank
+  // modal pre-filled with that rank, so a reason is captured (saved as grounding).
   function setOverride(btn, rank) {
-    var strip = btn.parentElement;
-    var label = strip.nextElementSibling;
-    var aiBtn = strip.querySelector('.ai-rank');
-    var aiRank = aiBtn ? parseInt(aiBtn.textContent) : null;
-    strip.querySelectorAll('.ov-btn').forEach(function(b) {
-      b.className = 'ov-btn';
-      if (aiRank && parseInt(b.textContent) === aiRank) b.classList.add('ai-rank');
-    });
-    if (rank === aiRank) {
-      label.textContent = 'AI rank · no override';
-      label.className = 'override-label';
-    } else {
-      btn.className = 'ov-btn ov-' + rank;
-      label.textContent = aiRank ? ('AI: ' + aiRank + ' → You: ' + rank) : ('You: ' + rank);
-      label.className = 'override-label overridden';
-    }
-    // Persist the override and reflect it on the rank badge
-    var card = btn.closest('.item-card');
+    var card = btn.closest('.item-card, .src-card');
     var idEl = card ? card.querySelector('[data-item-id]') : null;
-    var itemId = idEl ? idEl.getAttribute('data-item-id') : null;
-    if (itemId) {
-      fetch('/admin/news/' + itemId + '/override', {
-        method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({rank: rank})
-      }).then(function(r){ return r.json(); }).then(function(d){
-        if (d.ok) {
-          var badge = card.querySelector('.rank-badge');
-          if (badge) { badge.textContent = rank; badge.className = 'rank-badge rank-' + rank; }
-        } else { alert('Override failed: ' + (d.error || 'unknown')); }
-      }).catch(function(e){ alert('Network error: ' + e); });
-    }
+    var itemId = idEl ? idEl.getAttribute('data-item-id') : (card ? card.getAttribute('data-item-id') : null);
+    var titleEl = card ? card.querySelector('.item-title, .src-title') : null;
+    var title = titleEl ? titleEl.textContent : '';
+    if (itemId) openChallenge(parseInt(itemId), title, rank);
   }
   function toggleTr(id) {
     var el = document.getElementById(id);
@@ -1021,5 +1050,8 @@
       btn.disabled = false;
     });
   }
+
+  // Restore the reviewer's chosen translation language (per-browser, no login needed)
+  (function(){ try { var v = localStorage.getItem('reviewLang'); if (v) { var s = document.getElementById('reviewLang'); if (s) s.value = v; } } catch(e){} })();
 </script>
 {% endblock %}

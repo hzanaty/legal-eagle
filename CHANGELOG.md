@@ -1,5 +1,33 @@
 # CHANGELOG
 
+## v3.12 — 2026-09-08
+### "Tag" retired · Analyze split · Review item-action redesign
+
+- **Terminology: "tag" is gone as a concept.** Glossary step renamed **Glossary Match**
+  (`agents/news_tagger.py` → `agents/glossary_match.py`, `tag_items` → `match_glossary`); the
+  dedup/repetition classification is now **Status** (DB column `repetition_tag` →
+  `repetition_status`, in-place migration; Review filter "Tag" → "Status"). UI/JS/CSS/docs all
+  updated; `topic_label` / `dedup_status` unchanged.
+- **Pipeline "Analyze" split into two visible steps: Glossary Match → Rank** (stepper now 9
+  pills; controller emits per-step log markers; help modal + SPEC + lifecycle updated to match
+  the real order — Glossary Match runs before Rank so a match can floor the rank).
+- **Review item-action redesign**: **🚩 Re-rank** (formerly "Challenge"), **🔖 Re-match**, and
+  **🌐 Translate** now sit on *every* card in both the flat and grouped views (previously the
+  challenge/re-rank buttons only appeared inside the announcements view). The bare 1–5 override
+  no longer changes rank silently — clicking a number opens the Re-rank modal pre-filled, and a
+  **reason is mandatory** (saved as grounding + a Tier-1 signal). Toolbar "Re-rank All" removed.
+- **Per-item Re-match** (`POST /admin/news/<id>/rematch`): re-runs Glossary Match on one item
+  (deterministic, no AI).
+- **Per-item Translate**: header language picker (remembered per browser), side-by-side
+  original/translation display; `/review/translate` generalized from English-only to any
+  `target_lang`.
+- **Fix**: the `/challenge` route unpacked `_tier2_score` as 2 values but it returns 3 since
+  v3.10 (rank, reasoning, effective_date) — the Re-rank/Challenge flow was erroring; now fixed.
+- **Docs**: README "How It Works" pipeline rewritten from the v2-era flow (removed the legacy
+  `GROUP (AI)` step); SPEC §7.5 stage checklist and ranking sections refreshed; rank-scale table
+  is 1–5 with duplicates noted as a Compare dedup outcome.
+- **Test Harness**: 22/22.
+
 ## v3.11 — 2026-09-08
 ### Pipeline Stage Help + Turkish source fixes
 

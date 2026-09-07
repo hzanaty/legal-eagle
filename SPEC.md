@@ -1,6 +1,6 @@
 # Legal Eagle 3.8 — Technical Specification
 
-**Version:** 3.11 (pipeline split into Glossary Match + Rank steps; "tag" terminology retired → Glossary Match / Status; authority name on Review card; URL textual-date capture; publish-date enforcement; effective-date rank-5)  
+**Version:** 3.12 (Review item-action redesign — 🚩 Re-rank / 🔖 Re-match / 🌐 Translate per item, reason-gated rank override; pipeline split into Glossary Match + Rank steps; "tag" terminology retired → Glossary Match / Status)  
 **Last Updated:** 2026-09-08
 
 This document provides the technical specification for Legal Eagle, an AI-powered regulatory compliance monitoring system for SAP Localization.

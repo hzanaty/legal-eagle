@@ -4,7 +4,7 @@
 
 > AI-powered platform that monitors legal changes, interprets their meaning, and helps SAP Localization teams respond faster with higher intelligence.
 
-**Current version: v3.11** — Pipeline stage help + Turkish source fixes · [CHANGELOG](CHANGELOG.md)
+**Current version: v3.12** — "Tag" retired → Glossary Match / Status · Analyze split · Review item-action redesign · [CHANGELOG](CHANGELOG.md)
 
 ---
 

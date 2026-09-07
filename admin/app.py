@@ -2085,6 +2085,7 @@ def admin_review_news(profile_id: int):
         active_tab='review',
         review_help=_load_review_help(),
         rank_help=_rank_help(),
+        language_names=LANGUAGE_NAMES,
         review_badge_count=review_badge_count,
         items=items,
         accepted_unscored_count=accepted_unscored_count,
@@ -2762,29 +2763,43 @@ def admin_preflight(profile_id: int):
 
 @app.route("/admin/profiles/<int:profile_id>/review/translate", methods=["POST"])
 def admin_review_translate(profile_id: int):
-    """Batch-translate review items to English via SAP AI Core."""
+    """Translate review items into a chosen language via SAP AI Core.
+
+    Body: {item_ids: [int], target_lang: "de"}. Item text is loaded from the DB
+    (so the client need not send it). Returns {translations: [{id, title, content}]}.
+    """
     from flask import jsonify, request as _req
     data = _req.get_json(force=True, silent=True) or {}
-    items = data.get("items", [])
-    if not items:
-        return jsonify({"translations": {}})
+    item_ids = [int(i) for i in (data.get("item_ids") or []) if str(i).strip()]
+    target_lang = (data.get("target_lang") or "en").strip()
+    lang_name = LANGUAGE_NAMES.get(target_lang, target_lang)
+    if not item_ids:
+        return jsonify({"translations": []})
 
-    # Build compact batch for the prompt (id + title + first 300 chars of content)
-    batch = []
-    for it in items:
-        batch.append({
-            "id": str(it.get("id", "")),
-            "source": str(it.get("item_source", "")),
-            "title": (it.get("title") or "")[:200],
-            "content": (it.get("content") or "")[:300],
-        })
+    conn = get_connection()
+    try:
+        placeholders = ",".join("?" * len(item_ids))
+        rows = conn.execute(
+            f"SELECT id, title, content FROM news_items WHERE id IN ({placeholders})",
+            item_ids,
+        ).fetchall()
+    finally:
+        conn.close()
+
+    batch = [{
+        "id": str(r["id"]),
+        "title": (r["title"] or "")[:300],
+        "content": (r["content"] or "")[:600],
+    } for r in rows]
+    if not batch:
+        return jsonify({"translations": []})
 
     import json as _json
     prompt_content = _json.dumps(batch, ensure_ascii=False)
     system_msg = (
-        "You are a professional legal translator. Translate the given items to English. "
+        f"You are a professional legal translator. Translate the given items into {lang_name}. "
         "Return a JSON object with key 'translations', whose value is an array of objects, "
-        "each with: id (string), title_en (string), content_en (string). "
+        "each with: id (string), title (string), content (string). "
         "Keep translations concise and accurate. Preserve proper nouns."
     )
 
@@ -2802,16 +2817,14 @@ def admin_review_translate(profile_id: int):
         )
         result_text = response.choices[0].message.content.strip()
         result = _json.loads(result_text)
-        # Normalise to {id: {title_en, content_en}} dict
-        translations = {}
-        for t in result.get("translations", []):
-            translations[str(t.get("id", ""))] = {
-                "title_en": t.get("title_en", ""),
-                "content_en": t.get("content_en", ""),
-            }
+        translations = [{
+            "id": str(t.get("id", "")),
+            "title": t.get("title", ""),
+            "content": t.get("content", ""),
+        } for t in result.get("translations", [])]
         return jsonify({"translations": translations})
     except Exception as e:
-        return jsonify({"translations": {}, "error": str(e)}), 200
+        return jsonify({"translations": [], "error": str(e)}), 200
 
 
 @app.route("/admin/reset-review-data", methods=["POST"])
@@ -2848,7 +2861,7 @@ def challenge_news_item(item_id: int):
 
         text = f"{item.get('title', '')} {item.get('content', '') or ''}"
         t1_rank = _tier1_score(text, signals)
-        t2_rank, t2_reasoning = _tier2_score(item, grounding)
+        t2_rank, t2_reasoning, _eff_date = _tier2_score(item, grounding)
         suggested_rank = max(t1_rank or 0, t2_rank)
         original_rank = item.get("significance_rank") or item.get("human_rank_override") or 0
 
@@ -2939,6 +2952,35 @@ def override_news_item_rank(item_id: int):
         )
         conn.commit()
         return jsonify({"ok": True, "rank": rank})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"ok": False, "error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/admin/news/<int:item_id>/rematch", methods=["POST"])
+def rematch_news_item(item_id: int):
+    """Re-run Glossary Match on a single item (deterministic; no AI)."""
+    conn = get_connection()
+    try:
+        row = conn.execute("SELECT * FROM news_items WHERE id=?", (item_id,)).fetchone()
+        if not row:
+            return jsonify({"ok": False, "error": "Item not found"}), 404
+        item = dict(row)
+        pid = item.get("profile_id")
+        from agents.glossary_match import match_glossary, save_topic_labels, flag_glossary_gaps
+        match_glossary([item], conn, pid)
+        save_topic_labels([item], conn, pid)
+        flag_glossary_gaps([item], conn, pid)
+        conn.commit()
+        import json as _json
+        try:
+            labels = _json.loads(item.get("topic_label") or "[]")
+        except Exception:
+            labels = []
+        labels = [l for l in labels if l and l != "General"]
+        return jsonify({"ok": True, "topic_label": labels, "glossary_gap": item.get("glossary_gap", 0)})
     except Exception as e:
         conn.rollback()
         return jsonify({"ok": False, "error": str(e)}), 500
