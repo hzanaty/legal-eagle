@@ -243,6 +243,28 @@
             title="Send V2 digest for selected items">
       ✉ Send Email (<span id="sendEmailCount">0</span> selected)
     </button>
+    {% if selected_profile %}
+    <button class="btn-sm danger" onclick="openResetModal()" title="Delete all news items and runs for this profile (testing only)" style="margin-left:auto;">
+      ⚠ Reset Data
+    </button>
+    {% endif %}
+  </div>
+
+  <!-- Reset data confirmation modal -->
+  <div class="challenge-overlay" id="resetOverlay" style="display:none" onclick="if(event.target===this)closeResetModal()">
+    <div class="challenge-modal" style="max-width:420px">
+      <h3 style="color:#bb0000">⚠ Reset All Data</h3>
+      <p style="font-size:12px;color:#6a6d70;margin:8px 0 16px">
+        This will permanently delete <strong>all news items, announcements, and run history</strong>
+        for profile <strong>{{ selected_profile.name if selected_profile else '' }}</strong>.
+        <br><br>Use only for testing. This cannot be undone.
+      </p>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn-sm" onclick="closeResetModal()">Cancel</button>
+        <button class="btn-sm danger" id="resetConfirmBtn" onclick="confirmReset()"
+                style="font-weight:700;">Delete everything</button>
+      </div>
+    </div>
   </div>
 
   <!-- Challenge modal (v3.4) -->
@@ -916,6 +938,36 @@
     var t = el.previousElementSibling;
     var v = el.classList.toggle('visible');
     t.innerHTML = v ? '&#9662; Hide translation' : '&#9656; Show translation';
+  }
+
+  // ── Reset data modal ──
+  function openResetModal() {
+    document.getElementById('resetOverlay').style.display = 'flex';
+  }
+  function closeResetModal() {
+    document.getElementById('resetOverlay').style.display = 'none';
+  }
+  function confirmReset() {
+    var btn = document.getElementById('resetConfirmBtn');
+    btn.textContent = 'Deleting…';
+    btn.disabled = true;
+    fetch('/admin/reset-review-data', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({profile_id: _profileId})
+    }).then(function(r){ return r.json(); }).then(function(d){
+      if (d.ok) {
+        location.reload();
+      } else {
+        alert('Reset failed: ' + (d.error || 'unknown error'));
+        btn.textContent = 'Delete everything';
+        btn.disabled = false;
+      }
+    }).catch(function(){
+      alert('Request failed.');
+      btn.textContent = 'Delete everything';
+      btn.disabled = false;
+    });
   }
 </script>
 {% endblock %}
