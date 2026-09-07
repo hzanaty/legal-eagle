@@ -358,6 +358,7 @@
                       <span>{{ src.publisher or src.domain or 'Source' }} · {{ 'URL' if src.source_type and 'URL' in src.source_type else ('X' if src.source_type and 'weet' in src.source_type else (src.source_type|upper if src.source_type else 'RSS')) }}{% if src.authority_status == 'inferred' %} <span title="Authority inferred by AI" style="color:#e9730c;font-weight:700;">✦</span>{% endif %}</span>
                       {% if src.authority_name %}<span class="authority-tag" title="Issuing authority">&#127963; {{ src.authority_name }}</span>{% endif %}
                       {% if src.published_at %}<span>{{ src.published_at|truncate(16, True, '') }}</span>{% endif %}
+                      {% if src.first_seen_at %}<span title="Fetched" style="opacity:0.65;">↓ {{ src.first_seen_at|truncate(16, True, '') }}</span>{% endif %}
                       {% if src.url %}<a href="{{ src.url }}" target="_blank" style="color:#0a6ed1;">Link</a>{% endif %}
                     </div>
                   </div>
@@ -405,6 +406,7 @@
           {% if item.authority_name %}<span class="authority-tag" title="Issuing authority{% if item.authority_status == 'inferred' %} — AI-inferred{% elif item.authority_status == 'configured' %} — configured{% endif %}">&#127963; {{ item.authority_name }}</span>{% endif %}
           {% if item.tag %}<span class="tag-pill tag-{{ item.tag|lower }}">{{ item.tag }}</span>{% endif %}
           <span class="pub-date" title="Article publish date">{% if item.published_at %}{{ item.published_at|truncate(16, True, '') }}{% else %}—{% endif %}</span>
+          {% if item.first_seen_at %}<span class="pub-date" title="Fetched" style="opacity:0.65;">↓ {{ item.first_seen_at|truncate(16, True, '') }}</span>{% endif %}
           {% if item.effective_date %}<span class="eff-date" title="Date the change comes into force">⏱ Effective {{ item.effective_date }}</span>{% endif %}
           {% for term in item.topic_label|fromjson %}{% if term != 'General' %}<span class="glossary-tag" title="Matched glossary term">{{ term }}</span>{% endif %}{% endfor %}
           {% if item.is_gap %}<span class="gap-badge">&#9888; Gap — no glossary match</span>{% endif %}
@@ -417,8 +419,8 @@
           {% endif %}
         </div>
         <div class="item-title">{{ item.title or '(no title)' }}</div>
-        <div class="item-snippet">{{ (item.content or '')|truncate(200, False, '…') }}</div>
-        {% if item.url %}<a class="item-url" href="{{ item.url }}" target="_blank">{{ item.url }}</a>{% endif %}
+        <div class="item-snippet">{{ (item.content or '')|strip_bare_urls|truncate(200, False, '…') }}</div>
+        {% if item.url %}<a class="item-url" href="{{ item.url }}" target="_blank">Read more ↗</a>{% endif %}
         {% if item.translation %}
         <span class="translation-toggle" onclick="toggleTr('tr-{{ item.item_source }}-{{ item.id }}')">&#9656; Show translation</span>
         <div class="item-translation" id="tr-{{ item.item_source }}-{{ item.id }}">{{ item.translation }}</div>

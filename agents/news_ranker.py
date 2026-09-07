@@ -38,10 +38,10 @@ from agents.ai_cache import cached_chat
 # gated OFF by default. The AI chat call was historically broken (always fell back to
 # rank 2), so enabling real AI ranking would change many ranks and needs its own
 # validation pass. With this off, ranking behaves exactly as shipped; the Tier-2 AI
-# call is still made to extract the effective_date. Set LEGAL_EAGLE_AI_RANK_REFINE=1
-# to let the AI rank actually influence scoring.
-_AI_RANK_REFINE = os.environ.get("LEGAL_EAGLE_AI_RANK_REFINE", "0") == "1"
-_FALLBACK_RANK = 2  # historical Tier-2 fallback used when refinement is off
+# call is still made to extract the effective_date. Set LEGAL_EAGLE_AI_RANK_REFINE=0
+# to disable AI rank influence and fall back to rank 2 for all Tier-2 items.
+_AI_RANK_REFINE = os.environ.get("LEGAL_EAGLE_AI_RANK_REFINE", "1") == "1"
+_FALLBACK_RANK = 2  # fallback used when LEGAL_EAGLE_AI_RANK_REFINE=0
 
 _DUPLICATE = "duplicate"
 _TIER1 = "tier1"
@@ -224,7 +224,9 @@ def rank_items(
         # Take the better of Tier 1 and Tier 2 (fires when Tier 1 gives rank < 4 or no match)
         final_rank = max(t1_rank or 0, rank_for_scoring)
         item["significance_rank"] = final_rank
-        item["rank_tier"] = _TIER2 if (t1_rank is None or rank_for_scoring > (t1_rank or 0)) else _TIER1
+        # Tier classification tracks the signal source: tier1 if any keyword matched,
+        # tier2 if AI alone drove the rank.
+        item["rank_tier"] = _TIER1 if t1_rank is not None else _TIER2
         item["rank_reasoning"] = t2_reasoning if item["rank_tier"] == _TIER2 else item.get("rank_reasoning", "")
 
         _apply_boosts(item)

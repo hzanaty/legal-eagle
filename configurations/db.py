@@ -1955,7 +1955,9 @@ def get_announcements_for_run_with_sources(
         if item_ids:
             placeholders = ",".join("?" * len(item_ids))
             src_rows = conn.execute(
-                f"SELECT * FROM news_items WHERE id IN ({placeholders})",
+                f"""SELECT *,
+                    (SELECT name FROM authorities WHERE authorities.id = news_items.authority_id) AS authority_name
+                    FROM news_items WHERE id IN ({placeholders})""",
                 item_ids,
             ).fetchall()
             sources = [dict(s) for s in src_rows]

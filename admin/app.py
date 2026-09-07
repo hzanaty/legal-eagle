@@ -172,6 +172,17 @@ def fromjson(value):
 
 app.jinja_env.filters["fromjson"] = fromjson
 
+
+def _strip_bare_urls(text: str) -> str:
+    """Remove lines that are pure URLs (from simulated URL source content stubs)."""
+    import re
+    lines = (text or "").splitlines()
+    cleaned = [l for l in lines if not re.match(r"^\s*https?://\S+\s*$", l)]
+    return " ".join(cleaned).strip()
+
+
+app.jinja_env.filters["strip_bare_urls"] = _strip_bare_urls
+
 EMAIL_REGEX = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 

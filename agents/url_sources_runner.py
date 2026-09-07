@@ -72,7 +72,7 @@ def scrape_url_source_with_config(source: dict) -> list:
         a_sel = field_selectors.get("author")
         a_el = container.select_one(a_sel) if a_sel else None
         item["author"] = a_el.get_text(strip=True) if a_el else ""
-        item["content"] = f"{item['title']}\n{item['link']}\n{item['date']}"
+        item["content"] = item["title"]
         return item
 
     items = []
