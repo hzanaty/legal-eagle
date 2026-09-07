@@ -29,12 +29,12 @@
     "title": "Analyzing — rank & tag",
     "blurb": "A three-tier engine (deterministic signals, then grounded GPT-4o) scores significance 1–5. Glossary tagging then assigns topic labels and flags significant items the glossary can't explain. Email is sent only for rank ≥ threshold (default 3); a glossary match floors an item at rank 2.",
     "ranks": [
-      {"level": 5, "meaning": "Enacted legislation with immediate compliance effect"},
-      {"level": 4, "meaning": "Upcoming regulatory change requiring preparation"},
-      {"level": 3, "meaning": "Operational impact — payroll, deadlines, rates"},
-      {"level": 2, "meaning": "Relevant case law or indirect implication"},
-      {"level": 1, "meaning": "Off-topic / macro / finance, no direct HR obligation"},
-      {"level": 0, "meaning": "Duplicate — not evaluated"}
+      {"level": 5, "label": "Urgent", "meaning": "Enacted legislation with immediate compliance effect"},
+      {"level": 4, "label": "Legal Change", "meaning": "Upcoming regulatory change requiring preparation"},
+      {"level": 3, "label": "Watch", "meaning": "Operational impact — payroll, deadlines, rates"},
+      {"level": 2, "label": "Signal", "meaning": "Relevant case law or indirect implication"},
+      {"level": 1, "label": "Noise", "meaning": "Off-topic / macro / finance, no direct HR obligation"},
+      {"level": 0, "label": "Duplicate", "meaning": "Not evaluated"}
     ]
   },
   {

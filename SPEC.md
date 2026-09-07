@@ -757,14 +757,16 @@ def compare_with_baseline(
 
 **Significance scale** (source of truth: the Tier-2 prompt + `_BOOTSTRAP_EXAMPLES` in `agents/news_ranker.py`; mirrored in `configurations/pipeline_help.json` for the UI):
 
-| Rank | Meaning | Example |
-|------|---------|---------|
-| **5** | Enacted legislation with immediate compliance effect | "Parliament passes amendment, effective immediately" |
-| **4** | Upcoming regulatory change requiring preparation | "Ministry releases draft regulation for consultation" |
-| **3** | Operational impact — payroll, deadlines, rates | "New contribution rates announced for next quarter" |
-| **2** | Relevant case law or indirect implication | "Tribunal ruling on overtime pay classification" |
-| **1** | Off-topic / macro / finance news, no direct HR obligation | "Central bank raises benchmark interest rate" |
-| **0** | DUPLICATE — not evaluated (outside the 1–5 scale) | — |
+| Rank | Label | Meaning | Example |
+|------|-------|---------|---------|
+| **5** | Urgent | Enacted legislation with immediate compliance effect | "Parliament passes amendment, effective immediately" |
+| **4** | Legal Change | Upcoming regulatory change requiring preparation | "Ministry releases draft regulation for consultation" |
+| **3** | Watch | Operational impact — payroll, deadlines, rates | "New contribution rates announced for next quarter" |
+| **2** | Signal | Relevant case law or indirect implication | "Tribunal ruling on overtime pay classification" |
+| **1** | Noise | Off-topic / macro / finance news, no direct HR obligation | "Central bank raises benchmark interest rate" |
+| **0** | Duplicate | Not evaluated (outside the 1–5 scale) | — |
+
+The short labels (Noise/Signal/Watch/Legal Change/Urgent) are shown on the Review RANK filter chips (`review_news.html`) and in the Run-tab help modal.
 
 Email is gated at rank ≥ threshold (default 3); Rank 1 = Noise is scored and saved but never emailed. A glossary match floors an item at rank 2 (`_apply_boosts`) so on-topic items are never scored as off-topic.
 
