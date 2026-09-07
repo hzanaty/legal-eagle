@@ -153,6 +153,25 @@ def render_md(text: str) -> str:
 
 app.jinja_env.filters["render_md"] = render_md
 
+
+def fromjson(value):
+    """Parse a JSON string into a Python object for templates. Returns [] on failure.
+
+    Used to render news_items.topic_label (a JSON array of matched glossary terms).
+    """
+    if value is None:
+        return []
+    if isinstance(value, (list, dict)):
+        return value
+    try:
+        import json as _json
+        return _json.loads(value)
+    except Exception:
+        return []
+
+
+app.jinja_env.filters["fromjson"] = fromjson
+
 EMAIL_REGEX = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
@@ -600,9 +619,13 @@ def admin_start_run(profile_id: int):
     lookback_override = request.form.get('lookback_override', '').strip() or None
     force_run = (lookback_override == 'force_full')  # map force_full override → force_run flag
     test_mode = request.form.get('test_mode') == '1'
+    send_email_flag = request.form.get('send_email') == '1'   # P5: explicit opt-in to actually send
     skip_comparison = request.form.get('skip_comparison') == '1'
     skip_filtering = request.form.get('skip_filtering') == '1'
-    skip_email = (request.form.get('skip_email') == '1') or test_mode
+    # P8: the pipeline itself never sends email (this removes the duplicate legacy v1 send). The
+    # single digest generation + optional SMTP send happens in the follow-on _digest_worker below,
+    # gated by send_email_flag. So skip_email is always True for the in-pipeline stage.
+    skip_email = True
     skip_grouping = request.form.get('skip_grouping') == '1'
     if test_mode:
         lookback_override = '7'
@@ -648,7 +671,7 @@ def admin_start_run(profile_id: int):
     conn.close()
 
     # Background worker
-    def _worker(pid: int, rid: int, force: bool, skip_comp: bool, skip_filt: bool, skip_mail: bool, skip_grp: bool, sel_rss, sel_twitter, sel_urls):
+    def _worker(pid: int, rid: int, force: bool, skip_comp: bool, skip_filt: bool, skip_mail: bool, skip_grp: bool, sel_rss, sel_twitter, sel_urls, send_mail: bool, dry: bool):
         # hook stdout to DB logs with line buffering
         class _DBLogger:
             def __init__(self, run_id: int):
@@ -711,7 +734,7 @@ def admin_start_run(profile_id: int):
                                 selected_rss_urls=sel_rss, selected_twitter_handles=sel_twitter,
                                 selected_url_sources=sel_urls,
                                 lookback_override=lookback_override if lookback_override != 'force_full' else None,
-                                skip_grouping=skip_grp, should_cancel=_cancel)
+                                skip_grouping=skip_grp, should_cancel=_cancel, dry_run=dry)
             status_final = "Success" if ok else "Failed"
             # v3.3: email lifecycle — PENDING (follow-on thread will update to SENT/FAILED)
             if skip_mail:
@@ -746,18 +769,44 @@ def admin_start_run(profile_id: int):
             if status_mark == "Failed":
                 _metrics["error_step"] = error_step or "pipeline"
                 _metrics["error_message"] = error_message or "Run returned failure — see log above."
+            # R2: record a meaningful item count for the History pill (0 before this fix)
+            try:
+                _cnt = fconn.execute(
+                    "SELECT COUNT(*) FROM news_items WHERE profile_id=? AND COALESCE(dedup_status,'') <> 'duplicate'",
+                    (pid,)).fetchone()[0]
+                _metrics["filtered_count"] = _cnt
+            except Exception:
+                pass
             finish_run(fconn, rid, status_mark, metrics=_metrics)
             append_run_log(fconn, rid, "INFO", f"🏁 Run {rid} finished with status {status_mark}")
             fconn.close()
 
-            # v3.3: follow-on digest thread (normal mode only, run succeeded)
-            if status_mark == "Success" and not skip_mail:
-                def _digest_worker(run_id_d=rid, pid_d=pid):
+            # P8/P5: single digest step. Runs on EVERY successful run (the pipeline no longer sends),
+            # EXCEPT a dry-run (Test mode) which persists nothing — no announcements, no email.
+            if status_mark == "Success" and not dry:
+                def _digest_worker(run_id_d=rid, pid_d=pid, do_send=send_mail):
+                    d_conn = None
                     try:
-                        from agents.email_sender import send_digest
                         from configurations.config_loader import creds as _creds
-                        send_digest(pid_d, run_id_d, None, d_conn, _creds.get("gmail", {}))
-                        d_conn.close()
+                        d_conn = get_connection()
+                        create_schema_if_needed(d_conn)
+                        if do_send:
+                            # generate announcements + send (sets email_status SENT/FAILED/SKIPPED)
+                            from agents.email_sender import send_digest
+                            send_digest(pid_d, run_id_d, None, d_conn, _creds.get("gmail", {}))
+                        else:
+                            # generate announcements only — no email sent
+                            from agents.email_composer import generate_digest
+                            _items = [dict(r) for r in d_conn.execute(
+                                "SELECT n.* FROM news_items n JOIN runs r ON n.profile_id=r.profile_id WHERE r.id=?",
+                                (run_id_d,)).fetchall()]
+                            generate_digest(_items, pid_d, d_conn, run_id_d)
+                            d_conn.execute("UPDATE runs SET email_status='GENERATED' WHERE id=?", (run_id_d,))
+                        # grouped_count = number of announcements produced this run
+                        ann = d_conn.execute(
+                            "SELECT COUNT(*) FROM news_announcements WHERE run_id=?", (run_id_d,)).fetchone()[0]
+                        d_conn.execute("UPDATE runs SET grouped_count=? WHERE id=?", (ann, run_id_d))
+                        d_conn.commit()
                     except Exception as _de:
                         print(f"⚠️ Digest worker exception: {_de}")
                         try:
@@ -767,9 +816,15 @@ def admin_start_run(profile_id: int):
                             _ec.close()
                         except Exception:
                             pass
+                    finally:
+                        if d_conn is not None:
+                            try:
+                                d_conn.close()
+                            except Exception:
+                                pass
                 threading.Thread(target=_digest_worker, daemon=True).start()
 
-    threading.Thread(target=_worker, args=(profile_id, run_id, force_run, skip_comparison, skip_filtering, skip_email, skip_grouping, selected_rss, selected_twitter, selected_urls), daemon=True).start()
+    threading.Thread(target=_worker, args=(profile_id, run_id, force_run, skip_comparison, skip_filtering, skip_email, skip_grouping, selected_rss, selected_twitter, selected_urls, send_email_flag, test_mode), daemon=True).start()
     return redirect(url_for("admin_profile_runs", profile_id=profile_id, run_id=run_id))
 
 
@@ -1045,17 +1100,25 @@ def update_profile_language(profile_id: int):
 
 @app.route("/admin/profiles/<int:profile_id>/date-scope/update", methods=["POST"])
 def update_profile_date_scope(profile_id: int):
-    """Update the default lookback window for a profile."""
+    """Update the initial-run lookback window for a profile.
+
+    Incremental (delta) fetching is always applied per source; this setting is only
+    the window used on a source's first run / as the delta cap. The legacy 'delta'/'all'
+    scope (unbounded first run) was retired in favour of a bounded window.
+    """
     date_scope = (request.form.get("date_scope", "") or "").strip()
-    allowed = ("all", "delta", "last_7_days", "last_30_days", "today", "")
+    # Migrate any legacy value to the 30-day window.
+    if date_scope in ("delta", "all", "force_full", ""):
+        date_scope = "last_30_days"
+    allowed = ("last_7_days", "last_30_days", "today")
     if date_scope not in allowed:
         flash("Invalid lookback window value.", "error")
         return redirect(url_for("admin_profile_detail", profile_id=profile_id))
 
-    save_profile_date_scope(profile_id, date_scope or "all")
+    save_profile_date_scope(profile_id, date_scope)
     conn = get_connection()
     create_schema_if_needed(conn)
-    add_audit_log(conn, entity="profiles", action="update_date_scope", details=f"date_scope={date_scope or 'all'}", profile_id=profile_id)
+    add_audit_log(conn, entity="profiles", action="update_date_scope", details=f"date_scope={date_scope}", profile_id=profile_id)
     conn.close()
 
     label_map = {"all": "N/A (no limit)", "last_7_days": "Last 7 days", "last_30_days": "Last 30 days"}
@@ -2801,10 +2864,39 @@ def confirm_challenge_news_item(item_id: int):
         conn.close()
 
 
+@app.route("/admin/news/<int:item_id>/override", methods=["POST"])
+def override_news_item_rank(item_id: int):
+    """Manual rank override from the Review override strip (no reason needed).
+
+    Sets the human override AND the effective significance_rank so the badge + downstream reflect it.
+    """
+    data = request.json or {}
+    try:
+        rank = int(data.get("rank", 0))
+    except Exception:
+        return jsonify({"ok": False, "error": "invalid rank"}), 400
+    conn = get_connection()
+    try:
+        row = conn.execute("SELECT id FROM news_items WHERE id=?", (item_id,)).fetchone()
+        if not row:
+            return jsonify({"ok": False, "error": "Item not found"}), 404
+        conn.execute(
+            "UPDATE news_items SET human_rank_override=?, significance_rank=?, rank_tier='human', "
+            "rank_reasoning='Manual override' WHERE id=?",
+            (rank, rank, item_id),
+        )
+        conn.commit()
+        return jsonify({"ok": True, "rank": rank})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"ok": False, "error": str(e)}), 500
+    finally:
+        conn.close()
+
+
 @app.route("/admin/news/<int:item_id>/rerank", methods=["POST"])
 def rerank_news_item(item_id: int):
     """Re-run the full ranking pipeline on a single item."""
-    conn = get_connection()
     try:
         row = conn.execute(
             "SELECT * FROM news_items WHERE id=?", (item_id,)

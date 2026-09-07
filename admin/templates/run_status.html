@@ -47,6 +47,9 @@
   .stage-bar { background: white; border-bottom: 1px solid #e5e5e5; padding: 8px 12px; display: flex; align-items: center; overflow-x: auto; flex-shrink: 0; }
   .stage-step { display: flex; align-items: center; }
   .stage-pill { display: flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; color: #aaa; background: #f7f7f7; white-space: nowrap; }
+  .stage-pill.active { color: #0a6ed1; background: #e8f1fb; }
+  .stage-pill.done { color: #107e3e; background: #e8f5e9; }
+  .stage-pill.skipped { color: #aaa; background: #f7f7f7; text-decoration: line-through; }
   .stage-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: 0.7; }
   .stage-arrow { color: #ccc; font-size: 12px; padding: 0 3px; }
   .right-toolbar { background: white; border-bottom: 1px solid #e5e5e5; padding: 6px 12px; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
@@ -76,6 +79,7 @@
       <div class="section-block-title">Sources</div>
 
       {% if rss_feeds %}
+      <input type="hidden" name="has_rss_sources" value="1" form="startRunForm">
       <div class="source-group">
         <div class="source-group-header">
           <span class="source-group-label">&#128225; RSS <span class="source-group-count">{{ rss_feeds|length }}</span></span>
@@ -93,6 +97,7 @@
       {% endif %}
 
       {% if tweets %}
+      <input type="hidden" name="has_twitter_sources" value="1" form="startRunForm">
       <div class="source-group">
         <div class="source-group-header">
           <span class="source-group-label">&#128038; Twitter <span class="source-group-count">{{ tweets|length }}</span></span>
@@ -110,15 +115,16 @@
       {% endif %}
 
       {% if url_sources %}
+      <input type="hidden" name="has_url_sources" value="1" form="startRunForm">
       <div class="source-group">
         <div class="source-group-header">
           <span class="source-group-label">&#127760; URL Sources <span class="source-group-count">{{ url_sources|length }}</span></span>
-          <span class="source-toggle" onclick="deselectAll('url')">Deselect all</span>
+          <span class="source-toggle" onclick="deselectAll('urls')">Deselect all</span>
         </div>
         <div class="chip-list">
           {% for s in url_sources %}
           <label class="chip" onclick="toggleChip(this)">
-            <input type="checkbox" name="selected_url" value="{{ s.url }}" checked form="startRunForm">
+            <input type="checkbox" name="selected_urls" value="{{ s.url }}" checked form="startRunForm">
             {{ s.url|truncate(28, True, '…') }}
           </label>
           {% endfor %}
@@ -135,14 +141,24 @@
       <div class="test-mode-row">
         <div class="test-mode-text">
           <div class="test-mode-label">Test mode</div>
-          <div class="test-mode-desc">Fetches last 7 days from all sources, skips email send and email pre-checks.</div>
+          <div class="test-mode-desc">Dry-run for a high-level review — 7-day lookback, and nothing is saved (no Review items, no announcements, no email).</div>
         </div>
         <div class="toggle" id="testToggle" onclick="toggleTestMode()"></div>
       </div>
       <div class="test-mode-implications" id="testImplications">
         <div class="impl-row"><span class="impl-icon">&#8617;</span> Lookback: last 7 days (ignores per-source anchor)</div>
-        <div class="impl-row"><span class="impl-icon">&#9993;</span> Email send skipped</div>
-        <div class="impl-row"><span class="impl-icon">&#10003;</span> Email pre-checks skipped</div>
+        <div class="impl-row"><span class="impl-icon">&#128274;</span> Nothing saved — no Review items or announcements</div>
+        <div class="impl-row"><span class="impl-icon">&#9993;</span> No email sent</div>
+      </div>
+    </div>
+
+    <div class="section-block">
+      <div class="test-mode-row">
+        <div class="test-mode-text">
+          <div class="test-mode-label">Send email digest</div>
+          <div class="test-mode-desc">Off: digest is generated for review (Announcements + RCM) but no email is sent. On: also email it to the configured receivers.</div>
+        </div>
+        <div class="toggle" id="sendToggle" onclick="toggleSendEmail()"></div>
       </div>
     </div>
 
@@ -160,6 +176,7 @@
     <div class="run-footer">
       <form method="POST" action="{{ url_for('admin_start_run', profile_id=selected_profile.id) }}" id="startRunForm">
         <input type="hidden" name="test_mode" id="testModeVal" value="0">
+        <input type="hidden" name="send_email" id="sendEmailVal" value="0">
         <button type="submit" class="btn-start" id="btnStart">&#9654; Start Run</button>
       </form>
     </div>
@@ -167,15 +184,18 @@
 
   <!-- Right panel -->
   <div class="run-right">
-    <div class="test-banner" id="testBanner">&#9888; Test mode — 7-day lookback · no email will be sent</div>
-    <div class="stage-bar">
-      {% for s in ['Starting','Collecting','Filtering','Comparing','Grouping','Sending','Done'] %}
+    <div class="test-banner" id="testBanner">&#9888; Test mode — dry-run · nothing saved, no email</div>
+    <div class="stage-bar" id="stageBar">
+      {% for s in ['Starting','Collecting','Attributing','Comparing','Analyzing','Sending','Done'] %}
       <div class="stage-step">
-        <div class="stage-pill"><span class="stage-dot"></span>{{ s }}</div>
+        <div class="stage-pill" data-stage="{{ loop.index0 }}"><span class="stage-dot"></span>{{ s }}</div>
         {% if not loop.last %}<span class="stage-arrow">&rsaquo;</span>{% endif %}
       </div>
       {% endfor %}
     </div>
+    {% if selected_run %}
+    <div id="runMeta" data-run-id="{{ selected_run.id }}" data-run-status="{{ selected_run.status }}" data-email-status="{{ selected_run.email_status|default('PENDING')|upper }}" style="display:none"></div>
+    {% endif %}
     {% if selected_run and selected_run.status in ('Failed','failed') and selected_run.error_message %}
     <div style="background:#fde8e8;border:1px solid #f5b5b0;color:#b42318;padding:8px 14px;font-size:12px;">
       &#10007; <strong>{{ selected_run.error_step|default('pipeline') }}</strong>: {{ selected_run.error_message }}
@@ -192,6 +212,9 @@
       {% elif estatus == 'FAILED' %}
         <span class="email-badge failed">&#9993; Digest failed</span>
         <button class="btn-resend" onclick="resendDigest({{ selected_run.id }}, {{ selected_profile.id }})">&#8635; Resend</button>
+      {% elif estatus == 'GENERATED' %}
+        <span class="email-badge skipped">&#9993; Digest ready — email not sent</span>
+        <button class="btn-resend" onclick="resendDigest({{ selected_run.id }}, {{ selected_profile.id }})">&#8635; Send</button>
       {% elif estatus == 'SKIPPED' %}
         <span class="email-badge skipped">&#9993; Email skipped (test mode)</span>
       {% else %}
@@ -205,13 +228,13 @@
         {% for run in runs|default([]) %}
         <a class="history-pill {% if run.status == 'failed' or run.status == 'Failed' %}failed{% else %}success{% endif %}"
            href="{{ url_for('admin_profile_runs', profile_id=selected_profile.id) }}?run_id={{ run.id }}">
-          {{ run.started_at|default('')|truncate(10, True, '') }} · {% if run.status in ('failed','Failed') %}Error{% else %}{{ run.filtered_count|default(0) }} items{% endif %}
+          {{ (run.started_at or '')|truncate(10, True, '') }} · {% if run.status in ('failed','Failed') %}Error{% else %}{{ run.filtered_count|default(0) }} items{% endif %}
         </a>
         {% endfor %}
       </div>
     </div>
-    <div class="log-panel">
-      <div class="log-idle">
+    <div class="log-panel" id="logPanel">
+      <div class="log-idle" id="logIdle">
         <div class="log-idle-icon">&#9654;</div>
         <div style="color:#666;font-size:12px">Configure sources and click <strong style="color:#999">Start Run</strong> to begin.</div>
         <div style="color:#444;font-size:11px;margin-top:6px">Or click a history pill above to view a past run.</div>
@@ -231,21 +254,33 @@
     var btn = document.getElementById('btnStart');
     btn.classList.toggle('test', testMode);
     btn.innerHTML = testMode ? '&#9654; Start Test Run' : '&#9654; Start Run';
+  }
+  // Email pre-checks follow the "Send email" toggle, not Test mode (P5).
+  function _setEmailChecksSkipped(skip) {
     ['check-email-rcv','check-smtp'].forEach(function(id) {
       var row = document.getElementById(id);
       if (!row) return;
-      row.classList.toggle('skipped', testMode);
+      row.classList.toggle('skipped', skip);
       var existing = row.querySelector('.check-skip-label');
-      if (testMode && !existing) {
+      if (skip && !existing) {
         var lbl = document.createElement('span');
         lbl.className = 'check-skip-label';
-        lbl.textContent = 'skipped in test mode';
+        lbl.textContent = 'not sending';
         row.appendChild(lbl);
-      } else if (!testMode && existing) {
+      } else if (!skip && existing) {
         existing.remove();
       }
     });
   }
+  var sendEmail = false;
+  function toggleSendEmail() {
+    sendEmail = !sendEmail;
+    document.getElementById('sendToggle').classList.toggle('on', sendEmail);
+    document.getElementById('sendEmailVal').value = sendEmail ? '1' : '0';
+    _setEmailChecksSkipped(!sendEmail);   // email checks apply only when sending
+  }
+  // Default: not sending → email pre-checks shown as skipped
+  _setEmailChecksSkipped(true);
   function toggleChip(label) {
     var cb = label.querySelector('input');
     cb.checked = !cb.checked;
@@ -269,5 +304,72 @@
       else { alert('Resend failed: ' + (d.message || 'unknown error')); if (btn) { btn.textContent = '↻ Resend'; btn.disabled = false; } }
     }).catch(function(e){ alert('Network error: ' + e); if (btn) { btn.disabled = false; } });
   }
+
+  // ── Live/historic run log streaming + stage stepper ──
+  (function streamRun() {
+    var meta = document.getElementById('runMeta');
+    if (!meta) return;                                  // no run selected → idle placeholder
+    var runId = meta.getAttribute('data-run-id');
+    if (!runId) return;
+    var initialStatus = (meta.getAttribute('data-run-status') || '').toLowerCase();
+    var wasLive = (initialStatus === 'running' || initialStatus === 'queued');
+
+    var panel = document.getElementById('logPanel');
+    var idle = document.getElementById('logIdle');
+    if (idle) idle.remove();
+    var pills = Array.prototype.slice.call(document.querySelectorAll('#stageBar .stage-pill'));
+    var cur = -1;
+    function setStage(i) {
+      if (i <= cur) return;
+      cur = i;
+      pills.forEach(function(p, idx) {
+        p.classList.remove('active', 'done');
+        if (idx < i) p.classList.add('done');
+        else if (idx === i) p.classList.add('active');
+      });
+    }
+    // Map pipeline log lines to stepper stages (monotonic advance).
+    // Stages: 0 Starting · 1 Collecting · 2 Attributing · 3 Comparing · 4 Analyzing · 5 Sending · 6 Done
+    var MARKERS = [
+      { re: /RSS items collected|monitored site items|tweets collected|RSS Parser|Fetching|collected/i, stage: 1 },
+      { re: /Attribution stamped|Attribution stage|attribut/i, stage: 2 },
+      { re: /semantic comparison|Compare News|comparison|dedup|new items and/i, stage: 3 },
+      { re: /Analyzing stage|Rank stage|ranking|Tag stage|Glossary gap|glossary|tagging|Effective-date/i, stage: 4 },
+      { re: /Email gate|Sending summary|Email preview|digest|Sending/i, stage: 5 }
+    ];
+    function appendLine(text) {
+      var div = document.createElement('div');
+      div.textContent = text;
+      // Color by real severity, not stray substrings. (Avoid matching "errors=0" or bare "error".)
+      if (/❌|\[ERROR\]|\bexception\b|\btraceback\b|\bfailed\b|failure/i.test(text)) div.style.color = '#ff8080';      // error → red
+      else if (/⚠|\[WARN\]|\bwarning\b/i.test(text)) div.style.color = '#e9b96e';                                    // warning → amber
+      else if (/✅|✓|\bcomplete\b|\bready\b|\bok\b|\bpassed?\b/i.test(text)) div.style.color = '#7ede7e';            // success → green
+      else div.style.color = '#dcdcdc';                                                                              // info → default
+      panel.appendChild(div);
+      panel.scrollTop = panel.scrollHeight;
+      for (var i = MARKERS.length - 1; i >= 0; i--) {
+        if (MARKERS[i].re.test(text)) { setStage(MARKERS[i].stage); break; }
+      }
+    }
+    setStage(0);
+    var es = new EventSource('/admin/runs/' + runId + '/stream');
+    es.onmessage = function(e) { appendLine(e.data); };
+    es.addEventListener('done', function(e) {
+      // Sending (pill index 5) turns green ONLY if the digest was actually emailed;
+      // if Send-email was off / test mode / send failed, it stays grey (skipped).
+      var estatus = (meta.getAttribute('data-email-status') || '').toUpperCase();
+      pills.forEach(function(p, idx) {
+        p.classList.remove('active', 'done', 'skipped');
+        if (idx === 5) p.classList.add(estatus === 'SENT' ? 'done' : 'skipped');
+        else p.classList.add('done');
+      });
+      cur = pills.length;
+      es.close();
+      // If we watched a live run finish, reload once to refresh the email badge + history counts.
+      if (wasLive) { setTimeout(function() { location.reload(); }, 1000); }
+    });
+    es.onerror = function() { /* browser auto-reconnects with Last-Event-ID; ignore transient errors */ };
+  })();
+
 </script>
 {% endblock %}

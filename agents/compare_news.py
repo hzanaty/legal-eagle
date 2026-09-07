@@ -188,6 +188,8 @@ def _build_item_record(item: Dict[str, Any]) -> Dict[str, Any]:
         "significance_rank": item.get("significance_rank"),
         "rank_tier": item.get("rank_tier"),
         "rank_reasoning": item.get("rank_reasoning"),
+        # v3.8: effective date (populated by news_ranker; upsert updates it)
+        "effective_date": item.get("effective_date"),
     }
 
 
@@ -235,6 +237,7 @@ def run_compare_news_agent(
     glossary: Optional[Dict[str, str]] = None,
     language: Optional[str] = "en",
     skip_comparison: bool = False,
+    skip_persist: bool = False,
 ):
     """
     DB-backed compare agent:
@@ -262,15 +265,19 @@ def run_compare_news_agent(
         out_dir.mkdir(parents=True, exist_ok=True)
         snapshot_path = out_dir / "all_news.json"
         
-        # Still persist items to DB for future baseline
-        print("🗃️ Persisting current items to DB baseline...")
+        # Still persist items to DB for future baseline (unless dry-run)
         for item in current_items:
-            try:
-                item["dedup_status"] = "new"
-                rec = _build_item_record(item)
-                add_news_item(item.get("profile_id") or 1, rec)
-            except Exception as e:
-                print(f"⚠️ Failed to upsert news item to DB: {e}")
+            item["dedup_status"] = "new"
+        if not skip_persist:
+            print("🗃️ Persisting current items to DB baseline...")
+            for item in current_items:
+                try:
+                    rec = _build_item_record(item)
+                    add_news_item(item.get("profile_id") or 1, rec)
+                except Exception as e:
+                    print(f"⚠️ Failed to upsert news item to DB: {e}")
+        else:
+            print("🧪 Dry-run: skipping DB persistence.")
         
         # Save snapshot
         try:
@@ -382,6 +389,7 @@ def run_compare_news_agent(
         )
 
         classification = "new"
+        semantic_prior_count = 0  # repetition carried from a cosine-matched (reworded) prior
         if is_dup:
             classification = "duplicate"
         elif use_embeddings and i < len(curr_emb):
@@ -403,13 +411,22 @@ def run_compare_news_agent(
                     classification = "update"
                     item["is_update"] = True
                     item["delta"] = deltas
+                    # A reworded re-announcement of a recurring change is a REPEAT, not a
+                    # fresh update. Carry the matched prior's repetition_count so the ranker's
+                    # REPEATED elevation can fire on a semantic (non-exact-key) match.
+                    if 0 <= best_j < len(baseline_emb):
+                        semantic_prior_count = int(
+                            (baseline_items[best_j] or {}).get("repetition_count") or 0
+                        )
                 else:
                     classification = "new"
 
         item["dedup_status"] = classification
-        # v3.2: REPEATED tag — set based on how many times this entity has appeared
+        # v3.2: REPEATED tag — set based on how many times this entity has appeared.
+        # Exact-key match (guid/url/hash/fingerprint) OR a semantic re-announcement both count.
         matched = _find_matched_baseline(item, by_source_id, by_url, by_sig, by_fp)
-        prior_count = int((matched or {}).get("repetition_count") or 0)
+        exact_prior_count = int((matched or {}).get("repetition_count") or 0)
+        prior_count = max(exact_prior_count, semantic_prior_count)
         item["repetition_count"] = prior_count
         if prior_count >= 3:
             item["repetition_tag"] = "repeated"
@@ -434,13 +451,16 @@ def run_compare_news_agent(
 
     # Persist ALL current items (with dedup_status) — duplicates are preserved (F7),
     # never dropped, so they remain queryable and visible (collapsed) in Review.
-    print("🗃️ Persisting current items to DB baseline (with dedup_status)...")
-    for item in current_items:
-        try:
-            rec = _build_item_record(item)
-            add_news_item(item.get("profile_id") or 1, rec)
-        except Exception as e:
-            print(f"⚠️ Failed to upsert news item to DB: {e}")
+    if not skip_persist:
+        print("🗃️ Persisting current items to DB baseline (with dedup_status)...")
+        for item in current_items:
+            try:
+                rec = _build_item_record(item)
+                add_news_item(item.get("profile_id") or 1, rec)
+            except Exception as e:
+                print(f"⚠️ Failed to upsert news item to DB: {e}")
+    else:
+        print("🧪 Dry-run: skipping DB persistence (nothing saved to news_items).")
 
     dup_count = sum(1 for it in current_items if it.get("dedup_status") == "duplicate")
     print(f"✅ New: {len(new_items)} | Updates: {len(update_items)} | Duplicates (kept): {dup_count}")

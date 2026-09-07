@@ -27,6 +27,8 @@
   .gap-count { font-size: 11px; color: #e9730c; font-weight: 600; display: flex; align-items: center; gap: 4px; }
 
   .item-list { flex: 1; overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 5px; min-height: 0; }
+  /* "All Items" view wrapper must be a bounded flex column so .item-list can scroll (fixes no-scroll bug) */
+  #itemsView { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 
   /* Level-1 topic / level-2 aspect rows (only render when grouped data present) */
   .topic-row { background: #354a5f; color: white; padding: 8px 12px; display: flex; align-items: center; gap: 8px; cursor: pointer; border-radius: 4px; margin: 8px 0 2px; user-select: none; }
@@ -55,6 +57,9 @@
   .item-meta { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; flex-wrap: wrap; }
   .source-tag { font-size: 10px; font-weight: 700; color: #0a6ed1; background: #e8f1fb; border-radius: 3px; padding: 1px 6px; }
   .pub-date { font-size: 10px; color: #6a6d70; }
+  .eff-date { font-size: 10px; font-weight: 700; background: #e8f5e9; color: #107e3e; border: 1px solid #c8e6c9; border-radius: 3px; padding: 1px 6px; }
+  .glossary-tag { font-size: 10px; font-weight: 700; background: #eef2f8; color: #354a5f; border: 1px solid #d5dde8; border-radius: 3px; padding: 1px 6px; }
+  .authority-tag { font-size: 10px; font-weight: 700; background: #f3eefe; color: #5b3fb8; border: 1px solid #ddd0f5; border-radius: 3px; padding: 1px 6px; }
   .tag-pill { font-size: 10px; font-weight: 700; border-radius: 3px; padding: 1px 6px; }
   .tag-new { background: #e8f5e9; color: #107e3e; } .tag-update { background: #e3f2fd; color: #0a6ed1; }
   .tag-repeated { background: #fff3e0; color: #e9730c; } .tag-dup { background: #f5f5f5; color: #aaa; }
@@ -179,7 +184,7 @@
       <div class="chip-group">
         <div class="fchip active" data-dim="rank" data-val="all" onclick="setFilter(this)">All</div>
         <div class="fchip r1" data-dim="rank" data-val="1" onclick="setFilter(this)">1 — Noise</div>
-        <div class="fchip r2" data-dim="rank" data-val="2" onclick="setFilter(this)">2 — Background</div>
+        <div class="fchip r2" data-dim="rank" data-val="2" onclick="setFilter(this)">2 — Signal</div>
         <div class="fchip r3" data-dim="rank" data-val="3" onclick="setFilter(this)">3 — Watch</div>
         <div class="fchip r4" data-dim="rank" data-val="4" onclick="setFilter(this)">4 — Legal Change</div>
         <div class="fchip r5" data-dim="rank" data-val="5" onclick="setFilter(this)">5 — Urgent</div>
@@ -196,15 +201,7 @@
       </div>
     </div>
     <div class="filter-row">
-      <span class="filter-label">Source</span>
-      <div class="chip-group">
-        <div class="fchip active" data-dim="src" data-val="all" onclick="setFilter(this)">All</div>
-        <div class="fchip" data-dim="src" data-val="accepted" onclick="setFilter(this)">Accepted</div>
-        <div class="fchip" data-dim="src" data-val="filtered" onclick="setFilter(this)">Filtered</div>
-      </div>
-    </div>
-    <div class="filter-row">
-      <span class="filter-label">LoB</span>
+      <span class="filter-label">Glossary</span>
       <div class="chip-group">
         <div class="fchip active" data-dim="lob" data-val="all" onclick="setFilter(this)">All</div>
         <div class="fchip" data-dim="lob" data-val="matched" onclick="setFilter(this)">Matched</div>
@@ -223,11 +220,19 @@
   <div class="review-toolbar">
     <label class="select-all-check"><input type="checkbox" id="selAll" onchange="toggleAll(this)"> Select all</label>
     <span style="font-size:11px;color:#6a6d70">
-      Accepted <strong>{{ accepted_unscored_count }}</strong> · Filtered <strong>{{ filtered_unscored_count }}</strong> · Reviewed <strong>{{ reviewed_count }}</strong>
+      Accepted <strong>{{ accepted_unscored_count }}</strong> · Reviewed <strong>{{ reviewed_count }}</strong>
     </span>
     <span class="items-count" id="itemCount">{{ items|length }} items</span>
+    <label style="font-size:11px;color:#6a6d70;margin-left:8px;">Sort by
+      <select id="sortSelect" onchange="sortItems()"
+              style="font-size:11px;padding:2px 5px;border:1px solid #d9d9d9;border-radius:4px;margin-left:3px;">
+        <option value="rank">Rank (highest)</option>
+        <option value="published">Publish date (newest)</option>
+        <option value="effective">Effective date (soonest)</option>
+      </select>
+    </label>
     {% if gap_count %}
-    <span class="gap-count" title="Rank ≥ 3 items with no glossary/LoB match — needs confirmation">
+    <span class="gap-count" title="Rank ≥ 3 items with no glossary match — needs confirmation">
       &#9888; {{ gap_count }} glossary gap{{ 's' if gap_count != 1 }}
       <a href="#" onclick="filterGapsOnly(); return false;" style="color:#0a6ed1;margin-left:4px;">Show only gaps</a>
     </span>
@@ -350,7 +355,8 @@
                   <div class="src-card-body">
                     <div class="src-title">{{ src.title or '(no title)' }}</div>
                     <div class="src-meta">
-                      {% if src.publisher %}<span>{{ src.publisher }}</span>{% endif %}
+                      <span>{{ src.publisher or src.domain or 'Source' }} · {{ 'URL' if src.source_type and 'URL' in src.source_type else ('X' if src.source_type and 'weet' in src.source_type else (src.source_type|upper if src.source_type else 'RSS')) }}{% if src.authority_status == 'inferred' %} <span title="Authority inferred by AI" style="color:#e9730c;font-weight:700;">✦</span>{% endif %}</span>
+                      {% if src.authority_name %}<span class="authority-tag" title="Issuing authority">&#127963; {{ src.authority_name }}</span>{% endif %}
                       {% if src.published_at %}<span>{{ src.published_at|truncate(16, True, '') }}</span>{% endif %}
                       {% if src.url %}<a href="{{ src.url }}" target="_blank" style="color:#0a6ed1;">Link</a>{% endif %}
                     </div>
@@ -388,16 +394,20 @@
          data-src="{{ item.item_source|default('') }}"
          data-lob="{% if item.is_gap %}gap{% else %}matched{% endif %}"
          data-email="{{ 'sent' if item.email_sent else 'unsent' }}"
+         data-published="{{ item.published_at or '' }}"
+         data-effective="{{ item.effective_date or '' }}"
          data-item-id="{{ item.id }}">
       <input type="checkbox" class="item-check" onchange="onCardSel(this)" data-item-id="{{ item.id }}">
       <div class="rank-badge {% if score >= 1 %}rank-{{ score }}{% else %}rank-d{% endif %}">{% if score == 0 %}D{% elif score >= 1 %}{{ score }}{% else %}?{% endif %}</div>
       <div class="item-main">
         <div class="item-meta">
-          <span class="source-tag">{{ item.source_type|upper if item.source_type else 'RSS' }}</span>
+          <span class="source-tag">{{ item.publisher or item.domain or 'Source' }} · {{ 'URL' if item.source_type and 'URL' in item.source_type else ('X' if item.source_type and 'weet' in item.source_type else (item.source_type|upper if item.source_type else 'RSS')) }}{% if item.authority_status == 'inferred' %} <span title="Authority inferred by AI" style="color:#e9730c;font-weight:700;">✦</span>{% endif %}</span>
+          {% if item.authority_name %}<span class="authority-tag" title="Issuing authority{% if item.authority_status == 'inferred' %} — AI-inferred{% elif item.authority_status == 'configured' %} — configured{% endif %}">&#127963; {{ item.authority_name }}</span>{% endif %}
           {% if item.tag %}<span class="tag-pill tag-{{ item.tag|lower }}">{{ item.tag }}</span>{% endif %}
-          {% if item.publisher %}<span style="font-size:10px;color:#6a6d70;">{{ item.publisher }}{% if item.authority_status == 'inferred' %} <span title="Authority inferred by AI" style="color:#e9730c;font-weight:700;">✦</span>{% endif %}</span>{% endif %}
-          <span class="pub-date">{{ item.published_at|default(item.created_at, true)|default('', true)|truncate(16, True, '') }}</span>
-          {% if item.is_gap %}<span class="gap-badge">&#9888; Gap — no LoB match</span>{% endif %}
+          <span class="pub-date" title="Article publish date">{% if item.published_at %}{{ item.published_at|truncate(16, True, '') }}{% else %}—{% endif %}</span>
+          {% if item.effective_date %}<span class="eff-date" title="Date the change comes into force">⏱ Effective {{ item.effective_date }}</span>{% endif %}
+          {% for term in item.topic_label|fromjson %}{% if term != 'General' %}<span class="glossary-tag" title="Matched glossary term">{{ term }}</span>{% endif %}{% endfor %}
+          {% if item.is_gap %}<span class="gap-badge">&#9888; Gap — no glossary match</span>{% endif %}
           {% if score != 0 %}
             {% if item.email_sent %}
               <span style="font-size:10px;background:#e8f5e9;color:#107e3e;padding:1px 6px;border-radius:8px;font-weight:600;">✓ Sent</span>
@@ -405,7 +415,6 @@
               <span style="font-size:10px;background:#fff4e5;color:#e07b00;padding:1px 6px;border-radius:8px;font-weight:600;">✉ Unsent</span>
             {% endif %}
           {% endif %}
-          <span style="font-size:10px;color:#aaa;">{{ 'Accepted' if item.item_source == 'accepted' else 'Filtered' }}</span>
         </div>
         <div class="item-title">{{ item.title or '(no title)' }}</div>
         <div class="item-snippet">{{ (item.content or '')|truncate(200, False, '…') }}</div>
@@ -628,6 +637,37 @@
     var el = document.getElementById('itemCount');
     if (el) el.textContent = vis + ' items';
   }
+
+  // v3.8: client-side sort of the flat item list by rank / publish date / effective date.
+  function sortItems() {
+    var sel = document.getElementById('sortSelect');
+    var mode = sel ? sel.value : 'rank';
+    var list = document.getElementById('itemList');
+    if (!list) return;
+    var cards = Array.prototype.slice.call(list.querySelectorAll('.item-card'));
+    function num(v) { var n = parseInt(v, 10); return isNaN(n) ? 0 : n; }
+    cards.sort(function(a, b) {
+      if (mode === 'published') {
+        // Newest publish date first; undated sinks to the bottom.
+        return (b.dataset.published || '').localeCompare(a.dataset.published || '');
+      }
+      if (mode === 'effective') {
+        // Soonest effective date first; items without one sink to the bottom.
+        var ae = a.dataset.effective || '', be = b.dataset.effective || '';
+        if (ae && be) return ae.localeCompare(be);
+        if (ae) return -1;
+        if (be) return 1;
+        return 0;
+      }
+      // Default: rank desc, tie-break by newest publish date.
+      var dr = num(b.dataset.rank) - num(a.dataset.rank);
+      if (dr !== 0) return dr;
+      return (b.dataset.published || '').localeCompare(a.dataset.published || '');
+    });
+    cards.forEach(function(c) { list.appendChild(c); });
+  }
+  // Apply the default sort (Rank) once on load so effective-date-5 items surface on top.
+  document.addEventListener('DOMContentLoaded', sortItems);
 
   // ── v3.6: Preview for RCM ──
   var _previewAnnId = null, _previewMd = '', _previewTitle = '', _previewSources = [];
@@ -852,6 +892,21 @@
       btn.className = 'ov-btn ov-' + rank;
       label.textContent = aiRank ? ('AI: ' + aiRank + ' → You: ' + rank) : ('You: ' + rank);
       label.className = 'override-label overridden';
+    }
+    // Persist the override and reflect it on the rank badge
+    var card = btn.closest('.item-card');
+    var idEl = card ? card.querySelector('[data-item-id]') : null;
+    var itemId = idEl ? idEl.getAttribute('data-item-id') : null;
+    if (itemId) {
+      fetch('/admin/news/' + itemId + '/override', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({rank: rank})
+      }).then(function(r){ return r.json(); }).then(function(d){
+        if (d.ok) {
+          var badge = card.querySelector('.rank-badge');
+          if (badge) { badge.textContent = rank; badge.className = 'rank-badge rank-' + rank; }
+        } else { alert('Override failed: ' + (d.error || 'unknown')); }
+      }).catch(function(e){ alert('Network error: ' + e); });
     }
   }
   function toggleTr(id) {

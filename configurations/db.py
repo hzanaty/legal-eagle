@@ -13,10 +13,14 @@ def get_connection(db_path: Optional[str] = None) -> sqlite3.Connection:
     Open a sqlite3 connection with foreign_keys enabled and rows as dict-like objects.
     """
     path = db_path or DB_PATH_DEFAULT
-    conn = sqlite3.connect(path)
+    conn = sqlite3.connect(path, timeout=10)
     conn.row_factory = sqlite3.Row
     with conn:
         conn.execute("PRAGMA foreign_keys = ON;")
+        # Let readers/writers wait for a held lock instead of erroring instantly with
+        # "database is locked" (the run worker writes run_logs rapidly while the Run page
+        # and SSE stream read concurrently). Prevents transient 500s during a live run.
+        conn.execute("PRAGMA busy_timeout = 5000;")
     return conn
 
 
@@ -49,6 +53,17 @@ def create_schema_if_needed(conn: sqlite3.Connection) -> None:
         # Add profile-level date_scope (lookback window) — replaces per-source date_scope
         try:
             conn.execute("ALTER TABLE profiles ADD COLUMN date_scope TEXT DEFAULT 'all'")
+        except Exception:
+            pass
+
+        # v3.8: retire the legacy 'delta'/'all'/'force_full' scope (unbounded first run) —
+        # it was misleading (incremental fetch is always applied regardless). Migrate any
+        # such profile to the bounded 30-day initial-run window. Idempotent.
+        try:
+            conn.execute(
+                "UPDATE profiles SET date_scope='last_30_days' "
+                "WHERE date_scope IN ('delta','all','force_full') OR date_scope IS NULL OR date_scope=''"
+            )
         except Exception:
             pass
 
@@ -515,6 +530,9 @@ def create_schema_if_needed(conn: sqlite3.Connection) -> None:
         # AND topic_label == '["General"]' (rank-significant item with no glossary match)
         for _col, _decl in (
             ("glossary_gap", "INTEGER NOT NULL DEFAULT 0"),
+            # Effective date (v3.8) — the date a law/policy/rate comes into force, extracted
+            # by the AI ranker from the article body (ISO YYYY-MM-DD). NULL when none stated.
+            ("effective_date", "TEXT"),
         ):
             try:
                 conn.execute(f"ALTER TABLE news_items ADD COLUMN {_col} {_decl}")
@@ -968,6 +986,8 @@ def upsert_news_item(conn: sqlite3.Connection, profile_id: int, item: Dict[str, 
     topic_label = item.get("topic_label")
     email_eligible = item.get("email_eligible") or 0
     email_sent = item.get("email_sent") or 0
+    # v3.8 effective date (optional; stamped by ranker / effective-date step)
+    effective_date = item.get("effective_date")
 
     with conn:
         # 1) Locate existing row by strongest identifiers first
@@ -1015,7 +1035,8 @@ def upsert_news_item(conn: sqlite3.Connection, profile_id: int, item: Dict[str, 
                     repetition_count=COALESCE(?, repetition_count),
                     topic_label=COALESCE(?, topic_label),
                     email_eligible=COALESCE(?, email_eligible),
-                    email_sent=COALESCE(?, email_sent)
+                    email_sent=COALESCE(?, email_sent),
+                    effective_date=COALESCE(?, effective_date)
                 WHERE id=?
                 """,
                 (
@@ -1039,6 +1060,7 @@ def upsert_news_item(conn: sqlite3.Connection, profile_id: int, item: Dict[str, 
                     topic_label,
                     email_eligible,
                     email_sent,
+                    effective_date,
                     news_id,
                 ),
             )
@@ -1047,8 +1069,8 @@ def upsert_news_item(conn: sqlite3.Connection, profile_id: int, item: Dict[str, 
         # 3) Insert new
         conn.execute(
             """
-            INSERT INTO news_items(profile_id, source_type, source_id, url, domain, title, content, published_at, first_seen_at, last_seen_at, hash_signature, publisher, authority_id, authority_status, dedup_status, significance_rank, rank_tier, rank_reasoning, repetition_tag, repetition_count, topic_label, email_eligible, email_sent)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            INSERT INTO news_items(profile_id, source_type, source_id, url, domain, title, content, published_at, first_seen_at, last_seen_at, hash_signature, publisher, authority_id, authority_status, dedup_status, significance_rank, rank_tier, rank_reasoning, repetition_tag, repetition_count, topic_label, email_eligible, email_sent, effective_date)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """,
             (
                 profile_id,
@@ -1074,6 +1096,7 @@ def upsert_news_item(conn: sqlite3.Connection, profile_id: int, item: Dict[str, 
                 topic_label,
                 email_eligible,
                 email_sent,
+                effective_date,
             ),
         )
         row = conn.execute(
@@ -1130,7 +1153,7 @@ def list_url_sources(conn: sqlite3.Connection, profile_id: int) -> List[Dict[str
     """
     rows = conn.execute(
         "SELECT url, mode, sample_link, read_more_label, crawl_version, max_depth, allowed_domains, path_filter, max_results, date_scope, url_date_template, last_successful_fetch, created_at, "
-        "simulation_status, simulated_at, container_selector, field_selectors, read_more_selector, pagination_type, pagination_selector, depth_level, requires_js "
+        "simulation_status, simulated_at, container_selector, field_selectors, read_more_selector, pagination_type, pagination_selector, depth_level, requires_js, publisher_name, authority_id "
         "FROM url_sources WHERE profile_id = ? ORDER BY url",
         (profile_id,)
     ).fetchall()
@@ -1159,6 +1182,9 @@ def list_url_sources(conn: sqlite3.Connection, profile_id: int) -> List[Dict[str
             "pagination_selector": r["pagination_selector"],
             "depth_level": r["depth_level"],
             "requires_js": r["requires_js"],
+            # Source attribution (v3.0)
+            "publisher_name": r["publisher_name"],
+            "authority_id": r["authority_id"],
         }
         for r in rows
     ]
@@ -1562,7 +1588,9 @@ def list_all_news_for_review(
                    publisher, authority_id, authority_status, dedup_status,
                    significance_rank, rank_tier, rank_reasoning,
                    repetition_tag, repetition_count,
-                   topic_label, email_eligible, email_sent, glossary_gap
+                   topic_label, email_eligible, email_sent, glossary_gap,
+                   effective_date,
+                   (SELECT name FROM authorities WHERE authorities.id = news_items.authority_id) AS authority_name
             FROM news_items
             WHERE profile_id = ?
         """
@@ -1617,8 +1645,9 @@ def list_all_news_for_review(
             item['hash_signature'] = None
             results.append(item)
     
-    # Sort combined results by date (most recent first)
-    results.sort(key=lambda x: x.get('created_at') or x.get('last_seen_at') or '', reverse=True)
+    # Sort combined results by publish date (most recent first); fall back to
+    # collection time only when an item has no publish date.
+    results.sort(key=lambda x: x.get('published_at') or x.get('created_at') or x.get('last_seen_at') or '', reverse=True)
     
     # Apply pagination
     return results[offset:offset + limit]

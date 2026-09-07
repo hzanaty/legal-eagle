@@ -1,8 +1,11 @@
 """
 Copies the latest harness run data from tests/test.db → configurations/config.db
-for the Xanadu (XN/HCM) demo profile. Run after a successful harness pass.
+for the Xanadu (XN/HCM) profile, so the real admin UI can be inspected with harness
+output. This is a MANUAL-TESTING helper (run after a successful harness pass) — it is
+NOT the demo prep tool. For the team demo (reset review data / seed the REPEATED baseline
+against the live gov-site + RSS flow), use scripts/prep_xanadu_demo.py instead.
 
-Usage: python3 scripts/refresh_xanadu_demo.py
+Usage: python3 scripts/load_harness_run.py
 """
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

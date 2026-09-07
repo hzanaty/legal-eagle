@@ -26,12 +26,22 @@ Public interface:
     Mutates each item dict in place with significance_rank, rank_tier, rank_reasoning.
 """
 import json
+import os
 import re
 from typing import Any, Dict, List, Optional
 
 from configurations.config_loader import creds
 from agents.sap_ai_client import SAPAICoreClient
 from agents.ai_cache import cached_chat
+
+# AI-rank refinement (Tier 2 AI adjusting the rank of Tier-1 / unmatched items) is
+# gated OFF by default. The AI chat call was historically broken (always fell back to
+# rank 2), so enabling real AI ranking would change many ranks and needs its own
+# validation pass. With this off, ranking behaves exactly as shipped; the Tier-2 AI
+# call is still made to extract the effective_date. Set LEGAL_EAGLE_AI_RANK_REFINE=1
+# to let the AI rank actually influence scoring.
+_AI_RANK_REFINE = os.environ.get("LEGAL_EAGLE_AI_RANK_REFINE", "0") == "1"
+_FALLBACK_RANK = 2  # historical Tier-2 fallback used when refinement is off
 
 _DUPLICATE = "duplicate"
 _TIER1 = "tier1"
@@ -96,8 +106,13 @@ def _tier1_score(text: str, signals: List[Dict[str, Any]]) -> Optional[int]:
     return best
 
 
-def _tier2_score(item: Dict[str, Any], grounding: List[Dict[str, Any]]) -> tuple[int, str]:
-    """Call AI to produce rank 1–5 + one-line reasoning. Returns (rank, reasoning)."""
+def _tier2_score(item: Dict[str, Any], grounding: List[Dict[str, Any]]) -> tuple[int, str, Optional[str]]:
+    """Call AI to produce rank 1–5 + one-line reasoning + optional effective date.
+
+    Returns (rank, reasoning, effective_date) where effective_date is an ISO
+    'YYYY-MM-DD' string if the article explicitly states when the change comes
+    into force, else None.
+    """
     title = item.get("title", "")
     content = item.get("content", "") or ""
 
@@ -113,28 +128,58 @@ def _tier2_score(item: Dict[str, Any], grounding: List[Dict[str, Any]]) -> tuple
         "  3 = operational impact (payroll, deadlines, rates)\n"
         "  2 = relevant case law or indirect implication\n"
         "  1 = off-topic or macro/finance news with no direct HR obligation\n\n"
+        "Also extract the EFFECTIVE DATE — the date the described law, policy, regulation or "
+        "rate comes into force / takes effect — but ONLY if the article states a specific date. "
+        "Return it as 'YYYY-MM-DD'. If no specific effective date is stated, return null.\n\n"
         f"Examples:\n{examples_text}\n\n"
         f'Title: "{title}"\n'
-        f'Content: "{content[:400]}"\n\n'
-        'Respond with a JSON object: {"rank": <1-5>, "reasoning": "<one sentence>"}'
+        f'Content: "{content[:1500]}"\n\n'
+        'Respond with a JSON object: '
+        '{"rank": <1-5>, "reasoning": "<one sentence>", "effective_date": "<YYYY-MM-DD or null>"}'
     )
 
-    def _call():
+    def _call() -> str:
         client = _get_ai_client()
-        return client.chat(prompt)
+        resp = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0,
+            response_format={"type": "json_object"},
+        )
+        return resp.choices[0].message.content
 
     try:
         raw = cached_chat(prompt, _call)
         # Extract JSON from the response (may be wrapped in markdown code block)
-        match = re.search(r'\{[^}]+\}', raw, re.DOTALL)
+        match = re.search(r'\{.*\}', raw, re.DOTALL)
         if match:
             parsed = json.loads(match.group())
             rank = max(1, min(5, int(parsed.get("rank", 2))))
             reasoning = str(parsed.get("reasoning", ""))
-            return rank, reasoning
+            effective_date = _normalize_effective_date(parsed.get("effective_date"))
+            return rank, reasoning, effective_date
     except Exception:
         pass
-    return 2, "Tier 2 fallback — AI unavailable or parse error"
+    return 2, "Tier 2 fallback — AI unavailable or parse error", None
+
+
+def _normalize_effective_date(value: Any) -> Optional[str]:
+    """Normalize an AI-returned effective date to ISO 'YYYY-MM-DD', or None.
+
+    Accepts a real date string (any parseable format); returns None for null,
+    empty, the literal 'null', or an unparseable value.
+    """
+    if not value or not isinstance(value, str):
+        return None
+    v = value.strip()
+    if not v or v.lower() == "null":
+        return None
+    try:
+        from agents.date_filter import parse_date_string
+        dt = parse_date_string(v)
+        return dt.strftime("%Y-%m-%d") if dt else None
+    except Exception:
+        return None
 
 
 def rank_items(
@@ -158,21 +203,28 @@ def rank_items(
 
         # Tier 1 — deterministic keyword/regex
         t1_rank = _tier1_score(text, signals)
+
+        # AI pass — extract the effective_date for every non-duplicate item (the
+        # post-tag step uses it to elevate relevant items). It also returns an AI
+        # rank, but that only influences scoring when _AI_RANK_REFINE is enabled;
+        # by default ranking is preserved exactly as shipped (fallback rank 2).
+        t2_rank, t2_reasoning, effective_date = _tier2_score(item, grounding)
+        item["effective_date"] = effective_date
+        rank_for_scoring = t2_rank if _AI_RANK_REFINE else _FALLBACK_RANK
+
         if t1_rank is not None:
             item["significance_rank"] = t1_rank
             item["rank_tier"] = _TIER1
             item["rank_reasoning"] = f"Tier 1 signal match (rank {t1_rank})"
             if t1_rank >= 4:
-                # Strong Tier 1 match — skip AI
+                # Strong Tier 1 match — AI rank not applied (Tier 1 wins)
                 _apply_boosts(item)
                 continue
 
-        # Tier 2 — AI (fires when Tier 1 gives rank < 4 or no match)
-        t2_rank, t2_reasoning = _tier2_score(item, grounding)
-        # Take the better of Tier 1 and Tier 2
-        final_rank = max(t1_rank or 0, t2_rank)
+        # Take the better of Tier 1 and Tier 2 (fires when Tier 1 gives rank < 4 or no match)
+        final_rank = max(t1_rank or 0, rank_for_scoring)
         item["significance_rank"] = final_rank
-        item["rank_tier"] = _TIER2 if (t1_rank is None or t2_rank > (t1_rank or 0)) else _TIER1
+        item["rank_tier"] = _TIER2 if (t1_rank is None or rank_for_scoring > (t1_rank or 0)) else _TIER1
         item["rank_reasoning"] = t2_reasoning if item["rank_tier"] == _TIER2 else item.get("rank_reasoning", "")
 
         _apply_boosts(item)
@@ -199,19 +251,14 @@ def _apply_boosts(item: Dict[str, Any]) -> None:
 
 
 def rerank_items_for_profile(profile_id: int, db_conn) -> int:
-    """Re-run the full ranker over all news_items for the profile's latest run.
+    """Re-run the full ranker over all current news_items for the profile.
 
     Returns the count of items re-ranked.
     """
-    latest_run = db_conn.execute(
-        "SELECT id FROM runs WHERE profile_id=? ORDER BY id DESC LIMIT 1", (profile_id,)
-    ).fetchone()
-    if not latest_run:
-        return 0
-
-    run_id = latest_run["id"]
+    # news_items is scoped by profile_id (there is no run_id column), so re-rank the profile's
+    # current items directly.
     rows = db_conn.execute(
-        "SELECT * FROM news_items WHERE run_id=?", (run_id,)
+        "SELECT * FROM news_items WHERE profile_id=?", (profile_id,)
     ).fetchall()
     if not rows:
         return 0
@@ -224,4 +271,5 @@ def rerank_items_for_profile(profile_id: int, db_conn) -> int:
             "UPDATE news_items SET significance_rank=?, rank_tier=?, rank_reasoning=? WHERE id=?",
             (item.get("significance_rank", 0), item.get("rank_tier", ""), item.get("rank_reasoning", ""), item["id"]),
         )
+    db_conn.commit()
     return len(items)

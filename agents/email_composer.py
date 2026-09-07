@@ -216,53 +216,44 @@ def generate_digest(
 
     send_date = datetime.now(timezone.utc).strftime("%-d %B %Y")
 
-    # Build authority → {topic_label → [item]}
-    authority_groups: dict[int | None, dict[str, list[dict]]] = {}
+    # Build topic_label → [items] — mirror the Review Topic→Announcement→Sources hierarchy
+    # (no authority-first grouping, so there is no "Other Topics" bucket).
+    topic_groups: dict[str, list[dict]] = {}
     for it in items:
-        aid = it.get("authority_id")
         labels_raw = it.get("topic_label") or '["General"]'
         try:
             labels = json.loads(labels_raw)
         except Exception:
             labels = ["General"]
         for lbl in labels:
-            authority_groups.setdefault(aid, {}).setdefault(lbl, []).append(it)
+            topic_groups.setdefault(lbl, []).append(it)
 
     # Delete any existing announcements for this run (supports Resend idempotency)
     conn.execute("DELETE FROM news_announcements WHERE run_id=?", (run_id,))
 
-    authority_blocks_html = ""
-    for aid, topic_map in authority_groups.items():
-        auth_name = _get_authority_name(conn, aid)
-        # Check if any item under this authority is inferred
-        is_inferred = any(
-            (it.get("authority_status") or "") == "inferred"
-            for topic_items in topic_map.values()
-            for it in topic_items
-        )
-        authority_block = _render_authority_row(auth_name, is_inferred)
+    # Sort topics by max rank desc
+    sorted_topics = sorted(
+        topic_groups.items(),
+        key=lambda kv: max((int(i.get("significance_rank") or 0) for i in kv[1]), default=0),
+        reverse=True,
+    )
 
-        # Sort topics by max rank desc
-        sorted_topics = sorted(
-            topic_map.items(),
-            key=lambda kv: max((int(i.get("significance_rank") or 0) for i in kv[1]), default=0),
-            reverse=True,
-        )
-
-        for topic_label, topic_items in sorted_topics:
-            if not any(it.get("email_eligible") for it in topic_items):
-                continue  # no eligible anchor — skip announcement and HTML block
-            print(f"  🤖 Composing: {auth_name} / {topic_label} ({len(topic_items)} items)…")
-            aspects = _call_ai_for_group(topic_items, language)
-
-            item_ids = [int(it["id"]) for it in topic_items if it.get("id")]
-            for asp in aspects:
-                _save_announcement(conn, run_id, topic_label, asp, item_ids)
-
-            max_rank = max((int(it.get("significance_rank") or 0) for it in topic_items), default=0)
-            authority_block += _render_topic_block(topic_label, aspects, max_rank=max_rank)
-
-        authority_blocks_html += f'<div style="margin-bottom:16px;">{authority_block}</div>'
+    topic_blocks_html = ""
+    announced_item_ids: set = set()  # R7: announce each item once, even if it matches >1 glossary term
+    for topic_label, topic_items in sorted_topics:
+        if not any(it.get("email_eligible") for it in topic_items):
+            continue  # no eligible anchor — skip announcement and HTML block
+        item_ids = [int(it["id"]) for it in topic_items if it.get("id")]
+        # R7: if every item here was already announced under another glossary term, skip.
+        if item_ids and all(i in announced_item_ids for i in item_ids):
+            continue
+        print(f"  🤖 Composing: {topic_label} ({len(topic_items)} items)…")
+        aspects = _call_ai_for_group(topic_items, language)
+        for asp in aspects:
+            _save_announcement(conn, run_id, topic_label, asp, item_ids)
+        announced_item_ids.update(item_ids)
+        max_rank = max((int(it.get("significance_rank") or 0) for it in topic_items), default=0)
+        topic_blocks_html += _render_topic_block(topic_label, aspects, max_rank=max_rank)
 
     conn.commit()
 
@@ -282,5 +273,5 @@ def generate_digest(
     return (
         '<div style="font-family:sans-serif;font-size:13px;line-height:1.6;'
         'max-width:640px;background:#ffffff;padding:20px;">'
-        f"{header_html}{authority_blocks_html}{footer_html}</div>"
+        f"{header_html}{topic_blocks_html}{footer_html}</div>"
     )

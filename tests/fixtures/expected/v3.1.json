@@ -41,8 +41,8 @@
      "description": "B4 (3 Aug 2026) → dropped by age anchor, absent everywhere"},
 
     {"type": "item_outcome", "title_contains": "mandatory health insurance for part-time", "expect_table": "news_items",
-     "fields": {"publisher": "XN Official Gazette", "authority_status": "unknown"},
-     "description": "C4 → present + publisher stamped (genuinely new item)"},
+     "fields": {"publisher": "XN Official Gazette", "authority_status": "inferred"},
+     "description": "C4 → present + publisher stamped; AI infers an authority (inferred path added in v3.2, now that the AI call works)"},
 
     {"type": "item_outcome", "title_contains": "updated social insurance contribution schedule", "expect_table": "news_items",
      "fields": {"dedup_status": "duplicate"},

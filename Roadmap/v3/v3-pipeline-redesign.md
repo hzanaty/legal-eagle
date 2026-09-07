@@ -187,7 +187,7 @@ Return JSON: {"rank": 1-5, "reasoning": "...", "signals_found": [...]}
 | Initial Rank | Tags | Updated Rank | Email Decision | Manual Override |
 |---|---|---|---|---|
 | 1 — Noise | — | 1 | ❌ Not sent — logged as false positive | Can upgrade |
-| 2 — Background | — | 2 | ❌ Not sent — Review UI only | Can upgrade to 3+ |
+| 2 — Signal | — | 2 | ❌ Not sent — Review UI only | Can upgrade to 3+ |
 | 3 — Watch | — | 3 | ✅ Sent (default threshold) | Can downgrade to 2 |
 | 4 — Legal Change | — | 4 | ✅ Sent | Can downgrade |
 | 5 — Urgent | — | 5 | ✅ Sent — highlighted | Can downgrade |
@@ -196,7 +196,7 @@ Return JSON: {"rank": 1-5, "reasoning": "...", "signals_found": [...]}
 | 4 — Legal Change | REPEATED — unchanged | 4 | ❌ Not sent — no new content | Can upgrade to force reminder |
 | 4 — Legal Change | REPEATED — rank upgrade | 5 — upgraded | ✅ Sent — escalation is the news | Can downgrade |
 | 1 — Noise | REPEATED ×3+ | 1 — no elevation | ❌ Not sent — flags source | Can mark source for removal |
-| 2 — Background | REPEATED ×3+ | 3 — auto-elevated | ✅ Sent — topic heating up | Can downgrade |
+| 2 — Signal | REPEATED ×3+ | 3 — auto-elevated | ✅ Sent — topic heating up | Can downgrade |
 
 **Three elevation rules:**
 1. Rank upgrade detected in new content → always elevates, overrides REPEATED suppression
@@ -666,3 +666,38 @@ Deterministic integration test harness for automated verification of every v3.x 
 
 **Spec:** `docs/superpowers/specs/2026-09-04-test-harness-design.md`
 
+
+---
+
+## v3.8 — Analyzing stage (Tagging merged into Ranking) + Authority display + URL date capture
+
+Shipped 2026-09-07. Three changes, harness v3.0–v3.6 all green (0 regressions):
+
+**A. Tagging merged into Ranking → "Analyzing".** Glossary tagging was its own stage running *after*
+ranking, which created a rank↔gap seam (a relevant-but-unmatched item never reached rank ≥ 3, so it
+was never gap-flagged). `agents/agents_controller.py` now runs one **Analyzing** block: `tag_items`
+(glossary match) → `rank_items` (rank, now sees `topic_label`) → `flag_glossary_gaps` (rank + glossary
+both known) → single persist (rank + `effective_date` via `add_news_item`; `topic_label` via
+`save_topic_labels`; gap via `flag_glossary_gaps`). The separate Tagging stage is retired;
+`news_tagger.py` functions are reused, not deleted. Lifecycle tags (NEW/UPDATE/REPEATED/DUPLICATE) are
+unaffected — they come from the Comparing stage. Stepper (`run_status.html`) is now 7 pills:
+`Starting · Collecting · Attributing · Comparing · Analyzing · Sending · Done` (MARKERS remapped;
+the `done` handler's Sending pill index moved 6 → 5). Ranking *scoring* is unchanged by default
+(glossary is available to the ranker but only alters the score when `LEGAL_EAGLE_AI_RANK_REFINE=1`).
+
+**B. Authority name surfaced on the Review card.** `list_all_news_for_review` now selects
+`authority_name` via a correlated subquery on `authorities` (avoids JOIN column ambiguity);
+`review_news.html` renders a `.authority-tag` badge (🏛 name) on the item meta row and announcement
+source cards. Previously the attributed authority was invisible (only publisher + a ✦ for inferred).
+
+**C. URL publish-date capture.** `url_sources_runner.extract_article` only read an
+`article:published_time` meta or an ISO `\d{4}-\d{2}-\d{2}` regex, so textual dates
+(`<span class="date">05 September 2026</span>`) were missed → empty date → the item was rejected by the
+strict publish-date enforcement (would have dropped the whole Xanadu feed incl. the flagship). It now
+gathers candidate date strings (meta, `itemprop`, `<time>`, `.date`/`.published`/`.post-date`/
+`.article-date`/`.entry-date`, ISO-in-text) and parses the first that resolves via the dateutil-backed
+`date_filter.parse_date_string`, normalised to ISO.
+
+**Follow-on (not in v3.8):** the "annual leave" gap only fires once AI ranking is enabled
+(`LEGAL_EAGLE_AI_RANK_REFINE=1`) so a relevant-but-unmatched item can reach rank ≥ 3 on merit — see
+the `Roadmap/v4-roadmap.md` investigation TODO.

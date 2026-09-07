@@ -1387,21 +1387,40 @@ def extract_article(base_url: str, url: str, html: str) -> Dict:
             title = cleaned if cleaned else raw_title
 
     content_text = _largest_text_block(soup)
+    # Publish date extraction — gather candidate strings in priority order, then parse the
+    # first that resolves to a real date via the dateutil-backed parser (handles ISO, RFC, and
+    # textual/localized forms like "05 September 2026"). Normalised to ISO YYYY-MM-DD.
+    from agents.date_filter import parse_date_string as _pds
     date_text = ""
-    og_date = soup.find("meta", property="article:published_time")
-    if og_date and og_date.get("content"):
-        date_text = og_date["content"].strip()
-    # Fallback: parse Gregorian date from visible text when meta is missing
-    if not date_text:
-        try:
-            txt_all = soup.get_text(" ", strip=True)
-            import re as _re
-            m = _re.search(r"\b(\d{4})[/-](\d{2})[/-](\d{2})\b", txt_all)
-            if m:
-                y, mn, d = m.group(1), m.group(2), m.group(3)
-                date_text = f"{y}-{mn}-{d}"
-        except Exception:
-            pass
+    _cands: List[str] = []
+    for _prop in ("article:published_time", "og:updated_time"):
+        _m = soup.find("meta", property=_prop)
+        if _m and _m.get("content"):
+            _cands.append(_m["content"])
+    for _ip in ("datePublished", "dateModified"):
+        _m = soup.find(attrs={"itemprop": _ip})
+        if _m:
+            _cands.append(_m.get("content") or _m.get_text(" ", strip=True))
+    _t = soup.find("time")
+    if _t:
+        _cands.append(_t.get("datetime") or _t.get_text(" ", strip=True))
+    for _sel in (".date", ".published", ".post-date", ".article-date", ".entry-date"):
+        _el = soup.select_one(_sel)
+        if _el:
+            _cands.append(_el.get_text(" ", strip=True))
+    # Last resort: an ISO date anywhere in the visible text.
+    try:
+        import re as _re
+        _mm = _re.search(r"\b\d{4}[/-]\d{2}[/-]\d{2}\b", soup.get_text(" ", strip=True))
+        if _mm:
+            _cands.append(_mm.group(0))
+    except Exception:
+        pass
+    for _c in _cands:
+        _dt = _pds((_c or "").strip())
+        if _dt:
+            date_text = _dt.strftime("%Y-%m-%d")
+            break
 
     return {
         "source": urlparse(base_url).netloc,
@@ -2501,6 +2520,26 @@ def run_unified_sources(url_sources: List[Dict[str, str]], profile_slug: Optiona
         except Exception as e:
             errors.append({"url": u, "error": f"runner exception: {e}"})
             continue
+
+    # Publish date is required — reject any URL item whose date is missing or unparseable
+    # (a publish date is crucial; we do not capture undated news). This is unconditional,
+    # covering modes/paths that skip the per-source date window above.
+    try:
+        from agents.date_filter import parse_date_string
+        kept: List[Dict] = []
+        rejected = 0
+        for it in items:
+            if parse_date_string(it.get("date") or it.get("published") or it.get("published_at")) is None:
+                rejected += 1
+                ref = it.get("link") or it.get("url") or (it.get("title") or "")[:80]
+                print(f'❌ URL source: skipped item — no/invalid publish date: {ref}')
+                continue
+            kept.append(it)
+        if rejected:
+            print(f"❌ URL source: rejected {rejected} item(s) with missing/invalid publish date")
+        items = kept
+    except Exception as e:
+        print(f"⚠️ URL source date enforcement failed: {e}")
 
     try:
         print(f"[Sources] cumulative items={len(items)} errors={len(errors)}")

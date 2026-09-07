@@ -422,7 +422,7 @@ def send_digest(
         receivers_rows = db_conn.execute(
             "SELECT email FROM email_receivers WHERE profile_id=?", (profile_id,)
         ).fetchall()
-        all_emails = [r["email"] for r in receivers_rows if r.get("email")]
+        all_emails = [r["email"] for r in receivers_rows if r["email"]]
 
         if not all_emails:
             print("  ⚠️  send_digest: no receivers configured")

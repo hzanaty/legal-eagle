@@ -18,6 +18,7 @@ AI calls are wrapped via ai_cache for offline harness determinism.
 import json
 import re
 from typing import Any, Dict, List, Optional, Tuple
+from urllib.parse import urlparse
 
 from configurations.config_loader import creds
 from agents.sap_ai_client import SAPAICoreClient
@@ -39,6 +40,29 @@ def build_feed_config(rss_feeds: List[Dict[str, Any]]) -> Dict[str, Dict[str, An
             "publisher": f.get("publisher_name"),
             "authority_id": f.get("authority_id"),
         }
+    return cfg
+
+
+def build_url_config(url_sources: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    """Map URL-source host (netloc) -> {publisher, authority_id} from loaded url_source rows.
+
+    URL-scraped items carry no `feed_url`, so they are matched to their configured publisher/authority
+    by HOST (the netloc of the source URL), which equals the article link's netloc for same-site scrapes.
+    """
+    cfg: Dict[str, Dict[str, Any]] = {}
+    for s in url_sources or []:
+        url = s.get("url") if isinstance(s, dict) else None
+        if not url:
+            continue
+        try:
+            host = urlparse(url).netloc
+        except Exception:
+            host = None
+        if host:
+            cfg[host] = {
+                "publisher": s.get("publisher_name"),
+                "authority_id": s.get("authority_id"),
+            }
     return cfg
 
 
@@ -77,7 +101,13 @@ def _infer_authority(
     )
 
     def _call() -> str:
-        return _get_ai_client().chat(prompt)
+        resp = _get_ai_client().chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0,
+            response_format={"type": "json_object"},
+        )
+        return resp.choices[0].message.content
 
     try:
         raw = cached_chat(prompt, _call)
@@ -100,15 +130,17 @@ def attribute_items(
     feed_config: Optional[Dict[str, Dict[str, Any]]] = None,
     db_conn=None,
     profile_id: Optional[int] = None,
+    url_config: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> List[Dict[str, Any]]:
     """Stamp publisher / authority_id / authority_status onto each item in place.
 
-    An item is matched to its feed via ``item['feed_url']`` (set by rss_parser).
-    Configured path: authority_id is taken from feed config → status 'configured'.
-    Inferred path (v3.2): no configured authority_id + db_conn + profile_id supplied
-      → AI picks best match from profile authorities → status 'inferred' or 'unknown'.
+    An RSS item is matched to its feed via ``item['feed_url']``. A URL-scraped item (no feed_url)
+    is matched to its source by HOST via ``url_config``. Configured path → status 'configured'.
+    Inferred path (v3.2): no configured authority_id + db_conn + profile_id → AI picks best match.
+    Finally, `publisher` is always given a sensible fallback (host / @handle) so it is never blank.
     """
     feed_config = feed_config or {}
+    url_config = url_config or {}
 
     # Load authorities once for the inferred path (only when DB is available).
     authorities: List[Dict[str, Any]] = []
@@ -119,17 +151,31 @@ def attribute_items(
         except Exception:
             pass
 
+    def _host_of(it: Dict[str, Any]) -> Optional[str]:
+        u = it.get("link") or it.get("url") or ""
+        try:
+            return urlparse(u).netloc or it.get("source") or None
+        except Exception:
+            return it.get("source") or None
+
     for it in items:
+        # 1) Configured via RSS feed_url
         cfg = feed_config.get(it.get("feed_url")) if it.get("feed_url") else None
+        # 2) Configured via URL-source host (for URL-scraped items)
+        if cfg is None:
+            host = _host_of(it)
+            if host and host in url_config:
+                cfg = url_config[host]
         if cfg is not None:
             if cfg.get("publisher"):
                 it["publisher"] = cfg.get("publisher")
             if cfg.get("authority_id"):
                 it["authority_id"] = cfg.get("authority_id")
                 it["authority_status"] = CONFIGURED
+                _ensure_publisher(it)
                 continue
 
-        # No configured authority — try AI inference if DB context is available.
+        # 3) No configured authority — try AI inference if DB context is available.
         if authorities:
             aid, aname = _infer_authority(
                 it.get("title", ""), it.get("content", ""), authorities
@@ -139,8 +185,27 @@ def attribute_items(
                 it["authority_status"] = INFERRED
                 if not it.get("publisher"):
                     it["publisher"] = aname
+                _ensure_publisher(it)
                 continue
 
         it.setdefault("authority_status", UNKNOWN)
+        _ensure_publisher(it)
 
     return items
+
+
+def _ensure_publisher(it: Dict[str, Any]) -> None:
+    """Guarantee a non-empty display publisher: keep existing, else host, else @handle, else 'Source'."""
+    if it.get("publisher"):
+        return
+    handle = it.get("handle") or it.get("account")
+    if (it.get("source_type") or "").lower().startswith("tweet") and handle:
+        it["publisher"] = "@" + str(handle).lstrip("@")
+        return
+    u = it.get("link") or it.get("url") or ""
+    host = ""
+    try:
+        host = urlparse(u).netloc
+    except Exception:
+        host = ""
+    it["publisher"] = host or it.get("source") or "Source"

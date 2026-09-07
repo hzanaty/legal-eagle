@@ -103,17 +103,17 @@
 
     <form method="post" action="{{ url_for('update_profile_date_scope', profile_id=profile.id) }}">
       <div class="kv-row">
-        <div class="kv-label">Default Lookback
-          <div class="kv-help">Applies to all sources unless overridden at run time</div>
+        <div class="kv-label">Initial Run Lookback Window
+          <div class="kv-help">Window fetched on a source's first run (or after a reset). Later runs fetch only new items since the last successful fetch.</div>
         </div>
         {% set ds = profile.date_scope %}
+        {% set legacy = ds in ('delta','all','force_full') or not ds %}
         <div class="segmented" id="lookback-seg">
-          <button type="button" class="seg-btn {% if ds in ('delta','all','force_full') or not ds %}active{% endif %}" onclick="setLookback(this,'delta')">Delta</button>
           <button type="button" class="seg-btn {% if ds == 'today' %}active{% endif %}" onclick="setLookback(this,'today')">Today</button>
           <button type="button" class="seg-btn {% if ds == 'last_7_days' %}active{% endif %}" onclick="setLookback(this,'last_7_days')">7 days</button>
-          <button type="button" class="seg-btn {% if ds == 'last_30_days' %}active{% endif %}" onclick="setLookback(this,'last_30_days')">30 days</button>
+          <button type="button" class="seg-btn {% if ds == 'last_30_days' or legacy %}active{% endif %}" onclick="setLookback(this,'last_30_days')">30 days</button>
         </div>
-        <input type="hidden" name="date_scope" id="date_scope_val" value="{% if ds in ('delta','all','force_full') or not ds %}delta{% else %}{{ ds }}{% endif %}">
+        <input type="hidden" name="date_scope" id="date_scope_val" value="{% if ds in ('today','last_7_days','last_30_days') %}{{ ds }}{% else %}last_30_days{% endif %}">
         <button type="submit" class="btn-save">Save Lookback</button>
       </div>
     </form>

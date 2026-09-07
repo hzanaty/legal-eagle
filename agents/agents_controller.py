@@ -41,7 +41,7 @@ from agents.rss_parser import parse_rss_feed
 from agents.tweet_feed import search_tweets_multi_account, check_twitter_rate_limit
 from agents.url_sources_runner import run_unified_sources, scrape_url_source_with_config
 from agents.compare_news import run_compare_news_agent
-from agents.authority_attributor import build_feed_config, attribute_items
+from agents.authority_attributor import build_feed_config, build_url_config, attribute_items
 from agents.health_check import run_health_checks, summarize, hard_failures
 from agents.news_grouper import group_and_summarize_news
 from agents.email_sender import send_email
@@ -273,6 +273,7 @@ def run_profile_once(
     lookback_override: Optional[str] = None,
     skip_grouping: bool = False,
     should_cancel: Optional[callable] = None,
+    dry_run: bool = False,
 ) -> bool:
     """
     Run the full workflow for a single profile id (even if inactive).
@@ -568,10 +569,11 @@ def run_profile_once(
         # match from profile authorities list (wrapped in ai_cache for harness replay).
         try:
             feed_cfg = build_feed_config(RSS_FEED_URLS)
+            url_cfg = build_url_config(URL_SOURCES)
             attr_conn = get_connection()
-            attribute_items(all_news_items, feed_cfg, db_conn=attr_conn, profile_id=profile_id)
+            attribute_items(all_news_items, feed_cfg, db_conn=attr_conn, profile_id=profile_id, url_config=url_cfg)
             attr_conn.close()
-            print(f"🏷️  Attribution stamped ({len(feed_cfg)} configured feed(s), AI inference enabled)")
+            print(f"🏷️  Attribution stamped ({len(feed_cfg)} configured feed(s), {len(url_cfg)} URL host(s), AI inference enabled)")
         except Exception as e:
             print(f"⚠️ Attribution stage failed: {e}")
 
@@ -595,11 +597,12 @@ def run_profile_once(
         
         outputs_dir = f"outputs/{profile_slug}"
         compare_result = run_compare_news_agent(
-            filtered_items, 
-            outputs_dir=outputs_dir, 
-            glossary=GLOSSARY, 
+            filtered_items,
+            outputs_dir=outputs_dir,
+            glossary=GLOSSARY,
             language=LANGUAGE_PREFERENCE,
-            skip_comparison=skip_comparison
+            skip_comparison=skip_comparison,
+            skip_persist=dry_run,
         )
         new_items = compare_result.get("new_items", [])
         update_items = compare_result.get("update_items", [])
@@ -608,44 +611,99 @@ def run_profile_once(
         # Combine new and updates for the next stage
         final_items = new_items + update_items
 
-        # v3.2: RANK stage — three-tier engine scores all items (duplicates get rank 0).
-        # Runs on ALL items (filtered_items = new + updates + duplicates) so duplicates
-        # are stamped rank_tier='duplicate' before the UI reads the DB.
-        try:
-            from agents.news_ranker import rank_items
-            rank_conn = get_connection()
-            rank_items(filtered_items, profile_id, rank_conn)
-            rank_conn.close()
-            ranked = sum(1 for i in filtered_items if (i.get("significance_rank") or 0) > 0)
-            print(f"📊 Rank stage complete — {ranked}/{len(filtered_items)} items scored > 0")
-            # Persist rank fields back to DB (compare stage wrote rows without rank fields;
-            # upsert on source_id/url/hash_signature updates just the rank columns).
-            from configurations.config_loader import add_news_item as _add_item
-            from agents.compare_news import _build_item_record
-            for _it in filtered_items:
-                try:
-                    _rec = _build_item_record(_it)
-                    _add_item(_it.get("profile_id") or profile_id, _rec)
-                except Exception:
-                    pass
-        except Exception as e:
-            print(f"⚠️ Rank stage failed: {e}")
-
-        # v3.3: TAGGING stage — deterministic glossary-keyword matching assigns topic_label.
+        # v3.8: ANALYZING stage — glossary tagging + three-tier ranking, consolidated into ONE
+        # stage (was separate Ranking + Tagging). Order matters: glossary match runs FIRST so
+        # topic_label is known when ranking, then rank, then the glossary-gap flag (which needs
+        # both rank and glossary). Lifecycle tags (new/update/repeated/duplicate) come from the
+        # Comparing stage and are untouched here.
         try:
             from agents.news_tagger import tag_items, save_topic_labels, flag_glossary_gaps
-            tag_conn = get_connection()
-            tag_items(filtered_items, tag_conn, profile_id)
-            save_topic_labels(filtered_items, tag_conn, profile_id)
-            # v3.5: flag rank-significant items with no glossary match as glossary gaps
-            flag_glossary_gaps(filtered_items, tag_conn, profile_id)
-            tag_conn.close()
+            from agents.news_ranker import rank_items
+            # Reads only (glossary terms + ranking signals/grounding); mutate items in memory.
+            an_conn = get_connection()
+            tag_items(filtered_items, an_conn, profile_id)       # → topic_label (glossary match)
+            rank_items(filtered_items, profile_id, an_conn)      # → significance_rank (sees topic_label)
+            an_conn.close()
+            if not dry_run:
+                # Persist rank fields + effective_date (upsert on source_id/url/hash_signature).
+                from configurations.config_loader import add_news_item as _add_item
+                from agents.compare_news import _build_item_record
+                for _it in filtered_items:
+                    try:
+                        _rec = _build_item_record(_it)
+                        _add_item(_it.get("profile_id") or profile_id, _rec)
+                    except Exception:
+                        pass
+                # Persist topic_label, then flag glossary gaps (rank + glossary both known now).
+                w_conn = get_connection()
+                save_topic_labels(filtered_items, w_conn, profile_id)
+                flag_glossary_gaps(filtered_items, w_conn, profile_id)
+                w_conn.close()
+            ranked = sum(1 for i in filtered_items if (i.get("significance_rank") or 0) > 0)
             tagged = sum(1 for i in filtered_items if i.get("topic_label") and i["topic_label"] != '["General"]')
             gaps = sum(1 for i in filtered_items if i.get("glossary_gap"))
-            print(f"🏷  Tag stage complete — {tagged}/{len(filtered_items)} items matched glossary terms")
-            print(f"⚠️  Glossary gap check — {gaps}/{len(filtered_items)} items flagged (rank ≥ 3, no match)")
+            print(f"🔬 Analyzing stage complete — {tagged}/{len(filtered_items)} glossary-matched · {ranked}/{len(filtered_items)} ranked > 0")
+            if gaps:
+                print(f"⚠️  Glossary gap check — {gaps}/{len(filtered_items)} rank≥3 item(s) had NO glossary match (candidates to add)")
+            else:
+                print(f"✅ Glossary gap check — 0 gaps (all rank≥3 items matched a glossary term)")
         except Exception as e:
-            print(f"⚠️ Tag stage failed: {e}")
+            print(f"⚠️ Analyzing stage failed: {e}")
+
+        # v3.8: EFFECTIVE-DATE ELEVATION — a glossary-matched (relevant) item that carries an
+        # effective date (extracted by the ranker) is a definite, dated legal change → force rank 5.
+        # Items with no glossary match are noise: discard their effective date and leave rank untouched.
+        # Runs after TAG (glossary match known) and before the EMAIL gate (so eligibility sees rank 5).
+        try:
+            import json as _json
+            _GENERAL = _json.dumps(["General"])
+            eff_conn = get_connection()
+            elevated = 0
+            for _it in filtered_items:
+                if (_it.get("rank_tier") or "").lower() == "duplicate":
+                    continue
+                _label = _it.get("topic_label")
+                _matched = bool(_label) and _label != _GENERAL
+                _eff = _it.get("effective_date")
+
+                if _matched and _eff:
+                    if int(_it.get("significance_rank") or 0) < 5:
+                        _it["significance_rank"] = 5
+                        _it["rank_reasoning"] = (_it.get("rank_reasoning") or "") + " [effective-date → 5]"
+                        elevated += 1
+                elif not _matched and _eff:
+                    # Not relevant → do not capture an effective date (noise).
+                    _it["effective_date"] = None
+
+                # Persist final rank + effective_date. Direct UPDATE by identifier; also clears the
+                # date to NULL for non-matched items (COALESCE in upsert can't clear).
+                _src_type = _it.get("source_type", "RSS")
+                _src_id   = _it.get("source_id") or _it.get("guid") or _it.get("tweet_id")
+                _url      = _it.get("url") or _it.get("link")
+                _hash     = _it.get("hash_signature")
+                _rank_val = _it.get("significance_rank")
+                _eff_val  = _it.get("effective_date")
+                if _src_id:
+                    eff_conn.execute(
+                        "UPDATE news_items SET significance_rank=?, effective_date=?, rank_reasoning=? WHERE profile_id=? AND source_type=? AND source_id=?",
+                        (_rank_val, _eff_val, _it.get("rank_reasoning"), profile_id, _src_type, _src_id),
+                    )
+                elif _url:
+                    eff_conn.execute(
+                        "UPDATE news_items SET significance_rank=?, effective_date=?, rank_reasoning=? WHERE profile_id=? AND source_type=? AND url=?",
+                        (_rank_val, _eff_val, _it.get("rank_reasoning"), profile_id, _src_type, _url),
+                    )
+                elif _hash:
+                    eff_conn.execute(
+                        "UPDATE news_items SET significance_rank=?, effective_date=?, rank_reasoning=? WHERE profile_id=? AND source_type=? AND hash_signature=?",
+                        (_rank_val, _eff_val, _it.get("rank_reasoning"), profile_id, _src_type, _hash),
+                    )
+            eff_conn.commit()
+            eff_conn.close()
+            dated = sum(1 for i in filtered_items if i.get("effective_date"))
+            print(f"📆 Effective-date stage — {dated} relevant item(s) carry an effective date; {elevated} elevated to rank 5")
+        except Exception as e:
+            print(f"⚠️ Effective-date stage failed: {e}")
 
         # v3.3: EMAIL RANK GATE — set email_eligible=1 for items with rank >= threshold and not duplicate.
         try:
@@ -742,7 +800,7 @@ def run_profile_once(
 
         # Email (or save preview in test mode)
         if skip_email:
-            print("\n📧 [TEST MODE] Generating email preview...")
+            print("\n📧 Email preview generated (sending is handled by the digest step, not the pipeline).")
             # Save email preview to file
             import json
             preview_path = f"outputs/{profile_slug}/email_preview.html"
@@ -763,7 +821,7 @@ def run_profile_once(
             
             print(f"📁 Email preview saved to: {preview_path}")
             print(f"👀 Open file to review before sending")
-            print(f"⚠️  No emails sent (test mode active)\n")
+            print(f"ℹ️  No email sent from the pipeline (the digest step handles sending).\n")
             return True
         else:
             print("\n📧 Sending summary email...")

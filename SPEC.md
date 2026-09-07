@@ -1,7 +1,7 @@
-# Legal Eagle 3.7 — Technical Specification
+# Legal Eagle 3.8 — Technical Specification
 
-**Version:** 3.7 (Pipeline Redesign — 3-tier ranking, glossary tagging, challenge+grounding loop, glossary gap alert, RCM Preview fill, Legal Repo deprecated)  
-**Last Updated:** 2026-09-06
+**Version:** 3.8 (Analyzing stage = glossary tagging merged into ranking; authority name on Review card; URL textual-date capture; publish-date enforcement; effective-date rank-5)  
+**Last Updated:** 2026-09-07
 
 This document provides the technical specification for Legal Eagle, an AI-powered regulatory compliance monitoring system for SAP Localization.
 
@@ -1717,7 +1717,8 @@ legal-eagle/
 │   ├── migrate_*.py                 # Database migrations
 │   ├── setup_*.py                   # Profile setup scripts
 │   ├── resend_email_from_html.py    # Email resend utility
-│   ├── refresh_xanadu_demo.py       # Copy latest harness run → config.db, remap IDs (v3.4)
+│   ├── load_harness_run.py         # Copy latest harness run → config.db for manual testing, remap IDs (renamed from refresh_xanadu_demo.py)
+│   ├── prep_xanadu_demo.py          # Demo prep: reset Xanadu review data + seed REPEATED baseline (Xanadu-only guard)
 │   ├── export_config.py             # Export DB config to JSON (v2.31)
 │   ├── import_config.py             # Import DB config from JSON (v2.31)
 │   ├── launchd/                     # macOS launchd configs
