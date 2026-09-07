@@ -262,6 +262,12 @@
     <!-- ③ Process -->
     <div class="substep-group">
       <div class="substep-label">③ Process</div>
+      <div class="substep built" onclick="showDetail('filter')">
+        <span class="actor agent" title="Agent"><svg class="ic"><use href="#ic-agent"/></svg></span>
+        <div class="step-name">Filter</div>
+        <div class="step-sub">Per-source date window · v3.10</div>
+      </div>
+      <div class="inner-arrow">›</div>
       <div class="substep built" onclick="showDetail('attribute')">
         <span class="actor agent" title="Agent"><svg class="ic"><use href="#ic-agent"/></svg></span>
         <div class="step-name">Attribute</div>
@@ -601,6 +607,16 @@ const details = {
       { heading: 'What it does', items: ['Monitors Gmail inbox via IMAP', 'Looks for Law-to-Spec regulatory updates', 'Parses email body into structured news items'] },
       { heading: 'Key file', items: ['agents/email_inbox_parser.py', 'fetch_monitor_updates() → items'] },
       { heading: 'Dependencies', items: ['imaplib (IMAP protocol)', 'email (Python stdlib)', 'LEGAL_EAGLE_GMAIL_EMAIL_SENDER + APP_PASSWORD'] },
+    ]
+  },
+  'filter': {
+    title: 'News Filter',
+    subtitle: 'Per-source date window (v3.10) — FILTER stage between COLLECT and ATTRIBUTE',
+    tag: 'green', tagLabel: 'Shipped v3.10',
+    cols: [
+      { heading: 'What it does', items: ['Applies per-source date windowing to all collected items', 'Delta mode: keeps items newer than last_successful_fetch', 'First-run mode: uses configured lookback window', 'Covers RSS, URL sources, and simulated URL sources', 'filter_source_items() entry point'] },
+      { heading: 'Key file', items: ['agents/news_filter.py (renamed from date_filter.py)', 'filter_source_items(items, source_config) → filtered_items'] },
+      { heading: 'Dependencies', items: ['Source config (last_successful_fetch, lookback_days)', 'No external AI APIs — purely date-based'] },
     ]
   },
   'attribute': {

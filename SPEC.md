@@ -73,7 +73,7 @@ Legal Eagle monitors government sources for legal updates in chosen countries an
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
 │  │                   PROCESSING PIPELINE (v3)                            │   │
 │  │                                                                       │   │
-│  │  HEALTH CHECK ─▶ FETCH ─▶ ATTRIBUTE ─▶ ANNOTATE ─▶ RANK ─▶ TAG ─▶    │   │
+│  │  HEALTH CHECK ─▶ FETCH ─▶ FILTER ─▶ ATTRIBUTE ─▶ ANNOTATE ─▶ RANK ─▶ TAG ─▶  │   │
 │  │  TRANSLATE ─▶ SAVE ──────────────────────────────────────────────┐   │   │
 │  │                                                                   │   │   │
 │  │  health_check  authority_     compare_news   news_ranker          │   │   │
@@ -708,7 +708,7 @@ def check_inbox_for_updates(
 
 ---
 
-### 5.5 News Filter (`agents/news_filter.py`) — REMOVED (v3.1)
+### 5.5 News Filter (`agents/news_filter.py`) — RESTORED v3.10
 
 **Status:** Deleted in v3.1 (bug B6). The binary keep/drop relevance filter was the sole quality gate and let noise through while dropping useful items. It is replaced by the three-tier ranker, where **Rank 1 = Noise** is the quality gate (noise is scored, saved, and simply not emailed — never deleted).
 
@@ -1130,7 +1130,7 @@ The "🗓 Default Lookback Window" card on the profile configuration page sets t
 |-------|------|-----------------|
 | Starting | 🚀 | `Running single profile` |
 | Collecting | 📰 | `Running RSS Parser Agent \| Tweet Feed Agent \| URL Sources Runner` |
-| Filtering | 🧹 | `Filtering for relevance \| Skip filtering enabled` |
+| Filtering | 📅 | `📅 Filtering:` |
 | Comparing | 🔍 | `Relevant items after filtering` |
 | Grouping | 🧠 | `Grouping similar news items \| Skipping grouping` |
 | Sending | 📧 | `Sending summary email \| Generating email preview` |
@@ -1662,13 +1662,12 @@ legal-eagle/
 │   ├── url_sources_runner.py        # Website crawler (+ scrape_url_source_with_config)
 │   ├── source_simulator.py          # Zero-config URL source auto-discovery (v3.1, F9)
 │   ├── email_inbox_parser.py        # Gmail inbox monitor
-│   ├── date_filter.py               # Publication-date windowing
+│   ├── news_filter.py               # FILTER stage — per-source date windowing
 │   ├── authority_attributor.py      # ATTRIBUTE stage: publisher/authority (v3.1/3.2)
 │   ├── compare_news.py              # ANNOTATE: NEW/UPDATE/REPEATED/DUPLICATE
 │   ├── news_ranker.py               # Three-tier ranking engine (v3.2)
 │   ├── news_tagger.py               # Glossary tagging + flag_glossary_gaps (v3.3/3.5)
 │   ├── news_translator.py           # Post-save translation step (v3)
-│   ├── news_filter.py               # DELETED in v3.1 (replaced by ranker Rank 1 = Noise)
 │   ├── news_grouper.py              # LEGACY — replaced by news_tagger (v3.3)
 │   ├── email_composer.py            # V2 AI digest → news_announcements (v3.3)
 │   ├── email_sender.py              # Render + SMTP (send_digest / legacy send_email)

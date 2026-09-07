@@ -1,7 +1,7 @@
 import feedparser
 from datetime import datetime
 
-from agents.date_filter import parse_date_string
+from agents.news_filter import parse_date_string
 
 def parse_rss_feed(url):
     feed = feedparser.parse(url)

@@ -28,6 +28,7 @@ Public interface:
 import json
 import os
 import re
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Optional
 
 from configurations.config_loader import creds
@@ -42,6 +43,7 @@ from agents.ai_cache import cached_chat
 # to disable AI rank influence and fall back to rank 2 for all Tier-2 items.
 _AI_RANK_REFINE = os.environ.get("LEGAL_EAGLE_AI_RANK_REFINE", "1") == "1"
 _FALLBACK_RANK = 2  # fallback used when LEGAL_EAGLE_AI_RANK_REFINE=0
+_TIER2_WORKERS = 8  # matches health_check.py
 
 _DUPLICATE = "duplicate"
 _TIER1 = "tier1"
@@ -71,6 +73,16 @@ def _get_ai_client() -> SAPAICoreClient:
         chat_deployment_id=sap_cfg["chat_deployment_id"],
         embeddings_deployment_id=sap_cfg["embeddings_deployment_id"],
     )
+
+
+_AI_CLIENT: Optional[SAPAICoreClient] = None
+
+
+def _ai_client() -> SAPAICoreClient:
+    global _AI_CLIENT
+    if _AI_CLIENT is None:
+        _AI_CLIENT = _get_ai_client()
+    return _AI_CLIENT
 
 
 def _load_signals(db_conn, profile_id: int) -> List[Dict[str, Any]]:
@@ -139,7 +151,7 @@ def _tier2_score(item: Dict[str, Any], grounding: List[Dict[str, Any]]) -> tuple
     )
 
     def _call() -> str:
-        client = _get_ai_client()
+        client = _ai_client()
         resp = client.chat.completions.create(
             model="gpt-4o",
             messages=[{"role": "user", "content": prompt}],
@@ -175,7 +187,7 @@ def _normalize_effective_date(value: Any) -> Optional[str]:
     if not v or v.lower() == "null":
         return None
     try:
-        from agents.date_filter import parse_date_string
+        from agents.news_filter import parse_date_string
         dt = parse_date_string(v)
         return dt.strftime("%Y-%m-%d") if dt else None
     except Exception:
@@ -191,24 +203,27 @@ def rank_items(
     signals = _load_signals(db_conn, profile_id)
     grounding = _load_grounding(db_conn, profile_id)
 
+    # Pass 1: stamp duplicates + compute Tier-1 scores
+    non_dupes = []
+    t1_scores = {}
     for item in items:
-        # Tier 0 — duplicate passthrough
         if item.get("dedup_status") == _DUPLICATE:
             item["significance_rank"] = 0
             item["rank_tier"] = _DUPLICATE
             item["rank_reasoning"] = "duplicate — skipped ranker"
             continue
-
         text = f"{item.get('title', '')} {item.get('content', '') or ''}"
+        t1_scores[id(item)] = _tier1_score(text, signals)
+        non_dupes.append(item)
 
-        # Tier 1 — deterministic keyword/regex
-        t1_rank = _tier1_score(text, signals)
+    # Pass 2: parallel Tier-2 AI scoring
+    print(f"[Ranker] Tier-2 AI scoring {len(non_dupes)} items ({_TIER2_WORKERS} workers)...")
+    with ThreadPoolExecutor(max_workers=_TIER2_WORKERS) as pool:
+        t2_results = list(pool.map(lambda it: _tier2_score(it, grounding), non_dupes))
 
-        # AI pass — extract the effective_date for every non-duplicate item (the
-        # post-tag step uses it to elevate relevant items). It also returns an AI
-        # rank, but that only influences scoring when _AI_RANK_REFINE is enabled;
-        # by default ranking is preserved exactly as shipped (fallback rank 2).
-        t2_rank, t2_reasoning, effective_date = _tier2_score(item, grounding)
+    # Pass 3: apply final ranks + boosts
+    for item, (t2_rank, t2_reasoning, effective_date) in zip(non_dupes, t2_results):
+        t1_rank = t1_scores[id(item)]
         item["effective_date"] = effective_date
         rank_for_scoring = t2_rank if _AI_RANK_REFINE else _FALLBACK_RANK
 
@@ -217,18 +232,13 @@ def rank_items(
             item["rank_tier"] = _TIER1
             item["rank_reasoning"] = f"Tier 1 signal match (rank {t1_rank})"
             if t1_rank >= 4:
-                # Strong Tier 1 match — AI rank not applied (Tier 1 wins)
                 _apply_boosts(item)
                 continue
 
-        # Take the better of Tier 1 and Tier 2 (fires when Tier 1 gives rank < 4 or no match)
         final_rank = max(t1_rank or 0, rank_for_scoring)
         item["significance_rank"] = final_rank
-        # Tier classification tracks the signal source: tier1 if any keyword matched,
-        # tier2 if AI alone drove the rank.
         item["rank_tier"] = _TIER1 if t1_rank is not None else _TIER2
         item["rank_reasoning"] = t2_reasoning if item["rank_tier"] == _TIER2 else item.get("rank_reasoning", "")
-
         _apply_boosts(item)
 
     return items

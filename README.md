@@ -274,25 +274,28 @@ Each profile allows you to configure:
    ├─> Websites (static + dynamic with Playwright)
    └─> Email Inbox (Law-to-Spec monitoring)
 
-2. ATTRIBUTE
+2. FILTER
+   └─> Per-source date window (delta since last fetch, or configured lookback on first run)
+
+3. ATTRIBUTE
    └─> Publisher + Authority stamped from feed config or AI inference
 
-3. COMPARE (Deduplication)
+4. COMPARE (Deduplication)
    └─> Match against baseline
        Detect: new items, updated items, repeated (×3+), duplicates
 
-4. RANK
+5. RANK
    └─> Three-tier engine: Tier 0 duplicate (rank 0), Tier 1 keyword rules,
        Tier 2 GPT-4o AI scoring (1=Noise → 5=Urgent)
 
-5. GROUP (AI)
+6. GROUP (AI)
    └─> Cluster related items by theme (replaced by keyword tagging, shipped v3.3)
 
-6. EMAIL (Conditional)
+7. EMAIL (Conditional)
    └─> Bilingual HTML digest (native + English)
        Skip if no new/updated items
 
-7. BASELINE UPDATE
+8. BASELINE UPDATE
    └─> Store new items for future comparison
 ```
 

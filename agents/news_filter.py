@@ -1,29 +1,54 @@
-# agents/date_filter.py
+# agents/news_filter.py
 """
-Date filtering utility for news items.
-Filters RSS, tweets, and URL-crawled content by publication date.
+News Filter — the FILTER stage.
+
+Pipeline entry-point:
+  filter_source_items(items, source_copy) -> List[Dict]
+    Applies the date window already computed on source_copy (since_date or days)
+    to a list of collected items. Called per-source during the COLLECT stage so
+    every source type (RSS, URL, simulated URL) is filtered with its own anchor.
+
+Utility functions (used by other agents):
+  filter_items_by_date(items, days, since_date) -> List[Dict]
+  parse_item_date(item)                          -> Optional[datetime]
+  parse_date_string(date_str)                    -> Optional[datetime]
 """
 
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional
 
 
+def filter_source_items(items: List[Dict[str, Any]], source_copy: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Apply the date window already computed on source_copy to a list of items.
+
+    Uses since_date if set (delta mode), falls back to days (full window).
+    Returns the filtered list unchanged if neither key is present.
+    """
+    since = source_copy.get('since_date')
+    days = source_copy.get('days')
+    if since:
+        return filter_items_by_date(items, since_date=since)
+    if days is not None:
+        return filter_items_by_date(items, days=days)
+    return items
+
+
 def filter_items_by_date(
-    items: List[Dict[str, Any]], 
+    items: List[Dict[str, Any]],
     days: Optional[int] = None,
     since_date: Optional[datetime] = None
 ) -> List[Dict[str, Any]]:
     """
     Filter news items by date using either a lookback window or a specific start date.
-    
+
     Args:
         items: List of news items (RSS, tweets, URL sources, etc.)
         days: Lookback window in days (e.g., 7 for last 7 days). Mutually exclusive with since_date.
         since_date: Fetch items published since this datetime (incremental mode). Mutually exclusive with days.
-    
+
     Returns:
         Filtered list containing only items within the date range
-    
+
     Note:
         - Tries multiple date field names: 'date', 'published', 'published_at', 'pubDate'
         - Items without a parseable publish date are REJECTED (dropped) and reported as an

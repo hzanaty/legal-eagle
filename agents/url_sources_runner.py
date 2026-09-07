@@ -1390,7 +1390,7 @@ def extract_article(base_url: str, url: str, html: str) -> Dict:
     # Publish date extraction — gather candidate strings in priority order, then parse the
     # first that resolves to a real date via the dateutil-backed parser (handles ISO, RFC, and
     # textual/localized forms like "05 September 2026"). Normalised to ISO YYYY-MM-DD.
-    from agents.date_filter import parse_date_string as _pds
+    from agents.news_filter import parse_date_string as _pds
     date_text = ""
     _cands: List[str] = []
     for _prop in ("article:published_time", "og:updated_time"):
@@ -2505,7 +2505,7 @@ def run_unified_sources(url_sources: List[Dict[str, str]], profile_slug: Optiona
 
             # Mechanism A: post-scrape date filter (skipped for recursive — it manages its own pagination)
             if mode != "recursive":
-                from agents.date_filter import filter_items_by_date
+                from agents.news_filter import filter_items_by_date
                 before = len(src_items)
                 if since_dt is not None:
                     src_items = filter_items_by_date(src_items, since_date=since_dt)
@@ -2525,7 +2525,7 @@ def run_unified_sources(url_sources: List[Dict[str, str]], profile_slug: Optiona
     # (a publish date is crucial; we do not capture undated news). This is unconditional,
     # covering modes/paths that skip the per-source date window above.
     try:
-        from agents.date_filter import parse_date_string
+        from agents.news_filter import parse_date_string
         kept: List[Dict] = []
         rejected = 0
         for it in items:

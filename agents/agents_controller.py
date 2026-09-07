@@ -45,7 +45,7 @@ from agents.authority_attributor import build_feed_config, build_url_config, att
 from agents.health_check import run_health_checks, summarize, hard_failures
 from agents.news_grouper import group_and_summarize_news
 from agents.email_sender import send_email
-from agents.date_filter import filter_items_by_date
+from agents.news_filter import filter_items_by_date, filter_source_items
 from agents.email_inbox_parser import fetch_monitor_updates, format_monitor_updates_for_email
 from urllib.parse import urlparse
 
@@ -214,6 +214,7 @@ def run_controller():
         # 5. Combine all items
         all_news_items = rss_items + tweet_items + url_items + snap_items
         print(f"\n📦 Total collected items (pre-filter): {len(all_news_items)}")
+        print(f"📅 Filtering: date window applied per source → {len(all_news_items)} items")
 
         # 5.1. ATTRIBUTE stage (v3.1): stamp publisher / authority from feed config.
         try:
@@ -533,7 +534,8 @@ def run_profile_once(
         for s in simulated:
             try:
                 got = scrape_url_source_with_config(s)
-                print(f"   ↳ {s['url']}: simulated scrape → {len(got)} items")
+                got = filter_source_items(got, s)
+                print(f"   ↳ {s['url']}: simulated scrape → {len(got)} items in window")
                 url_items.extend(got)
             except Exception as e:
                 url_errors.append(f"{s['url']}: {e}")
@@ -562,6 +564,7 @@ def run_profile_once(
         # 4) Combine and process
         all_news_items = rss_items + tweet_items + url_items
         print(f"\n📦 Total collected items (pre-filter): {len(all_news_items)}")
+        print(f"📅 Filtering: date window applied per source → {len(all_news_items)} items")
 
         # 4.1) ATTRIBUTE stage (v3.2): stamp publisher / authority_id / authority_status.
         # Configured path: authority comes from feed config (no AI call).

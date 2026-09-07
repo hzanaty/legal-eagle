@@ -186,7 +186,7 @@
   <div class="run-right">
     <div class="test-banner" id="testBanner">&#9888; Test mode — dry-run · nothing saved, no email</div>
     <div class="stage-bar" id="stageBar">
-      {% for s in ['Starting','Collecting','Attributing','Comparing','Analyzing','Sending','Done'] %}
+      {% for s in ['Starting','Collecting','Filtering','Attributing','Comparing','Analyzing','Sending','Done'] %}
       <div class="stage-step">
         <div class="stage-pill" data-stage="{{ loop.index0 }}"><span class="stage-dot"></span>{{ s }}</div>
         {% if not loop.last %}<span class="stage-arrow">&rsaquo;</span>{% endif %}
@@ -329,13 +329,14 @@
       });
     }
     // Map pipeline log lines to stepper stages (monotonic advance).
-    // Stages: 0 Starting · 1 Collecting · 2 Attributing · 3 Comparing · 4 Analyzing · 5 Sending · 6 Done
+    // Stages: 0 Starting · 1 Collecting · 2 Filtering · 3 Attributing · 4 Comparing · 5 Analyzing · 6 Sending · 7 Done
     var MARKERS = [
       { re: /RSS items collected|monitored site items|tweets collected|RSS Parser|Fetching|collected/i, stage: 1 },
-      { re: /Attribution stamped|Attribution stage|attribut/i, stage: 2 },
-      { re: /semantic comparison|Compare News|comparison|dedup|new items and/i, stage: 3 },
-      { re: /Analyzing stage|Rank stage|ranking|Tag stage|Glossary gap|glossary|tagging|Effective-date/i, stage: 4 },
-      { re: /Email gate|Sending summary|Email preview|digest|Sending/i, stage: 5 }
+      { re: /📅 Filtering:/i, stage: 2 },
+      { re: /Attribution stamped|Attribution stage|attribut/i, stage: 3 },
+      { re: /semantic comparison|Compare News|comparison|dedup|new items and/i, stage: 4 },
+      { re: /Analyzing stage|Rank stage|ranking|Tag stage|Glossary gap|glossary|tagging|Effective-date/i, stage: 5 },
+      { re: /Email gate|Sending summary|Email preview|digest|Sending/i, stage: 6 }
     ];
     function appendLine(text) {
       var div = document.createElement('div');
@@ -360,7 +361,7 @@
       var estatus = (meta.getAttribute('data-email-status') || '').toUpperCase();
       pills.forEach(function(p, idx) {
         p.classList.remove('active', 'done', 'skipped');
-        if (idx === 5) p.classList.add(estatus === 'SENT' ? 'done' : 'skipped');
+        if (idx === 6) p.classList.add(estatus === 'SENT' ? 'done' : 'skipped');
         else p.classList.add('done');
       });
       cur = pills.length;
