@@ -2002,14 +2002,23 @@ def reset_review_data(
     deleted_items = 0
     deleted_runs = 0
 
+    # news_announcements is linked to runs via run_id
     if run_ids:
         placeholders = ",".join("?" * len(run_ids))
         deleted_announcements = conn.execute(
             f"DELETE FROM news_announcements WHERE run_id IN ({placeholders})", run_ids
         ).rowcount
+
+    # news_items is scoped directly by profile_id (no run_id column)
+    if profile_id is not None:
         deleted_items = conn.execute(
-            f"DELETE FROM news_items WHERE run_id IN ({placeholders})", run_ids
+            "DELETE FROM news_items WHERE profile_id=?", (profile_id,)
         ).rowcount
+    else:
+        deleted_items = conn.execute("DELETE FROM news_items").rowcount
+
+    if run_ids:
+        placeholders = ",".join("?" * len(run_ids))
         deleted_runs = conn.execute(
             f"DELETE FROM runs WHERE id IN ({placeholders})", run_ids
         ).rowcount
