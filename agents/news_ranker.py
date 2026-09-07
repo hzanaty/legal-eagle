@@ -246,6 +246,21 @@ def rank_items(
 
 def _apply_boosts(item: Dict[str, Any]) -> None:
     """Apply first-party source boost and REPEATED elevation in place."""
+    # Glossary relevance floor: a real glossary match (topic_label set by the tagger,
+    # which runs before ranking) means the item is on-topic for the profile's legal
+    # domain → it must never be scored as off-topic (rank 1). Floor at 2 ("relevant");
+    # genuine significance (≥3) is still earned by Tier-1 signals or the AI.
+    label = item.get("topic_label")
+    if label:
+        try:
+            matches = json.loads(label)
+        except Exception:
+            matches = []
+        real = [m for m in matches if m and m != "General"]
+        if real and item.get("significance_rank", 0) < 2:
+            item["significance_rank"] = 2
+            item["rank_reasoning"] = (item.get("rank_reasoning") or "") + " [glossary relevance floor]"
+
     # First-party source boost: known authority on its own feed → floor at 2
     if item.get("authority_status") == "configured" and item.get("authority_id"):
         if item.get("significance_rank", 0) < 2:

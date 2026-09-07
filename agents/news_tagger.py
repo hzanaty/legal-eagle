@@ -21,6 +21,17 @@ def _load_terms(conn: sqlite3.Connection, profile_id: int) -> list[str]:
     return [r[0] for r in rows]
 
 
+def _norm(s: str) -> str:
+    """Lowercase for case-insensitive matching, Turkish-safe.
+
+    Python's ``'İ'.lower()`` yields ``'i' + U+0307`` (combining dot above), so a
+    glossary term like ``istihdam`` would never match text containing ``İstihdam``.
+    Stripping U+0307 fixes that; it is safe for English and ü/ş/ğ/ç/ö, none of
+    which contain that combining mark.
+    """
+    return s.lower().replace("̇", "")
+
+
 def tag_items(items: list[dict], conn: sqlite3.Connection, profile_id: int) -> list[dict]:
     """Assign topic_label to each item via glossary keyword matching.
 
@@ -29,8 +40,8 @@ def tag_items(items: list[dict], conn: sqlite3.Connection, profile_id: int) -> l
     """
     terms = _load_terms(conn, profile_id)
     for item in items:
-        text = f"{item.get('title', '')} {item.get('content', '')}".lower()
-        matched = [t for t in terms if t.lower() in text]
+        text = _norm(f"{item.get('title', '')} {item.get('content', '')}")
+        matched = [t for t in terms if _norm(t) in text]
         item["topic_label"] = json.dumps(matched) if matched else json.dumps(["General"])
     return items
 
