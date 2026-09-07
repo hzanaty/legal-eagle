@@ -22,7 +22,13 @@
   {
     "stage": "Comparing",
     "title": "Comparing — dedupe & detect change",
-    "blurb": "Classifies each item against the baseline as New, Update (with delta), Repeated (with count), or Duplicate. Duplicates are kept at rank 0, never dropped."
+    "blurb": "Classifies each item against the baseline and stamps its status. Duplicates are kept (stamped rank 0), never dropped.",
+    "statuses": [
+      {"label": "NEW", "meaning": "First time this item has been seen."},
+      {"label": "UPDATE", "meaning": "Seen before but changed since the last run (delta shown)."},
+      {"label": "REPEATED", "meaning": "The same story has recurred across 3 or more runs."},
+      {"label": "DUPLICATE", "meaning": "Identical to another item — stamped rank 0, kept, never emailed."}
+    ]
   },
   {
     "stage": "Analyzing",
@@ -33,8 +39,7 @@
       {"level": 4, "label": "Legal Change", "meaning": "Upcoming regulatory change requiring preparation"},
       {"level": 3, "label": "Watch", "meaning": "Operational impact — payroll, deadlines, rates"},
       {"level": 2, "label": "Signal", "meaning": "Relevant case law or indirect implication"},
-      {"level": 1, "label": "Noise", "meaning": "Off-topic / macro / finance, no direct HR obligation"},
-      {"level": 0, "label": "Duplicate", "meaning": "Not evaluated"}
+      {"level": 1, "label": "Noise", "meaning": "Off-topic / macro / finance, no direct HR obligation"}
     ]
   },
   {

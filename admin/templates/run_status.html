@@ -239,6 +239,13 @@
             {% endfor %}
           </ul>
           {% endif %}
+          {% if s.statuses %}
+          <ul class="help-rank-list">
+            {% for st in s.statuses %}
+            <li><span class="help-rank-name">{{ st.label }}</span> — {{ st.meaning }}</li>
+            {% endfor %}
+          </ul>
+          {% endif %}
         </div>
         {% else %}
         <div class="help-stage-row"><div>Stage help is unavailable.</div></div>

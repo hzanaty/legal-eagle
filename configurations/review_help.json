@@ -1,9 +1,9 @@
 {
-  "Tag": [
+  "Status": [
     {"label": "NEW", "meaning": "First time this item has been seen."},
     {"label": "UPDATE", "meaning": "Seen before but changed since the last run (the delta is shown)."},
     {"label": "REPEATED", "meaning": "The same story has recurred across 3 or more runs."},
-    {"label": "DUPLICATE", "meaning": "Identical to another item — kept at rank 0, shown collapsed, never emailed."}
+    {"label": "DUPLICATE", "meaning": "Identical to another item — stamped rank 0, shown collapsed, never emailed."}
   ],
   "Glossary": [
     {"label": "Matched", "meaning": "Item matched at least one glossary term, so it received a topic label."},

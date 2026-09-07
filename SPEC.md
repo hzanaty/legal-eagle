@@ -764,9 +764,8 @@ def compare_with_baseline(
 | **3** | Watch | Operational impact — payroll, deadlines, rates | "New contribution rates announced for next quarter" |
 | **2** | Signal | Relevant case law or indirect implication | "Tribunal ruling on overtime pay classification" |
 | **1** | Noise | Off-topic / macro / finance news, no direct HR obligation | "Central bank raises benchmark interest rate" |
-| **0** | Duplicate | Not evaluated (outside the 1–5 scale) | — |
 
-The short labels (Noise/Signal/Watch/Legal Change/Urgent) are shown on the Review RANK filter chips (`review_news.html`) and in the Run-tab help modal.
+Duplicates are stamped `significance_rank = 0` by the Compare stage's Tier-0 dedup passthrough — a **dedup outcome, not a significance level** (the NEW / UPDATE / REPEATED / DUPLICATE status is set in §5.6, not here). The short labels (Noise/Signal/Watch/Legal Change/Urgent) are shown on the Review RANK filter chips (`review_news.html`) and in the Run-tab help modal.
 
 Email is gated at rank ≥ threshold (default 3); Rank 1 = Noise is scored and saved but never emailed. A glossary match floors an item at rank 2 (`_apply_boosts`) so on-topic items are never scored as off-topic.
 
