@@ -2023,8 +2023,22 @@ def reset_review_data(
             f"DELETE FROM runs WHERE id IN ({placeholders})", run_ids
         ).rowcount
 
+    # Clear each URL source's last_successful_fetch so the next run starts from a
+    # clean full window instead of a stale delta anchor (otherwise re-runs after a
+    # reset fetch "since last fetch" and return nothing).
+    if profile_id is not None:
+        cleared_sources = conn.execute(
+            "UPDATE url_sources SET last_successful_fetch=NULL WHERE profile_id=?",
+            (profile_id,),
+        ).rowcount
+    else:
+        cleared_sources = conn.execute(
+            "UPDATE url_sources SET last_successful_fetch=NULL"
+        ).rowcount
+
     return {
         "runs": deleted_runs,
         "news_items": deleted_items,
         "news_announcements": deleted_announcements,
+        "url_sources_reset": cleared_sources,
     }
