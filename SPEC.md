@@ -1339,6 +1339,11 @@ def load_global_credentials() -> Dict[str, str]
 
 ### 9.1 Daily Digest Flow (v3)
 
+> **In-app help:** the Run-tab stepper's "?" button opens a modal explaining each of the 8
+> stages. That text is the single source of truth in `configurations/pipeline_help.json` —
+> edit the JSON to change the UI wording (no template/code change needed). Keep it aligned
+> with the flow below.
+
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                    DAILY DIGEST FLOW (v3)                        │

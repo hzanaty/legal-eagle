@@ -93,6 +93,22 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("LEGAL_EAGLE_ADMIN_SECRET", "local-only-admin")
 app.config['TEMPLATES_AUTO_RELOAD'] = True  # Auto-reload templates without server restart
 
+# Pipeline stage help — single source of truth for the Run-tab "?" stepper modal.
+# Loaded per call (not cached) so editing the JSON reflects on a page reload.
+_PIPELINE_HELP_PATH = os.path.join(
+    os.path.dirname(__file__), "..", "configurations", "pipeline_help.json"
+)
+
+
+def _load_pipeline_help() -> list:
+    import json as _json
+    try:
+        with open(_PIPELINE_HELP_PATH, encoding="utf-8") as f:
+            return _json.load(f)
+    except Exception:
+        return []
+
+
 # Timestamp formatting (UTC -> local) filter for Jinja
 from zoneinfo import ZoneInfo
 
@@ -574,6 +590,7 @@ def admin_profile_runs(profile_id: int):
         selected_profile=profile,
         profiles=profiles_list,
         active_tab='run',
+        pipeline_help=_load_pipeline_help(),
         review_badge_count=review_badge_count,
         runs=runs,
         selected_run=selected_run,

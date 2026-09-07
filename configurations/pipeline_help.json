@@ -1,0 +1,42 @@
+[
+  {
+    "stage": "Starting",
+    "title": "Starting — pre-flight checks",
+    "blurb": "Parallel health checks (database, SAP AI Core, Gmail) run before any fetching. If a required system is unreachable the run aborts here."
+  },
+  {
+    "stage": "Collecting",
+    "title": "Collecting — fetch from sources",
+    "blurb": "Pulls new items from every configured source (RSS, Twitter/X, crawled URL sources, email inbox). Each source is anchored to its own last-fetch date so nothing is re-pulled."
+  },
+  {
+    "stage": "Filtering",
+    "title": "Filtering — drop stale / irrelevant",
+    "blurb": "Applies each source's date window (lookback). The old binary keep/drop filter is retired — relevance is now enforced by the ranker's Rank 1 (Noise) tier, which scores items but never emails noise."
+  },
+  {
+    "stage": "Attributing",
+    "title": "Attributing — issuing authority",
+    "blurb": "Stamps each item's publisher and authority. Configured feeds match directly; feeds with no configured authority get an AI-inferred one (flagged in Review)."
+  },
+  {
+    "stage": "Comparing",
+    "title": "Comparing — dedupe & detect change",
+    "blurb": "Classifies each item against the baseline as New, Update (with delta), Repeated (with count), or Duplicate. Duplicates are kept at rank 0, never dropped."
+  },
+  {
+    "stage": "Analyzing",
+    "title": "Analyzing — rank & tag",
+    "blurb": "A three-tier engine (deterministic signals, then grounded GPT-4o) scores significance 1–5. Glossary tagging then assigns topic labels and flags significant items the glossary can't explain."
+  },
+  {
+    "stage": "Sending",
+    "title": "Sending — email digest",
+    "blurb": "Items at or above the rank threshold (default 3) are composed into an AI-grouped HTML digest and sent via Gmail on a separate thread. Skipped in test mode; resendable on failure."
+  },
+  {
+    "stage": "Done",
+    "title": "Done — run complete",
+    "blurb": "Results are saved and visible in Review immediately. The email send runs afterward on its own thread; human review is asynchronous and never blocks the run."
+  }
+]

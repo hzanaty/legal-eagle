@@ -52,6 +52,22 @@
   .stage-pill.skipped { color: #aaa; background: #f7f7f7; text-decoration: line-through; }
   .stage-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: 0.7; }
   .stage-arrow { color: #ccc; font-size: 12px; padding: 0 3px; }
+  /* Stepper + "?" help button (button pinned outside the scrolling bar) */
+  .stage-bar-wrap { display: flex; align-items: center; background: white; border-bottom: 1px solid #e5e5e5; }
+  .stage-bar-wrap .stage-bar { flex: 1; min-width: 0; border-bottom: none; }
+  .stage-help-btn { flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%; border: 1px solid #c5d8f5; background: #e8f1fb; color: #0a6ed1; font-size: 12px; font-weight: 700; cursor: pointer; margin: 0 12px; line-height: 1; padding: 0; }
+  .stage-help-btn:hover { background: #d3e6fb; }
+  /* Pipeline help modal (same idiom as review_news.html challenge modal) */
+  .help-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 9000; align-items: center; justify-content: center; }
+  .help-overlay.open { display: flex; }
+  .help-modal { background: white; border-radius: 8px; box-shadow: 0 8px 32px rgba(0,0,0,0.22); width: 560px; max-width: 96vw; max-height: 84vh; overflow-y: auto; padding: 24px 26px 20px; position: relative; }
+  .help-modal h3 { margin: 0 0 4px; font-size: 15px; color: #1a4060; }
+  .help-modal .help-sub { font-size: 11px; color: #6a6d70; margin: 0 0 16px; }
+  .help-stage-row { padding: 10px 0; border-top: 1px solid #f0f0f0; }
+  .help-stage-row:first-of-type { border-top: none; }
+  .help-stage-row strong { display: block; font-size: 12.5px; color: #32363a; margin-bottom: 3px; }
+  .help-stage-row div { font-size: 12px; color: #6a6d70; line-height: 1.5; }
+  .help-close { margin-top: 16px; background: #0a6ed1; color: white; border: none; border-radius: 4px; padding: 8px 16px; font-size: 12px; font-weight: 600; cursor: pointer; }
   .right-toolbar { background: white; border-bottom: 1px solid #e5e5e5; padding: 6px 12px; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
   .history-label { font-size: 10px; font-weight: 700; color: #6a6d70; text-transform: uppercase; letter-spacing: 0.05em; flex-shrink: 0; }
   .history-pills { display: flex; gap: 6px; overflow-x: auto; flex: 1; }
@@ -185,13 +201,30 @@
   <!-- Right panel -->
   <div class="run-right">
     <div class="test-banner" id="testBanner">&#9888; Test mode — dry-run · nothing saved, no email</div>
-    <div class="stage-bar" id="stageBar">
+    <div class="stage-bar-wrap">
+      <div class="stage-bar" id="stageBar">
       {% for s in ['Starting','Collecting','Filtering','Attributing','Comparing','Analyzing','Sending','Done'] %}
       <div class="stage-step">
         <div class="stage-pill" data-stage="{{ loop.index0 }}"><span class="stage-dot"></span>{{ s }}</div>
         {% if not loop.last %}<span class="stage-arrow">&rsaquo;</span>{% endif %}
       </div>
       {% endfor %}
+      </div>
+      <button type="button" class="stage-help-btn" onclick="openHelpModal()" title="What does each stage do?" aria-label="Pipeline help">?</button>
+    </div>
+
+    <!-- Pipeline help modal (text from configurations/pipeline_help.json) -->
+    <div class="help-overlay" id="helpOverlay" onclick="if(event.target===this)closeHelpModal()">
+      <div class="help-modal">
+        <h3>How the pipeline works</h3>
+        <p class="help-sub">Each run moves through these stages in order.</p>
+        {% for s in pipeline_help %}
+        <div class="help-stage-row"><strong>{{ loop.index }}. {{ s.title }}</strong><div>{{ s.blurb }}</div></div>
+        {% else %}
+        <div class="help-stage-row"><div>Stage help is unavailable.</div></div>
+        {% endfor %}
+        <button type="button" class="help-close" onclick="closeHelpModal()">Close</button>
+      </div>
     </div>
     {% if selected_run %}
     <div id="runMeta" data-run-id="{{ selected_run.id }}" data-run-status="{{ selected_run.status }}" data-email-status="{{ selected_run.email_status|default('PENDING')|upper }}" style="display:none"></div>
@@ -245,6 +278,13 @@
 
 <script>
   var testMode = false;
+
+  // ── Pipeline help modal ──
+  function openHelpModal() { document.getElementById('helpOverlay').classList.add('open'); }
+  function closeHelpModal() { document.getElementById('helpOverlay').classList.remove('open'); }
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeHelpModal();
+  });
   function toggleTestMode() {
     testMode = !testMode;
     document.getElementById('testToggle').classList.toggle('on', testMode);
