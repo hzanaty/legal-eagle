@@ -109,6 +109,28 @@ def _load_pipeline_help() -> list:
         return []
 
 
+_REVIEW_HELP_PATH = os.path.join(
+    os.path.dirname(__file__), "..", "configurations", "review_help.json"
+)
+
+
+def _load_review_help() -> dict:
+    import json as _json
+    try:
+        with open(_REVIEW_HELP_PATH, encoding="utf-8") as f:
+            return _json.load(f)
+    except Exception:
+        return {}
+
+
+def _rank_help() -> list:
+    """Reuse the Analyzing-stage rank scale from pipeline_help.json (single source)."""
+    return next(
+        (s.get("ranks", []) for s in _load_pipeline_help() if s.get("stage") == "Analyzing"),
+        [],
+    )
+
+
 # Timestamp formatting (UTC -> local) filter for Jinja
 from zoneinfo import ZoneInfo
 
@@ -2061,6 +2083,8 @@ def admin_review_news(profile_id: int):
         selected_profile=profile,
         profiles=profiles_list,
         active_tab='review',
+        review_help=_load_review_help(),
+        rank_help=_rank_help(),
         review_badge_count=review_badge_count,
         items=items,
         accepted_unscored_count=accepted_unscored_count,
