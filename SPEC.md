@@ -515,7 +515,7 @@ CREATE TABLE authorities (
 
 #### Table: `glossary_terms` (+ `glossary_synonyms`, `glossary_patterns`)
 
-Normalized per-profile glossary. `glossary_terms` holds the term (`term`, `lang`, `category`, `product`, `weight`, `notes`); `glossary_synonyms` and `glossary_patterns` hold child synonym strings and regex patterns keyed by `term_id`. The glossary tagger and the Glossary Gap enrichment flow both read/write this table. (Supersedes the flat `glossary` table.)
+Normalized per-profile glossary. `glossary_terms` holds the term (`term`, `lang`, `category`, `product`, `weight`, `notes`); `glossary_synonyms` and `glossary_patterns` hold child synonym strings and regex patterns keyed by `term_id`. The Glossary Match step and the Glossary Gap enrichment flow both read/write this table. (Supersedes the flat `glossary` table.)
 
 #### Table: `ranking_signals` (v3.2)
 
@@ -745,7 +745,7 @@ def compare_with_baseline(
 
 ---
 
-### 5.7 News Grouper (`agents/news_grouper.py`) — REPLACED by News Tagger (v3.3)
+### 5.7 News Grouper (`agents/news_grouper.py`) — REPLACED by Glossary Match (v3.3)
 
 **Status:** Superseded in v3.3. LLM theme-grouping obscured individual items and their ranks, and assigned OTHER/wrong-LoB categories (bugs B3/B4). It is replaced by deterministic Glossary Match (`glossary_match.py`) plus the AI digest composer (`email_composer.py`). The file still exists and `group_and_summarize_news()` is reachable only through the legacy `skip_grouping`/preview path in the controller; it is no longer part of the v3 pipeline. Email organization is now structural (by Topic Label), not editorial.
 
@@ -753,7 +753,7 @@ def compare_with_baseline(
 
 ### 5.7a News Ranker (`agents/news_ranker.py`) — NEW (v3.2)
 
-**Purpose**: Assign `significance_rank` (0–5) via a three-tier engine. `rank_items(items, profile_id, db_conn)` mutates each item in place with `significance_rank`, `rank_tier`, `rank_reasoning`.
+**Purpose**: Assign `significance_rank` — 1–5 (plus 0 for duplicates, a dedup outcome) — via a three-tier engine. `rank_items(items, profile_id, db_conn)` mutates each item in place with `significance_rank`, `rank_tier`, `rank_reasoning`.
 
 **Significance scale** (source of truth: the Tier-2 prompt + `_BOOTSTRAP_EXAMPLES` in `agents/news_ranker.py`; mirrored in `configurations/pipeline_help.json` for the UI):
 
@@ -771,7 +771,7 @@ Email is gated at rank ≥ threshold (default 3); Rank 1 = Noise is scored and s
 
 - **Tier 0 — DUPLICATE passthrough**: items with `dedup_status='duplicate'` are stamped rank 0, `rank_tier='duplicate'`, and skip both tiers.
 - **Tier 1 — Deterministic**: keyword/regex rules loaded from `ranking_signals` (ordered by `min_rank` DESC). No AI call; fully explainable. A Tier-1 match at rank ≥ 4 short-circuits and skips Tier 2.
-- **Tier 2 — AI**: gpt-4o via `sap_ai_client`, fired when Tier 1 gives rank < 4 or no match. The prompt includes up to 10 `ranking_grounding` summaries as few-shot examples (plus profile bootstrap examples). The call is wrapped in `ai_cache` for offline harness determinism. Falls back to rank 2 on AI-unavailable/parse error.
+- **Tier 2 — AI**: gpt-4o via `sap_ai_client`, fired when Tier 1 gives rank < 4 or no match. The prompt includes up to 10 `ranking_grounding` summaries as few-shot examples (plus profile bootstrap examples). The same call also extracts the item's `effective_date` when stated. AI rank influence is gated by the `LEGAL_EAGLE_AI_RANK_REFINE` env flag (default on; when off, Tier-2 items fall back to rank 2 while `effective_date` extraction still runs). The call is wrapped in `ai_cache` for offline harness determinism. Falls back to rank 2 on AI-unavailable/parse error.
 - **REPEATED elevation** (`_apply_boosts`): REPEATED ×3+ with rank ≥ 2 auto-elevates +1 (cap 5); rank-1 noise is not elevated.
 - **Re-rank (F6)**: `rerank_items_for_profile(profile_id, db_conn)` re-runs the ranker over existing DB rows without re-fetching, updating the rank columns.
 
@@ -781,9 +781,9 @@ Email is gated at rank ≥ threshold (default 3); Rank 1 = Noise is scored and s
 
 **Purpose**: Deterministic glossary-keyword matching (no LLM). 
 
-- `tag_items(items, conn, profile_id)`: matches item text against profile glossary terms and sets `topic_label` to a JSON array of matched terms, or `["General"]` when none match.
+- `match_glossary(items, conn, profile_id)`: matches item text against profile glossary terms and sets `topic_label` to a JSON array of matched terms, or `["General"]` when none match.
 - `save_topic_labels(items, conn, profile_id)`: persists `topic_label` to `news_items`, resolving each row by id → source_id → url → hash_signature fallback.
-- `flag_glossary_gaps(items, conn, profile_id)` (v3.5): runs after `save_topic_labels`; sets `glossary_gap = 1` for items with `significance_rank ≥ 3` AND `topic_label == ["General"]` (a rank-significant item the glossary cannot explain). NULL `topic_label` (never tagged) is not flagged. Same id/source_id/url/hash fallback persistence.
+- `flag_glossary_gaps(items, conn, profile_id)` (v3.5): runs after `save_topic_labels`; sets `glossary_gap = 1` for items with `significance_rank ≥ 3` AND `topic_label == ["General"]` (a rank-significant item the glossary cannot explain). NULL `topic_label` (Glossary Match never ran) is not flagged. Same id/source_id/url/hash fallback persistence.
 
 ---
 
@@ -1069,7 +1069,7 @@ def run_profile_once(
 - `POST /admin/news/<item_id>/challenge` · `POST /admin/news/<item_id>/confirm-challenge` — Challenge modal + confirm (writes `human_rank_override`, `ranking_grounding`, `ranking_signals`) (v3.4)
 - `POST /admin/news/<item_id>/rerank` · `POST /admin/profiles/<id>/rerank-all` — Re-rank one / all items (F6)
 - `POST /admin/profiles/<id>/glossary/suggest` — AI keyword suggestions (regex fallback) (v3.5)
-- `POST /admin/news/<item_id>/add-to-glossary` — add term + re-tag + clear gap flag (v3.5)
+- `POST /admin/news/<item_id>/add-to-glossary` — add term + re-match + clear gap flag (v3.5)
 
 #### ANS Email (v2.26+, currently disabled)
 - `POST /admin/profiles/<id>/ans/provision` - Re-provision ANS Actions for all receivers — **route disabled; re-enable for BTP deployment**
@@ -1138,19 +1138,21 @@ The "🗓 Default Lookback Window" card on the profile configuration page sets t
 
 `run_status.html` replaces the raw terminal log with a two-panel layout:
 
-**Left panel — Stage checklist** (7 pipeline stages):
+**Left panel — Stage checklist** (9 pipeline stages):
 
 | Stage | Icon | Trigger pattern |
 |-------|------|-----------------|
 | Starting | 🚀 | `Running single profile` |
 | Collecting | 📰 | `Running RSS Parser Agent \| Tweet Feed Agent \| URL Sources Runner` |
 | Filtering | 📅 | `📅 Filtering:` |
-| Comparing | 🔍 | `Relevant items after filtering` |
-| Grouping | 🧠 | `Grouping similar news items \| Skipping grouping` |
-| Sending | 📧 | `Sending summary email \| Generating email preview` |
+| Attributing | 🏛️ | `Attribution stamped \| Attribution stage` |
+| Comparing | 🔍 | `semantic comparison \| Compare News \| dedup` |
+| Glossary Match | 🔖 | `🔖 Glossary Match \| Glossary gap` |
+| Rank | 📊 | `📊 Rank \| Rank stage \| [Ranker]` |
+| Sending | 📧 | `Sending summary email \| Email gate \| digest` |
 | Done | ✅ | `event: done` (SSE terminal event) |
 
-Each stage shows a status icon (idle `·` / active `⟳` / done `✓` / skipped `⏭` / failed `✗`) and a summary extracted from the log (e.g. `55 collected`, `4 relevant`, `0 new · 0 updated`).
+Each stage shows a status icon (idle `·` / active `⟳` / done `✓` / skipped `⏭` / failed `✗`) and a summary extracted from the log (e.g. `55 collected`, `12 in window`, `0 new · 0 updated`, `8 ranked > 0`).
 
 **Collecting sub-items** — the Collecting stage expands to show individual source rows:
 
@@ -1261,7 +1263,7 @@ The Review tab (`admin/templates/review_news.html`) is the human surface for the
 - **Attribution**: Channel / Publisher / Authority columns; ✦ spark icon on AI-inferred authority items with an inline authority-override dropdown.
 - **Challenge + Re-rank** (v3.4/F6): a Challenge button re-evaluates an item with full grounding context and auto-populates an override reason; confirm writes the override plus a Tier-2 grounding example and a Tier-1 rule simultaneously. Re-rank re-runs the ranker on existing items (no re-fetch), per-item or profile-wide.
 - **Topic → Announcement → Sources hierarchy** (v3.4): Level 1 = Topic (`topic_label`), Level 2 = Announcement (`news_announcements`), Level 3 = Sources (backing `news_items` via `item_ids_json`). Clicking an Announcement renders `announcement_md` inline as markdown.
-- **Glossary Gap Alert** (v3.5): a `⚠ N glossary gaps` toolbar strip with a "Show only gaps" filter, and a `⚠ Gap — no LoB match` badge per flagged card (driven by `item.is_gap`). An inline **+ Add to Glossary** panel AI-suggests keywords; confirming a term + LoB saves the term, re-tags the item, and clears the gap flag with no navigation away.
+- **Glossary Gap Alert** (v3.5): a `⚠ N glossary gaps` toolbar strip with a "Show only gaps" filter, and a `⚠ Gap — no LoB match` badge per flagged card (driven by `item.is_gap`). An inline **+ Add to Glossary** panel AI-suggests keywords; confirming a term + LoB saves the term, re-matches the item against the glossary, and clears the gap flag with no navigation away.
 - **Email controls** (v3.3): All / Unsent-only filter chip, ✉ Unsent / ✓ Sent pill per item, and a "✉ Send Email (N)" toolbar button. Publish dates surface on every card.
 
 ### 7.11 Run All Active (v3.0 UI / v3.1 backend)
@@ -1307,6 +1309,9 @@ LEGAL_EAGLE_BRIGHTDATA_PASSWORD=<password>
 
 # Admin UI
 LEGAL_EAGLE_ADMIN_SECRET=<secret-key>
+
+# Ranking (optional)
+LEGAL_EAGLE_AI_RANK_REFINE=1   # 1 = Tier-2 AI influences rank (default); 0 = Tier-2 items fall back to rank 2 (effective_date extraction still runs)
 ```
 
 ### 8.2 Configuration Loader (`configurations/config_loader.py`)
@@ -1353,7 +1358,7 @@ def load_global_credentials() -> Dict[str, str]
 
 ### 9.1 Daily Digest Flow (v3)
 
-> **In-app help:** the Run-tab stepper's "?" button opens a modal explaining each of the 8
+> **In-app help:** the Run-tab stepper's "?" button opens a modal explaining each of the 9
 > stages. That text is the single source of truth in `configurations/pipeline_help.json` —
 > edit the JSON to change the UI wording (no template/code change needed). Keep it aligned
 > with the flow below.

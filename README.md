@@ -30,9 +30,9 @@ Legal Eagle Core is **operational today** as a Regulatory Intelligence Engine, m
 
 Legal Eagle automatically:
 - 🔍 **Monitors** government sources, official gazettes, RSS feeds, and social media
-- 🤖 **Filters** using AI semantic understanding (not keyword matching)
+- 🤖 **Ranks** by regulatory significance (1–5) using deterministic signals + GPT-4o — noise is scored but never emailed
 - 🔄 **Detects** both new regulations and updates to existing ones
-- 📊 **Groups** related changes by theme for easy scanning
+- 🏷️ **Labels** items by glossary topic for easy scanning
 - 📧 **Delivers** daily actionable digests with direct links to sources
 - 🗄️ **Maintains** searchable historical intelligence baseline
 
@@ -41,11 +41,11 @@ Legal Eagle automatically:
 | Capability | Description |
 |------------|-------------|
 | **Multi-Source Collection** | RSS feeds, Twitter/X, government websites (static + dynamic), email monitoring |
-| **AI-Powered Filtering** | SAP AI Core (GPT-4o) semantic relevance evaluation |
-| **Smart Deduplication** | Detects duplicate news and updates to previously reported items; REPEATED tag for persistent signals |
-| **Three-Tier Ranking Engine** | Deterministic rules (Tier 1) + GPT-4o AI scoring (Tier 2); 1=Noise → 5=Urgent; REPEATED tag elevates rank for recurring topics |
+| **Significance Gate** | The three-tier ranker is the quality gate — Rank 1 (Noise) is scored and saved but never emailed (replaced the old binary AI filter, v3.1) |
+| **Smart Deduplication** | Detects duplicate news and updates to previously reported items; REPEATED status for persistent signals |
+| **Three-Tier Ranking Engine** | Tier 0 duplicate (rank 0) · Tier 1 deterministic signals · Tier 2 grounded GPT-4o; scale 5 Urgent · 4 Legal Change · 3 Watch · 2 Signal · 1 Noise; a glossary match floors an item at rank 2; email gated at rank ≥ 3; REPEATED status elevates recurring items |
 | **Source Attribution** | Publisher + Authority stamped per item from feed config; AI inference for unconfigured feeds; ✦ icon + manual override UI |
-| **Intelligent Grouping** | AI clusters related news by regulatory theme (replaced by keyword tagging, shipped v3.3) |
+| **Glossary Match** | Deterministic glossary keyword matching assigns topic labels (`topic_label`); replaced the earlier AI theme-grouping (v3.3) |
 | **Multi-Profile Support** | Country + Line of Business combinations (SA/HCM, TR/HCM, ES/HCM, GR/HCM, etc.) |
 | **Bilingual Digests** | Native language + English translation in single email |
 | **Human-in-the-Loop** | Review/score workflow continuously improves accuracy |
@@ -164,7 +164,7 @@ Transform the current Flask/Jinja2 admin UI to a modern SAPUI5 application while
 
 - **Python 3.11+**
 - **API Keys / Credentials**:
-  - SAP AI Core credentials (for AI filtering, grouping, translation)
+  - SAP AI Core credentials (for authority inference, ranking, translation, digest composition)
   - Twitter/X Bearer Token (for social media monitoring)
   - Gmail App Password (for sending email digests)
 
@@ -204,7 +204,7 @@ Transform the current Flask/Jinja2 admin UI to a modern SAPUI5 application while
 Create a `.env` file in the project root:
 
 ```bash
-# SAP AI Core (required for AI filtering, grouping, translation)
+# SAP AI Core (required for authority inference, ranking, translation, digest composition)
 LEGAL_EAGLE_SAP_AICORE_BASE_URL=https://api.ai.prod.eu-central-1.aws.ml.hana.ondemand.com
 LEGAL_EAGLE_SAP_AICORE_AUTH_URL=https://auth.ai.prod.eu-central-1.aws.ml.hana.ondemand.com/oauth/token
 LEGAL_EAGLE_SAP_AICORE_CLIENT_ID=<client-id>
@@ -239,9 +239,9 @@ Each profile allows you to configure:
 
 ### Run Execution
 - Manual execution with live log streaming
-- **Stage visualization**: 7-stage checklist with live state icons and per-stage status summaries
+- **Stage visualization**: 9-stage checklist (Starting → Collecting → Filtering → Attributing → Comparing → Glossary Match → Rank → Sending → Done) with live state icons and per-stage status summaries
 - **Source breakdown**: Collecting stage shows individual RSS feeds, Twitter @handles, and URL sources as clickable sub-items
-- **Run Options**: Per-run overrides for lookback window, skip comparison/filtering/grouping, test mode
+- **Run Options**: Per-run overrides for lookback window, skip comparison/filtering, test mode
 - View run history and metrics
 - Cancel running executions cooperatively
 
@@ -268,35 +268,43 @@ Each profile allows you to configure:
 │                     LEGAL EAGLE PIPELINE                         │
 └─────────────────────────────────────────────────────────────────┘
 
-1. COLLECT
+1. STARTING
+   └─> Pre-flight health checks (DB · SAP AI Core · Gmail) — abort if a
+       required system is unreachable
+
+2. COLLECTING
    ├─> RSS Feeds (government announcements)
    ├─> Twitter/X (official accounts)
    ├─> Websites (static + dynamic with Playwright)
    └─> Email Inbox (Law-to-Spec monitoring)
 
-2. FILTER
+3. FILTERING
    └─> Per-source date window (delta since last fetch, or configured lookback on first run)
 
-3. ATTRIBUTE
+4. ATTRIBUTING
    └─> Publisher + Authority stamped from feed config or AI inference
 
-4. COMPARE (Deduplication)
-   └─> Match against baseline
-       Detect: new items, updated items, repeated (×3+), duplicates
+5. COMPARING (Deduplication)
+   └─> Match against baseline → Status: NEW · UPDATE · REPEATED (×3+) · DUPLICATE
+       (duplicates kept at rank 0, never dropped)
 
-5. RANK
-   └─> Three-tier engine: Tier 0 duplicate (rank 0), Tier 1 keyword rules,
-       Tier 2 GPT-4o AI scoring (1=Noise → 5=Urgent)
+6. GLOSSARY MATCH
+   └─> Deterministic glossary keyword matching → topic labels (no AI).
+       Runs before Rank so a glossary match can floor an item's rank.
 
-6. GROUP (AI)
-   └─> Cluster related items by theme (replaced by keyword tagging, shipped v3.3)
+7. RANK
+   └─> Three-tier significance engine: Tier 0 duplicate (rank 0) ·
+       Tier 1 deterministic signals · Tier 2 GPT-4o (grounded).
+       Scale: 5 Urgent · 4 Legal Change · 3 Watch · 2 Signal · 1 Noise.
+       A glossary match floors an item at rank 2.
 
-7. EMAIL (Conditional)
-   └─> Bilingual HTML digest (native + English)
-       Skip if no new/updated items
+8. SENDING (rank-gated)
+   └─> Items at significance_rank ≥ threshold (default 3) composed into a
+       bilingual HTML digest (native + English) and emailed. Skipped in test mode.
 
-8. BASELINE UPDATE
-   └─> Store new items for future comparison
+9. DONE / BASELINE UPDATE
+   └─> All items saved (visible in Review immediately); new items stored for
+       future comparison
 ```
 
 ---
@@ -308,7 +316,7 @@ Each profile allows you to configure:
 - **[UI5_MIGRATION_ROADMAP.md](UI5_MIGRATION_ROADMAP.md)** — UI5/Fiori migration detailed plan
 
 ### Technical & Operations
-- **[SPEC.md](SPEC.md)** — Technical specification (v2.32 current architecture)
+- **[SPEC.md](SPEC.md)** — Technical specification (v3 current architecture)
 - **[CHANGELOG.md](CHANGELOG.md)** — Version history and release notes
 - **[BTP_DEPLOYMENT.md](BTP_DEPLOYMENT.md)** — SAP BTP Cloud Foundry deployment guide
 
@@ -342,7 +350,7 @@ See [BTP_DEPLOYMENT.md](BTP_DEPLOYMENT.md) for complete deployment guide.
 
 ```
 legal-eagle/
-├── agents/                   # Processing pipeline (collect, filter, group, email)
+├── agents/                   # Processing pipeline (collect, filter, attribute, compare, glossary match, rank, email)
 ├── admin/                    # Flask Admin UI + templates
 ├── configurations/           # Database, config loader, environment variables
 ├── scripts/                  # Utilities, migrations, admin launchers
