@@ -54,6 +54,11 @@ def scrape_url_source_with_config(source: dict) -> list:
     else:
         resp = requests.get(url, headers=DEFAULT_HEADERS, timeout=20)
         resp.raise_for_status()
+        # Servers that omit charset (e.g. ikanun.com sends bare "text/html") make
+        # requests default to ISO-8859-1, mangling UTF-8 (Turkish ü/ı/ş → Ã¼/Ä±).
+        # Fall back to chardet-detected encoding only when no charset was declared.
+        if "charset" not in resp.headers.get("Content-Type", "").lower():
+            resp.encoding = resp.apparent_encoding or resp.encoding
         html = resp.text
 
     field_selectors = _json.loads(source.get("field_selectors") or "{}")
@@ -96,6 +101,10 @@ def http_get(url: str, timeout: int = 20, retries: int = 3, backoff_sec: float =
                 except Exception:
                     pass
                 continue
+            # See scrape_url_source_with_config: fix UTF-8 mojibake for servers
+            # that omit the charset in their Content-Type header.
+            if "charset" not in r.headers.get("Content-Type", "").lower():
+                r.encoding = r.apparent_encoding or r.encoding
             return r.status_code, r.text
         except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
             return -1, f"HTTP error: {e}"
