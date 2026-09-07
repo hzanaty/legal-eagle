@@ -4,7 +4,7 @@
 
 > AI-powered platform that monitors legal changes, interprets their meaning, and helps SAP Localization teams respond faster with higher intelligence.
 
-**Current version: v3.7** — Deprecate Legal Repository · [CHANGELOG](CHANGELOG.md)
+**Current version: v3.11** — Pipeline stage help + Turkish source fixes · [CHANGELOG](CHANGELOG.md)
 
 ---
 

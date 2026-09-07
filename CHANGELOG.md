@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## v3.11 — 2026-09-08
+### Pipeline Stage Help + Turkish source fixes
+
+- **Pipeline help modal**: "?" button pinned to the right of the Run-tab stepper opens a modal explaining all 8 stages. Text sourced from a single canonical file, `configurations/pipeline_help.json` (loaded per-request; reword with no template/code change). `admin/app.py` `_load_pipeline_help()` + `run_status.html` modal; SPEC §9.1 points to the JSON.
+- **Turkish date parsing** (`agents/news_filter.py`): parse ISO strictly first, then dateutil with `dayfirst=True` — DD.MM.YYYY (e.g. 10.05.2026) now reads as 10 May, not 5 October. Fixes months-old Turkish articles slipping past a 7-day lookback.
+- **UTF-8 decoding** (`agents/url_sources_runner.py`): fall back to `apparent_encoding` when a server omits charset — fixes Turkish mojibake (Güvenlik was rendering as GÃ¼venlik). Applied to both `scrape_url_source_with_config` and `http_get`.
+- **Glossary Turkish-İ matching + relevance floor** (`agents/news_tagger.py`, `agents/news_ranker.py`): `_norm()` strips the combining dot from `İ.lower()` so `istihdam` matches `İstihdam`; a real glossary match now floors significance at rank 2 so on-topic items aren't scored off-topic.
+- **Reset Data** (`configurations/db.py`, `admin/templates/review_news.html`): new review-screen button with confirmation modal; reset now also clears each URL source's `last_successful_fetch` so re-runs start from a clean window instead of a stale delta anchor.
+- **Test Harness**: 22/22.
+
 ## v3.7 — 2026-09-06
 ### Deprecate Legal Repository
 Retired the Legal Repository subsystem that was bundled into Legal Eagle by mistake (predates v3, out of scope for the pipeline tool):
