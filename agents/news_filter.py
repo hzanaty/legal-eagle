@@ -148,21 +148,26 @@ def parse_date_string(date_str: Optional[str]) -> Optional[datetime]:
     s = date_str.strip()
     if not s:
         return None
-    # Primary: dateutil handles ISO, RFC, and localized/human date strings and
-    # raises on malformed components (e.g. month 31).
+    # ISO-8601 first (YYYY-MM-DD / YYYY-MM-DDTHH:MM:SS). These are unambiguous and
+    # MUST NOT be passed to dateutil with dayfirst=True — dateutil would misread
+    # "2026-09-02" as day=09/month=02. RSS feeds normalise to ISO, so this is the
+    # common path.
+    import re as _re
+    if _re.match(r"^\d{4}-\d{2}-\d{2}", s):
+        try:
+            if "T" in s:
+                return datetime.fromisoformat(s.split(".")[0].replace("Z", ""))
+            return datetime.strptime(s[:10], "%Y-%m-%d")
+        except (ValueError, TypeError):
+            return None
+    # Non-ISO: dateutil with dayfirst=True so European/Turkish DD.MM.YYYY dates
+    # (e.g. "10.05.2026" = 10 May) parse correctly rather than as US month-first.
     try:
         from dateutil import parser as _du
-        dt = _du.parse(s)
+        dt = _du.parse(s, dayfirst=True)
         # Normalise to naive UTC so comparisons with datetime.utcnow() don't raise.
         if dt.tzinfo is not None:
             dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
         return dt
     except Exception:
-        pass
-    # Fallback (dateutil unavailable): ISO / YYYY-MM-DD only.
-    try:
-        if "T" in s:
-            return datetime.fromisoformat(s.split(".")[0].replace("Z", ""))
-        return datetime.strptime(s[:10], "%Y-%m-%d")
-    except (ValueError, TypeError):
         return None
