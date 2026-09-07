@@ -755,6 +755,19 @@ def compare_with_baseline(
 
 **Purpose**: Assign `significance_rank` (0–5) via a three-tier engine. `rank_items(items, profile_id, db_conn)` mutates each item in place with `significance_rank`, `rank_tier`, `rank_reasoning`.
 
+**Significance scale** (source of truth: the Tier-2 prompt + `_BOOTSTRAP_EXAMPLES` in `agents/news_ranker.py`; mirrored in `configurations/pipeline_help.json` for the UI):
+
+| Rank | Meaning | Example |
+|------|---------|---------|
+| **5** | Enacted legislation with immediate compliance effect | "Parliament passes amendment, effective immediately" |
+| **4** | Upcoming regulatory change requiring preparation | "Ministry releases draft regulation for consultation" |
+| **3** | Operational impact — payroll, deadlines, rates | "New contribution rates announced for next quarter" |
+| **2** | Relevant case law or indirect implication | "Tribunal ruling on overtime pay classification" |
+| **1** | Off-topic / macro / finance news, no direct HR obligation | "Central bank raises benchmark interest rate" |
+| **0** | DUPLICATE — not evaluated (outside the 1–5 scale) | — |
+
+Email is gated at rank ≥ threshold (default 3); Rank 1 = Noise is scored and saved but never emailed. A glossary match floors an item at rank 2 (`_apply_boosts`) so on-topic items are never scored as off-topic.
+
 - **Tier 0 — DUPLICATE passthrough**: items with `dedup_status='duplicate'` are stamped rank 0, `rank_tier='duplicate'`, and skip both tiers.
 - **Tier 1 — Deterministic**: keyword/regex rules loaded from `ranking_signals` (ordered by `min_rank` DESC). No AI call; fully explainable. A Tier-1 match at rank ≥ 4 short-circuits and skips Tier 2.
 - **Tier 2 — AI**: gpt-4o via `sap_ai_client`, fired when Tier 1 gives rank < 4 or no match. The prompt includes up to 10 `ranking_grounding` summaries as few-shot examples (plus profile bootstrap examples). The call is wrapped in `ai_cache` for offline harness determinism. Falls back to rank 2 on AI-unavailable/parse error.
