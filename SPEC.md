@@ -1,7 +1,7 @@
 # Legal Eagle 3.8 — Technical Specification
 
-**Version:** 3.8 (Analyzing stage = glossary tagging merged into ranking; authority name on Review card; URL textual-date capture; publish-date enforcement; effective-date rank-5)  
-**Last Updated:** 2026-09-07
+**Version:** 3.11 (pipeline split into Glossary Match + Rank steps; "tag" terminology retired → Glossary Match / Status; authority name on Review card; URL textual-date capture; publish-date enforcement; effective-date rank-5)  
+**Last Updated:** 2026-09-08
 
 This document provides the technical specification for Legal Eagle, an AI-powered regulatory compliance monitoring system for SAP Localization.
 
@@ -43,8 +43,8 @@ Legal Eagle monitors government sources for legal updates in chosen countries an
 - **Four-dimensional item model** (v3): every news item carries four independent dimensions, stored in the DB and shown in the Review UI:
   - **Significance Rank (1–5)** — how legally important, assigned by the three-tier ranking engine (`significance_rank`; DUPLICATEs carry the special value 0, outside the 1–5 scale)
   - **LoB Relevance** — matched glossary terms (or blank → glossary gap alert)
-  - **Topic Label** — what the item is about, from glossary keyword tagging (`topic_label`, JSON array; `["General"]` when no term matches)
-  - **Repetition Tag** — NEW · UPDATE · REPEATED · DUPLICATE, from cross-run frequency counting (`repetition_tag` / `repetition_count`)
+  - **Topic Label** — what the item is about, from Glossary Match (`topic_label`, JSON array; `["General"]` when no term matches)
+  - **Status** — NEW · UPDATE · REPEATED · DUPLICATE, from cross-run frequency counting (`repetition_status` / `repetition_count`)
   These dimensions are independent: a rank-4 item with blank LoB Relevance is valid — it means the ranker found a significant item the current glossary cannot explain, which raises a Glossary Gap Alert (v3.5).
 - **Ranking as the quality gate** (v3): the old binary relevance filter is gone; noise is Rank 1 and simply not emailed. Email is gated on rank ≥ 3 (configurable per profile).
 - **Confirm-not-author human loop** (v3): the human never writes rules. On Challenge → override → confirm, the AI re-evaluates, auto-populates the reason, reflects the understood signal back, and a single confirmation writes both a Tier-2 grounding example (`ranking_grounding`) and a Tier-1 deterministic rule (`ranking_signals`) — so the system gets faster and smarter from every interaction.
@@ -73,7 +73,7 @@ Legal Eagle monitors government sources for legal updates in chosen countries an
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
 │  │                   PROCESSING PIPELINE (v3)                            │   │
 │  │                                                                       │   │
-│  │  HEALTH CHECK ─▶ FETCH ─▶ FILTER ─▶ ATTRIBUTE ─▶ ANNOTATE ─▶ RANK ─▶ TAG ─▶  │   │
+│  │  HEALTH CHECK ─▶ FETCH ─▶ FILTER ─▶ ATTRIBUTE ─▶ ANNOTATE ─▶ GLOSSARY MATCH ─▶ RANK ─▶  │   │
 │  │  TRANSLATE ─▶ SAVE ──────────────────────────────────────────────┐   │   │
 │  │                                                                   │   │   │
 │  │  health_check  authority_     compare_news   news_ranker          │   │   │
@@ -81,7 +81,7 @@ Legal Eagle monitors government sources for legal updates in chosen countries an
 │  │                (publisher +   REPEATED/       /regex → Tier2 gpt-4o│   │   │
 │  │                authority)     DUPLICATE→rank0) grounded)           │   │   │
 │  │                                                                   │   │   │
-│  │  news_tagger (topic_label + glossary_gap) · news_translator       │   │   │
+│  │  glossary_match (topic_label + glossary_gap) · news_translator    │   │   │
 │  │                                                                   │   │   │
 │  │  ┌──────────────────────┐                                        │   │   │
 │  │  │ email_inbox_parser   │ (Monitor Updates from Law-to-Spec)      │   │   │
@@ -361,7 +361,7 @@ CREATE TABLE news_items (
 | `significance_rank` | v3.2 | 0 = duplicate (not evaluated), 1–5 = ranked significance |
 | `rank_tier` | v3.2 | `tier1` \| `tier2` \| `duplicate` |
 | `rank_reasoning` | v3.2 | One-line rationale from the ranker |
-| `repetition_tag` | v3.2 | `new` \| `update` \| `repeated` \| `duplicate` |
+| `repetition_status` | v3.2 | `new` \| `update` \| `repeated` \| `duplicate` |
 | `repetition_count` | v3.2 | Times same entity fingerprint seen across runs |
 | `topic_label` | v3.3 | JSON array of matched glossary terms (`["General"]` if none) |
 | `email_eligible` | v3.3 | 1 if `significance_rank ≥ threshold` and not duplicate |
@@ -741,13 +741,13 @@ def compare_with_baseline(
 - Content hash comparison for updates
 - Link matching as fallback
 
-**v3 role — ANNOTATE stage:** `compare_news.py` is the annotator. It classifies every item as **NEW / UPDATE (with delta) / REPEATED (with count) / DUPLICATE** and stamps `dedup_status`. DUPLICATE items are **never dropped** — they are saved with `significance_rank = 0` and shown in a collapsed section of the Review UI (F7). Items whose fingerprint has recurred across runs get `repetition_tag='repeated'` / `repetition_count`, feeding the ranker's REPEATED elevation rules. The age gate migrated here from the deleted `news_filter.py`, anchored to each source's `last_successful_fetch`. The controller invokes it via `run_compare_news_agent(...)`, which returns `new_items` and `update_items`.
+**v3 role — ANNOTATE stage:** `compare_news.py` is the annotator. It classifies every item as **NEW / UPDATE (with delta) / REPEATED (with count) / DUPLICATE** and stamps `dedup_status`. DUPLICATE items are **never dropped** — they are saved with `significance_rank = 0` and shown in a collapsed section of the Review UI (F7). Items whose fingerprint has recurred across runs get `repetition_status='repeated'` / `repetition_count`, feeding the ranker's REPEATED elevation rules. The age gate migrated here from the deleted `news_filter.py`, anchored to each source's `last_successful_fetch`. The controller invokes it via `run_compare_news_agent(...)`, which returns `new_items` and `update_items`.
 
 ---
 
 ### 5.7 News Grouper (`agents/news_grouper.py`) — REPLACED by News Tagger (v3.3)
 
-**Status:** Superseded in v3.3. LLM theme-grouping obscured individual items and their ranks, and assigned OTHER/wrong-LoB categories (bugs B3/B4). It is replaced by deterministic glossary tagging (`news_tagger.py`) plus the AI digest composer (`email_composer.py`). The file still exists and `group_and_summarize_news()` is reachable only through the legacy `skip_grouping`/preview path in the controller; it is no longer part of the v3 pipeline. Email organization is now structural (by Topic Label), not editorial.
+**Status:** Superseded in v3.3. LLM theme-grouping obscured individual items and their ranks, and assigned OTHER/wrong-LoB categories (bugs B3/B4). It is replaced by deterministic Glossary Match (`glossary_match.py`) plus the AI digest composer (`email_composer.py`). The file still exists and `group_and_summarize_news()` is reachable only through the legacy `skip_grouping`/preview path in the controller; it is no longer part of the v3 pipeline. Email organization is now structural (by Topic Label), not editorial.
 
 ---
 
@@ -777,9 +777,9 @@ Email is gated at rank ≥ threshold (default 3); Rank 1 = Noise is scored and s
 
 ---
 
-### 5.7b News Tagger (`agents/news_tagger.py`) — NEW (v3.3)
+### 5.7b Glossary Match (`agents/glossary_match.py`) — NEW (v3.3)
 
-**Purpose**: Deterministic glossary-keyword tagging (no LLM). 
+**Purpose**: Deterministic glossary-keyword matching (no LLM). 
 
 - `tag_items(items, conn, profile_id)`: matches item text against profile glossary terms and sets `topic_label` to a JSON array of matched terms, or `["General"]` when none match.
 - `save_topic_labels(items, conn, profile_id)`: persists `topic_label` to `news_items`, resolving each row by id → source_id → url → hash_signature fallback.
@@ -949,8 +949,8 @@ def run_profile_once(
 3. **FETCH**: RSS, tweets, URL sources — each source anchored to its own `last_successful_fetch` (null → fall back to `date_scope` window); force-fetch treats the anchor as null but stays bounded by `date_scope`; anchor written immediately on each source's success (F1/F4/F5)
 4. **ATTRIBUTE** (`authority_attributor.py`): stamp `publisher` / `authority_id` / `authority_status` (configured, else AI-inferred)
 5. **ANNOTATE** (`compare_news.py`): classify NEW / UPDATE / REPEATED / DUPLICATE; DUPLICATEs saved (rank 0), never dropped
-6. **RANK** (`news_ranker.py`): three-tier engine scores all items 1–5 (duplicates stay 0); rank fields upserted to DB
-7. **TAG** (`news_tagger.py`): glossary keyword matching → `topic_label`; `flag_glossary_gaps()` sets `glossary_gap` for rank ≥ 3 items with no match (v3.5)
+6. **GLOSSARY MATCH** (`glossary_match.py`): glossary keyword matching → `topic_label` (runs before RANK so a glossary match can floor the rank)
+7. **RANK** (`news_ranker.py`): three-tier engine scores all items 1–5 (duplicates stay 0); rank fields upserted to DB; `flag_glossary_gaps()` then sets `glossary_gap` for rank ≥ 3 items with no glossary match (v3.5)
 8. **EMAIL RANK GATE**: `email_eligible = 1` for rank ≥ threshold (default 3) non-duplicate items
 9. **TRANSLATE** (`news_translator.py`): non-English profiles, rendered at send time
 10. **SAVE**: all four dimensions persisted; items available immediately in Review UI
@@ -1379,12 +1379,13 @@ def load_global_credentials() -> Dict[str, str]
 5. ANNOTATE  (compare_news → run_compare_news_agent)
    └─> NEW | UPDATE | REPEATED | DUPLICATE (rank 0, never dropped)
 
-6. RANK  (news_ranker.rank_items)
+6. GLOSSARY MATCH  (glossary_match.match_glossary)
+   └─> topic_label (runs before RANK)
+
+7. RANK  (news_ranker.rank_items)
    └─> Tier 0 duplicate → Tier 1 signals → Tier 2 gpt-4o (grounded)
        significance_rank 1–5, REPEATED elevation
-
-7. TAG  (news_tagger)
-   └─> topic_label + flag_glossary_gaps (glossary_gap)
+   └─> flag_glossary_gaps (glossary_gap) after rank
 
 8. EMAIL RANK GATE
    └─> email_eligible = 1 for rank ≥ threshold (default 3), non-duplicate
@@ -1685,9 +1686,9 @@ legal-eagle/
 │   ├── authority_attributor.py      # ATTRIBUTE stage: publisher/authority (v3.1/3.2)
 │   ├── compare_news.py              # ANNOTATE: NEW/UPDATE/REPEATED/DUPLICATE
 │   ├── news_ranker.py               # Three-tier ranking engine (v3.2)
-│   ├── news_tagger.py               # Glossary tagging + flag_glossary_gaps (v3.3/3.5)
+│   ├── glossary_match.py             # Glossary Match (topic_label) + flag_glossary_gaps (v3.3/3.5)
 │   ├── news_translator.py           # Post-save translation step (v3)
-│   ├── news_grouper.py              # LEGACY — replaced by news_tagger (v3.3)
+│   ├── news_grouper.py              # LEGACY — replaced by glossary_match (v3.3)
 │   ├── email_composer.py            # V2 AI digest → news_announcements (v3.3)
 │   ├── email_sender.py              # Render + SMTP (send_digest / legacy send_email)
 │   ├── ai_cache.py                  # Deterministic chat/embedding cache for the harness

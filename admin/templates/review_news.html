@@ -69,14 +69,14 @@
 
   .item-main { flex: 1; min-width: 0; }
   .item-meta { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; flex-wrap: wrap; }
-  .source-tag { font-size: 10px; font-weight: 700; color: #0a6ed1; background: #e8f1fb; border-radius: 3px; padding: 1px 6px; }
+  .source-pill { font-size: 10px; font-weight: 700; color: #0a6ed1; background: #e8f1fb; border-radius: 3px; padding: 1px 6px; }
   .pub-date { font-size: 10px; color: #6a6d70; }
   .eff-date { font-size: 10px; font-weight: 700; background: #e8f5e9; color: #107e3e; border: 1px solid #c8e6c9; border-radius: 3px; padding: 1px 6px; }
-  .glossary-tag { font-size: 10px; font-weight: 700; background: #eef2f8; color: #354a5f; border: 1px solid #d5dde8; border-radius: 3px; padding: 1px 6px; }
-  .authority-tag { font-size: 10px; font-weight: 700; background: #f3eefe; color: #5b3fb8; border: 1px solid #ddd0f5; border-radius: 3px; padding: 1px 6px; }
-  .tag-pill { font-size: 10px; font-weight: 700; border-radius: 3px; padding: 1px 6px; }
-  .tag-new { background: #e8f5e9; color: #107e3e; } .tag-update { background: #e3f2fd; color: #0a6ed1; }
-  .tag-repeated { background: #fff3e0; color: #e9730c; } .tag-dup { background: #f5f5f5; color: #aaa; }
+  .glossary-pill { font-size: 10px; font-weight: 700; background: #eef2f8; color: #354a5f; border: 1px solid #d5dde8; border-radius: 3px; padding: 1px 6px; }
+  .authority-pill { font-size: 10px; font-weight: 700; background: #f3eefe; color: #5b3fb8; border: 1px solid #ddd0f5; border-radius: 3px; padding: 1px 6px; }
+  .status-pill { font-size: 10px; font-weight: 700; border-radius: 3px; padding: 1px 6px; }
+  .status-new { background: #e8f5e9; color: #107e3e; } .status-update { background: #e3f2fd; color: #0a6ed1; }
+  .status-repeated { background: #fff3e0; color: #e9730c; } .status-dup { background: #f5f5f5; color: #aaa; }
   .gap-badge { font-size: 10px; font-weight: 700; background: #fff3e0; color: #e9730c; border: 1px solid #ffe0b2; border-radius: 3px; padding: 1px 6px; }
   .item-title { font-size: 12px; font-weight: 600; color: #32363a; margin-bottom: 2px; line-height: 1.4; }
   .item-snippet { font-size: 11px; color: #6a6d70; line-height: 1.5; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
@@ -208,11 +208,11 @@
     <div class="filter-row">
       <span class="filter-label">Status</span>
       <div class="chip-group">
-        <div class="fchip active" data-dim="tag" data-val="all" onclick="setFilter(this)">All</div>
-        <div class="fchip" data-dim="tag" data-val="NEW" onclick="setFilter(this)">NEW</div>
-        <div class="fchip" data-dim="tag" data-val="UPDATE" onclick="setFilter(this)">UPDATE</div>
-        <div class="fchip" data-dim="tag" data-val="REPEATED" onclick="setFilter(this)">REPEATED</div>
-        <div class="fchip" data-dim="tag" data-val="DUPLICATE" onclick="setFilter(this)">DUPLICATE</div>
+        <div class="fchip active" data-dim="status" data-val="all" onclick="setFilter(this)">All</div>
+        <div class="fchip" data-dim="status" data-val="NEW" onclick="setFilter(this)">NEW</div>
+        <div class="fchip" data-dim="status" data-val="UPDATE" onclick="setFilter(this)">UPDATE</div>
+        <div class="fchip" data-dim="status" data-val="REPEATED" onclick="setFilter(this)">REPEATED</div>
+        <div class="fchip" data-dim="status" data-val="DUPLICATE" onclick="setFilter(this)">DUPLICATE</div>
       </div>
     </div>
     <div class="filter-row">
@@ -419,7 +419,7 @@
                     <div class="src-title">{{ src.title or '(no title)' }}</div>
                     <div class="src-meta">
                       <span>{{ src.publisher or src.domain or 'Source' }} · {{ 'URL' if src.source_type and 'URL' in src.source_type else ('X' if src.source_type and 'weet' in src.source_type else (src.source_type|upper if src.source_type else 'RSS')) }}{% if src.authority_status == 'inferred' %} <span title="Authority inferred by AI" style="color:#e9730c;font-weight:700;">✦</span>{% endif %}</span>
-                      {% if src.authority_name %}<span class="authority-tag" title="Issuing authority">&#127963; {{ src.authority_name }}</span>{% endif %}
+                      {% if src.authority_name %}<span class="authority-pill" title="Issuing authority">&#127963; {{ src.authority_name }}</span>{% endif %}
                       {% if src.published_at %}<span>{{ src.published_at|truncate(16, True, '') }}</span>{% endif %}
                       {% if src.first_seen_at %}<span title="Fetched" style="opacity:0.65;">↓ {{ src.first_seen_at|truncate(16, True, '') }}</span>{% endif %}
                       {% if src.url %}<a href="{{ src.url }}" target="_blank" style="color:#0a6ed1;">Link</a>{% endif %}
@@ -454,7 +454,7 @@
     {% set score = raw|int if raw is not none else -1 %}
     <div class="item-card {% if score == 0 %}dup-card{% endif %} {% if item.is_gap %}gap-card{% endif %}"
          data-rank="{{ score if score >= 1 else '' }}"
-         data-tag="{{ item.tag|default('') }}"
+         data-status="{{ item.status|default('') }}"
          data-src="{{ item.item_source|default('') }}"
          data-lob="{% if item.is_gap %}gap{% else %}matched{% endif %}"
          data-email="{{ 'sent' if item.email_sent else 'unsent' }}"
@@ -465,13 +465,13 @@
       <div class="rank-badge {% if score >= 1 %}rank-{{ score }}{% else %}rank-d{% endif %}">{% if score == 0 %}D{% elif score >= 1 %}{{ score }}{% else %}?{% endif %}</div>
       <div class="item-main">
         <div class="item-meta">
-          <span class="source-tag">{{ item.publisher or item.domain or 'Source' }} · {{ 'URL' if item.source_type and 'URL' in item.source_type else ('X' if item.source_type and 'weet' in item.source_type else (item.source_type|upper if item.source_type else 'RSS')) }}{% if item.authority_status == 'inferred' %} <span title="Authority inferred by AI" style="color:#e9730c;font-weight:700;">✦</span>{% endif %}</span>
-          {% if item.authority_name %}<span class="authority-tag" title="Issuing authority{% if item.authority_status == 'inferred' %} — AI-inferred{% elif item.authority_status == 'configured' %} — configured{% endif %}">&#127963; {{ item.authority_name }}</span>{% endif %}
-          {% if item.tag %}<span class="tag-pill tag-{{ item.tag|lower }}">{{ item.tag }}</span>{% endif %}
+          <span class="source-pill">{{ item.publisher or item.domain or 'Source' }} · {{ 'URL' if item.source_type and 'URL' in item.source_type else ('X' if item.source_type and 'weet' in item.source_type else (item.source_type|upper if item.source_type else 'RSS')) }}{% if item.authority_status == 'inferred' %} <span title="Authority inferred by AI" style="color:#e9730c;font-weight:700;">✦</span>{% endif %}</span>
+          {% if item.authority_name %}<span class="authority-pill" title="Issuing authority{% if item.authority_status == 'inferred' %} — AI-inferred{% elif item.authority_status == 'configured' %} — configured{% endif %}">&#127963; {{ item.authority_name }}</span>{% endif %}
+          {% if item.status %}<span class="status-pill status-{{ item.status|lower }}">{{ item.status }}</span>{% endif %}
           <span class="pub-date" title="Article publish date">{% if item.published_at %}{{ item.published_at|truncate(16, True, '') }}{% else %}—{% endif %}</span>
           {% if item.first_seen_at %}<span class="pub-date" title="Fetched" style="opacity:0.65;">↓ {{ item.first_seen_at|truncate(16, True, '') }}</span>{% endif %}
           {% if item.effective_date %}<span class="eff-date" title="Date the change comes into force">⏱ Effective {{ item.effective_date }}</span>{% endif %}
-          {% for term in item.topic_label|fromjson %}{% if term != 'General' %}<span class="glossary-tag" title="Matched glossary term">{{ term }}</span>{% endif %}{% endfor %}
+          {% for term in item.topic_label|fromjson %}{% if term != 'General' %}<span class="glossary-pill" title="Matched glossary term">{{ term }}</span>{% endif %}{% endfor %}
           {% if item.is_gap %}<span class="gap-badge">&#9888; Gap — no glossary match</span>{% endif %}
           {% if score != 0 %}
             {% if item.email_sent %}
@@ -560,7 +560,7 @@
 </div>
 
 <script>
-  var filters = { rank: 'all', tag: 'all', src: 'all', lob: 'all', email: 'all' };
+  var filters = { rank: 'all', status: 'all', src: 'all', lob: 'all', email: 'all' };
   var _profileId = {{ profile_id }};
 
   // ── View toggle ──
@@ -692,7 +692,7 @@
     var vis = 0;
     document.querySelectorAll('.item-card').forEach(function(c) {
       var show = (filters.rank  === 'all' || filters.rank  === c.dataset.rank) &&
-                 (filters.tag   === 'all' || filters.tag   === c.dataset.tag) &&
+                 (filters.status === 'all' || filters.status === c.dataset.status) &&
                  (filters.src   === 'all' || filters.src   === c.dataset.src) &&
                  (filters.lob   === 'all' || filters.lob   === c.dataset.lob) &&
                  (filters.email === 'all' || filters.email === c.dataset.email);

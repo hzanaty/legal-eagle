@@ -462,13 +462,20 @@ def create_schema_if_needed(conn: sqlite3.Connection) -> None:
         # significance_rank: 0=duplicate, 1-5 scored by news_ranker
         # rank_tier: 'tier1' (deterministic) | 'tier2' (AI) | 'duplicate'
         # rank_reasoning: one-line rationale from ranker
-        # repetition_tag: 'new' | 'update' | 'repeated' | 'duplicate'
+        # repetition_status: 'new' | 'update' | 'repeated' | 'duplicate'  (the Status classification)
         # repetition_count: times same entity fingerprint seen across runs
+        # Migration: rename the legacy repetition_tag column in place (SQLite 3.25+).
+        try:
+            _cols = [r[1] for r in conn.execute("PRAGMA table_info(news_items)").fetchall()]
+            if "repetition_tag" in _cols and "repetition_status" not in _cols:
+                conn.execute("ALTER TABLE news_items RENAME COLUMN repetition_tag TO repetition_status")
+        except Exception:
+            pass
         for _col, _decl in (
             ("significance_rank", "INTEGER DEFAULT 0"),
             ("rank_tier", "TEXT"),
             ("rank_reasoning", "TEXT"),
-            ("repetition_tag", "TEXT"),
+            ("repetition_status", "TEXT"),
             ("repetition_count", "INTEGER DEFAULT 0"),
         ):
             try:
@@ -980,7 +987,7 @@ def upsert_news_item(conn: sqlite3.Connection, profile_id: int, item: Dict[str, 
     significance_rank = item.get("significance_rank")
     rank_tier = item.get("rank_tier")
     rank_reasoning = item.get("rank_reasoning")
-    repetition_tag = item.get("repetition_tag")
+    repetition_status = item.get("repetition_status")
     repetition_count = item.get("repetition_count")
     # v3.3 tagging + email gate (optional; stamped by tagger/gate stages; also used by seed)
     topic_label = item.get("topic_label")
@@ -1031,7 +1038,7 @@ def upsert_news_item(conn: sqlite3.Connection, profile_id: int, item: Dict[str, 
                     significance_rank=COALESCE(?, significance_rank),
                     rank_tier=COALESCE(?, rank_tier),
                     rank_reasoning=COALESCE(?, rank_reasoning),
-                    repetition_tag=COALESCE(?, repetition_tag),
+                    repetition_status=COALESCE(?, repetition_status),
                     repetition_count=COALESCE(?, repetition_count),
                     topic_label=COALESCE(?, topic_label),
                     email_eligible=COALESCE(?, email_eligible),
@@ -1055,7 +1062,7 @@ def upsert_news_item(conn: sqlite3.Connection, profile_id: int, item: Dict[str, 
                     significance_rank,
                     rank_tier,
                     rank_reasoning,
-                    repetition_tag,
+                    repetition_status,
                     repetition_count,
                     topic_label,
                     email_eligible,
@@ -1069,7 +1076,7 @@ def upsert_news_item(conn: sqlite3.Connection, profile_id: int, item: Dict[str, 
         # 3) Insert new
         conn.execute(
             """
-            INSERT INTO news_items(profile_id, source_type, source_id, url, domain, title, content, published_at, first_seen_at, last_seen_at, hash_signature, publisher, authority_id, authority_status, dedup_status, significance_rank, rank_tier, rank_reasoning, repetition_tag, repetition_count, topic_label, email_eligible, email_sent, effective_date)
+            INSERT INTO news_items(profile_id, source_type, source_id, url, domain, title, content, published_at, first_seen_at, last_seen_at, hash_signature, publisher, authority_id, authority_status, dedup_status, significance_rank, rank_tier, rank_reasoning, repetition_status, repetition_count, topic_label, email_eligible, email_sent, effective_date)
             VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """,
             (
@@ -1091,7 +1098,7 @@ def upsert_news_item(conn: sqlite3.Connection, profile_id: int, item: Dict[str, 
                 significance_rank,
                 rank_tier,
                 rank_reasoning,
-                repetition_tag,
+                repetition_status,
                 repetition_count,
                 topic_label,
                 email_eligible,
@@ -1587,7 +1594,7 @@ def list_all_news_for_review(
                    relevance_score, reviewed_at,
                    publisher, authority_id, authority_status, dedup_status,
                    significance_rank, rank_tier, rank_reasoning,
-                   repetition_tag, repetition_count,
+                   repetition_status, repetition_count,
                    topic_label, email_eligible, email_sent, glossary_gap,
                    effective_date,
                    (SELECT name FROM authorities WHERE authorities.id = news_items.authority_id) AS authority_name
@@ -1610,7 +1617,7 @@ def list_all_news_for_review(
             item['created_at'] = r['first_seen_at']
             # v3.2: unified rank/tag fields for template
             item['rank'] = r['significance_rank'] if 'significance_rank' in r.keys() else None
-            item['tag'] = (r['repetition_tag'] or '').upper() if 'repetition_tag' in r.keys() else ''
+            item['status'] = (r['repetition_status'] or '').upper() if 'repetition_status' in r.keys() else ''
             # v3.5: glossary gap flag — consumed by review_news.html (item.is_gap)
             item['is_gap'] = bool(int(item.get('glossary_gap') or 0))
             results.append(item)

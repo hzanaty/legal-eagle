@@ -1,7 +1,7 @@
 """
-Stage 4.4 — Tag
+Glossary Match stage (part of the Analyze phase).
 
-Deterministic glossary-keyword tagger. Assigns topic_label (JSON array) to each item
+Deterministic glossary-keyword matcher. Assigns topic_label (JSON array) to each item
 by matching glossary terms against item title + content. No AI calls.
 
 Topic label format: JSON array of matching glossary term strings, e.g. '["Labour Law", "Pension"]'.
@@ -32,7 +32,7 @@ def _norm(s: str) -> str:
     return s.lower().replace("̇", "")
 
 
-def tag_items(items: list[dict], conn: sqlite3.Connection, profile_id: int) -> list[dict]:
+def match_glossary(items: list[dict], conn: sqlite3.Connection, profile_id: int) -> list[dict]:
     """Assign topic_label to each item via glossary keyword matching.
 
     Matching is case-insensitive substring on title + content. Each item can

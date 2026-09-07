@@ -114,7 +114,7 @@ def run_v3_2():
 def run_v3_3():
     """Tagging + email rank gate live: fetch → attribute → dedup → rank → tag → email gate.
 
-    Extends v3.2: news_tagger.py assigns topic_label; rank gate sets email_eligible.
+    Extends v3.2: glossary_match.py assigns topic_label; rank gate sets email_eligible.
     Schema assertions (column_exists + table_exists) pass deterministically.
     email_eligible assertions for C4 are AI-gated (require embedding cache for dedup).
     """

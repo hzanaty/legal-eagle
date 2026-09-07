@@ -280,10 +280,16 @@
         <div class="step-sub">Dedup + classify · v3.1</div>
       </div>
       <div class="inner-arrow">›</div>
+      <div class="substep built" onclick="showDetail('glossary_match')">
+        <span class="actor agent" title="Agent"><svg class="ic"><use href="#ic-agent"/></svg></span>
+        <div class="step-name">Glossary Match</div>
+        <div class="step-sub">Glossary → topic labels · v3.3</div>
+      </div>
+      <div class="inner-arrow">›</div>
       <div class="substep built" onclick="showDetail('rank')">
         <span class="actor agent" title="Agent"><svg class="ic"><use href="#ic-agent"/></svg></span>
-        <div class="step-name">Analyze</div>
-        <div class="step-sub">Glossary tag + 3-tier rank · v3.8 ✓</div>
+        <div class="step-name">Rank</div>
+        <div class="step-sub">3-tier significance 1–5 · v3.2</div>
       </div>
       <div class="inner-arrow">›</div>
       <div class="substep built" onclick="showDetail('translate')">
@@ -369,7 +375,7 @@
       <div class="db-tag db-r">R ranking_signals</div>
       <div class="db-tag db-r">R ranking_grounding</div>
     </div>
-    <div class="db-cell" onclick="showDetail('tag')">
+    <div class="db-cell" onclick="showDetail('glossary_match')">
       <div class="db-step">⑥ Tag</div>
       <div class="db-tag db-r">R glossary_terms</div>
       <div class="db-tag db-w">W topic_label</div>
@@ -518,7 +524,7 @@ const details = {
     subtitle: 'Admin UI — terms, synonyms, regex patterns per LoB',
     tag: 'grey', tagLabel: 'UI Only',
     cols: [
-      { heading: 'What it does', items: ['Manages glossary_terms per LoB (HCM / FIN)', 'Synonyms and regex patterns per term', 'Drives keyword matching in Tagger (v3)', 'Used as context in AI filter (v2)'] },
+      { heading: 'What it does', items: ['Manages glossary_terms per LoB (HCM / FIN)', 'Synonyms and regex patterns per term', 'Drives keyword matching in Glossary Match (v3)', 'Used as context in AI filter (v2)'] },
       { heading: 'Key file', items: ['admin/app.py', 'configurations/config_loader.py (glossary helpers)', 'configurations/db.py (glossary_terms, glossary_synonyms, glossary_patterns)'] },
       { heading: 'Dependencies', items: ['SQLite config.db', 'No external APIs'] },
     ]
@@ -643,13 +649,13 @@ const details = {
       { heading: 'Tier 3 — Human Override', items: ['Challenge button in Review UI', 'Extracts generalizable signal pattern', 'Auto-promotes to Tier 1 rule on confirmation', 'agents/news_ranker.py (to be created)'] },
     ]
   },
-  'tag': {
-    title: 'News Tagger',
+  'glossary_match': {
+    title: 'Glossary Match',
     subtitle: 'NEW in v3 Phase 3 (v3.3) — deterministic glossary keyword matching + email rank gate',
     tag: 'green', tagLabel: 'Shipped v3.3',
     cols: [
       { heading: 'What it does', items: ['Matches item text against glossary_terms table', 'Assigns Topic Labels (matched terms) as JSON array', 'Sets email_eligible = 1 for significance_rank ≥ 3 (configurable threshold, non-duplicate)', 'Persists topic_label + email_eligible to news_items via source_id/url/hash lookup'] },
-      { heading: 'Key file', items: ['agents/news_tagger.py', 'configurations/config_loader.py (glossary helpers)', 'agents/agents_controller.py (Stage 4.4 + email gate)'] },
+      { heading: 'Key file', items: ['agents/glossary_match.py', 'configurations/config_loader.py (glossary helpers)', 'agents/agents_controller.py (Stage 4.4 + email gate)'] },
       { heading: 'Dependencies', items: ['SQLite glossary_terms', 'No external API needed — fully deterministic'] },
     ]
   },
@@ -668,8 +674,8 @@ const details = {
     subtitle: 'Fully shipped v3.3 — all pipeline writes complete',
     tag: 'green', tagLabel: 'Shipped v3.3',
     cols: [
-      { heading: 'Shipped (v3.1–v3.3)', items: ['publisher / authority_id / authority_status columns (ATTRIBUTE stage)', 'dedup_status (new / update / duplicate) persisted', 'significance_rank + rank_tier + rank_reasoning (v3.2)', 'repetition_tag + repetition_count (v3.2)', 'topic_label (JSON array) from Tagger (v3.3)', 'email_eligible (0/1) from rank gate (v3.3)', 'email_sent (0/1) on news_items (v3.3)', 'email_status on runs (v3.3)'] },
-      { heading: 'Key file', items: ['configurations/db.py (news_items INSERT/UPDATE)', 'agents/authority_attributor.py (v3.1)', 'agents/compare_news.py (dedup_status)', 'agents/news_ranker.py (v3.2)', 'agents/news_tagger.py (v3.3)'] },
+      { heading: 'Shipped (v3.1–v3.3)', items: ['publisher / authority_id / authority_status columns (ATTRIBUTE stage)', 'dedup_status (new / update / duplicate) persisted', 'significance_rank + rank_tier + rank_reasoning (v3.2)', 'repetition_status + repetition_count (v3.2)', 'topic_label (JSON array) from Glossary Match (v3.3)', 'email_eligible (0/1) from rank gate (v3.3)', 'email_sent (0/1) on news_items (v3.3)', 'email_status on runs (v3.3)'] },
+      { heading: 'Key file', items: ['configurations/db.py (news_items INSERT/UPDATE)', 'agents/authority_attributor.py (v3.1)', 'agents/compare_news.py (dedup_status)', 'agents/news_ranker.py (v3.2)', 'agents/glossary_match.py (v3.3)'] },
     ]
   },
   'email-send': {
@@ -730,7 +736,7 @@ const details = {
     tag: 'green', tagLabel: 'Shipped v3.5',
     cols: [
       { heading: 'What it does', items: ['glossary_gap flag set by Tag stage when significance_rank ≥ 3 AND topic_label = ["General"]', '⚠ "N glossary gaps" strip in Review toolbar with "Show only gaps" (reuses LoB=gap filter)', '⚠ Gap — no LoB match badge on each gap item card', '+ Add to Glossary panel: AI suggests keywords, user confirms inline', 'On confirm: term saved, item re-tagged, gap flag cleared — no navigation away'] },
-      { heading: 'Key files', items: ['agents/news_tagger.py — flag_glossary_gaps()', 'configurations/db.py — glossary_gap column + is_gap mapping', 'agents/agents_controller.py — gap check after TAG stage', 'admin/app.py — /glossary/suggest + /add-to-glossary', 'admin/templates/review_news.html — strip + panel + JS'] },
+      { heading: 'Key files', items: ['agents/glossary_match.py — flag_glossary_gaps()', 'configurations/db.py — glossary_gap column + is_gap mapping', 'agents/agents_controller.py — gap check after Rank stage', 'admin/app.py — /glossary/suggest + /add-to-glossary', 'admin/templates/review_news.html — strip + panel + JS'] },
       { heading: 'Harness', items: ['python3 tests/run_harness.py --version v3.5 → 34/34 (4 skipped — AI)'] },
     ]
   },

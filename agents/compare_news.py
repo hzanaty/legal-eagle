@@ -182,7 +182,7 @@ def _build_item_record(item: Dict[str, Any]) -> Dict[str, Any]:
         "authority_status": item.get("authority_status"),
         "dedup_status": item.get("dedup_status"),
         # v3.2: repetition tracking
-        "repetition_tag": item.get("repetition_tag"),
+        "repetition_status": item.get("repetition_status"),
         "repetition_count": item.get("repetition_count"),
         # v3.2: rank fields (populated by news_ranker after compare; upsert updates them)
         "significance_rank": item.get("significance_rank"),
@@ -429,13 +429,13 @@ def run_compare_news_agent(
         prior_count = max(exact_prior_count, semantic_prior_count)
         item["repetition_count"] = prior_count
         if prior_count >= 3:
-            item["repetition_tag"] = "repeated"
+            item["repetition_status"] = "repeated"
         elif classification == "duplicate":
-            item["repetition_tag"] = "duplicate"
+            item["repetition_status"] = "duplicate"
         elif classification == "update":
-            item["repetition_tag"] = "update"
+            item["repetition_status"] = "update"
         else:
-            item["repetition_tag"] = "new"
+            item["repetition_status"] = "new"
         if classification == "new":
             new_items.append(item)
             # register as a comparison target for the rest of this run

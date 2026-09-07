@@ -18,7 +18,7 @@ Three-tier ranking engine that assigns significance_rank (0–5) to each item:
 Post-scoring adjustments (order matters):
   • First-party source boost: if item authority_id matches the feed's configured
     authority_id, significance_rank = max(significance_rank, 2).
-  • REPEATED elevation: if repetition_tag='repeated' AND repetition_count >= 3 AND
+  • REPEATED elevation: if repetition_status='repeated' AND repetition_count >= 3 AND
     significance_rank >= 2 → significance_rank += 1 (capped at 5).
 
 Public interface:
@@ -269,7 +269,7 @@ def _apply_boosts(item: Dict[str, Any]) -> None:
 
     # REPEATED elevation: story seen ≥ 3 times + currently scored ≥ 2 → +1
     if (
-        item.get("repetition_tag") == "repeated"
+        item.get("repetition_status") == "repeated"
         and (item.get("repetition_count") or 0) >= 3
         and item.get("significance_rank", 0) >= 2
     ):

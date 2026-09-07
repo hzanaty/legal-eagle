@@ -620,11 +620,13 @@ def run_profile_once(
         # both rank and glossary). Lifecycle tags (new/update/repeated/duplicate) come from the
         # Comparing stage and are untouched here.
         try:
-            from agents.news_tagger import tag_items, save_topic_labels, flag_glossary_gaps
+            from agents.glossary_match import match_glossary, save_topic_labels, flag_glossary_gaps
             from agents.news_ranker import rank_items
             # Reads only (glossary terms + ranking signals/grounding); mutate items in memory.
             an_conn = get_connection()
-            tag_items(filtered_items, an_conn, profile_id)       # → topic_label (glossary match)
+            print("🔖 Glossary Match: matching items against glossary…")
+            match_glossary(filtered_items, an_conn, profile_id)  # → topic_label (Glossary Match)
+            print("📊 Rank: scoring significance 1–5…")
             rank_items(filtered_items, profile_id, an_conn)      # → significance_rank (sees topic_label)
             an_conn.close()
             if not dry_run:
@@ -645,7 +647,7 @@ def run_profile_once(
             ranked = sum(1 for i in filtered_items if (i.get("significance_rank") or 0) > 0)
             tagged = sum(1 for i in filtered_items if i.get("topic_label") and i["topic_label"] != '["General"]')
             gaps = sum(1 for i in filtered_items if i.get("glossary_gap"))
-            print(f"🔬 Analyzing stage complete — {tagged}/{len(filtered_items)} glossary-matched · {ranked}/{len(filtered_items)} ranked > 0")
+            print(f"📊 Rank stage complete — {tagged}/{len(filtered_items)} glossary-matched · {ranked}/{len(filtered_items)} ranked > 0")
             if gaps:
                 print(f"⚠️  Glossary gap check — {gaps}/{len(filtered_items)} rank≥3 item(s) had NO glossary match (candidates to add)")
             else:

@@ -126,7 +126,7 @@ def _load_review_help() -> dict:
 def _rank_help() -> list:
     """Reuse the Analyzing-stage rank scale from pipeline_help.json (single source)."""
     return next(
-        (s.get("ranks", []) for s in _load_pipeline_help() if s.get("stage") == "Analyzing"),
+        (s.get("ranks", []) for s in _load_pipeline_help() if s.get("stage") == "Rank"),
         [],
     )
 
@@ -2178,7 +2178,7 @@ def suggest_glossary_keywords(profile_id: int):
 def add_news_item_to_glossary(item_id: int):
     """v3.5: Add a term, re-tag the item, and clear its glossary_gap flag atomically."""
     from configurations.db import add_glossary_term
-    from agents.news_tagger import tag_items, save_topic_labels
+    from agents.glossary_match import match_glossary, save_topic_labels
     data = request.get_json(force=True, silent=True) or {}
     term = (data.get("term") or "").strip()
     category = (data.get("category") or "").strip() or None
@@ -2194,7 +2194,7 @@ def add_news_item_to_glossary(item_id: int):
         pid = item["profile_id"]
 
         term_id = add_glossary_term(conn, pid, term, "en", category)
-        tag_items([item], conn, pid)
+        match_glossary([item], conn, pid)
         save_topic_labels([item], conn, pid)
         conn.execute("UPDATE news_items SET glossary_gap=0 WHERE id=?", (item_id,))
         conn.commit()

@@ -31,9 +31,14 @@
     ]
   },
   {
-    "stage": "Analyzing",
-    "title": "Analyzing — rank & tag",
-    "blurb": "A three-tier engine (deterministic signals, then grounded GPT-4o) scores significance 1–5. Glossary tagging then assigns topic labels and flags significant items the glossary can't explain. Email is sent only for rank ≥ threshold (default 3); a glossary match floors an item at rank 2.",
+    "stage": "Glossary Match",
+    "title": "Glossary Match — topic labels",
+    "blurb": "Matches each item against the profile glossary (deterministic, no AI) and assigns topic labels. Runs before Rank so a glossary match can floor an item's rank. Rank-significant items that match nothing are later flagged as glossary gaps."
+  },
+  {
+    "stage": "Rank",
+    "title": "Rank — significance 1–5",
+    "blurb": "A three-tier engine (deterministic signals, then grounded GPT-4o) scores significance 1–5. Email is sent only for rank ≥ threshold (default 3); a glossary match floors an item at rank 2.",
     "ranks": [
       {"level": 5, "label": "Urgent", "meaning": "Enacted legislation with immediate compliance effect"},
       {"level": 4, "label": "Legal Change", "meaning": "Upcoming regulatory change requiring preparation"},
