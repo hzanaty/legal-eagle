@@ -2988,17 +2988,20 @@ def confirm_challenge_news_item(item_id: int):
         item = dict(row)
         profile_id = item.get("profile_id")
 
-        # Write override back to news_items
+        # Write override back to news_items (update significance_rank so badge reflects it)
         conn.execute(
-            "UPDATE news_items SET human_rank_override=?, human_override_reason=? WHERE id=?",
-            (override_rank, override_reason, item_id),
+            "UPDATE news_items SET human_rank_override=?, significance_rank=?, "
+            "rank_tier='human', human_override_reason=? WHERE id=?",
+            (override_rank, override_rank, override_reason, item_id),
         )
 
-        # Write few-shot grounding example
+        # Write few-shot grounding example (with rank so AI prompt is useful)
         title = item.get("title") or ""
         summary = f"{title} — {override_reason}" if override_reason else title
         grounding_id = insert_ranking_grounding(
-            conn, profile_id, item_id, summary, source_label=item.get("publisher") or None
+            conn, profile_id, item_id, summary,
+            source_label=item.get("publisher") or None,
+            rank=override_rank,
         )
 
         # Write Tier 1 signal (keyword extracted from override_reason or title)

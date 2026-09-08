@@ -1994,6 +1994,7 @@ def insert_ranking_grounding(
     item_id: int,
     example_md: str,
     source_label: Optional[str] = None,
+    rank: Optional[int] = None,
 ) -> int:
     for _col, _decl in (("source_label", "TEXT"), ("created_at", "TEXT")):
         try:
@@ -2002,10 +2003,10 @@ def insert_ranking_grounding(
             pass
     cur = conn.execute(
         """
-        INSERT INTO ranking_grounding(profile_id, source_item_id, summary, source_label, created_at)
-        VALUES(?,?,?,?,datetime('now'))
+        INSERT INTO ranking_grounding(profile_id, source_item_id, summary, source_label, rank, created_at)
+        VALUES(?,?,?,?,?,datetime('now'))
         """,
-        (profile_id, item_id, example_md, source_label),
+        (profile_id, item_id, example_md, source_label, rank),
     )
     return cur.lastrowid
 
