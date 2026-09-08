@@ -583,6 +583,62 @@ def create_schema_if_needed(conn: sqlite3.Connection) -> None:
         except Exception:
             pass
 
+        # v3.13: L2 deep-fetch + grouping state machine columns on news_items
+        # l2_summary: 2-3 sentence factual summary of the full article (L2 deep fetch)
+        # l2_fetched_at: cache marker — skip re-fetch when already populated
+        # act_ref: law/act/gazette reference (e.g. "7555 Sayılı...") — clustering key.
+        #          Primary source L2 fetch; best-effort earlier from glossary_match. NULL when none.
+        # announce_state: pending (new/dirty) -> assigned (titled+placed) -> excluded (below threshold)
+        # announcement_id: persistent membership FK into news_announcements
+        # english_title: AI-generated English title — the clustering fingerprint
+        # added_after_publish: 1 when the item joined a frozen (done) announcement post-publication
+        for _col, _decl in (
+            ("l2_summary", "TEXT"),
+            ("l2_fetched_at", "TEXT"),
+            ("act_ref", "TEXT"),
+            ("law_primary", "TEXT"),
+            ("law_secondary", "TEXT"),
+            ("law_reference", "TEXT"),
+            ("announce_state", "TEXT"),
+            ("announcement_id", "INTEGER"),
+            ("english_title", "TEXT"),
+            ("added_after_publish", "INTEGER NOT NULL DEFAULT 0"),
+        ):
+            try:
+                conn.execute(f"ALTER TABLE news_items ADD COLUMN {_col} {_decl}")
+            except Exception:
+                pass
+
+        # v3.13: announcements become profile-scoped + persistent (no longer delete-regenerate
+        # per run). profile_id added so announcements accumulate and carry a draft->done lifecycle.
+        try:
+            conn.execute("ALTER TABLE news_announcements ADD COLUMN profile_id INTEGER")
+        except Exception:
+            pass
+
+        # v3.13: RCM reference titles cache — per-profile naming-convention examples pulled
+        # offline from LOKA (scope=regulations). Used to ground announcement title generation.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS rcm_reference_titles (
+                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                profile_id       INTEGER NOT NULL,
+                jira_key         TEXT,
+                regulation_title TEXT NOT NULL,
+                country          TEXT,
+                effective_date   TEXT,
+                synced_at        TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            """
+        )
+        try:
+            conn.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uniq_rcm_ref "
+                "ON rcm_reference_titles (profile_id, jira_key)"
+            )
+        except Exception:
+            pass
+
 
 # -----------------------
 # Profiles
@@ -995,6 +1051,14 @@ def upsert_news_item(conn: sqlite3.Connection, profile_id: int, item: Dict[str, 
     email_sent = item.get("email_sent") or 0
     # v3.8 effective date (optional; stamped by ranker / effective-date step)
     effective_date = item.get("effective_date")
+    # v3.13 L2 deep-fetch + grouping fields (optional; stamped by l2_fetcher / glossary_match)
+    l2_summary = item.get("l2_summary")
+    l2_fetched_at = item.get("l2_fetched_at")
+    act_ref = item.get("act_ref")
+    law_primary = item.get("law_primary")
+    law_secondary = item.get("law_secondary")
+    law_reference = item.get("law_reference")
+    announce_state = item.get("announce_state")
 
     with conn:
         # 1) Locate existing row by strongest identifiers first
@@ -1043,7 +1107,14 @@ def upsert_news_item(conn: sqlite3.Connection, profile_id: int, item: Dict[str, 
                     topic_label=COALESCE(?, topic_label),
                     email_eligible=COALESCE(?, email_eligible),
                     email_sent=COALESCE(?, email_sent),
-                    effective_date=COALESCE(?, effective_date)
+                    effective_date=COALESCE(?, effective_date),
+                    l2_summary=COALESCE(?, l2_summary),
+                    l2_fetched_at=COALESCE(?, l2_fetched_at),
+                    act_ref=COALESCE(?, act_ref),
+                    law_primary=COALESCE(?, law_primary),
+                    law_secondary=COALESCE(?, law_secondary),
+                    law_reference=COALESCE(?, law_reference),
+                    announce_state=COALESCE(?, announce_state)
                 WHERE id=?
                 """,
                 (
@@ -1068,6 +1139,13 @@ def upsert_news_item(conn: sqlite3.Connection, profile_id: int, item: Dict[str, 
                     email_eligible,
                     email_sent,
                     effective_date,
+                    l2_summary,
+                    l2_fetched_at,
+                    act_ref,
+                    law_primary,
+                    law_secondary,
+                    law_reference,
+                    announce_state,
                     news_id,
                 ),
             )
@@ -1076,8 +1154,8 @@ def upsert_news_item(conn: sqlite3.Connection, profile_id: int, item: Dict[str, 
         # 3) Insert new
         conn.execute(
             """
-            INSERT INTO news_items(profile_id, source_type, source_id, url, domain, title, content, published_at, first_seen_at, last_seen_at, hash_signature, publisher, authority_id, authority_status, dedup_status, significance_rank, rank_tier, rank_reasoning, repetition_status, repetition_count, topic_label, email_eligible, email_sent, effective_date)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            INSERT INTO news_items(profile_id, source_type, source_id, url, domain, title, content, published_at, first_seen_at, last_seen_at, hash_signature, publisher, authority_id, authority_status, dedup_status, significance_rank, rank_tier, rank_reasoning, repetition_status, repetition_count, topic_label, email_eligible, email_sent, effective_date, l2_summary, l2_fetched_at, act_ref, law_primary, law_secondary, law_reference, announce_state)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """,
             (
                 profile_id,
@@ -1104,6 +1182,13 @@ def upsert_news_item(conn: sqlite3.Connection, profile_id: int, item: Dict[str, 
                 email_eligible,
                 email_sent,
                 effective_date,
+                l2_summary,
+                l2_fetched_at,
+                act_ref,
+                law_primary,
+                law_secondary,
+                law_reference,
+                announce_state,
             ),
         )
         row = conn.execute(
@@ -1597,7 +1682,7 @@ def list_all_news_for_review(
                    human_rank_override, human_override_reason,
                    repetition_status, repetition_count,
                    topic_label, email_eligible, email_sent, glossary_gap,
-                   effective_date,
+                   effective_date, l2_summary, act_ref, law_primary, law_secondary, law_reference,
                    (SELECT name FROM authorities WHERE authorities.id = news_items.authority_id) AS authority_name
             FROM news_items
             WHERE profile_id = ?
@@ -1984,6 +2069,168 @@ def set_announcement_publish(conn: sqlite3.Connection, announcement_id: int,
             "UPDATE news_announcements SET jira_legal_change=?, status=? WHERE id=?",
             ((jira_legal_change or None), status, announcement_id),
         )
+
+
+# -----------------------
+# v3.13 — persistent, profile-scoped announcement state machine
+# -----------------------
+
+def get_announcements_for_profile_with_sources(
+    conn: sqlite3.Connection, profile_id: int
+) -> List[Dict[str, Any]]:
+    """Profile-scoped read for the Announcement tab (persistent across runs)."""
+    rows = conn.execute(
+        "SELECT * FROM news_announcements WHERE profile_id=? ORDER BY "
+        "CASE WHEN status='done' THEN 1 ELSE 0 END, id DESC",
+        (profile_id,),
+    ).fetchall()
+    result = []
+    for row in rows:
+        ann = dict(row)
+        try:
+            item_ids = json.loads(ann.get("item_ids_json") or "[]")
+        except Exception:
+            item_ids = []
+        sources = []
+        if item_ids:
+            placeholders = ",".join("?" * len(item_ids))
+            src_rows = conn.execute(
+                f"""SELECT *,
+                    (SELECT name FROM authorities WHERE authorities.id = news_items.authority_id) AS authority_name
+                    FROM news_items WHERE id IN ({placeholders})""",
+                item_ids,
+            ).fetchall()
+            sources = [dict(s) for s in src_rows]
+        ann["sources"] = sources
+        result.append(ann)
+    return result
+
+
+def get_pending_announce_items(conn: sqlite3.Connection, profile_id: int) -> List[Dict[str, Any]]:
+    """Items awaiting (re)grouping: announce_state='pending' AND email_eligible=1."""
+    rows = conn.execute(
+        """SELECT * FROM news_items
+           WHERE profile_id=? AND email_eligible=1
+             AND COALESCE(announce_state,'pending')='pending'
+           ORDER BY significance_rank DESC, id""",
+        (profile_id,),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_draft_announcements(conn: sqlite3.Connection, profile_id: int) -> List[Dict[str, Any]]:
+    """Mutable (draft) announcements for a profile — candidates a pending item may join."""
+    rows = conn.execute(
+        "SELECT * FROM news_announcements WHERE profile_id=? AND COALESCE(status,'draft')!='done' ORDER BY id",
+        (profile_id,),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_done_announcements(conn: sqlite3.Connection, profile_id: int) -> List[Dict[str, Any]]:
+    """Frozen (published) announcements — never regenerated, but may gain post-publish sources."""
+    rows = conn.execute(
+        "SELECT * FROM news_announcements WHERE profile_id=? AND status='done' ORDER BY id",
+        (profile_id,),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def insert_announcement(
+    conn: sqlite3.Connection, profile_id: int, run_id: int, topic_label: str,
+    title: str, rcm_json: str, first_published: str,
+    source_links: list, item_ids: list,
+) -> int:
+    """Insert a new draft announcement. Returns its id."""
+    cur = conn.execute(
+        """INSERT INTO news_announcements(run_id, profile_id, topic_label, title,
+                announcement_md, announcement_rcm_json, first_published,
+                source_links_json, item_ids_json, status)
+           VALUES(?,?,?,?,?,?,?,?,?,'draft')""",
+        (run_id, profile_id, topic_label, title, "", rcm_json, first_published,
+         json.dumps(source_links or []), json.dumps(item_ids or [])),
+    )
+    return int(cur.lastrowid)
+
+
+def update_announcement_content(
+    conn: sqlite3.Connection, announcement_id: int, title: str, rcm_json: str,
+    source_links: list, item_ids: list, first_published: str | None = None,
+) -> None:
+    """Regenerate a draft announcement's title/body/membership (never call on 'done')."""
+    conn.execute(
+        """UPDATE news_announcements
+           SET title=?, announcement_rcm_json=?, source_links_json=?, item_ids_json=?,
+               first_published=COALESCE(?, first_published)
+           WHERE id=?""",
+        (title, rcm_json, json.dumps(source_links or []), json.dumps(item_ids or []),
+         first_published, announcement_id),
+    )
+
+
+def update_announcement_title(conn: sqlite3.Connection, announcement_id: int, title: str) -> None:
+    """Inline title override from the Announcement tab."""
+    with conn:
+        conn.execute(
+            "UPDATE news_announcements SET title=? WHERE id=?", (title, announcement_id)
+        )
+
+
+def append_item_to_announcement(
+    conn: sqlite3.Connection, announcement_id: int, item_id: int, added_after_publish: bool
+) -> None:
+    """Add one item id to an announcement's item_ids_json (dedup); mark post-publish if frozen."""
+    row = conn.execute(
+        "SELECT item_ids_json FROM news_announcements WHERE id=?", (announcement_id,)
+    ).fetchone()
+    try:
+        ids = json.loads(row["item_ids_json"]) if row else []
+    except Exception:
+        ids = []
+    if item_id not in ids:
+        ids.append(item_id)
+    conn.execute(
+        "UPDATE news_announcements SET item_ids_json=? WHERE id=?",
+        (json.dumps(ids), announcement_id),
+    )
+    conn.execute(
+        "UPDATE news_items SET announcement_id=?, announce_state='assigned', added_after_publish=? WHERE id=?",
+        (announcement_id, 1 if added_after_publish else 0, item_id),
+    )
+
+
+def set_item_assigned(conn: sqlite3.Connection, item_id: int, announcement_id: int) -> None:
+    conn.execute(
+        "UPDATE news_items SET announce_state='assigned', announcement_id=? WHERE id=?",
+        (announcement_id, item_id),
+    )
+
+
+def mark_items_pending(conn: sqlite3.Connection, item_ids: List[int]) -> None:
+    """Flip items back to 'pending' and detach them from any DRAFT announcement.
+
+    Items attached to a 'done' announcement are NOT detached (frozen record stays intact).
+    """
+    if not item_ids:
+        return
+    with conn:
+        for iid in item_ids:
+            row = conn.execute(
+                """SELECT a.id, a.status FROM news_announcements a
+                   JOIN news_items i ON i.announcement_id = a.id WHERE i.id=?""",
+                (iid,),
+            ).fetchone()
+            if row and row["status"] == "done":
+                # Keep membership in the frozen announcement; just re-evaluate.
+                conn.execute(
+                    "UPDATE news_items SET announce_state='pending' WHERE id=?", (iid,)
+                )
+            else:
+                conn.execute(
+                    "UPDATE news_items SET announce_state='pending', announcement_id=NULL WHERE id=?",
+                    (iid,),
+                )
+
 
 
 def save_announcement_rcm(conn: sqlite3.Connection, announcement_id: int, rcm_json_str: str) -> None:

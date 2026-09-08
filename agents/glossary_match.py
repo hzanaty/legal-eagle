@@ -9,7 +9,31 @@ Items with no glossary match receive '["General"]'.
 """
 
 import json
+import re
 import sqlite3
+
+
+# v3.13: best-effort law/act/gazette reference extraction from L1 text (title + description).
+# L2 fetch is the PRIMARY source of act_ref; this only catches references that already
+# appear in the headline/description (e.g. "Law No. 7555", "OVP 2027-2029",
+# "Official Gazette No. 32765"), so clustering has an early key when L2 confirms.
+_ACT_REF_PATTERNS = [
+    r"\b(?:Law|Act|Decree|Regulation|Directive)\s+No\.?\s*\d+[\w/-]*",
+    r"\b(?:Official\s+Gazette)\s+No\.?\s*\d+[\w/-]*",
+    r"\b\d{3,5}\s+Say[ıi]l[ıi]\b[\w\s.]*",     # Turkish "NNNN Sayılı ..." act reference
+    r"\b[A-ZÇĞİÖŞÜ]{2,6}\s*\(\s*\d{4}\s*[–-]\s*\d{4}\s*\)",  # e.g. OVP (2027-2029)
+]
+
+
+def extract_act_ref(text: str) -> str:
+    """Return the first law/act/gazette reference found in text, or "" if none."""
+    if not text:
+        return ""
+    for pat in _ACT_REF_PATTERNS:
+        m = re.search(pat, text)
+        if m:
+            return m.group(0).strip()
+    return ""
 
 
 def _load_terms(conn: sqlite3.Connection, profile_id: int) -> list[str]:
@@ -43,6 +67,11 @@ def match_glossary(items: list[dict], conn: sqlite3.Connection, profile_id: int)
         text = _norm(f"{item.get('title', '')} {item.get('content', '')}")
         matched = [t for t in terms if _norm(t) in text]
         item["topic_label"] = json.dumps(matched) if matched else json.dumps(["General"])
+        # v3.13: best-effort act_ref from L1 (title + description). Only set when found —
+        # L2 fetch is the primary source and must not be overwritten by an empty result.
+        ref = extract_act_ref(f"{item.get('title', '')} {item.get('content', '')}")
+        if ref:
+            item["act_ref"] = ref
     return items
 
 

@@ -36,6 +36,11 @@
     "blurb": "Matches each item against the profile glossary (deterministic, no AI) and assigns topic labels. Runs before Rank so a glossary match can floor an item's rank. Rank-significant items that match nothing are later flagged as glossary gaps."
   },
   {
+    "stage": "L2 Fetch",
+    "title": "L2 Fetch — full-article detail + act reference",
+    "blurb": "Follows each item's URL, extracts the full article, and makes one AI call for a factual summary plus the law/act/gazette reference (act_ref). Runs before Rank so ranking sees the richer context. Mandatory: if any item's fetch fails, the run stops."
+  },
+  {
     "stage": "Rank",
     "title": "Rank — significance 1–5",
     "blurb": "A three-tier engine (deterministic signals, then grounded GPT-4o) scores significance 1–5. Email is sent only for rank ≥ threshold (default 3); a glossary match floors an item at rank 2.",

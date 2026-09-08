@@ -190,6 +190,13 @@ def _build_item_record(item: Dict[str, Any]) -> Dict[str, Any]:
         "rank_reasoning": item.get("rank_reasoning"),
         # v3.8: effective date (populated by news_ranker; upsert updates it)
         "effective_date": item.get("effective_date"),
+        # v3.13: L2 deep-fetch fields (populated by l2_fetcher; act_ref may also come from glossary_match)
+        "l2_summary": item.get("l2_summary"),
+        "l2_fetched_at": item.get("l2_fetched_at"),
+        "act_ref": item.get("act_ref"),
+        "law_primary": item.get("law_primary"),
+        "law_secondary": item.get("law_secondary"),
+        "law_reference": item.get("law_reference"),
     }
 
 

@@ -43,7 +43,7 @@ from agents.url_sources_runner import run_unified_sources, scrape_url_source_wit
 from agents.compare_news import run_compare_news_agent
 from agents.authority_attributor import build_feed_config, build_url_config, attribute_items
 from agents.health_check import run_health_checks, summarize, hard_failures
-from agents.news_grouper import group_and_summarize_news
+from agents.news_ranker import rank_items
 from agents.email_sender import send_email
 from agents.news_filter import filter_items_by_date, filter_source_items
 from agents.email_inbox_parser import fetch_monitor_updates, format_monitor_updates_for_email
@@ -238,10 +238,23 @@ def run_controller():
         updates_count = sum(1 for it in final_items if it.get("is_update"))
         print(f"ℹ️ Updates in final set: {updates_count}")
 
-        # 6. News Grouper Agent
-        print("\n🧠 Grouping similar news items...")
-        grouped_summary = group_and_summarize_news(final_items, "", LANGUAGE_PREFERENCE)
-        print(f"✅ Grouped summary ready with {len(grouped_summary)} entries.")
+        # 6. Grouping (v3.13: legacy news_grouper retired → archived; each item is its own
+        #    group for the v1 email path. Structured announcements come from announcement_agent.)
+        grouped_summary = [
+            {
+                "title": it.get("title", ""),
+                "summary": it.get("content", it.get("summary", "")),
+                "category": it.get("category", ""),
+                "titles": [it.get("title", "")],
+                "links": [it.get("link", it.get("url", ""))],
+                "items": [it],
+                "group_size": 1,
+                "date_grouped": datetime.utcnow().strftime("%Y-%m-%d %H:%M"),
+                "is_update_section": it.get("is_update", False),
+                "delta": it.get("delta", None),
+            }
+            for it in final_items
+        ]
 
         # 7. Email Composer Agent
         print("📧 Sending summary email...")
@@ -625,9 +638,14 @@ def run_profile_once(
             # Reads only (glossary terms + ranking signals/grounding); mutate items in memory.
             an_conn = get_connection()
             print("🔖 Glossary Match: matching items against glossary…")
-            match_glossary(filtered_items, an_conn, profile_id)  # → topic_label (Glossary Match)
+            match_glossary(filtered_items, an_conn, profile_id)  # → topic_label + best-effort act_ref
+            # v3.13: L2 Deep Fetch — MANDATORY, runs before Rank so ranking sees richer context.
+            # Any item failure raises L2FetchError which aborts the run (re-raised below).
+            print("🌐 L2 Fetch: pulling full-article detail + act_ref (mandatory)…")
+            from agents.l2_fetcher import run_l2_fetch
+            run_l2_fetch(filtered_items)
             print("📊 Rank: scoring significance 1–5…")
-            rank_items(filtered_items, profile_id, an_conn)      # → significance_rank (sees topic_label)
+            rank_items(filtered_items, profile_id, an_conn)      # → significance_rank (sees topic_label + L2)
             an_conn.close()
             if not dry_run:
                 # Persist rank fields + effective_date (upsert on source_id/url/hash_signature).
@@ -653,6 +671,11 @@ def run_profile_once(
             else:
                 print(f"✅ Glossary gap check — 0 gaps (all rank≥3 items matched a glossary term)")
         except Exception as e:
+            from agents.l2_fetcher import L2FetchError
+            if isinstance(e, L2FetchError):
+                # L2 is mandatory — do not swallow. Abort the run loudly.
+                print(f"❌ L2 Fetch failed (run aborted): {e}")
+                raise
             print(f"⚠️ Analyzing stage failed: {e}")
 
         # v3.8: EFFECTIVE-DATE ELEVATION — a glossary-matched (relevant) item that carries an
@@ -746,27 +769,24 @@ def run_profile_once(
         except Exception as e:
             print(f"⚠️ Email gate failed: {e}")
 
-        if skip_grouping:
-            print("⏭ Skipping grouping — each item treated as its own group")
-            grouped_summary = [
-                {
-                    "title": it.get("title", ""),
-                    "summary": it.get("content", it.get("summary", "")),
-                    "category": it.get("category", ""),
-                    "titles": [it.get("title", "")],
-                    "links": [it.get("link", it.get("url", ""))],
-                    "items": [it],
-                    "group_size": 1,
-                    "date_grouped": datetime.utcnow().strftime("%Y-%m-%d %H:%M"),
-                    "is_update_section": it.get("is_update", False),
-                    "delta": it.get("delta", None),
-                }
-                for it in final_items
-            ]
-        else:
-            print("\n🧠 Grouping similar news items...")
-            grouped_summary = group_and_summarize_news(final_items, "", LANGUAGE_PREFERENCE)
-            print(f"✅ Grouped summary ready with {len(grouped_summary)} entries.")
+        # v3.13: legacy semantic grouper (news_grouper) retired → archived. The v1 preview/send
+        # path below now treats each item as its own group; real Topic→Announcement→Sources
+        # structure is built by announcement_agent into news_announcements (Announcement tab).
+        grouped_summary = [
+            {
+                "title": it.get("title", ""),
+                "summary": it.get("content", it.get("summary", "")),
+                "category": it.get("category", ""),
+                "titles": [it.get("title", "")],
+                "links": [it.get("link", it.get("url", ""))],
+                "items": [it],
+                "group_size": 1,
+                "date_grouped": datetime.utcnow().strftime("%Y-%m-%d %H:%M"),
+                "is_update_section": it.get("is_update", False),
+                "delta": it.get("delta", None),
+            }
+            for it in final_items
+        ]
 
         # Monitor Updates (Law-to-Specification email integration)
         monitor_updates_data = None
