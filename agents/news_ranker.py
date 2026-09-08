@@ -126,7 +126,9 @@ def _tier2_score(item: Dict[str, Any], grounding: List[Dict[str, Any]]) -> tuple
     into force, else None.
     """
     title = item.get("title", "")
-    content = item.get("content", "") or ""
+    l2_summary = (item.get("l2_summary") or "").strip()
+    content_field = l2_summary if l2_summary else ((item.get("content", "") or "")[:1500])
+    content_label = "Summary" if l2_summary else "Content"
 
     examples_text = "\n".join(
         f'  rank {e["rank"]}: "{e["title"]}" — {e["reasoning"]}'
@@ -145,7 +147,7 @@ def _tier2_score(item: Dict[str, Any], grounding: List[Dict[str, Any]]) -> tuple
         "Return it as 'YYYY-MM-DD'. If no specific effective date is stated, return null.\n\n"
         f"Examples:\n{examples_text}\n\n"
         f'Title: "{title}"\n'
-        f'Content: "{content[:1500]}"\n\n'
+        f'{content_label}: "{content_field}"\n\n'
         'Respond with a JSON object: '
         '{"rank": <1-5>, "reasoning": "<one sentence>", "effective_date": "<YYYY-MM-DD or null>"}'
     )
@@ -212,7 +214,7 @@ def rank_items(
             item["rank_tier"] = _DUPLICATE
             item["rank_reasoning"] = "duplicate — skipped ranker"
             continue
-        text = f"{item.get('title', '')} {item.get('content', '') or ''}"
+        text = f"{item.get('title', '')} {item.get('l2_summary', '') or ''} {item.get('content', '') or ''}"
         t1_scores[id(item)] = _tier1_score(text, signals)
         non_dupes.append(item)
 
