@@ -2177,7 +2177,7 @@ def suggest_glossary_keywords(profile_id: int):
 
 @app.route("/admin/news/<int:item_id>/add-to-glossary", methods=["POST"])
 def add_news_item_to_glossary(item_id: int):
-    """v3.5: Add a term, re-tag the item, and clear its glossary_gap flag atomically."""
+    """v3.5: Add a term, re-match the item against the glossary, and clear its glossary_gap flag atomically."""
     from configurations.db import add_glossary_term
     from agents.glossary_match import match_glossary, save_topic_labels
     data = request.get_json(force=True, silent=True) or {}

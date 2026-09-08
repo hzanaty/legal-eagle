@@ -141,12 +141,12 @@
   .detail-section li { font-size: 12px; color: #c9d1d9; padding: 3px 0; display: flex; align-items: flex-start; gap: 6px; }
   .detail-section li::before { content: '›'; color: #484f58; flex-shrink: 0; }
 
-  .tag { display: inline-block; font-size: 10px; padding: 2px 7px; border-radius: 10px; font-weight: 600; margin-top: 4px; }
-  .tag.green  { background: #0d2b13; color: #3fb950; border: 1px solid #3fb950; }
-  .tag.yellow { background: #2b200d; color: #d29922; border: 1px solid #d29922; }
-  .tag.red    { background: #2b0d0d; color: #f85149; border: 1px solid #f85149; }
-  .tag.blue   { background: #0c1825; color: #58a6ff; border: 1px solid #58a6ff; }
-  .tag.grey   { background: #1c2128; color: #7d8590; border: 1px solid #484f58; }
+  .badge { display: inline-block; font-size: 10px; padding: 2px 7px; border-radius: 10px; font-weight: 600; margin-top: 4px; }
+  .badge.green  { background: #0d2b13; color: #3fb950; border: 1px solid #3fb950; }
+  .badge.yellow { background: #2b200d; color: #d29922; border: 1px solid #d29922; }
+  .badge.red    { background: #2b0d0d; color: #f85149; border: 1px solid #f85149; }
+  .badge.blue   { background: #0c1825; color: #58a6ff; border: 1px solid #58a6ff; }
+  .badge.grey   { background: #1c2128; color: #7d8590; border: 1px solid #484f58; }
 
   .close-btn { float: right; background: none; border: 1px solid #30363d; color: #7d8590; border-radius: 6px; padding: 3px 10px; cursor: pointer; font-size: 12px; }
   .close-btn:hover { border-color: #58a6ff; color: #58a6ff; }
@@ -156,7 +156,7 @@
   .db-cell { background:#161b22; border:1px solid #21262d; border-radius:8px; padding:6px 8px; cursor:pointer; transition:all 0.15s; min-width:90px; }
   .db-cell:hover { border-color:#58a6ff; }
   .db-step { font-size:11px; font-weight:600; color:#e6edf3; margin-bottom:4px; }
-  .db-tag  { font-size:9px; padding:1px 5px; border-radius:8px; margin-top:2px; white-space:nowrap; border:1px solid; display:inline-block; }
+  .db-badge  { font-size:9px; padding:1px 5px; border-radius:8px; margin-top:2px; white-space:nowrap; border:1px solid; display:inline-block; }
   .db-r  { background:#0c1825; color:#58a6ff; border-color:#1f3a5a; }
   .db-w  { background:#0d2b13; color:#3fb950; border-color:#1a4a22; }
   .db-rw { background:#1a1f0d; color:#d29922; border-color:#3a3010; }
@@ -335,9 +335,9 @@
 <!-- DB BAND -->
 <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;padding-left:4px;">
   <span style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#7d8590;">DB access</span>
-  <span class="db-tag db-r" style="font-size:10px;padding:1px 6px;">R read</span>
-  <span class="db-tag db-w" style="font-size:10px;padding:1px 6px;">W write</span>
-  <span class="db-tag db-rw" style="font-size:10px;padding:1px 6px;">R/W both</span>
+  <span class="db-badge db-r" style="font-size:10px;padding:1px 6px;">R read</span>
+  <span class="db-badge db-w" style="font-size:10px;padding:1px 6px;">W write</span>
+  <span class="db-badge db-rw" style="font-size:10px;padding:1px 6px;">R/W both</span>
 </div>
 <div style="display:flex;align-items:stretch;background:#0d1117;border:1px solid #21262d;border-radius:10px;overflow:hidden;margin-bottom:10px;">
   <div style="writing-mode:vertical-rl;text-orientation:mixed;transform:rotate(180deg);font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#7d8590;padding:12px 6px;border-right:1px solid #21262d;border-left:2px solid #30363d;min-width:30px;display:flex;align-items:center;justify-content:center;white-space:nowrap;">DB</div>
@@ -345,60 +345,61 @@
 
     <div class="db-cell" onclick="showDetail('run-select')">
       <div class="db-step">① Start</div>
-      <div class="db-tag db-r">R profiles</div>
-      <div class="db-tag db-r">R sources</div>
+      <div class="db-badge db-r">R profiles</div>
+      <div class="db-badge db-r">R sources</div>
     </div>
     <div class="db-cell" onclick="showDetail('health-check')">
       <div class="db-step">② Health</div>
-      <div class="db-tag db-r">R sources</div>
-      <div class="db-tag db-w">W run log</div>
+      <div class="db-badge db-r">R sources</div>
+      <div class="db-badge db-w">W run log</div>
     </div>
     <div class="db-cell" onclick="showDetail('rss')">
       <div class="db-step">Collect</div>
-      <div class="db-tag db-r">R rss_feeds</div>
-      <div class="db-tag db-r">R tweet_accounts</div>
-      <div class="db-tag db-r">R crawl_urls</div>
+      <div class="db-badge db-r">R rss_feeds</div>
+      <div class="db-badge db-r">R tweet_accounts</div>
+      <div class="db-badge db-r">R crawl_urls</div>
     </div>
     <div class="db-cell" onclick="showDetail('attribute')">
       <div class="db-step">③ Attribute</div>
-      <div class="db-tag db-r">R authorities</div>
-      <div class="db-tag db-w">W publisher</div>
-      <div class="db-tag db-w">W authority_id</div>
+      <div class="db-badge db-r">R authorities</div>
+      <div class="db-badge db-w">W publisher</div>
+      <div class="db-badge db-w">W authority_id</div>
     </div>
     <div class="db-cell" onclick="showDetail('compare')">
       <div class="db-step">④ Compare</div>
-      <div class="db-tag db-r">R news_items</div>
-      <div class="db-tag db-rw">R/W baseline</div>
-    </div>
-    <div class="db-cell" onclick="showDetail('rank')">
-      <div class="db-step">⑤ Rank</div>
-      <div class="db-tag db-r">R ranking_signals</div>
-      <div class="db-tag db-r">R ranking_grounding</div>
+      <div class="db-badge db-r">R news_items</div>
+      <div class="db-badge db-rw">R/W baseline</div>
     </div>
     <div class="db-cell" onclick="showDetail('glossary_match')">
-      <div class="db-step">⑥ Tag</div>
-      <div class="db-tag db-r">R glossary_terms</div>
-      <div class="db-tag db-w">W topic_label</div>
-      <div class="db-tag db-w">W email_eligible</div>
+      <div class="db-step">⑤ Glossary Match</div>
+      <div class="db-badge db-r">R glossary_terms</div>
+      <div class="db-badge db-w">W topic_label</div>
+      <div class="db-badge db-w">W glossary_gap</div>
+    </div>
+    <div class="db-cell" onclick="showDetail('rank')">
+      <div class="db-step">⑥ Rank</div>
+      <div class="db-badge db-r">R ranking_signals</div>
+      <div class="db-badge db-r">R ranking_grounding</div>
+      <div class="db-badge db-w">W email_eligible</div>
     </div>
     <div class="db-cell" onclick="showDetail('translate')">
       <div class="db-step">⑦ Translate</div>
-      <div class="db-tag db-w">W translations</div>
+      <div class="db-badge db-w">W translations</div>
     </div>
     <div class="db-cell" onclick="showDetail('save-db')">
       <div class="db-step">⑧ Save</div>
-      <div class="db-tag db-w">W news_items</div>
-      <div class="db-tag db-w">W rank, labels</div>
-      <div class="db-tag db-w">W status, class</div>
+      <div class="db-badge db-w">W news_items</div>
+      <div class="db-badge db-w">W rank, labels</div>
+      <div class="db-badge db-w">W status, class</div>
     </div>
     <div class="db-cell" onclick="showDetail('email-send')">
       <div class="db-step">⑨ Finish</div>
-      <div class="db-tag db-r">R news_items</div>
-      <div class="db-tag db-w">W last_fetch_date</div>
-      <div class="db-tag db-w">W runs</div>
-      <div class="db-tag db-w">W email_status</div>
-      <div class="db-tag db-w">W email_sent</div>
-      <div class="db-tag db-w">W news_aspects</div>
+      <div class="db-badge db-r">R news_items</div>
+      <div class="db-badge db-w">W last_fetch_date</div>
+      <div class="db-badge db-w">W runs</div>
+      <div class="db-badge db-w">W email_status</div>
+      <div class="db-badge db-w">W email_sent</div>
+      <div class="db-badge db-w">W news_aspects</div>
     </div>
 
   </div>
@@ -416,14 +417,20 @@
     <div class="inner-arrow">›</div>
     <div class="step built" onclick="showDetail('challenge')">
       <span class="actor human" title="Human"><svg class="ic"><use href="#ic-human"/></svg></span>
-      <div class="step-name">Challenge Rank</div>
-      <div class="step-sub">Override + grounding</div>
+      <div class="step-name">Re-rank</div>
+      <div class="step-sub">Override + grounding · reason-gated</div>
     </div>
     <div class="inner-arrow">›</div>
     <div class="step built" onclick="showDetail('glossary-gap')">
       <span class="actor human" title="Human"><svg class="ic"><use href="#ic-human"/></svg></span>
       <div class="step-name">Glossary Gap</div>
       <div class="step-sub">Gap badge · v3.5</div>
+    </div>
+    <div class="inner-arrow">›</div>
+    <div class="step built" onclick="showDetail('rematch')">
+      <span class="actor human" title="Human"><svg class="ic"><use href="#ic-human"/></svg></span>
+      <div class="step-name">Re-match</div>
+      <div class="step-sub">Re-run Glossary Match after adding a term · v3.12</div>
     </div>
     <div class="inner-arrow">›</div>
     <div class="step built" onclick="showDetail('rcm-publish')">
@@ -453,11 +460,11 @@
   <!-- Content -->
   <div style="display:flex;align-items:center;gap:8px;padding:10px 16px;flex:1;flex-wrap:wrap;">
 
-    <!-- Source: Challenge Rank (REVIEW) -->
+    <!-- Source: Re-rank (REVIEW) -->
     <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
       <div style="font-size:11px;font-weight:700;color:#80b9ad;text-transform:uppercase;letter-spacing:1px;">Review</div>
       <div style="background:#161b22;border:1px solid #e6edf3;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;color:#e6edf3;position:relative;">
-        Challenge Rank
+        Re-rank
         <span style="position:absolute;top:0;left:0;right:0;height:2px;background:#e6edf3;border-radius:4px 4px 0 0;"></span>
       </div>
     </div>
@@ -512,7 +519,7 @@ const details = {
   'profile-config': {
     title: 'Profile Configuration',
     subtitle: 'Admin UI — happens before any run',
-    tag: 'grey', tagLabel: 'UI Only',
+    badge: 'grey', badgeLabel: 'UI Only',
     cols: [
       { heading: 'What it does', items: ['Defines Country + Line of Business pair', 'Sets schedule (cron or manual)', 'Sets date_scope (how far back to look)', 'Manages language settings per profile'] },
       { heading: 'Key file', items: ['admin/app.py — /admin/profile/&lt;id&gt;', 'admin/templates/profile.html', 'configurations/config_loader.py'] },
@@ -522,7 +529,7 @@ const details = {
   'glossary': {
     title: 'Glossary Management',
     subtitle: 'Admin UI — terms, synonyms, regex patterns per LoB',
-    tag: 'grey', tagLabel: 'UI Only',
+    badge: 'grey', badgeLabel: 'UI Only',
     cols: [
       { heading: 'What it does', items: ['Manages glossary_terms per LoB (HCM / FIN)', 'Synonyms and regex patterns per term', 'Drives keyword matching in Glossary Match (v3)', 'Used as context in AI filter (v2)'] },
       { heading: 'Key file', items: ['admin/app.py', 'configurations/config_loader.py (glossary helpers)', 'configurations/db.py (glossary_terms, glossary_synonyms, glossary_patterns)'] },
@@ -532,7 +539,7 @@ const details = {
   'sources': {
     title: 'Source Configuration',
     subtitle: 'Admin UI — RSS feeds, Twitter handles, URL sources',
-    tag: 'grey', tagLabel: 'UI Only',
+    badge: 'grey', badgeLabel: 'UI Only',
     cols: [
       { heading: 'What it does', items: ['Add/remove RSS feed URLs', 'Add Twitter handles to monitor', 'Add static/dynamic crawl URLs', 'Set per-source max_lookback_days'] },
       { heading: 'Key file', items: ['admin/app.py', 'admin/templates/profile.html', 'configurations/db.py (rss_feeds, tweet_accounts, crawl_urls, snap_urls)'] },
@@ -542,7 +549,7 @@ const details = {
   'receivers': {
     title: 'Email Receivers',
     subtitle: 'Admin UI — recipients with per-receiver translation language',
-    tag: 'grey', tagLabel: 'UI Only',
+    badge: 'grey', badgeLabel: 'UI Only',
     cols: [
       { heading: 'What it does', items: ['Add email recipients per profile', 'Set translation_lang per recipient', 'Bilingual digest (native + English) per receiver preference'] },
       { heading: 'Key file', items: ['admin/app.py', 'configurations/db.py (email_receivers)'] },
@@ -552,7 +559,7 @@ const details = {
   'run-select': {
     title: 'Select Profile & Trigger Run',
     subtitle: 'Manual trigger from Admin UI or scheduled cron',
-    tag: 'grey', tagLabel: 'UI Only',
+    badge: 'grey', badgeLabel: 'UI Only',
     cols: [
       { heading: 'What it does', items: ['Pick profile from dashboard', 'Manual: "Run Now" button', 'Scheduled: cron-based controller loop', 'Opens live log streaming view (SSE)'] },
       { heading: 'Key file', items: ['admin/app.py — /admin/run/&lt;id&gt;', 'agents/agents_controller.py — run_controller() + run_profile_once()'] },
@@ -562,7 +569,7 @@ const details = {
   'health-check': {
     title: 'Health Check',
     subtitle: 'Shipped v3.1 — runs before any fetching begins',
-    tag: 'green', tagLabel: 'Shipped v3.1',
+    badge: 'green', badgeLabel: 'Shipped v3.1',
     cols: [
       { heading: 'What it does', items: ['HTTP HEAD check on all RSS/URL sources', 'Twitter Bearer token validation', 'Gmail SMTP connect → login → quit', 'SAP AI Core minimal chat call', 'DB writability test write'] },
       { heading: 'Key file', items: ['agents/health_check.py (to be created)', 'Source warnings → log and continue', 'Hard blocks (AI Core / Gmail / DB) → abort run early'] },
@@ -572,7 +579,7 @@ const details = {
   'rss': {
     title: 'RSS Parser',
     subtitle: 'Unchanged in v3 — fetches and parses RSS feeds',
-    tag: 'green', tagLabel: 'Unchanged',
+    badge: 'green', badgeLabel: 'Unchanged',
     cols: [
       { heading: 'What it does', items: ['Fetches each RSS feed URL', 'Parses entries: title, link, published date, summary', 'Uses last_fetch_date as lookback window', 'Returns flat list of raw items'] },
       { heading: 'Key file', items: ['agents/rss_parser.py', 'parse_rss_feed(url) → list of items'] },
@@ -582,7 +589,7 @@ const details = {
   'twitter': {
     title: 'Twitter Feed',
     subtitle: 'Unchanged in v3 — Twitter API v2 search',
-    tag: 'green', tagLabel: 'Unchanged',
+    badge: 'green', badgeLabel: 'Unchanged',
     cols: [
       { heading: 'What it does', items: ['Timeline search per handle', 'Keyword search across accounts', 'Bearer token auth (API v2)', 'Returns flat list of tweet objects'] },
       { heading: 'Key file', items: ['agents/tweet_feed.py', 'search_tweets_multi_account(handles, token, days)'] },
@@ -592,7 +599,7 @@ const details = {
   'url-scrape': {
     title: 'URL Sources Runner',
     subtitle: 'Shipped v3.1 — per-source anchor + Source Simulator (F9)',
-    tag: 'green', tagLabel: 'Shipped v3.1',
+    badge: 'green', badgeLabel: 'Shipped v3.1',
     cols: [
       { heading: 'What it does', items: ['Static scraping via requests + BeautifulSoup4', 'Dynamic scraping via Playwright (JS-rendered)', 'Unified runner across both modes', 'Optional Brightdata proxy support'] },
       { heading: 'v3.1 shipped', items: ['Per-source last_successful_fetch replaces global days window', 'Source Simulator (F9): 1-field add + ⚡ auto-discovery of selectors', 'scrape_url_source_with_config() reads stored selectors', 'Force-fetch mode overrides anchor (bounded by date_scope)'] },
@@ -602,7 +609,7 @@ const details = {
   'email-inbox': {
     title: 'Email Inbox Parser',
     subtitle: 'Unchanged in v3 — Gmail IMAP for Law-to-Spec monitoring',
-    tag: 'green', tagLabel: 'Unchanged',
+    badge: 'green', badgeLabel: 'Unchanged',
     cols: [
       { heading: 'What it does', items: ['Monitors Gmail inbox via IMAP', 'Looks for Law-to-Spec regulatory updates', 'Parses email body into structured news items'] },
       { heading: 'Key file', items: ['agents/email_inbox_parser.py', 'fetch_monitor_updates() → items'] },
@@ -612,7 +619,7 @@ const details = {
   'filter': {
     title: 'News Filter',
     subtitle: 'Per-source date window (v3.10) — FILTER stage between COLLECT and ATTRIBUTE',
-    tag: 'green', tagLabel: 'Shipped v3.10',
+    badge: 'green', badgeLabel: 'Shipped v3.10',
     cols: [
       { heading: 'What it does', items: ['Applies per-source date windowing to all collected items', 'Delta mode: keeps items newer than last_successful_fetch', 'First-run mode: uses configured lookback window', 'Covers RSS, URL sources, and simulated URL sources', 'filter_source_items() entry point'] },
       { heading: 'Key file', items: ['agents/news_filter.py (renamed from date_filter.py)', 'filter_source_items(items, source_config) → filtered_items'] },
@@ -622,7 +629,7 @@ const details = {
   'attribute': {
     title: 'Source Attributor',
     subtitle: 'Shipped v3.1 (configured path) + v3.2 (AI inference path)',
-    tag: 'green', tagLabel: 'Shipped v3.2',
+    badge: 'green', badgeLabel: 'Shipped v3.2',
     cols: [
       { heading: 'What it does', items: ['Stamps publisher + authority_id + authority_status per item', 'Configured path (v3.1): reads authority_id directly from feed config', 'AI path (v3.2): infers authority for mixed-publisher feeds (authority_status=inferred)', '✦ spark icon + override UI in Review for inferred items', 'Same-authority items get lowered dedup cosine threshold (v3.1)'] },
       { heading: 'Key file', items: ['agents/authority_attributor.py', 'configurations/db.py (authorities table, publisher/authority_id/authority_status on news_items)', 'admin/templates/review_news.html (authority override dropdown)'] },
@@ -632,7 +639,7 @@ const details = {
   'compare': {
     title: 'Compare / Deduplication',
     subtitle: 'Shipped v3.1 — DUPLICATEs preserved, entity + cosine dedup',
-    tag: 'green', tagLabel: 'Shipped v3.1',
+    badge: 'green', badgeLabel: 'Shipped v3.1',
     cols: [
       { heading: 'What it does', items: ['Embedding-based semantic similarity (cosine)', 'Entity-canonical fingerprint for exact/near matches', 'Classifies: NEW | UPDATE | DUPLICATE (dedup_status)', '7-day rolling baseline window (SQLite)'] },
       { heading: 'v3.1 shipped', items: ['DUPLICATEs saved with dedup_status — never dropped', 'Cosine-tiered thresholds (DUP ≥ 0.80; Jaccard AND-gate dropped)', 'Entity fingerprint + intra-run dedup', 'Graceful degrade to deterministic dedup if embeddings down'] },
@@ -642,7 +649,7 @@ const details = {
   'rank': {
     title: 'News Ranker — 3-Tier Ranking Engine',
     subtitle: 'Shipped v3.2 — 3-tier ranking engine (deterministic + AI + human override)',
-    tag: 'green', tagLabel: 'Shipped v3.2',
+    badge: 'green', badgeLabel: 'Shipped v3.2',
     cols: [
       { heading: 'Tier 1 — Deterministic', items: ['Regex/keyword rules from ranking_signals table', 'Runs first — fastest and most explainable', 'Human-approved rules auto-extracted by grounding loop'] },
       { heading: 'Tier 2 — LLM (GPT-4o)', items: ['5–8 bootstrap examples as few-shot prompt', 'Up to 10 grounding summaries (human overrides)', 'Outputs rank 1–5 with reasoning text'] },
@@ -652,7 +659,7 @@ const details = {
   'glossary_match': {
     title: 'Glossary Match',
     subtitle: 'NEW in v3 Phase 3 (v3.3) — deterministic glossary keyword matching + email rank gate',
-    tag: 'green', tagLabel: 'Shipped v3.3',
+    badge: 'green', badgeLabel: 'Shipped v3.3',
     cols: [
       { heading: 'What it does', items: ['Matches item text against glossary_terms table', 'Assigns Topic Labels (matched terms) as JSON array', 'Sets email_eligible = 1 for significance_rank ≥ 3 (configurable threshold, non-duplicate)', 'Persists topic_label + email_eligible to news_items via source_id/url/hash lookup'] },
       { heading: 'Key file', items: ['agents/glossary_match.py', 'configurations/config_loader.py (glossary helpers)', 'agents/agents_controller.py (Stage 4.4 + email gate)'] },
@@ -662,7 +669,7 @@ const details = {
   'translate': {
     title: 'Translator',
     subtitle: 'Shipped v3.1 — extracted to agents/news_translator.py',
-    tag: 'green', tagLabel: 'Shipped v3.1',
+    badge: 'green', badgeLabel: 'Shipped v3.1',
     cols: [
       { heading: 'What it does', items: ['Translates title + summary to recipient language', 'Stores translation in DB alongside original', 'Same-language input is a no-op'] },
       { heading: 'v3.1 shipped', items: ['Extracted from email_sender.py into its own stage', 'AI-cache ready (record/replay via agents/ai_cache.py)', 'Behaviour-preserving refactor'] },
@@ -672,7 +679,7 @@ const details = {
   'save-db': {
     title: 'Save to DB',
     subtitle: 'Fully shipped v3.3 — all pipeline writes complete',
-    tag: 'green', tagLabel: 'Shipped v3.3',
+    badge: 'green', badgeLabel: 'Shipped v3.3',
     cols: [
       { heading: 'Shipped (v3.1–v3.3)', items: ['publisher / authority_id / authority_status columns (ATTRIBUTE stage)', 'dedup_status (new / update / duplicate) persisted', 'significance_rank + rank_tier + rank_reasoning (v3.2)', 'repetition_status + repetition_count (v3.2)', 'topic_label (JSON array) from Glossary Match (v3.3)', 'email_eligible (0/1) from rank gate (v3.3)', 'email_sent (0/1) on news_items (v3.3)', 'email_status on runs (v3.3)'] },
       { heading: 'Key file', items: ['configurations/db.py (news_items INSERT/UPDATE)', 'agents/authority_attributor.py (v3.1)', 'agents/compare_news.py (dedup_status)', 'agents/news_ranker.py (v3.2)', 'agents/glossary_match.py (v3.3)'] },
@@ -681,7 +688,7 @@ const details = {
   'email-send': {
     title: 'Send Email — V2 AI Digest',
     subtitle: 'Modified in v3.3 — AI digest grouped by Authority → Topic Label, decoupled from run',
-    tag: 'green', tagLabel: 'Shipped v3.3',
+    badge: 'green', badgeLabel: 'Shipped v3.3',
     cols: [
       { heading: 'What it does', items: ['Run marks SUCCESS first — email is a follow-on step (never blocks run status)', 'Collects all email_eligible items (significance_rank ≥ 3, non-duplicate)', 'Groups by Authority → Topic Label; one AI call per authority+topic group', 'AI detects aspects per group → title + collective summary + source links', 'Writes news_aspects rows; assembles inline-CSS HTML digest (640px, SAP blue)', 'Rank badge on each topic block: green (rank ≥ 4) · amber (rank 3) · hidden below 3', 'Sends via Gmail SMTP; sets email_sent = 1 on all included items'] },
       { heading: 'email_status lifecycle', items: ['PENDING → run complete, digest not yet started', 'SENDING → digest generation + send in progress', 'SENT → digest sent successfully', 'FAILED → Resend button appears in run log', 'SKIPPED → test mode run, no auto-send'] },
@@ -692,7 +699,7 @@ const details = {
   'baseline': {
     title: 'Update Baseline',
     subtitle: 'Shipped v3.1 — per-source fetch anchoring (F1/F4)',
-    tag: 'green', tagLabel: 'Shipped v3.1',
+    badge: 'green', badgeLabel: 'Shipped v3.1',
     cols: [
       { heading: 'What it does', items: ['Stores processed items in SQLite news_items', 'Updates last_fetch_date per source after success', 'Enables deduplication on next run'] },
       { heading: 'v3.1 shipped', items: ['Per-source anchor written immediately on each feed success (F4)', 'New sources fall back to profile.date_scope days (F1)', 'Force-fetch treats anchor as null, bounded by date_scope (F5)'] },
@@ -702,7 +709,7 @@ const details = {
   'log-monitor': {
     title: 'Log Monitor',
     subtitle: 'Admin UI — live SSE streaming during run, unchanged in v3',
-    tag: 'grey', tagLabel: 'UI Only',
+    badge: 'grey', badgeLabel: 'UI Only',
     cols: [
       { heading: 'What it does', items: ['Streams run logs in real time via SSE', 'Shows step-by-step progress per agent', 'Cancel button to abort mid-run', 'Run history table (past runs + timestamps)'] },
       { heading: 'Key file', items: ['admin/app.py — /admin/run/&lt;id&gt; (SSE endpoint)', 'admin/templates/run_status.html'] },
@@ -712,7 +719,7 @@ const details = {
   'review-news': {
     title: 'Review News',
     subtitle: 'Admin UI — runs after pipeline, unchanged in v3',
-    tag: 'grey', tagLabel: 'UI Only',
+    badge: 'grey', badgeLabel: 'UI Only',
     cols: [
       { heading: 'What it does', items: ['Shows all collected + filtered news cards', 'Manual scoring (thumbs up/down)', 'Bulk approve / reject actions', 'L2S mapping to JIRA EPICs', 'Translation toggle (native ↔ English)'] },
       { heading: 'Key file', items: ['admin/app.py — /admin/review/&lt;id&gt;', 'admin/templates/review_news.html'] },
@@ -720,22 +727,32 @@ const details = {
     ]
   },
   'challenge': {
-    title: 'Challenge Rank (Human Override + Grounding Loop)',
-    subtitle: 'Shipped v3.4 (2026-09-05) — self-improvement mechanism',
-    tag: 'green', tagLabel: 'Shipped v3.4',
+    title: 'Re-rank (Human Override + Grounding Loop)',
+    subtitle: 'Shipped v3.4 · relocated to every card in v3.12 — self-improvement mechanism',
+    badge: 'green', badgeLabel: 'Shipped v3.4 / v3.12',
     cols: [
-      { heading: 'What it does', items: ['Reviewer clicks ⚡ on any Source card in Review tab', 'AI re-runs Tier 1 + Tier 2 and shows suggested rank vs current', 'Human sets override rank + reason → Confirm &amp; Learn', 'W ranking_grounding: title + reason → Tier 2 few-shot example', 'W ranking_signals: first keyword from reason → Tier 1 deterministic rule', 'Bulk Re-rank All button re-scores all items in latest run'] },
+      { heading: 'What it does', items: ['Reviewer clicks 🚩 Re-rank on any card (flat or grouped)', 'AI re-runs Tier 1 + Tier 2 and shows suggested rank vs current', 'Human sets override rank + a required reason → Confirm &amp; Learn', 'Card shows AI: N › You: M afterwards (AI original preserved)', 'W ranking_grounding: title + reason → Tier 2 few-shot example', 'W ranking_signals: first keyword from reason → Tier 1 deterministic rule'] },
       { heading: 'Key tables', items: ['ranking_signals (Tier 1 — regex/keyword rules, no AI call)', 'ranking_grounding (Tier 2 — few-shot grounding examples for LLM)', 'news_items.human_rank_override, human_override_reason (v3.4)'] },
-      { heading: 'Key file', items: ['admin/app.py — /admin/news/&lt;id&gt;/challenge + confirm-challenge + rerank', '/admin/profiles/&lt;id&gt;/rerank-all', 'agents/news_ranker.py — _load_grounding fix, rerank_items_for_profile()', 'admin/templates/review_news.html — Challenge modal + Re-rank All button'] },
+      { heading: 'Key file', items: ['admin/app.py — /admin/news/&lt;id&gt;/challenge + confirm-challenge', 'agents/news_ranker.py — _load_grounding, _tier2_score', 'admin/templates/review_news.html — 🚩 Re-rank modal (reason-gated)'] },
       { heading: 'Harness', items: ['python3 tests/run_harness.py --version v3.4 → 32/32 (4 skipped — AI)'] },
+    ]
+  },
+  'rematch': {
+    title: 'Re-match (per-item Glossary Match)',
+    subtitle: 'Shipped v3.12 — re-run the glossary match on one item after adding a term',
+    badge: 'green', badgeLabel: 'Shipped v3.12',
+    cols: [
+      { heading: 'What it does', items: ['Typical flow: Glossary Gap flags a rank≥3 item with no match → you + Add to Glossary → click 🔖 Re-match', 'Re-runs Glossary Match on that one item (deterministic, no AI)', 'Refreshes topic_label + clears/updates the glossary_gap flag', 'Also runs automatically inside + Add to Glossary'] },
+      { heading: 'Key files', items: ['admin/app.py — /admin/news/&lt;id&gt;/rematch', 'agents/glossary_match.py — match_glossary + save_topic_labels + flag_glossary_gaps', 'admin/templates/review_news.html — 🔖 Re-match button'] },
+      { heading: 'Harness', items: ['python3 tests/run_harness.py --version v3.2 → 22/22'] },
     ]
   },
   'glossary-gap': {
     title: 'Glossary Gap Alert',
     subtitle: 'Shipped v3.5 — Gap badge + inline Add to Glossary for rank ≥ 3 items with no glossary match',
-    tag: 'green', tagLabel: 'Shipped v3.5',
+    badge: 'green', badgeLabel: 'Shipped v3.5',
     cols: [
-      { heading: 'What it does', items: ['glossary_gap flag set by Tag stage when significance_rank ≥ 3 AND topic_label = ["General"]', '⚠ "N glossary gaps" strip in Review toolbar with "Show only gaps" (reuses LoB=gap filter)', '⚠ Gap — no LoB match badge on each gap item card', '+ Add to Glossary panel: AI suggests keywords, user confirms inline', 'On confirm: term saved, item re-tagged, gap flag cleared — no navigation away'] },
+      { heading: 'What it does', items: ['glossary_gap flag set after the Rank stage when significance_rank ≥ 3 AND topic_label = ["General"]', '⚠ "N glossary gaps" strip in Review toolbar with "Show only gaps" (reuses LoB=gap filter)', '⚠ Gap — no LoB match badge on each gap item card', '+ Add to Glossary panel: AI suggests keywords, user confirms inline', 'On confirm: term saved, item re-matched, gap flag cleared — no navigation away'] },
       { heading: 'Key files', items: ['agents/glossary_match.py — flag_glossary_gaps()', 'configurations/db.py — glossary_gap column + is_gap mapping', 'agents/agents_controller.py — gap check after Rank stage', 'admin/app.py — /glossary/suggest + /add-to-glossary', 'admin/templates/review_news.html — strip + panel + JS'] },
       { heading: 'Harness', items: ['python3 tests/run_harness.py --version v3.5 → 34/34 (4 skipped — AI)'] },
     ]
@@ -743,7 +760,7 @@ const details = {
   'rcm-publish': {
     title: 'Preview for RCM + Close the Loop',
     subtitle: 'Planned v3.6 — read-only RCM-template popup + Open-L2S link, then link JIRA → mark Done',
-    tag: 'green', tagLabel: 'Shipped v3.6',
+    badge: 'green', badgeLabel: 'Shipped v3.6',
     cols: [
       { heading: 'What it does', items: ['"Preview for RCM" button per Announcement row (sends nothing — not "Publish")', 'Read-only modal renders announcement_md in the RCM / Law2Spec template + source links (from item_ids_json)', '"Open L2S" opens L2S in a new tab — LPM copies/pastes manually (as today)', 'Close the loop: LPM pastes the JIRA Legal Change # onto the announcement and marks it DONE — the LPM finish line', 'No JIRA API — manual paste. V4 Announce Agent automates create + link + stamp'] },
       { heading: 'Key files (planned)', items: ['admin/app.py — GET /admin/announcement-template/&lt;id&gt; + POST save JIRA #/status', 'configurations/db.py — news_announcements.jira_legal_change + status', 'admin/templates/review_news.html — Preview modal + Done control'] },
@@ -752,7 +769,7 @@ const details = {
   'announce-agent': {
     title: 'Announce Agent',
     subtitle: 'Planned V4 — automates the JIRA Legal Change via the sanctioned L2S path',
-    tag: 'red', tagLabel: 'Planned V4',
+    badge: 'red', badgeLabel: 'Planned V4',
     cols: [
       { heading: 'What it does', items: ['Automates the v3.6 manual step: create JIRA Legal Change + auto-link + auto-stamp Done', 'Uses the SANCTIONED L2S/GLO path — resolves the raw-JIRA-REST governance concern', 'Announcement editing before hand-off'] },
       { heading: 'Resources (L2A hub — verify at V4)', items: ['l2s-prd-mcp (auth-proxy .../l2s-prd-mcp/mcp)', 'glo-requirements-setup skill (l2a-capability-hub)', 'agents/announce_agent.py (new)'] },
@@ -761,7 +778,7 @@ const details = {
   'impact-analysis': {
     title: 'Impact Agent',
     subtitle: 'Planned V4 — AI impact report, grounded on external SAP legal + technical knowledge',
-    tag: 'red', tagLabel: 'Planned V4',
+    badge: 'red', badgeLabel: 'Planned V4',
     cols: [
       { heading: 'What it does', items: ['AI call per announcement → impact report (affected products, before/after, expected solution)', 'Cached to news_announcements.impact_analysis_md (new V4 column)', '"Preview Analysis" button: AI first click, cached thereafter, Copy MD → Law2Spec Prompt', 'Grounding is external — NOT the deprecated in-app Legal Repo'] },
       { heading: 'Resources (L2A hub — verify at V4)', items: ['glo-functional-spec-fitgap-generator skill (law→product fit/gap)', 'glo-taxonomy-kg + sap-mcp-glorep-kg (legal/requirements KGs)', 'SAP ABAP MCP + SAP Enterprise Knowledge Graph (technical)', 'agents/impact_analyzer.py (new)'] },
@@ -777,7 +794,7 @@ function showDetail(id) {
   if (currentStep === id) { closeDetail(); return; }
   currentStep = id;
   document.getElementById('detail-title').textContent = d.title;
-  document.getElementById('detail-subtitle').innerHTML = `<span class="tag ${d.tag}">${d.tagLabel}</span> &nbsp; ${d.subtitle}`;
+  document.getElementById('detail-subtitle').innerHTML = `<span class="badge ${d.badge}">${d.badgeLabel}</span> &nbsp; ${d.subtitle}`;
   const grid = document.getElementById('detail-grid');
   grid.innerHTML = d.cols.map(col => `
     <div class="detail-section">

@@ -422,7 +422,7 @@ def run_compare_news_agent(
                     classification = "new"
 
         item["dedup_status"] = classification
-        # v3.2: REPEATED tag — set based on how many times this entity has appeared.
+        # v3.2: REPEATED status — set based on how many times this entity has appeared.
         # Exact-key match (guid/url/hash/fingerprint) OR a semantic re-announcement both count.
         matched = _find_matched_baseline(item, by_source_id, by_url, by_sig, by_fp)
         exact_prior_count = int((matched or {}).get("repetition_count") or 0)
