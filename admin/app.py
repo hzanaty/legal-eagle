@@ -845,13 +845,10 @@ def admin_start_run(profile_id: int):
                             from agents.email_sender import send_digest
                             send_digest(pid_d, run_id_d, None, d_conn, _creds.get("gmail", {}))
                         else:
-                            # generate announcements only — no email sent
-                            from agents.email_composer import generate_digest
-                            _items = [dict(r) for r in d_conn.execute(
-                                "SELECT n.* FROM news_items n JOIN runs r ON n.profile_id=r.profile_id WHERE r.id=?",
-                                (run_id_d,)).fetchall()]
-                            generate_digest(_items, pid_d, d_conn, run_id_d)
-                            d_conn.execute("UPDATE runs SET email_status='GENERATED' WHERE id=?", (run_id_d,))
+                            # v3.13: send OFF → DEFER announcement generation. Items stay
+                            # announce_state='pending' (NULL defaults to pending) and are built
+                            # on-demand from the Announcement tab ("Process New/Changed").
+                            d_conn.execute("UPDATE runs SET email_status='DEFERRED' WHERE id=?", (run_id_d,))
                         # grouped_count = number of announcements produced this run
                         ann = d_conn.execute(
                             "SELECT COUNT(*) FROM news_announcements WHERE run_id=?", (run_id_d,)).fetchone()[0]
@@ -1086,6 +1083,9 @@ def admin_profile_detail(profile_id: int):
     glossary = load_glossary(profile_id)
     reset_quota_date = get_setting_value(profile_id, 'tweets_reset_quota_date')
     monitor_enabled = get_setting_value(profile_id, 'monitor_updates_enabled', 'false') == 'true'
+    # v3.13: RCM link + LOKA topic (for RCM reference sync)
+    rcm_url = get_setting_value(profile_id, 'rcm_url', '')
+    loka_topic = get_setting_value(profile_id, 'loka_topic', '')
 
     # DISABLED: ANS check — re-enable for BTP deployment
     # from agents.ans_sender import get_ans_sender
@@ -1112,6 +1112,8 @@ def admin_profile_detail(profile_id: int):
         glossary=glossary,
         reset_quota_date=reset_quota_date,
         monitor_enabled=monitor_enabled,
+        rcm_url=rcm_url,
+        loka_topic=loka_topic,
         language_names=LANGUAGE_NAMES,
         ans_available=ans_available,
         profiles_total=profiles_total,
@@ -2108,9 +2110,88 @@ def admin_review_news(profile_id: int):
     )
 
 
+@app.route("/admin/profiles/<int:profile_id>/announcements")
+def admin_announcements(profile_id: int):
+    """v3.13: Announcement tab — persistent Topic→Announcement→Sources structure."""
+    _ensure_schema()
+    conn = get_connection()
+    create_schema_if_needed(conn)
+    prof = conn.execute("SELECT * FROM profiles WHERE id = ?", (profile_id,)).fetchone()
+    if not prof:
+        conn.close()
+        flash("Profile not found.", "error")
+        return redirect(url_for("admin_dashboard"))
+    profile = {
+        "id": int(prof["id"]), "country_code": prof["country_code"], "lob": prof["lob"],
+        "name": prof["name"], "language": prof["language"], "active": int(prof["active"] or 0),
+    }
+    from configurations.db import get_announcements_for_profile_with_sources, get_pending_announce_items
+    announcements = get_announcements_for_profile_with_sources(conn, profile_id)
+    topic_map: dict = {}
+    for ann in announcements:
+        topic_map.setdefault(ann.get("topic_label") or "General", []).append(ann)
+    topics = [
+        {"topic_label": lbl, "announcements": anns,
+         "source_count": sum(len(a.get("sources") or []) for a in anns)}
+        for lbl, anns in topic_map.items()
+    ]
+    pending_count = len(get_pending_announce_items(conn, profile_id))
+    shell = _shell_context(conn, profile_id)
+    _sel = shell["selected_meta"]
+    profile["source_count"] = _sel["source_count"] if _sel else 0
+    profile["last_run_display"] = _sel["last_run_display"] if _sel else "Never run"
+    profile["language_name"] = LANGUAGE_NAMES.get(profile["language"], profile["language"])
+    review_badge_count = count_all_news_for_review(conn, profile_id)
+    conn.close()
+    return render_template(
+        "announcements.html",
+        profile=profile, selected_profile=profile, profiles=shell["profiles_list"],
+        active_tab="announcement", profile_id=profile_id, topics=topics,
+        announce_pending_count=pending_count, review_badge_count=review_badge_count,
+        profiles_total=shell["profiles_total"], review_total=shell["review_total"],
+        recently_run_count=shell["recently_run_count"], never_run_count=shell["never_run_count"],
+        language_names=LANGUAGE_NAMES,
+    )
+
+
+@app.route("/admin/profiles/<int:profile_id>/announcements/process", methods=["POST"])
+def process_announcements(profile_id: int):
+    """v3.13: 'Process New/Changed' — run announcement_agent on pending items only."""
+    conn = get_connection()
+    try:
+        create_schema_if_needed(conn)
+        run_row = conn.execute(
+            "SELECT id FROM runs WHERE profile_id=? ORDER BY id DESC LIMIT 1", (profile_id,)
+        ).fetchone()
+        run_id = run_row["id"] if run_row else 0
+        from agents import announcement_agent
+        stats = announcement_agent.build(conn, profile_id, run_id)
+        return jsonify({"ok": True, **stats})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"ok": False, "error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/admin/announcements/<int:ann_id>/title", methods=["POST"])
+def update_announcement_title_route(ann_id: int):
+    """v3.13: inline title override from the Announcement tab."""
+    data = request.get_json(force=True, silent=True) or {}
+    title = (data.get("title") or "").strip()
+    if not title:
+        return jsonify({"ok": False, "error": "empty title"}), 400
+    conn = get_connection()
+    try:
+        from configurations.db import update_announcement_title
+        update_announcement_title(conn, ann_id, title)
+        return jsonify({"ok": True, "title": title})
+    finally:
+        conn.close()
+
+
 @app.route("/admin/profiles/<int:profile_id>/news/<int:item_id>/authority", methods=["POST"])
 def set_news_item_authority(profile_id: int, item_id: int):
-    """v3.2: Override authority attribution for an inferred-status news item."""
     auth_raw = request.form.get("authority_id", "").strip()
     authority_id = int(auth_raw) if auth_raw.isdigit() else None
     conn = get_connection()
@@ -2222,9 +2303,11 @@ def announcement_template(ann_id: int):
         if not row:
             return jsonify({"ok": False, "error": "announcement not found"}), 404
         ann = dict(row)
-        # Resolve profile via the announcement's run (for the per-profile L2S URL setting)
-        prof_row = conn.execute("SELECT profile_id FROM runs WHERE id=?", (ann.get("run_id"),)).fetchone()
-        profile_id = prof_row["profile_id"] if prof_row else None
+        # v3.13: announcements are profile-scoped; fall back to run lookup for legacy rows.
+        profile_id = ann.get("profile_id")
+        if not profile_id:
+            prof_row = conn.execute("SELECT profile_id FROM runs WHERE id=?", (ann.get("run_id"),)).fetchone()
+            profile_id = prof_row["profile_id"] if prof_row else None
         # Resolve source items
         try:
             item_ids = _json.loads(ann.get("item_ids_json") or "[]")
@@ -2258,7 +2341,8 @@ def announcement_template(ann_id: int):
     finally:
         conn.close()
 
-    l2s_url = get_setting_value(profile_id, "l2s_url", "") if profile_id else ""
+    # v3.13: direct RCM link (was l2s_url). JIRA staging input removed from the modal.
+    rcm_url = get_setting_value(profile_id, "rcm_url", "") if profile_id else ""
     return jsonify({
         "ok": True,
         "title": ann.get("title"),
@@ -2267,7 +2351,7 @@ def announcement_template(ann_id: int):
         "sources": sources,
         "jira_legal_change": ann.get("jira_legal_change"),
         "status": ann.get("status") or "draft",
-        "l2s_url": l2s_url,
+        "rcm_url": rcm_url,
     })
 
 
@@ -2295,13 +2379,20 @@ def publish_announcement(ann_id: int):
         conn.close()
 
 
-@app.route("/admin/profiles/<int:profile_id>/l2s-url", methods=["POST"])
-def set_l2s_url(profile_id: int):
-    """v3.6: save the per-profile L2S URL used by the Preview modal's 'Open L2S' link."""
+@app.route("/admin/profiles/<int:profile_id>/rcm-settings", methods=["POST"])
+def set_rcm_settings(profile_id: int):
+    """v3.13: save per-profile RCM URL (direct RCM link) and LOKA Topic (HCM/FIN)."""
     data = request.get_json(force=True, silent=True) or {}
-    url = (data.get("url") or "").strip()
-    set_setting_value(profile_id, "l2s_url", url)
-    return jsonify({"ok": True, "l2s_url": url})
+    out = {}
+    if "rcm_url" in data:
+        rcm_url = (data.get("rcm_url") or "").strip()
+        set_setting_value(profile_id, "rcm_url", rcm_url)
+        out["rcm_url"] = rcm_url
+    if "loka_topic" in data:
+        loka_topic = (data.get("loka_topic") or "").strip()
+        set_setting_value(profile_id, "loka_topic", loka_topic)
+        out["loka_topic"] = loka_topic
+    return jsonify({"ok": True, **out})
 
 
 @app.route("/admin/profiles/<int:profile_id>/review/score", methods=["POST"])
@@ -2915,6 +3006,9 @@ def confirm_challenge_news_item(item_id: int):
         if keyword:
             insert_ranking_signal(conn, profile_id, keyword, override_rank, reason=override_reason or None)
 
+        # v3.13: rank changed → re-evaluate grouping membership.
+        from configurations.db import mark_items_pending
+        mark_items_pending(conn, [item_id])
         conn.commit()
         return jsonify({
             "ok": True,
@@ -2950,6 +3044,9 @@ def override_news_item_rank(item_id: int):
             "rank_reasoning='Manual override' WHERE id=?",
             (rank, rank, item_id),
         )
+        # v3.13: rank changed → re-evaluate grouping membership.
+        from configurations.db import mark_items_pending
+        mark_items_pending(conn, [item_id])
         conn.commit()
         return jsonify({"ok": True, "rank": rank})
     except Exception as e:
@@ -2973,6 +3070,9 @@ def rematch_news_item(item_id: int):
         match_glossary([item], conn, pid)
         save_topic_labels([item], conn, pid)
         flag_glossary_gaps([item], conn, pid)
+        # v3.13: re-match changes topic → item must be re-evaluated for grouping.
+        from configurations.db import mark_items_pending
+        mark_items_pending(conn, [item_id])
         conn.commit()
         import json as _json
         try:

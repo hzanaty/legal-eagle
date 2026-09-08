@@ -75,6 +75,9 @@
   .pub-date { font-size: 10px; color: #6a6d70; }
   .eff-date { font-size: 10px; font-weight: 700; background: #e8f5e9; color: #107e3e; border: 1px solid #c8e6c9; border-radius: 3px; padding: 1px 6px; }
   .glossary-pill { font-size: 10px; font-weight: 700; background: #eef2f8; color: #354a5f; border: 1px solid #d5dde8; border-radius: 3px; padding: 1px 6px; }
+  .law-pill { font-size: 10px; font-weight: 700; background: #fdf3e3; color: #8a5a00; border: 1px solid #f0d9ac; border-radius: 3px; padding: 1px 6px; }
+  .law-pill.secondary { background: #fbf6ec; color: #a07a2c; border-color: #ecdcbd; }
+  .law-pill.reference { background: #f2f2f2; color: #666; border-color: #dcdcdc; }
   .authority-pill { font-size: 10px; font-weight: 700; background: #f3eefe; color: #5b3fb8; border: 1px solid #ddd0f5; border-radius: 3px; padding: 1px 6px; }
   .status-pill { font-size: 10px; font-weight: 700; border-radius: 3px; padding: 1px 6px; }
   .status-new { background: #e8f5e9; color: #107e3e; } .status-update { background: #e3f2fd; color: #0a6ed1; }
@@ -486,6 +489,9 @@
           <span class="pub-date" title="Article publish date">{% if item.published_at %}{{ item.published_at|truncate(16, True, '') }}{% else %}—{% endif %}</span>
           {% if item.first_seen_at %}<span class="pub-date" title="Fetched" style="opacity:0.65;">↓ {{ item.first_seen_at|truncate(16, True, '') }}</span>{% endif %}
           {% if item.effective_date %}<span class="eff-date" title="Date the change comes into force">⏱ Effective {{ item.effective_date }}</span>{% endif %}
+          {% if item.law_primary %}<span class="law-pill" title="Primary law / article">&#9878; {{ item.law_primary }}</span>{% endif %}
+          {% if item.law_secondary %}<span class="law-pill secondary" title="Secondary law / article">&sect; {{ item.law_secondary }}</span>{% endif %}
+          {% if item.law_reference %}<span class="law-pill reference" title="Reference (gazette / decision / circular / decree no.)"># {{ item.law_reference }}</span>{% endif %}
           {% for term in item.topic_label|fromjson %}{% if term != 'General' %}<span class="glossary-pill" title="Matched glossary term">{{ term }}</span>{% endif %}{% endfor %}
           {% if item.is_gap %}<span class="gap-badge">&#9888; Gap — no glossary match</span>{% endif %}
           {% if score != 0 %}
@@ -498,6 +504,10 @@
         </div>
         <div class="item-title">{{ item.title or '(no title)' }}</div>
         <div class="item-snippet">{{ (item.content or '')|strip_bare_urls|truncate(200, False, '…') }}</div>
+        {% if item.l2_summary %}
+        <span class="translation-toggle" onclick="toggleTr('l2-{{ item.item_source }}-{{ item.id }}')">&#9656; News Details</span>
+        <div class="item-translation" id="l2-{{ item.item_source }}-{{ item.id }}">{{ item.l2_summary }}</div>
+        {% endif %}
         {% if item.url %}<a class="item-url" href="{{ item.url }}" target="_blank">Read more ↗</a>{% endif %}
         {% if item.translation %}
         <span class="translation-toggle" onclick="toggleTr('tr-{{ item.item_source }}-{{ item.id }}')">&#9656; Show translation</span>

@@ -117,6 +117,44 @@
         <button type="submit" class="btn-save">Save Lookback</button>
       </div>
     </form>
+
+    <!-- v3.13: RCM link + LOKA topic (announcement grounding) -->
+    <div class="kv-row">
+      <div class="kv-label">RCM Portal URL
+        <div class="kv-help">Official SAP RCM link opened from the Preview-for-RCM modal (replaces L2S/JIRA staging)</div>
+      </div>
+      <input type="text" class="cfg-field" id="rcm_url_val" value="{{ rcm_url or '' }}"
+             placeholder="https://app.main.regulatory-change-manager.cloud.sap/…">
+      <button type="button" class="btn-save" onclick="saveRcmSettings()">Save</button>
+    </div>
+    <div class="kv-row">
+      <div class="kv-label">LOKA Topic
+        <div class="kv-help">Topic filter for the RCM reference-title sync — HCM (Human Capital Management) or FIN (S/4HANA)</div>
+      </div>
+      <input type="text" class="cfg-field" id="loka_topic_val" value="{{ loka_topic or '' }}"
+             placeholder="HCM or FIN" list="loka_topic_opts">
+      <datalist id="loka_topic_opts"><option value="HCM"><option value="FIN"></datalist>
+      <button type="button" class="btn-save" onclick="saveRcmSettings()">Save</button>
+    </div>
+    <div class="kv-row">
+      <div class="kv-label">RCM Reference Titles
+        <div class="kv-help">Run <code>/sync-rcm-titles {{ profile.id }}</code> in Claude Code to refresh naming-convention examples from LOKA</div>
+      </div>
+      <span id="rcm_sync_status" style="font-size:11px;color:#6a6d70;">Sync via Claude Code command</span>
+    </div>
+    <script>
+      function saveRcmSettings(){
+        var body = {
+          rcm_url: document.getElementById('rcm_url_val').value,
+          loka_topic: document.getElementById('loka_topic_val').value
+        };
+        fetch('/admin/profiles/{{ profile.id }}/rcm-settings', {
+          method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
+        }).then(r=>r.json()).then(d=>{
+          document.getElementById('rcm_sync_status').textContent = d.ok ? 'Saved ✓' : ('Error: ' + d.error);
+        });
+      }
+    </script>
   </div>
 
   <!-- ══ SOURCES ══ -->

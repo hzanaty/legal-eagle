@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% block announcement_tab %}
+<style>
+  .ann-wrap { display:flex; flex-direction:column; flex:1; min-height:0; background:#f7f7f7; }
+  .ann-toolbar { background:#fff; border-bottom:1px solid #e5e5e5; padding:10px 16px; display:flex; align-items:center; gap:12px; }
+  .ann-process-btn { background:#0070b1; color:#fff; border:none; border-radius:4px; padding:7px 14px; font-size:12px; font-weight:600; cursor:pointer; }
+  .ann-process-btn:disabled { opacity:.5; cursor:default; }
+  .ann-toolbar .muted { font-size:11px; color:#6a6d70; }
+  .ann-scroll { flex:1; overflow:auto; padding:16px; }
+  .topic-block { margin-bottom:20px; }
+  .topic-header { background:#0070b1; color:#fff; padding:8px 14px; border-radius:4px 4px 0 0; font-weight:700; font-size:12px; letter-spacing:.5px; text-transform:uppercase; }
+  .topic-body { border:1px solid #ccc; border-top:none; background:#fff; }
+  .ann-row { border-bottom:1px solid #eee; padding:12px 14px; }
+  .ann-row:last-child { border-bottom:none; }
+  .ann-title-line { display:flex; align-items:center; gap:8px; }
+  .ann-title-edit { flex:1; font-weight:700; font-size:14px; color:#0070b1; border:1px solid transparent; border-radius:4px; padding:3px 6px; background:transparent; }
+  .ann-title-edit:hover, .ann-title-edit:focus { border-color:#c5d8f5; background:#f5f9ff; outline:none; }
+  .ann-status { font-size:10px; padding:1px 7px; border-radius:8px; font-weight:600; }
+  .ann-status.draft { background:#eef2f7; color:#556; }
+  .ann-status.done { background:#e8f5e9; color:#107e3e; }
+  .ann-preview-btn { background:#fff; border:1px solid #0070b1; color:#0070b1; border-radius:4px; padding:4px 10px; font-size:11px; cursor:pointer; }
+  .src-list { margin-top:8px; }
+  .src-card { display:flex; gap:8px; padding:6px 0; border-top:1px dashed #eee; }
+  .src-body { flex:1; }
+  .src-title { font-size:12.5px; color:#32363a; font-weight:600; }
+  .src-meta { font-size:10.5px; color:#888; margin-top:2px; }
+  .post-pub { background:#fff3cd; color:#856404; font-size:9px; padding:1px 6px; border-radius:6px; font-weight:700; margin-left:6px; }
+  .law-pill { font-size:10px; font-weight:700; background:#fdf3e3; color:#8a5a00; border:1px solid #f0d9ac; border-radius:3px; padding:1px 6px; }
+  .law-pill.secondary { background:#fbf6ec; color:#a07a2c; border-color:#ecdcbd; }
+  .law-pill.reference { background:#f2f2f2; color:#666; border-color:#dcdcdc; }
+  .l2-toggle { background:none; border:none; color:#0070b1; font-size:11px; cursor:pointer; padding:2px 0; }
+  .l2-body { display:none; font-size:11.5px; color:#444; background:#f7fafd; border-left:2px solid #0070b1; padding:6px 10px; margin:4px 0; }
+  .ann-empty { text-align:center; color:#888; padding:48px; font-size:13px; }
+  .rank-badge { flex-shrink:0; width:20px; height:20px; border-radius:50%; color:#fff; font-size:10px; font-weight:700; display:inline-flex; align-items:center; justify-content:center; }
+  .rank-5{background:#bb0000}.rank-4{background:#e9730c}.rank-3{background:#e8a400}.rank-2{background:#888}.rank-1{background:#bbb}.rank-d{background:#ccc}
+  /* RCM modal */
+  .rcm-ov { display:none; position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:1000; align-items:center; justify-content:center; }
+  .rcm-modal { background:#fff; width:640px; max-width:92vw; max-height:86vh; overflow:auto; border-radius:6px; padding:20px; }
+  .rcm-section-header { font-size:12px; font-weight:700; color:#0070b1; text-transform:uppercase; letter-spacing:.5px; margin:12px 0 4px; }
+  .rcm-list { margin:0; padding-left:18px; font-size:12.5px; color:#333; }
+  .rcm-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
+  .rcm-open { background:#0070b1; color:#fff; text-decoration:none; padding:7px 14px; border-radius:4px; font-size:12px; }
+  .rcm-cancel { background:#eee; border:none; padding:7px 14px; border-radius:4px; font-size:12px; cursor:pointer; }
+</style>
+
+<div class="ann-wrap">
+  <div class="ann-toolbar">
+    <button class="ann-process-btn" id="annProcessBtn" onclick="processAnnouncements()">
+      ⟳ Process New/Changed{% if announce_pending_count %} ({{ announce_pending_count }}){% endif %}
+    </button>
+    <span class="muted" id="annStatus">
+      {% if announce_pending_count %}{{ announce_pending_count }} item(s) pending — click to group.{% else %}No pending items.{% endif %}
+    </span>
+  </div>
+
+  <div class="ann-scroll">
+    {% if not topics %}
+      <div class="ann-empty">No announcements yet. Run the pipeline, then click <b>Process New/Changed</b> to build them.</div>
+    {% endif %}
+    {% for t in topics %}
+      <div class="topic-block">
+        <div class="topic-header">{{ t.topic_label }} · {{ t.announcements|length }} announcement(s) · {{ t.source_count }} source(s)</div>
+        <div class="topic-body">
+          {% for ann in t.announcements %}
+          <div class="ann-row">
+            <div class="ann-title-line">
+              <input class="ann-title-edit" value="{{ ann.title }}"
+                     data-ann="{{ ann.id }}"
+                     onblur="saveTitle(this)" onkeydown="if(event.key==='Enter'){this.blur();}">
+              <span class="ann-status {{ 'done' if ann.status=='done' else 'draft' }}">
+                {{ 'Published' if ann.status=='done' else 'Draft' }}
+              </span>
+              <button class="ann-preview-btn" onclick="openPreview({{ ann.id }})">Preview for RCM</button>
+            </div>
+            <div class="src-list">
+              {% for s in ann.sources %}
+              <div class="src-card">
+                {% set r = s.significance_rank or 0 %}
+                <div class="rank-badge rank-{{ r if r else 'd' }}">{{ r if r else 'D' }}</div>
+                <div class="src-body">
+                  <div class="src-title">
+                    {{ s.title or '(no title)' }}
+                    {% if s.added_after_publish %}<span class="post-pub">added after publish</span>{% endif %}
+                  </div>
+                  <div class="src-meta">
+                    {{ s.publisher or s.source_type }}{% if s.published_at %} · {{ s.published_at[:10] }}{% endif %}
+                    {% if s.law_primary %} · <span class="law-pill" title="Primary law / article">⚖ {{ s.law_primary }}</span>{% endif %}
+                    {% if s.law_secondary %} <span class="law-pill secondary" title="Secondary law / article">§ {{ s.law_secondary }}</span>{% endif %}
+                    {% if s.law_reference %} <span class="law-pill reference" title="Reference"># {{ s.law_reference }}</span>{% endif %}
+                    {% if s.url %} · <a href="{{ s.url }}" target="_blank">Link ↗</a>{% endif %}
+                  </div>
+                  {% if s.l2_summary %}
+                  <button class="l2-toggle" onclick="toggleL2(this)">▶ News Details</button>
+                  <div class="l2-body">{{ s.l2_summary }}</div>
+                  {% endif %}
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="rcm-ov" id="rcmOverlay">
+  <div class="rcm-modal">
+    <h3 id="rcmTitle" style="color:#0070b1;">Loading…</h3>
+    <div class="rcm-section-header">Introduction</div>
+    <ul class="rcm-list" id="rcmIntro"></ul>
+    <div class="rcm-section-header" id="rcmBizHdr" style="display:none;">Business Background/Impact</div>
+    <ul class="rcm-list" id="rcmBiz" style="display:none;"></ul>
+    <div class="rcm-actions">
+      <a class="rcm-open" id="rcmOpen" href="#" target="_blank" style="display:none;">Open RCM ↗</a>
+      <button class="rcm-cancel" onclick="document.getElementById('rcmOverlay').style.display='none';">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  var PID = {{ profile_id }};
+
+  function toggleL2(btn){
+    var b = btn.nextElementSibling;
+    var open = b.style.display === 'block';
+    b.style.display = open ? 'none' : 'block';
+    btn.textContent = (open ? '▶' : '▼') + ' News Details';
+  }
+
+  function saveTitle(inp){
+    var id = inp.getAttribute('data-ann');
+    fetch('/admin/announcements/' + id + '/title', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({title: inp.value})
+    });
+  }
+
+  function processAnnouncements(){
+    var btn = document.getElementById('annProcessBtn');
+    var st = document.getElementById('annStatus');
+    btn.disabled = true; st.textContent = 'Processing…';
+    fetch('/admin/profiles/' + PID + '/announcements/process', {method:'POST'})
+      .then(r => r.json()).then(d => {
+        if(d.ok){
+          st.textContent = 'Done: ' + d.new_announcements + ' new, ' +
+            d.joined_draft + ' joined draft, ' + d.joined_frozen + ' added to published.';
+          setTimeout(function(){ location.reload(); }, 800);
+        } else { st.textContent = 'Error: ' + d.error; btn.disabled = false; }
+      }).catch(e => { st.textContent = 'Error: ' + e; btn.disabled = false; });
+  }
+
+  function openPreview(annId){
+    var ov = document.getElementById('rcmOverlay');
+    ov.style.display = 'flex';
+    document.getElementById('rcmTitle').textContent = 'Loading…';
+    document.getElementById('rcmIntro').innerHTML = '';
+    document.getElementById('rcmBiz').innerHTML = '';
+    fetch('/admin/announcements/' + annId + '/template').then(r => r.json()).then(d => {
+      if(!d.ok){ document.getElementById('rcmTitle').textContent = 'Error'; return; }
+      document.getElementById('rcmTitle').textContent = d.title || '';
+      var intro = document.getElementById('rcmIntro');
+      (d.rcm && d.rcm.introduction || []).forEach(function(b){
+        var li = document.createElement('li'); li.textContent = b; intro.appendChild(li);
+      });
+      var biz = d.rcm && d.rcm.business_background || [];
+      if(biz.length){
+        document.getElementById('rcmBizHdr').style.display = 'block';
+        var bl = document.getElementById('rcmBiz'); bl.style.display = 'block';
+        biz.forEach(function(b){ var li=document.createElement('li'); li.textContent=b; bl.appendChild(li); });
+      }
+      var open = document.getElementById('rcmOpen');
+      if(d.rcm_url){ open.href = d.rcm_url; open.style.display = 'inline-block'; }
+      else { open.style.display = 'none'; }
+    });
+  }
+</script>
+{% endblock %}

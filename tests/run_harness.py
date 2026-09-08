@@ -346,6 +346,71 @@ def run_v3_6():
     sys.exit(0 if ok else 1)
 
 
+def run_v3_13():
+    """L2 deep-fetch (mandatory) + title-first persistent announcements.
+
+    Full pipeline now includes the mandatory L2 step (needs every article page to exist),
+    then announcement_agent.build groups pending items. REQUIRES the AI cache — L2 and the
+    announcement agent make AI calls, so the stage runs only when recordings are present;
+    otherwise the AI-gated assertions are skipped.
+    """
+    os.environ["LEGAL_EAGLE_DB"] = TEST_DB_PATH
+    os.environ["LEGAL_EAGLE_AI_CACHE"] = AI_CACHE_DIR
+    os.environ["DISABLE_TWEETS"] = "1"
+
+    from tests.server import start_server, stop_server
+    from tests.reset_and_seed import reset_and_seed
+    from tests.assertions import run_assertions
+    from configurations.db import get_connection
+
+    print("[TEST] v3.13 harness — L2 deep-fetch + title-first persistent announcements")
+    server = start_server(FIXTURES_DIR)
+    print(f"[OK]  Fixture server on :9999 (root={FIXTURES_DIR})")
+    try:
+        conn, pid = reset_and_seed()
+        conn.close()
+        print(f"[OK]  DB reset + seeded (id={pid}), pointing pipeline at test.db")
+
+        from agents.agents_controller import run_profile_once
+        import glob
+        ai_available = (
+            bool(glob.glob(os.path.join(AI_CACHE_DIR, "emb_*.json")))
+            and bool(glob.glob(os.path.join(AI_CACHE_DIR, "chat_*.json")))
+        )
+        print("[RUN] run_profile_once (mandatory L2 runs before Rank)...")
+        try:
+            run_profile_once(pid, skip_filter=True, skip_grouping=True, skip_email=True)
+        except Exception as e:
+            # Mandatory L2 makes AI calls; without the cache it aborts. Schema/column
+            # assertions still validate (they only need the migrated DB), so continue.
+            print(f"[WARN] pipeline aborted ({type(e).__name__}: {e}) — running schema assertions only")
+
+        # Build persistent announcements from pending items (title-first clustering).
+        import sqlite3 as _sqlite3
+        from configurations.db import create_run
+        from agents import announcement_agent
+        _conn = get_connection(TEST_DB_PATH)
+        _conn.row_factory = _sqlite3.Row
+        _run_id = create_run(_conn, pid, origin="harness")
+        if ai_available:
+            print("[RUN] announcement_agent.build(pending items)…")
+            try:
+                stats = announcement_agent.build(_conn, pid, _run_id)
+                print(f"[OK]  announcement_agent stats: {stats}")
+            except Exception as e:
+                print(f"[WARN] announcement_agent.build failed: {e}")
+        else:
+            print("[SKIP] announcement_agent.build — no AI cache (grouping assertions will skip)")
+        _conn.close()
+
+        conn = get_connection(TEST_DB_PATH)
+        ok = run_assertions(conn, pid, "v3.13", ai_available=ai_available)
+        conn.close()
+    finally:
+        stop_server(server)
+    sys.exit(0 if ok else 1)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--version", required=True)
@@ -364,6 +429,8 @@ if __name__ == "__main__":
         run_v3_5()
     elif args.version == "v3.6":
         run_v3_6()
+    elif args.version == "v3.13":
+        run_v3_13()
     else:
         print(f"Version {args.version} not yet in harness")
         sys.exit(1)

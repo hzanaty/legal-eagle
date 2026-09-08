@@ -1,0 +1,22 @@
+{
+  "version": "v3.13",
+  "description": "L2 deep-fetch + title-first persistent announcements. Standalone (not chained): schema deltas always checked; pipeline-dependent L2/act_ref/grouping assertions are AI-gated since mandatory L2 + the announcement agent require the AI cache to run.",
+  "assertions": [
+    { "type": "column_exists", "table": "news_items", "column": "l2_summary", "description": "news_items.l2_summary column exists" },
+    { "type": "column_exists", "table": "news_items", "column": "l2_fetched_at", "description": "news_items.l2_fetched_at column exists" },
+    { "type": "column_exists", "table": "news_items", "column": "act_ref", "description": "news_items.act_ref column exists" },
+    { "type": "column_exists", "table": "news_items", "column": "announce_state", "description": "news_items.announce_state column exists" },
+    { "type": "column_exists", "table": "news_items", "column": "announcement_id", "description": "news_items.announcement_id column exists" },
+    { "type": "column_exists", "table": "news_items", "column": "english_title", "description": "news_items.english_title column exists" },
+    { "type": "column_exists", "table": "news_items", "column": "added_after_publish", "description": "news_items.added_after_publish column exists" },
+    { "type": "column_exists", "table": "news_announcements", "column": "profile_id", "description": "news_announcements.profile_id column exists (profile-scoped persistence)" },
+    { "type": "table_exists", "table": "rcm_reference_titles", "description": "rcm_reference_titles cache table exists" },
+    { "type": "table_has_rows", "table": "rcm_reference_titles", "min_rows": 1, "description": "rcm_reference_titles seeded for the profile" },
+
+    { "type": "value_check", "table": "news_items", "column": "l2_summary", "where": "LOWER(title) LIKE '%maternity leave%'", "expected_not_null": true, "requires_ai": true, "description": "L2 populated l2_summary for the maternity-leave item" },
+    { "type": "value_check", "table": "news_items", "column": "act_ref", "where": "LOWER(title) LIKE '%termination notice period extended%'", "expected_not_null": true, "requires_ai": true, "description": "act_ref extracted (Law No. 7412) for the termination-notice item" },
+    { "type": "table_has_rows", "table": "news_announcements", "min_rows": 1, "requires_ai": true, "description": "announcement_agent produced at least one announcement" },
+    { "type": "value_check", "table": "news_items", "column": "english_title", "where": "LOWER(title) LIKE '%termination notice period extended%'", "expected_not_null": true, "requires_ai": true, "description": "english_title persisted for the termination item" },
+    { "type": "announcement_single_for_act", "act_ref": "Law No. 7412", "requires_ai": true, "description": "cross-language pair (EN + TR, same act Law No. 7412) grouped into exactly ONE announcement" }
+  ]
+}

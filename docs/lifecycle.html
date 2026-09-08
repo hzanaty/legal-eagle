@@ -172,7 +172,7 @@
 </defs></svg>
 
 <h1>Legal Eagle — System Lifecycle</h1>
-<p class="tagline">v3.12 shipped &nbsp;·&nbsp; V4 planned &nbsp;·&nbsp; Click any step for details</p>
+<p class="tagline">v3.13 shipped &nbsp;·&nbsp; V4 planned &nbsp;·&nbsp; Click any step for details</p>
 
 <!-- SETUP -->
 <div class="phase-block">
@@ -283,7 +283,13 @@
       <div class="substep built" onclick="showDetail('glossary_match')">
         <span class="actor agent" title="Agent"><svg class="ic"><use href="#ic-agent"/></svg></span>
         <div class="step-name">Glossary Match</div>
-        <div class="step-sub">Glossary → topic labels · v3.3</div>
+        <div class="step-sub">Glossary → topic labels + act_ref · v3.3/v3.13</div>
+      </div>
+      <div class="inner-arrow">›</div>
+      <div class="substep built" onclick="showDetail('l2_fetch')">
+        <span class="actor agent" title="Agent"><svg class="ic"><use href="#ic-agent"/></svg></span>
+        <div class="step-name">L2 Fetch</div>
+        <div class="step-sub">Full-article detail + act_ref (mandatory) · v3.13</div>
       </div>
       <div class="inner-arrow">›</div>
       <div class="substep built" onclick="showDetail('rank')">
@@ -433,10 +439,16 @@
       <div class="step-sub">Re-run Glossary Match after adding a term · v3.12</div>
     </div>
     <div class="inner-arrow">›</div>
+    <div class="step built" onclick="showDetail('announcement-build')">
+      <span class="actor agent" title="Agent"><svg class="ic"><use href="#ic-agent"/></svg></span>
+      <div class="step-name">Announcement</div>
+      <div class="step-sub">Title-first grouping → persistent · v3.13</div>
+    </div>
+    <div class="inner-arrow">›</div>
     <div class="step built" onclick="showDetail('rcm-publish')">
       <span class="actor human" title="Human"><svg class="ic"><use href="#ic-human"/></svg></span>
       <div class="step-name">Preview for RCM</div>
-      <div class="step-sub">RCM-template fill + JIRA link → Done · v3.6</div>
+      <div class="step-sub">Instant RCM preview + direct RCM link · v3.13</div>
     </div>
     <div class="inner-arrow">›</div>
     <div class="step future" onclick="showDetail('announce-agent')">
@@ -666,6 +678,16 @@ const details = {
       { heading: 'Dependencies', items: ['SQLite glossary_terms', 'No external API needed — fully deterministic'] },
     ]
   },
+  'l2_fetch': {
+    title: 'L2 Deep Fetch',
+    subtitle: 'NEW v3.13 — mandatory full-article fetch + summary + act_ref, before Rank',
+    badge: 'green', badgeLabel: 'Shipped v3.13',
+    cols: [
+      { heading: 'What it does', items: ['Follows each item URL, extracts full article (reuses extract_article)', 'One AI call → l2_summary (2-3 factual sentences) + act_ref (law/gazette ref)', 'MANDATORY: any item failure raises L2FetchError and STOPS the run', 'Feeds richer context to Rank and to announcement clustering'] },
+      { heading: 'Key file', items: ['agents/l2_fetcher.py', 'agents/url_sources_runner.py (extract_article, reused)', 'agents/agents_controller.py (after Glossary Match, before Rank)'] },
+      { heading: 'Dependencies', items: ['requests (article fetch)', 'SAP AI Core (summary + act_ref)', 'Source Simulator precheck validates L2 at config time'] },
+    ]
+  },
   'translate': {
     title: 'Translator',
     subtitle: 'Shipped v3.1 — extracted to agents/news_translator.py',
@@ -718,12 +740,12 @@ const details = {
   },
   'review-news': {
     title: 'Review News',
-    subtitle: 'Admin UI — runs after pipeline, unchanged in v3',
+    subtitle: 'Admin UI — flat item list (grouped announcements moved to the Announcement tab in v3.13)',
     badge: 'grey', badgeLabel: 'UI Only',
     cols: [
-      { heading: 'What it does', items: ['Shows all collected + filtered news cards', 'Manual scoring (thumbs up/down)', 'Bulk approve / reject actions', 'L2S mapping to JIRA EPICs', 'Translation toggle (native ↔ English)'] },
-      { heading: 'Key file', items: ['admin/app.py — /admin/review/&lt;id&gt;', 'admin/templates/review_news.html'] },
-      { heading: 'Dependencies', items: ['SQLite news_items + filtered_news', 'LOKA integration (loka_client.py)', 'No external AI APIs at review time'] },
+      { heading: 'What it does', items: ['Flat list of all collected + filtered news items', 'Per-item actions: Re-rank (🚩), Re-match (🔖), Translate (🌐)', '"News Details" accordion shows the L2 full-article summary inline (v3.13)', 'Bulk approve / reject; manual scoring', 'The Topic → Announcement → Sources structure now lives in the separate Announcement tab'] },
+      { heading: 'Key file', items: ['admin/app.py — /admin/profiles/&lt;id&gt;/review', 'admin/templates/review_news.html'] },
+      { heading: 'Dependencies', items: ['SQLite news_items + filtered_news', 'No external AI APIs at review time (grouping is on the Announcement tab)'] },
     ]
   },
   'challenge': {
@@ -757,13 +779,25 @@ const details = {
       { heading: 'Harness', items: ['python3 tests/run_harness.py --version v3.5 → 34/34 (4 skipped — AI)'] },
     ]
   },
+  'announcement-build': {
+    title: 'Announcement — title-first grouping engine',
+    subtitle: 'NEW v3.13 — the announcement_agent that builds persistent, cross-language announcements',
+    badge: 'green', badgeLabel: 'Shipped v3.13',
+    cols: [
+      { heading: 'Flow (one word each)', items: ['Select — pending, email-eligible items only (bounded cost)', 'Title — AI English title per item (grounded in L2 + RCM reference titles)', 'Embed — vectorize titles', 'Cluster — cosine, guarded by act_ref (primary) / date (fallback)', 'Assign — join draft / attach to frozen (added_after_publish) / new', 'Compose — unified title + RCM body JSON', 'Persist — write news_announcements + item membership'] },
+      { heading: 'The magic', items: ['Cross-language grouping: EN + local-language items on the SAME act (act_ref) collapse into ONE announcement', 'act_ref is primary identity — title wording differences do not split them', 'Persistent + profile-scoped: draft → done (published = frozen, never regenerated)', 'Incremental "Process New/Changed" re-groups only pending items; re-rank/re-match flips an item back to pending', 'A new item matching a frozen announcement joins it marked "added after publish" (RCM Pending-Republish signal)'] },
+      { heading: 'Key files', items: ['agents/announcement_agent.py — build() + merge guard + 2 AI passes', 'agents/embeddings_util.py — get_embeddings + cosine (shared)', 'agents/rcm_reference_sync.py — LOKA title cache for grounding', 'admin/templates/announcements.html — Announcement tab UI'] },
+      { heading: 'Harness', items: ['python3 tests/run_harness.py --version v3.13 → 15/15 (cross-language pair → 1 announcement)'] },
+    ]
+  },
   'rcm-publish': {
     title: 'Preview for RCM + Close the Loop',
-    subtitle: 'Planned v3.6 — read-only RCM-template popup + Open-L2S link, then link JIRA → mark Done',
-    badge: 'green', badgeLabel: 'Shipped v3.6',
+    subtitle: 'v3.13 — instant read-only RCM preview (body already in template form) + direct Open-RCM link, then mark Done',
+    badge: 'green', badgeLabel: 'Shipped v3.6 / v3.13',
     cols: [
-      { heading: 'What it does', items: ['"Preview for RCM" button per Announcement row (sends nothing — not "Publish")', 'Read-only modal renders announcement_md in the RCM / Law2Spec template + source links (from item_ids_json)', '"Open L2S" opens L2S in a new tab — LPM copies/pastes manually (as today)', 'Close the loop: LPM pastes the JIRA Legal Change # onto the announcement and marks it DONE — the LPM finish line', 'No JIRA API — manual paste. V4 Announce Agent automates create + link + stamp'] },
-      { heading: 'Key files (planned)', items: ['admin/app.py — GET /admin/announcement-template/&lt;id&gt; + POST save JIRA #/status', 'configurations/db.py — news_announcements.jira_legal_change + status', 'admin/templates/review_news.html — Preview modal + Done control'] },
+      { heading: 'What it does', items: ['"Preview for RCM" per Announcement row opens INSTANTLY — no AI call (the body is already RCM-template JSON, produced by the Announcement agent)', 'Modal renders Introduction + Business Background bullets + source links', '"Open RCM" opens the official SAP RCM portal directly (per-profile rcm_url) — L2S/JIRA staging removed', 'Mark Done sets status=done (frozen); no JIRA Legal Change input anymore'] },
+      { heading: 'v3.13 change', items: ['Was: narrative body → AI fill on click → JIRA # input → Done (v3.6)', 'Now: RCM JSON generated up-front by announcement_agent → instant preview → direct RCM link', 'rcm_filler.py is now a passthrough (short-circuits when announcement_rcm_json present)'] },
+      { heading: 'Key files', items: ['admin/app.py — GET /admin/announcements/&lt;id&gt;/template (instant) + POST publish', 'configurations/db.py — news_announcements.status + announcement_rcm_json', 'admin/templates/announcements.html — Preview modal + Open RCM'] },
     ]
   },
   'announce-agent': {

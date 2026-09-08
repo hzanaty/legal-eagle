@@ -108,6 +108,19 @@ def reset_and_seed():
             "INSERT INTO ranking_signals(profile_id, signal_type, pattern, min_rank, confidence, created_from) VALUES(?,?,?,?,?,?)",
             (pid, s["signal_type"], s["pattern"], s["min_rank"], s["confidence"], s["created_from"])
         )
+    # v3.13: LOKA topic + RCM reference titles (ground announcement title generation)
+    conn.execute("INSERT INTO settings(profile_id, key, value) VALUES(?,?,?)", (pid, "loka_topic", "HCM"))
+    conn.execute("INSERT INTO settings(profile_id, key, value) VALUES(?,?,?)",
+                 (pid, "rcm_url", "https://app.main.regulatory-change-manager.cloud.sap/index.html#/detail/XN-DEMO"))
+    for jira, title, eff in [
+        ("XN-5001", "Social Insurance Contribution Rate Update Q1 2027", "2027-01-01"),
+        ("XN-5002", "Employment Law Amendment: Termination Notice Period", "2027-01-01"),
+        ("XN-5003", "Statutory Maternity Leave Extension to 16 Weeks", "2027-01-01"),
+    ]:
+        conn.execute(
+            "INSERT INTO rcm_reference_titles(profile_id, jira_key, regulation_title, country, effective_date) VALUES(?,?,?,?,?)",
+            (pid, jira, title, "Xanadu", eff),
+        )
     conn.commit()
     n = _inject_baseline(conn, pid)
     conn.commit()

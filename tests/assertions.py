@@ -132,8 +132,28 @@ def run_assertions(conn: sqlite3.Connection, profile_id: int, version: str, ai_a
             ).fetchone()[0]
             ok = count > 0
             results.append((ok, desc, f"no news_announcements row with topic_label '{a['topic_label']}'" if not ok else ""))
+        elif t == "announcement_single_for_act":
+            # Assert all items sharing a given act_ref landed in exactly ONE announcement
+            # (exercises cross-language / act-identity clustering).
+            # Uses LIKE so partial act_ref patterns (e.g. "Law No. 7412") match the full
+            # stored value (e.g. "Employment Law Amendment — Law No. 7412").
+            act_pattern = f"%{a['act_ref']}%"
+            rows = conn.execute(
+                "SELECT DISTINCT announcement_id FROM news_items "
+                "WHERE profile_id=? AND act_ref LIKE ? AND announcement_id IS NOT NULL",
+                (profile_id, act_pattern),
+            ).fetchall()
+            n_ann = len(rows)
+            n_items = conn.execute(
+                "SELECT COUNT(*) FROM news_items WHERE profile_id=? AND act_ref LIKE ?",
+                (profile_id, act_pattern),
+            ).fetchone()[0]
+            ok = n_ann == 1 and n_items >= 2
+            results.append((ok, desc,
+                            f"act_ref '{a['act_ref']}': {n_items} items across {n_ann} announcement(s) (want >=2 items in exactly 1)"
+                            if not ok else ""))
         elif t == "table_has_rows":
-            # Assert a table has >= min_rows rows (profile-scoped if profile_id column exists).
+            # Assert a table has >= min_rows rows (profile-scoped if profile_id column exists)..
             table = a["table"]
             min_rows = int(a.get("min_rows", 1))
             cols = {r[1] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()}

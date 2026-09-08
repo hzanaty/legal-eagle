@@ -1,5 +1,41 @@
 # CHANGELOG
 
+## v3.13 — 2026-09-08
+### L2 deep-fetch · title-first grouping · persistent announcements · direct RCM
+
+- **L2 Deep Fetch (new mandatory pipeline step)** — `agents/l2_fetcher.py` runs after Glossary
+  Match and before Rank. For each item it follows the URL, extracts the full article
+  (reusing `extract_article` from `url_sources_runner`), and makes one AI call for a factual
+  `l2_summary` + structured `act_ref` (law/act/gazette reference). **Any item failure stops the
+  run** (`L2FetchError`) — no silent degradation. Ranking now sees the richer context.
+- **Announcement grouping rebuilt** — new `agents/announcement_agent.py` owns
+  Select → Title → Embed → Cluster → Assign → Compose → Persist. Grouping key is an
+  **AI-generated English title** (cross-language), clustered by cosine with an **act_ref-first,
+  date-proximity-fallback** merge guard. RCM body JSON is generated directly (PASS 2), so
+  "Preview for RCM" is now instant.
+- **Persistent, profile-scoped announcements** — `news_announcements` gains `profile_id`; the
+  old delete-and-regenerate-per-run behaviour is gone. Announcements carry a `draft → done`
+  (published/frozen) lifecycle. Item state machine on `news_items`: `announce_state`
+  (`pending → assigned → excluded`), `announcement_id`, `english_title`, `added_after_publish`.
+- **Incremental processing** — the new **Announcement tab** has a **"Process New/Changed"**
+  button that runs the agent on `pending` items only (bounded cost). Re-rank / re-match flips an
+  item back to `pending`; a `done` announcement is never mutated — a matching new item joins it
+  marked **added after publish**.
+- **`email_composer.py` is now a pure formatter** — reads `news_announcements` and renders the
+  digest; all AI grouping/title/body generation moved to `announcement_agent`.
+- **RCM action simplified** — Preview modal now offers a direct **Open RCM** link (per-profile
+  `rcm_url` setting, replacing `l2s_url`); the JIRA Legal Change input was removed.
+- **RCM reference titles cache** — new `rcm_reference_titles` table + `agents/rcm_reference_sync.py`
+  + `/sync-rcm-titles` Claude Code command pull per-profile regulation titles from LOKA
+  (`scope=regulations`, `topic=HCM`/`FIN`) to ground title generation. New profile config fields:
+  **LOKA Topic** + **RCM Portal URL**.
+- **Reusable `agents/embeddings_util.py`** (`get_embeddings` + `cosine`) factored out of
+  `compare_news.py`.
+- **Legacy `news_grouper.py` archived** (`archive/news_grouper.py`); its 3 controller call sites
+  removed (each item is its own group on the retained v1 preview path).
+- **News Details accordion** — `l2_summary` shown as an inline expandable section on Review items
+  and Announcement source cards.
+
 ## v3.12 — 2026-09-08
 ### "Tag" retired · Analyze split · Review item-action redesign
 

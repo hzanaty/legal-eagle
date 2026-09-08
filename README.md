@@ -4,7 +4,7 @@
 
 > AI-powered platform that monitors legal changes, interprets their meaning, and helps SAP Localization teams respond faster with higher intelligence.
 
-**Current version: v3.12** — "Tag" retired → Glossary Match / Status · Analyze split · Review item-action redesign · [CHANGELOG](CHANGELOG.md)
+**Current version: v3.13** — L2 deep-fetch (mandatory) · title-first English clustering · persistent Announcement tab · direct RCM link · RCM reference sync · [CHANGELOG](CHANGELOG.md)
 
 ---
 

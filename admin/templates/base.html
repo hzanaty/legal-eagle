@@ -108,6 +108,7 @@
     .accent-configure .tab.active { color: #0a6ed1; font-weight: 700; border-bottom-color: #0a6ed1; }
     .accent-run .tab.active { color: #107e3e; font-weight: 700; border-bottom-color: #107e3e; }
     .accent-review .tab.active { color: #e9730c; font-weight: 700; border-bottom-color: #e9730c; }
+    .accent-announcement .tab.active { color: #0070b1; font-weight: 700; border-bottom-color: #0070b1; }
     .tab-badge { background: #bb0000; color: white; border-radius: 8px; padding: 1px 6px; font-size: 10px; font-weight: 700; margin-left: 4px; }
 
     .tab-panel { display: none; flex: 1; overflow: hidden; min-height: 0; }
@@ -208,12 +209,14 @@
           <div class="tab {% if active_tab=='configure' %}active{% endif %}" onclick="switchTab('configure')">Configure</div>
           <div class="tab {% if active_tab=='run' %}active{% endif %}" onclick="switchTab('run')">Run</div>
           <div class="tab {% if active_tab=='review' %}active{% endif %}" onclick="switchTab('review')">Review{% if review_badge_count|default(0) > 0 %}<span class="tab-badge">{{ review_badge_count }}</span>{% endif %}</div>
+          <div class="tab {% if active_tab=='announcement' %}active{% endif %}" onclick="switchTab('announcement')">Announcement{% if announce_pending_count|default(0) > 0 %}<span class="tab-badge">{{ announce_pending_count }}</span>{% endif %}</div>
         </div>
       </div>
 
       <div id="tab-configure" class="tab-panel {% if active_tab=='configure' %}active{% endif %}">{% block configure_tab %}{% endblock %}</div>
       <div id="tab-run" class="tab-panel {% if active_tab=='run' %}active{% endif %}">{% block run_tab %}{% endblock %}</div>
       <div id="tab-review" class="tab-panel {% if active_tab=='review' %}active{% endif %}">{% block review_tab %}{% endblock %}</div>
+      <div id="tab-announcement" class="tab-panel {% if active_tab=='announcement' %}active{% endif %}">{% block announcement_tab %}{% endblock %}</div>
       {% else %}
       <div class="detail-empty">
         <div>
@@ -238,7 +241,8 @@
     var routes = {
       configure: '/admin/profiles/' + pid,
       run: '/admin/profiles/' + pid + '/runs',
-      review: '/admin/profiles/' + pid + '/review'
+      review: '/admin/profiles/' + pid + '/review',
+      announcement: '/admin/profiles/' + pid + '/announcements'
     };
     location.href = routes[name] || ('/admin/profiles/' + pid);
     {% endif %}
