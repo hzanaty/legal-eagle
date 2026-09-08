@@ -4,7 +4,7 @@
 
 > AI-powered platform that monitors legal changes, interprets their meaning, and helps SAP Localization teams respond faster with higher intelligence.
 
-**Current version: v3.13** — L2 deep-fetch (mandatory) · title-first English clustering · persistent Announcement tab · direct RCM link · RCM reference sync · [CHANGELOG](CHANGELOG.md)
+**Current version: v3.14** — Glossary Labels (canonical multilingual topic grouping) · announce inclusion decoupled from email (gated on rank) · RCM config section · [CHANGELOG](CHANGELOG.md)
 
 ---
 
@@ -45,7 +45,7 @@ Legal Eagle automatically:
 | **Smart Deduplication** | Detects duplicate news and updates to previously reported items; REPEATED status for persistent signals |
 | **Three-Tier Ranking Engine** | Tier 0 duplicate (rank 0) · Tier 1 deterministic signals · Tier 2 grounded GPT-4o; scale 5 Urgent · 4 Legal Change · 3 Watch · 2 Signal · 1 Noise; a glossary match floors an item at rank 2; email gated at rank ≥ 3; REPEATED status elevates recurring items |
 | **Source Attribution** | Publisher + Authority stamped per item from feed config; AI inference for unconfigured feeds; ✦ icon + manual override UI |
-| **Glossary Match** | Deterministic glossary keyword matching assigns topic labels (`topic_label`); replaced the earlier AI theme-grouping (v3.3) |
+| **Glossary Match** | Deterministic matching against **Glossary Labels** — each label is one canonical topic with many multilingual member terms; the matcher stamps the canonical label as `topic_label` so cross-language items unify (v3.3; labels v3.14) |
 | **Multi-Profile Support** | Country + Line of Business combinations (SA/HCM, TR/HCM, ES/HCM, GR/HCM, etc.) |
 | **Bilingual Digests** | Native language + English translation in single email |
 | **Human-in-the-Loop** | Review/score workflow continuously improves accuracy |

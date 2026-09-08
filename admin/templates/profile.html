@@ -76,6 +76,7 @@
 
 <div class="cfg-anchor-bar">
   <div class="cfg-anchor active" onclick="cfgJump('sec-general',this)">General</div>
+  <div class="cfg-anchor" onclick="cfgJump('sec-rcm',this)">RCM</div>
   <div class="cfg-anchor" onclick="cfgJump('sec-sources',this)">Sources</div>
   <div class="cfg-anchor" onclick="cfgJump('sec-output',this)">Output</div>
   <div class="cfg-anchor" onclick="cfgJump('sec-knowledge',this)">Knowledge</div>
@@ -117,8 +118,11 @@
         <button type="submit" class="btn-save">Save Lookback</button>
       </div>
     </form>
+  </div>
 
-    <!-- v3.13: RCM link + LOKA topic (announcement grounding) -->
+  <!-- ══ RCM ══ -->
+  <div class="cfg-section" id="sec-rcm">
+    <div class="cfg-section-title">RCM Integration</div>
     <div class="kv-row">
       <div class="kv-label">RCM Portal URL
         <div class="kv-help">Official SAP RCM link opened from the Preview-for-RCM modal (replaces L2S/JIRA staging)</div>
@@ -128,19 +132,41 @@
       <button type="button" class="btn-save" onclick="saveRcmSettings()">Save</button>
     </div>
     <div class="kv-row">
-      <div class="kv-label">LOKA Topic
-        <div class="kv-help">Topic filter for the RCM reference-title sync — HCM (Human Capital Management) or FIN (S/4HANA)</div>
+      <div class="kv-label">RCM Topic
+        <div class="kv-help">Topic filter for the RCM reference-title sync — HCM or FIN</div>
       </div>
       <input type="text" class="cfg-field" id="loka_topic_val" value="{{ loka_topic or '' }}"
              placeholder="HCM or FIN" list="loka_topic_opts">
       <datalist id="loka_topic_opts"><option value="HCM"><option value="FIN"></datalist>
       <button type="button" class="btn-save" onclick="saveRcmSettings()">Save</button>
+      <span id="rcm_sync_status" style="font-size:11px;color:#107e3e;"></span>
     </div>
-    <div class="kv-row">
-      <div class="kv-label">RCM Reference Titles
-        <div class="kv-help">Run <code>/sync-rcm-titles {{ profile.id }}</code> in Claude Code to refresh naming-convention examples from LOKA</div>
+    <div class="kv-row" style="align-items:flex-start;padding-top:12px;padding-bottom:12px;">
+      <div class="kv-label">RCM History
+        <div class="kv-help">Naming-convention examples synced from LOKA</div>
       </div>
-      <span id="rcm_sync_status" style="font-size:11px;color:#6a6d70;">Sync via Claude Code command</span>
+      {% set n = rcm_ref_titles|length %}
+      {% if n > 0 %}
+      <div style="flex:1">
+        <button type="button" class="btn-sm" onclick="toggleEditor('rcm-history-list')" style="margin-bottom:8px;">
+          Show ({{ n }})
+        </button>
+        <div id="rcm-history-list" class="hidden">
+          {% for r in rcm_ref_titles %}
+          <div class="row-item">
+            {% if r.jira_key %}
+            <a class="mono" href="https://jira.tools.sap/browse/{{ r.jira_key }}" target="_blank" style="color:#0a6ed1;text-decoration:none;">{{ r.jira_key }}</a>
+            {% endif %}
+            <span style="flex:1;font-size:12px;color:#32363a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ r.regulation_title }}</span>
+            {% if r.effective_date %}<span class="row-pub">{{ r.effective_date[:10] }}</span>{% endif %}
+            <span class="row-date">{{ (r.synced_at or '')[:10] }}</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% else %}
+      <span style="font-size:11px;color:#6a6d70;">No titles synced yet — run <code>/sync-rcm-titles {{ profile.id }}</code> in Claude Code</span>
+      {% endif %}
     </div>
     <script>
       function saveRcmSettings(){
@@ -151,7 +177,8 @@
         fetch('/admin/profiles/{{ profile.id }}/rcm-settings', {
           method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
         }).then(r=>r.json()).then(d=>{
-          document.getElementById('rcm_sync_status').textContent = d.ok ? 'Saved ✓' : ('Error: ' + d.error);
+          var el = document.getElementById('rcm_sync_status');
+          if (el) { el.textContent = d.ok ? 'Saved ✓' : ('Error: ' + d.error); }
         });
       }
     </script>
@@ -444,31 +471,53 @@
   <div class="cfg-section" id="sec-knowledge">
     <div class="cfg-section-title">Knowledge</div>
 
-    <div style="font-size:12px;font-weight:600;color:#32363a;margin-bottom:8px">Glossary <span style="color:#6a6d70;font-weight:400">· {{ glossary.terms|length if glossary and glossary.terms else 0 }} terms</span></div>
-    <div class="gloss-chips">
-      {% for t in glossary.terms if glossary and glossary.terms %}
-      <span class="gloss-chip">{{ t.term }}
-        <form method="post" action="{{ url_for('delete_glossary_term_route', profile_id=profile.id) }}">
-          <input type="hidden" name="term_id" value="{{ t.id }}">
-          <button type="submit" title="Remove">&#10005;</button>
-        </form>
-      </span>
-      {% else %}
-      <span class="empty-note" style="padding:4px 0">No glossary terms yet</span>
-      {% endfor %}
-    </div>
-    <form method="post" action="{{ url_for('add_glossary_term_simple_route', profile_id=profile.id) }}" class="add-form">
-      <div><label>Add term</label><input name="term" placeholder="e.g. termination notice" required style="min-width:240px"></div>
-      <button type="submit" class="btn-add">Add</button>
-      <button type="button" class="btn-sm" style="align-self:flex-end" onclick="toggleEditor('gloss-bulk')">Bulk add…</button>
-    </form>
-    <div class="cfg-editor hidden" id="gloss-bulk">
-      <form method="post" action="{{ url_for('add_glossary_term_bulk_route', profile_id=profile.id) }}">
-        <label class="url-fieldlabel">One term per line</label>
-        <textarea class="cfg-field" name="bulk_terms" rows="5" placeholder="Labor contracts&#10;iqama and visa&#10;Wage Protection"></textarea>
-        <div style="margin-top:10px;"><button type="submit" class="btn-add">Add All Terms</button></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div style="font-size:12px;font-weight:600;color:#32363a">Glossary Labels
+        <span style="color:#6a6d70;font-weight:400">· {{ glossary_labels|length if glossary_labels else 0 }} labels</span>
+        <span class="kv-help" style="display:block;margin-top:2px">Each label is one canonical topic; add member terms in any language — a hit on any term stamps the label.</span>
+      </div>
+      <form method="post" action="{{ url_for('rematch_all_route', profile_id=profile.id) }}" style="margin:0">
+        <button type="submit" class="btn-sm" onclick="return confirm('Re-match all news items against the current labels?')">&#8635; Re-match all</button>
       </form>
     </div>
+
+    {% for lb in glossary_labels %}
+    <div class="cfg-editor" style="margin-top:0;margin-bottom:10px;padding:12px 14px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <form method="post" action="{{ url_for('rename_glossary_label_route', profile_id=profile.id, label_id=lb.id) }}" style="margin:0;flex:1;">
+          <input name="name" value="{{ lb.name }}" onblur="this.form.submit()"
+                 style="font-size:13px;font-weight:700;color:#0a6ed1;border:1px solid transparent;border-radius:4px;padding:3px 6px;background:transparent;width:100%;max-width:280px;">
+        </form>
+        <span style="font-size:11px;color:#6a6d70;">{{ lb.terms|length }} term(s)</span>
+        <form method="post" action="{{ url_for('delete_glossary_label_route', profile_id=profile.id, label_id=lb.id) }}" style="margin:0;">
+          <button type="submit" class="btn-sm danger" onclick="return confirm('Delete label \'{{ lb.name|e }}\' and all its terms?')">Delete label</button>
+        </form>
+      </div>
+      <div class="gloss-chips">
+        {% for t in lb.terms %}
+        <span class="gloss-chip">{{ t.term }}<span style="color:#9bb;font-size:9px;margin-left:4px;">{{ t.lang }}</span>
+          <form method="post" action="{{ url_for('delete_label_term_route', profile_id=profile.id, term_id=t.id) }}">
+            <button type="submit" title="Remove term">&#10005;</button>
+          </form>
+        </span>
+        {% else %}
+        <span class="empty-note" style="padding:2px 0">No terms yet</span>
+        {% endfor %}
+      </div>
+      <form method="post" action="{{ url_for('add_label_term_route', profile_id=profile.id, label_id=lb.id) }}" class="add-form" style="margin-top:8px;margin-bottom:0;">
+        <div><input name="term" placeholder="add member term (any language)" required style="min-width:240px"></div>
+        <div><input name="lang" placeholder="lang" value="en" style="width:60px"></div>
+        <button type="submit" class="btn-add">Add term</button>
+      </form>
+    </div>
+    {% else %}
+    <div class="empty-note" style="padding:8px 0">No glossary labels yet — add one below.</div>
+    {% endfor %}
+
+    <form method="post" action="{{ url_for('add_glossary_label_route', profile_id=profile.id) }}" class="add-form" style="margin-top:8px;">
+      <div><label>New label</label><input name="name" placeholder="e.g. SGK, Tax, Employment" required style="min-width:240px"></div>
+      <button type="submit" class="btn-add">Add Label</button>
+    </form>
 
     <div style="font-size:12px;font-weight:600;color:#32363a;margin:18px 0 8px">Authorities <span style="color:#6a6d70;font-weight:400">· {{ authorities|length if authorities else 0 }} configured</span></div>
     <table class="auth-table">
@@ -563,7 +612,7 @@
   (function(){
     var scroller = document.getElementById('cfgScroll');
     if (!scroller) return;
-    var secs = ['sec-general','sec-sources','sec-output','sec-knowledge'];
+    var secs = ['sec-general','sec-rcm','sec-sources','sec-output','sec-knowledge'];
     scroller.addEventListener('scroll', function(){
       var cur = secs[0];
       secs.forEach(function(s){

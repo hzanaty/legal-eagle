@@ -36,13 +36,33 @@ def extract_act_ref(text: str) -> str:
     return ""
 
 
-def _load_terms(conn: sqlite3.Connection, profile_id: int) -> list[str]:
-    """Return list of glossary term strings for the profile."""
+def _load_match_rules(conn: sqlite3.Connection, profile_id: int) -> list[dict]:
+    """Return match rules as [{match: str, is_regex: bool, label: str}].
+
+    The `label` is the term's canonical Glossary Label name when it has one, else the
+    term itself (unlabeled terms match on themselves). Covers each term, its synonyms,
+    and its regex patterns — all inheriting the term's label.
+    """
     rows = conn.execute(
-        "SELECT term FROM glossary_terms WHERE profile_id=? ORDER BY term",
+        """SELECT t.id AS term_id, t.term AS term, l.name AS label_name
+           FROM glossary_terms t
+           LEFT JOIN glossary_labels l ON l.id = t.label_id
+           WHERE t.profile_id=?""",
         (profile_id,),
     ).fetchall()
-    return [r[0] for r in rows]
+    rules: list[dict] = []
+    for r in rows:
+        label = r["label_name"] or r["term"]
+        rules.append({"match": r["term"], "is_regex": False, "label": label})
+        for syn in conn.execute(
+            "SELECT synonym FROM glossary_synonyms WHERE term_id=?", (r["term_id"],)
+        ).fetchall():
+            rules.append({"match": syn["synonym"], "is_regex": False, "label": label})
+        for pat in conn.execute(
+            "SELECT regex FROM glossary_patterns WHERE term_id=?", (r["term_id"],)
+        ).fetchall():
+            rules.append({"match": pat["regex"], "is_regex": True, "label": label})
+    return rules
 
 
 def _norm(s: str) -> str:
@@ -57,19 +77,33 @@ def _norm(s: str) -> str:
 
 
 def match_glossary(items: list[dict], conn: sqlite3.Connection, profile_id: int) -> list[dict]:
-    """Assign topic_label to each item via glossary keyword matching.
+    """Assign topic_label to each item via glossary matching.
 
-    Matching is case-insensitive substring on title + content. Each item can
-    match multiple terms; all matches are included in the JSON array.
+    Matching is case-insensitive substring (or regex) on title + content. Each item can
+    match terms across several labels; the DISTINCT canonical **label names** are stored
+    (not the raw terms), so any language/spelling of a term collapses to one label and
+    announcements about the same entity group together.
     """
-    terms = _load_terms(conn, profile_id)
+    rules = _load_match_rules(conn, profile_id)
     for item in items:
-        text = _norm(f"{item.get('title', '')} {item.get('content', '')}")
-        matched = [t for t in terms if _norm(t) in text]
-        item["topic_label"] = json.dumps(matched) if matched else json.dumps(["General"])
+        raw = f"{item.get('title', '')} {item.get('content', '')}"
+        text = _norm(raw)
+        labels: list[str] = []
+        for rule in rules:
+            hit = False
+            if rule["is_regex"]:
+                try:
+                    hit = re.search(rule["match"], raw, re.IGNORECASE) is not None
+                except re.error:
+                    hit = False
+            else:
+                hit = _norm(rule["match"]) in text
+            if hit and rule["label"] not in labels:
+                labels.append(rule["label"])
+        item["topic_label"] = json.dumps(labels) if labels else json.dumps(["General"])
         # v3.13: best-effort act_ref from L1 (title + description). Only set when found —
         # L2 fetch is the primary source and must not be overwritten by an empty result.
-        ref = extract_act_ref(f"{item.get('title', '')} {item.get('content', '')}")
+        ref = extract_act_ref(raw)
         if ref:
             item["act_ref"] = ref
     return items
@@ -151,3 +185,25 @@ def flag_glossary_gaps(items: list[dict], conn: sqlite3.Connection, profile_id: 
                 (is_gap, pid, src_type, hash_sig),
             )
     conn.commit()
+
+
+def rematch_items_for_profile(conn: sqlite3.Connection, profile_id: int) -> int:
+    """Re-run Glossary Match over ALL of a profile's news_items and rewrite topic_label.
+
+    Used after seeding/editing Glossary Labels so existing items carry canonical labels.
+    Re-flags glossary gaps and marks changed items pending for announcement regrouping.
+    Returns the number of items re-matched.
+    """
+    rows = conn.execute(
+        "SELECT * FROM news_items WHERE profile_id=?", (profile_id,)
+    ).fetchall()
+    if not rows:
+        return 0
+    items = [dict(r) for r in rows]
+    match_glossary(items, conn, profile_id)
+    save_topic_labels(items, conn, profile_id)
+    flag_glossary_gaps(items, conn, profile_id)
+    from configurations.db import mark_items_pending
+    mark_items_pending(conn, [it["id"] for it in items if it.get("id")])
+    conn.commit()
+    return len(items)

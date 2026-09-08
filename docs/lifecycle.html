@@ -172,7 +172,7 @@
 </defs></svg>
 
 <h1>Legal Eagle — System Lifecycle</h1>
-<p class="tagline">v3.13 shipped &nbsp;·&nbsp; V4 planned &nbsp;·&nbsp; Click any step for details</p>
+<p class="tagline">v3.14 shipped &nbsp;·&nbsp; V4 planned &nbsp;·&nbsp; Click any step for details</p>
 
 <!-- SETUP -->
 <div class="phase-block">
@@ -540,11 +540,11 @@ const details = {
   },
   'glossary': {
     title: 'Glossary Management',
-    subtitle: 'Admin UI — terms, synonyms, regex patterns per LoB',
+    subtitle: 'Admin UI — Glossary Labels (canonical) + multilingual member terms per LoB',
     badge: 'grey', badgeLabel: 'UI Only',
     cols: [
-      { heading: 'What it does', items: ['Manages glossary_terms per LoB (HCM / FIN)', 'Synonyms and regex patterns per term', 'Drives keyword matching in Glossary Match (v3)', 'Used as context in AI filter (v2)'] },
-      { heading: 'Key file', items: ['admin/app.py', 'configurations/config_loader.py (glossary helpers)', 'configurations/db.py (glossary_terms, glossary_synonyms, glossary_patterns)'] },
+      { heading: 'What it does', items: ['Manages Glossary Labels per LoB (HCM / FIN) — one canonical label groups many member terms', 'Add member terms in any language under a label (SGK · Sosyal Güvenlik · Social Security)', 'Synonyms and regex patterns per term', 'Re-match all re-labels a whole profile after edits', 'Drives keyword matching in Glossary Match (v3)'] },
+      { heading: 'Key file', items: ['admin/app.py (label routes)', 'configurations/db.py (glossary_labels, glossary_terms, glossary_synonyms, glossary_patterns)', 'agents/glossary_labels_seed.py (seed migration)'] },
       { heading: 'Dependencies', items: ['SQLite config.db', 'No external APIs'] },
     ]
   },
@@ -670,12 +670,12 @@ const details = {
   },
   'glossary_match': {
     title: 'Glossary Match',
-    subtitle: 'NEW in v3 Phase 3 (v3.3) — deterministic glossary keyword matching + email rank gate',
+    subtitle: 'NEW in v3 Phase 3 (v3.3) — deterministic glossary matching + email rank gate; canonical Glossary Labels (v3.14)',
     badge: 'green', badgeLabel: 'Shipped v3.3',
     cols: [
-      { heading: 'What it does', items: ['Matches item text against glossary_terms table', 'Assigns Topic Labels (matched terms) as JSON array', 'Sets email_eligible = 1 for significance_rank ≥ 3 (configurable threshold, non-duplicate)', 'Persists topic_label + email_eligible to news_items via source_id/url/hash lookup'] },
+      { heading: 'What it does', items: ['Matches item text against each term + synonyms + regex patterns', 'Stamps the canonical Glossary Label name as topic_label (JSON array) — cross-language terms unify (v3.14)', 'Sets email_eligible = 1 for significance_rank ≥ 3 (configurable threshold, non-duplicate)', 'Persists topic_label + email_eligible to news_items via source_id/url/hash lookup'] },
       { heading: 'Key file', items: ['agents/glossary_match.py', 'configurations/config_loader.py (glossary helpers)', 'agents/agents_controller.py (Stage 4.4 + email gate)'] },
-      { heading: 'Dependencies', items: ['SQLite glossary_terms', 'No external API needed — fully deterministic'] },
+      { heading: 'Dependencies', items: ['SQLite glossary_terms + glossary_labels', 'No external API needed — fully deterministic'] },
     ]
   },
   'l2_fetch': {

@@ -205,6 +205,26 @@ def create_schema_if_needed(conn: sqlite3.Connection) -> None:
             );
             """
         )
+        # Glossary Labels — canonical parent grouping. A label's `name` is what the matcher
+        # stamps as topic_label and what the announcement topic bar displays; many member
+        # terms (multilingual) live under one label.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS glossary_labels (
+                id INTEGER PRIMARY KEY,
+                profile_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                created_at TEXT DEFAULT (datetime('now')),
+                UNIQUE(profile_id, name),
+                FOREIGN KEY(profile_id) REFERENCES profiles(id) ON DELETE CASCADE
+            );
+            """
+        )
+        # Link each glossary term to its label (nullable — unlabeled terms match on themselves).
+        try:
+            conn.execute("ALTER TABLE glossary_terms ADD COLUMN label_id INTEGER")
+        except Exception:
+            pass
 
         # Weekly baseline storage for semantic dedup/update detection
         conn.execute(
@@ -919,20 +939,85 @@ def update_tweet_account_last_fetch(conn: sqlite3.Connection, profile_id: int, h
 
 def add_glossary_term(conn: sqlite3.Connection, profile_id: int, term: str, lang: str = "en",
                       category: Optional[str] = None, product: Optional[str] = None,
-                      weight: float = 1.0, notes: Optional[str] = None) -> int:
+                      weight: float = 1.0, notes: Optional[str] = None,
+                      label_id: Optional[int] = None) -> int:
     with conn:
         conn.execute(
             """
-            INSERT OR IGNORE INTO glossary_terms(profile_id, term, lang, category, product, weight, notes)
-            VALUES(?,?,?,?,?,?,?)
+            INSERT OR IGNORE INTO glossary_terms(profile_id, term, lang, category, product, weight, notes, label_id)
+            VALUES(?,?,?,?,?,?,?,?)
             """,
-            (profile_id, term, lang, category, product, weight, notes)
+            (profile_id, term, lang, category, product, weight, notes, label_id)
         )
         row = conn.execute(
             "SELECT id FROM glossary_terms WHERE profile_id=? AND term=? AND lang=? AND IFNULL(product,'')=IFNULL(?, '')",
             (profile_id, term, lang, product)
         ).fetchone()
+        term_id = int(row["id"]) if row else -1
+        # Backfill label on an existing (IGNORE'd) row when one wasn't set yet.
+        if term_id != -1 and label_id is not None:
+            conn.execute(
+                "UPDATE glossary_terms SET label_id=? WHERE id=? AND label_id IS NULL",
+                (label_id, term_id),
+            )
+        return term_id
+
+
+# -----------------------
+# Glossary Labels (canonical parent grouping)
+# -----------------------
+
+def add_label(conn: sqlite3.Connection, profile_id: int, name: str) -> int:
+    """Create (or fetch) a glossary label; returns its id."""
+    with conn:
+        conn.execute(
+            "INSERT OR IGNORE INTO glossary_labels(profile_id, name) VALUES(?,?)",
+            (profile_id, name.strip()),
+        )
+        row = conn.execute(
+            "SELECT id FROM glossary_labels WHERE profile_id=? AND name=?",
+            (profile_id, name.strip()),
+        ).fetchone()
         return int(row["id"]) if row else -1
+
+
+def list_labels(conn: sqlite3.Connection, profile_id: int) -> List[Dict[str, Any]]:
+    """Return labels for a profile, each with its member terms (id, term, lang)."""
+    labels = conn.execute(
+        "SELECT id, name FROM glossary_labels WHERE profile_id=? ORDER BY name",
+        (profile_id,),
+    ).fetchall()
+    result: List[Dict[str, Any]] = []
+    for lb in labels:
+        terms = conn.execute(
+            "SELECT id, term, lang FROM glossary_terms WHERE label_id=? ORDER BY term",
+            (lb["id"],),
+        ).fetchall()
+        result.append({
+            "id": lb["id"], "name": lb["name"],
+            "terms": [dict(t) for t in terms],
+        })
+    return result
+
+
+def rename_label(conn: sqlite3.Connection, profile_id: int, label_id: int, new_name: str) -> None:
+    with conn:
+        conn.execute(
+            "UPDATE glossary_labels SET name=? WHERE id=? AND profile_id=?",
+            (new_name.strip(), label_id, profile_id),
+        )
+
+
+def delete_label(conn: sqlite3.Connection, profile_id: int, label_id: int) -> None:
+    """Delete a label and its member terms (terms are meaningless without a label)."""
+    with conn:
+        conn.execute("DELETE FROM glossary_terms WHERE label_id=? AND profile_id=?", (label_id, profile_id))
+        conn.execute("DELETE FROM glossary_labels WHERE id=? AND profile_id=?", (label_id, profile_id))
+
+
+def assign_term_to_label(conn: sqlite3.Connection, term_id: int, label_id: int) -> None:
+    with conn:
+        conn.execute("UPDATE glossary_terms SET label_id=? WHERE id=?", (label_id, term_id))
 
 
 def add_glossary_synonym(conn: sqlite3.Connection, term_id: int, synonym: str) -> None:
@@ -980,6 +1065,7 @@ def list_glossary_terms(conn: sqlite3.Connection, profile_id: int) -> List[Dict[
                 "product": t["product"],
                 "weight": t["weight"],
                 "notes": t["notes"],
+                "label_id": t["label_id"] if "label_id" in t.keys() else None,
                 "synonyms": synonyms,
                 "patterns": patterns,
             }
@@ -2108,13 +2194,21 @@ def get_announcements_for_profile_with_sources(
 
 
 def get_pending_announce_items(conn: sqlite3.Connection, profile_id: int) -> List[Dict[str, Any]]:
-    """Items awaiting (re)grouping: announce_state='pending' AND email_eligible=1."""
+    """Items awaiting (re)grouping for announcements.
+
+    Gated on rank (not the email_eligible flag): any non-duplicate item whose
+    significance_rank meets the profile's threshold and is still announce_state='pending'.
+    Decoupled from email so a human rank upgrade qualifies an item for announcement
+    without a pipeline rerun.
+    """
+    threshold = int(get_setting(conn, profile_id, "email_rank_threshold", "3") or 3)
     rows = conn.execute(
         """SELECT * FROM news_items
-           WHERE profile_id=? AND email_eligible=1
+           WHERE profile_id=? AND significance_rank >= ?
+             AND COALESCE(rank_tier,'') != 'duplicate'
              AND COALESCE(announce_state,'pending')='pending'
            ORDER BY significance_rank DESC, id""",
-        (profile_id,),
+        (profile_id, threshold),
     ).fetchall()
     return [dict(r) for r in rows]
 

@@ -1,6 +1,6 @@
 # Legal Eagle 3.8 — Technical Specification
 
-**Version:** 3.12 (Review item-action redesign — 🚩 Re-rank / 🔖 Re-match / 🌐 Translate per item, reason-gated rank override; pipeline split into Glossary Match + Rank steps; "tag" terminology retired → Glossary Match / Status)  
+**Version:** 3.14 (Glossary Labels — canonical multilingual topic grouping; matcher stamps the canonical label as `topic_label`; announce inclusion decoupled from the email flag and gated on rank; RCM config in its own Configure section)  
 **Last Updated:** 2026-09-08
 
 This document provides the technical specification for Legal Eagle, an AI-powered regulatory compliance monitoring system for SAP Localization.
@@ -363,7 +363,7 @@ CREATE TABLE news_items (
 | `rank_reasoning` | v3.2 | One-line rationale from the ranker |
 | `repetition_status` | v3.2 | `new` \| `update` \| `repeated` \| `duplicate` |
 | `repetition_count` | v3.2 | Times same entity fingerprint seen across runs |
-| `topic_label` | v3.3 | JSON array of matched glossary terms (`["General"]` if none) |
+| `topic_label` | v3.3 | JSON array of canonical Glossary Label names (v3.14; matched-term names pre-v3.14). `["General"]` if none |
 | `email_eligible` | v3.3 | 1 if `significance_rank ≥ threshold` and not duplicate |
 | `email_sent` | v3.3 | 1 once included in a sent digest |
 | `human_rank_override` | v3.4 | Manual rank set via confirm-challenge (NULL if not overridden) |
@@ -513,9 +513,9 @@ CREATE TABLE authorities (
 );
 ```
 
-#### Table: `glossary_terms` (+ `glossary_synonyms`, `glossary_patterns`)
+#### Table: `glossary_terms` (+ `glossary_synonyms`, `glossary_patterns`, `glossary_labels`)
 
-Normalized per-profile glossary. `glossary_terms` holds the term (`term`, `lang`, `category`, `product`, `weight`, `notes`); `glossary_synonyms` and `glossary_patterns` hold child synonym strings and regex patterns keyed by `term_id`. The Glossary Match step and the Glossary Gap enrichment flow both read/write this table. (Supersedes the flat `glossary` table.)
+Normalized per-profile glossary. `glossary_terms` holds the term (`term`, `lang`, `category`, `product`, `weight`, `notes`) plus **`label_id`** (v3.14) linking it to a canonical **Glossary Label**; `glossary_synonyms` and `glossary_patterns` hold child synonym strings and regex patterns keyed by `term_id`. **`glossary_labels`** (v3.14: `id`, `profile_id`, `name`) is the canonical parent — one label groups many member terms across languages. The Glossary Match step matches term + synonyms + patterns and stamps the term's **label name** (not the raw term) as `topic_label`, so any language/spelling of a member term collapses to one canonical label; unlabeled terms match on themselves. (Supersedes the flat `glossary` table.)
 
 #### Table: `ranking_signals` (v3.2)
 
@@ -571,7 +571,7 @@ CREATE TABLE news_announcements (
 
 #### Table Count
 
-`create_schema_if_needed()` creates 20 tables (`profiles`, `settings`, `rss_feeds`, `tweet_accounts`, `crawl_urls`, `snap_urls`, `email_receivers`, `glossary_terms`, `glossary_synonyms`, `glossary_patterns`, `news_items`, `url_sources`, `audit_log`, `filtered_news`, `runs`, `run_logs`, `authorities`, `ranking_signals`, `ranking_grounding`, `news_announcements`). A 21st, `monitor_updates_processed`, is created by the monitor-updates migration script.
+`create_schema_if_needed()` creates 21 tables (`profiles`, `settings`, `rss_feeds`, `tweet_accounts`, `crawl_urls`, `snap_urls`, `email_receivers`, `glossary_terms`, `glossary_synonyms`, `glossary_patterns`, `glossary_labels`, `news_items`, `url_sources`, `audit_log`, `filtered_news`, `runs`, `run_logs`, `authorities`, `ranking_signals`, `ranking_grounding`, `news_announcements`). A 22nd, `monitor_updates_processed`, is created by the monitor-updates migration script.
 
 ---
 
@@ -781,7 +781,7 @@ Email is gated at rank ≥ threshold (default 3); Rank 1 = Noise is scored and s
 
 **Purpose**: Deterministic glossary-keyword matching (no LLM). 
 
-- `match_glossary(items, conn, profile_id)`: matches item text against profile glossary terms and sets `topic_label` to a JSON array of matched terms, or `["General"]` when none match.
+- `match_glossary(items, conn, profile_id)`: matches item text against each profile term + its synonyms + regex patterns and sets `topic_label` to a JSON array of the matched terms' **canonical Glossary Label names** (deduped), or `["General"]` when none match. `rematch_items_for_profile(conn, profile_id)` re-runs this over all of a profile's items after label edits.
 - `save_topic_labels(items, conn, profile_id)`: persists `topic_label` to `news_items`, resolving each row by id → source_id → url → hash_signature fallback.
 - `flag_glossary_gaps(items, conn, profile_id)` (v3.5): runs after `save_topic_labels`; sets `glossary_gap = 1` for items with `significance_rank ≥ 3` AND `topic_label == ["General"]` (a rank-significant item the glossary cannot explain). NULL `topic_label` (Glossary Match never ran) is not flagged. Same id/source_id/url/hash fallback persistence.
 

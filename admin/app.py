@@ -1048,6 +1048,13 @@ def admin_profile_detail(profile_id: int):
 
     authorities = list_authorities(conn, profile_id)
     review_badge_count = count_all_news_for_review(conn, profile_id)
+    rcm_ref_titles = conn.execute(
+        "SELECT jira_key, regulation_title, effective_date, synced_at "
+        "FROM rcm_reference_titles WHERE profile_id=? ORDER BY synced_at DESC",
+        (profile_id,),
+    ).fetchall()
+    from configurations.db import list_labels
+    glossary_labels = list_labels(conn, profile_id)
     conn.close()
 
     rss = load_rss_feeds(profile_id)
@@ -1110,10 +1117,12 @@ def admin_profile_detail(profile_id: int):
         receivers=receivers,
         receivers_with_lang=receivers_with_lang,
         glossary=glossary,
+        glossary_labels=glossary_labels,
         reset_quota_date=reset_quota_date,
         monitor_enabled=monitor_enabled,
         rcm_url=rcm_url,
         loka_topic=loka_topic,
+        rcm_ref_titles=rcm_ref_titles,
         language_names=LANGUAGE_NAMES,
         ans_available=ans_available,
         profiles_total=profiles_total,
@@ -1863,6 +1872,83 @@ def add_glossary_term_bulk_route(profile_id: int):
 
 
 # -----------------------
+# Glossary Labels (canonical parent grouping) — v3.14
+# -----------------------
+
+@app.route("/admin/profiles/<int:profile_id>/glossary/labels/add", methods=["POST"])
+def add_glossary_label_route(profile_id: int):
+    name = (request.form.get("name") or "").strip()
+    if not name:
+        flash("Label name required.", "error")
+        return redirect(url_for("admin_profile_detail", profile_id=profile_id) + "#sec-knowledge")
+    conn = get_connection()
+    create_schema_if_needed(conn)
+    from configurations.db import add_label
+    add_label(conn, profile_id, name)
+    add_audit_log(conn, entity="glossary_labels", action="add", details=f"name={name}", profile_id=profile_id)
+    conn.close()
+    return redirect(url_for("admin_profile_detail", profile_id=profile_id) + "#sec-knowledge")
+
+
+@app.route("/admin/profiles/<int:profile_id>/glossary/labels/<int:label_id>/rename", methods=["POST"])
+def rename_glossary_label_route(profile_id: int, label_id: int):
+    new_name = (request.form.get("name") or "").strip()
+    conn = get_connection()
+    create_schema_if_needed(conn)
+    from configurations.db import rename_label
+    if new_name:
+        rename_label(conn, profile_id, label_id, new_name)
+    conn.close()
+    return redirect(url_for("admin_profile_detail", profile_id=profile_id) + "#sec-knowledge")
+
+
+@app.route("/admin/profiles/<int:profile_id>/glossary/labels/<int:label_id>/delete", methods=["POST"])
+def delete_glossary_label_route(profile_id: int, label_id: int):
+    conn = get_connection()
+    create_schema_if_needed(conn)
+    from configurations.db import delete_label
+    delete_label(conn, profile_id, label_id)
+    add_audit_log(conn, entity="glossary_labels", action="delete", details=f"id={label_id}", profile_id=profile_id)
+    conn.close()
+    return redirect(url_for("admin_profile_detail", profile_id=profile_id) + "#sec-knowledge")
+
+
+@app.route("/admin/profiles/<int:profile_id>/glossary/labels/<int:label_id>/terms/add", methods=["POST"])
+def add_label_term_route(profile_id: int, label_id: int):
+    term = (request.form.get("term") or "").strip()
+    lang = (request.form.get("lang") or "").strip() or "en"
+    if not term:
+        return redirect(url_for("admin_profile_detail", profile_id=profile_id) + "#sec-knowledge")
+    conn = get_connection()
+    create_schema_if_needed(conn)
+    from configurations.db import add_glossary_term as add_term_helper
+    add_term_helper(conn, profile_id, term, lang, None, None, 1.0, None, label_id)
+    conn.close()
+    return redirect(url_for("admin_profile_detail", profile_id=profile_id) + "#sec-knowledge")
+
+
+@app.route("/admin/profiles/<int:profile_id>/glossary/terms/<int:term_id>/delete_one", methods=["POST"])
+def delete_label_term_route(profile_id: int, term_id: int):
+    conn = get_connection()
+    conn.execute("DELETE FROM glossary_terms WHERE id=? AND profile_id=?", (term_id, profile_id))
+    conn.commit()
+    conn.close()
+    return redirect(url_for("admin_profile_detail", profile_id=profile_id) + "#sec-knowledge")
+
+
+@app.route("/admin/profiles/<int:profile_id>/glossary/rematch_all", methods=["POST"])
+def rematch_all_route(profile_id: int):
+    """Re-run Glossary Match over all of a profile's items after label edits."""
+    conn = get_connection()
+    create_schema_if_needed(conn)
+    from agents.glossary_match import rematch_items_for_profile
+    n = rematch_items_for_profile(conn, profile_id)
+    conn.close()
+    flash(f"Re-matched {n} item(s) against current Glossary Labels.", "success")
+    return redirect(url_for("admin_profile_detail", profile_id=profile_id) + "#sec-knowledge")
+
+
+# -----------------------
 # Authority CRUD (v3.0)
 # -----------------------
 
@@ -2127,14 +2213,46 @@ def admin_announcements(profile_id: int):
     }
     from configurations.db import get_announcements_for_profile_with_sources, get_pending_announce_items
     announcements = get_announcements_for_profile_with_sources(conn, profile_id)
-    topic_map: dict = {}
+
+    # Group announcements by canonical Glossary Label. Each announcement's label set is the
+    # union of its sources' topic_label arrays (labels are canonical now, so cross-language
+    # items collapse to the same label). Bucket each announcement under its most-shared label
+    # (global frequency; alpha tie-break) so separate announcements sharing a label group.
+    import json as _json
+
+    def _ann_labels(ann: dict) -> list[str]:
+        out: list[str] = []
+        for s in ann.get("sources") or []:
+            try:
+                labels = _json.loads(s.get("topic_label") or "[]")
+            except Exception:
+                labels = []
+            for lb in labels:
+                if lb and lb != "General" and lb not in out:
+                    out.append(lb)
+        return out
+
+    freq: dict = {}
+    ann_label_sets: list = []
     for ann in announcements:
-        topic_map.setdefault(ann.get("topic_label") or "General", []).append(ann)
+        labels = _ann_labels(ann)
+        ann_label_sets.append(labels)
+        for lb in labels:
+            freq[lb] = freq.get(lb, 0) + 1
+
+    topic_map: dict = {}
+    for ann, labels in zip(announcements, ann_label_sets):
+        if labels:
+            bucket = sorted(labels, key=lambda l: (-freq.get(l, 0), l))[0]
+        else:
+            bucket = "General"
+        topic_map.setdefault(bucket, []).append(ann)
     topics = [
         {"topic_label": lbl, "announcements": anns,
          "source_count": sum(len(a.get("sources") or []) for a in anns)}
         for lbl, anns in topic_map.items()
     ]
+    topics.sort(key=lambda t: (-len(t["announcements"]), t["topic_label"]))
     pending_count = len(get_pending_announce_items(conn, profile_id))
     shell = _shell_context(conn, profile_id)
     _sel = shell["selected_meta"]
@@ -2988,11 +3106,15 @@ def confirm_challenge_news_item(item_id: int):
         item = dict(row)
         profile_id = item.get("profile_id")
 
-        # Write override back to news_items (update significance_rank so badge reflects it)
+        # Write override back to news_items (update significance_rank so badge reflects it).
+        # Also refresh email_eligible so a rank upgrade qualifies the item for the email
+        # digest too (announce inclusion is gated on rank directly, not this flag).
+        email_threshold = int(get_setting_value(profile_id, "email_rank_threshold", "3") or 3)
+        email_eligible = 1 if override_rank >= email_threshold else 0
         conn.execute(
             "UPDATE news_items SET human_rank_override=?, significance_rank=?, "
-            "rank_tier='human', human_override_reason=? WHERE id=?",
-            (override_rank, override_rank, override_reason, item_id),
+            "rank_tier='human', human_override_reason=?, email_eligible=? WHERE id=?",
+            (override_rank, override_rank, override_reason, email_eligible, item_id),
         )
 
         # Write few-shot grounding example (with rank so AI prompt is useful)
@@ -3039,13 +3161,17 @@ def override_news_item_rank(item_id: int):
         return jsonify({"ok": False, "error": "invalid rank"}), 400
     conn = get_connection()
     try:
-        row = conn.execute("SELECT id FROM news_items WHERE id=?", (item_id,)).fetchone()
+        row = conn.execute("SELECT id, profile_id FROM news_items WHERE id=?", (item_id,)).fetchone()
         if not row:
             return jsonify({"ok": False, "error": "Item not found"}), 404
+        # Refresh email_eligible so a rank upgrade qualifies the item for the email digest
+        # too (announce inclusion is gated on rank directly, not this flag).
+        email_threshold = int(get_setting_value(row["profile_id"], "email_rank_threshold", "3") or 3)
+        email_eligible = 1 if rank >= email_threshold else 0
         conn.execute(
             "UPDATE news_items SET human_rank_override=?, significance_rank=?, rank_tier='human', "
-            "rank_reasoning='Manual override' WHERE id=?",
-            (rank, rank, item_id),
+            "rank_reasoning='Manual override', email_eligible=? WHERE id=?",
+            (rank, rank, email_eligible, item_id),
         )
         # v3.13: rank changed → re-evaluate grouping membership.
         from configurations.db import mark_items_pending

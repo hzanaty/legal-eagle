@@ -1,5 +1,34 @@
 # CHANGELOG
 
+## v3.14 — 2026-09-08
+### Glossary Labels · announce decoupled from email · RCM config section
+
+- **Glossary Labels (canonical, multilingual topic grouping)** — a **label** is one canonical
+  topic (e.g. `SGK`, `Tax`, `Employment`); under it live many member terms in any language
+  (`SGK`, `Sosyal Güvenlik Kurumu`, `Social Security Institution` …). New `glossary_labels`
+  table + `label_id` on `glossary_terms`. The matcher (`glossary_match.py`) now matches term +
+  synonyms + patterns and stamps the **canonical label name** as `topic_label` — so any
+  language/spelling collapses to one label and separate announcements about the same entity
+  group together instead of splitting by surface form. `rematch_news_item` inherits this;
+  `rematch_items_for_profile` + a **Re-match all** action re-label a whole profile after edits.
+- **Config → Knowledge rebuilt as label cards** — editable label name, member-term chips (with
+  `lang`), add-term-under-label, add/delete label. New label routes in `admin/app.py`.
+- **Seed migration** — `agents/glossary_labels_seed.py` seeds a profile's labels + terms (no
+  manual creation); folds pre-existing flat terms into their label. Türkiye HCM (profile 4)
+  seeded with 7 labels / 72 terms.
+- **Announcement inclusion decoupled from the email flag** — `get_pending_announce_items` now
+  gates on **rank ≥ threshold** (not the run-time `email_eligible` flag). A human 🚩 re-rank /
+  override now also refreshes `email_eligible`, so a rank upgrade qualifies an item for **both**
+  announcement inclusion and the email digest without a pipeline rerun.
+- **Announce view groups by canonical label** — topic bar buckets announcements by their
+  most-shared Glossary Label (frequency, order-independent), resolving the SGK vs
+  "Sosyal Güvenlik" split.
+- **RCM moved to its own Configure section** — new **RCM** anchor tab; "LOKA Topic" renamed
+  **RCM Topic**; added **RCM History** (expandable list of synced reference titles with JIRA
+  links).
+- **Fixes** — confirm-challenge now writes `significance_rank` so the badge reflects the human
+  rank; `ranking_grounding` rows persist the `rank`.
+
 ## v3.13 — 2026-09-08
 ### L2 deep-fetch · title-first grouping · persistent announcements · direct RCM
 
