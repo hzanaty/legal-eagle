@@ -50,3 +50,6 @@ server.pid
 scripts/btp_seed_data.json
 tests/test.db
 tests/ai_cache/
+
+# Stray root-level DB from a mistyped path (real DB is configurations/config.db)
+legal_eagle.db
