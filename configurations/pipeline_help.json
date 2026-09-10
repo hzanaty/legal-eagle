@@ -7,17 +7,12 @@
   {
     "stage": "Collecting",
     "title": "Collecting — fetch from sources",
-    "blurb": "Pulls new items from every configured source (RSS, Twitter/X, crawled URL sources, email inbox) and stamps each item's publisher. Each source is anchored to its own last-fetch date so nothing is re-pulled."
+    "blurb": "Pulls new items from every configured source (RSS, Twitter/X, crawled URL sources, email inbox) and stamps each item's publisher plus a baseline issuing authority (configured, with AI-inferred fallback). Authority is later confirmed/overridden from the matched law in Law Match. Each source is anchored to its own last-fetch date so nothing is re-pulled."
   },
   {
     "stage": "Filtering",
     "title": "Filtering — drop stale by date",
     "blurb": "Applies each source's date window (lookback). Date-only — relevance is decided later by the Impact gate, not here."
-  },
-  {
-    "stage": "Attributing",
-    "title": "Attributing — publisher / authority",
-    "blurb": "Stamps each item's publisher and a first-pass authority. The authority is later confirmed (or derived from the matched law) in Law Match."
   },
   {
     "stage": "Comparing",
