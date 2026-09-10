@@ -306,7 +306,7 @@
       <div class="inner-arrow">›</div>
       <div class="substep built" onclick="showDetail('act-ref-dedup')">
         <span class="actor agent" title="Agent"><svg class="ic"><use href="#ic-agent"/></svg></span>
-        <div class="step-name">Dedup ↺</div>
+        <div class="step-name">Reconcile</div>
         <div class="step-sub">law_id cross-language reconcile · v3.15/v3.16</div>
       </div>
       <div class="inner-arrow">›</div>
@@ -416,7 +416,7 @@
       <div class="db-badge db-w">W email_eligible</div>
     </div>
     <div class="db-cell" onclick="showDetail('act-ref-dedup')">
-      <div class="db-step">⑦ Dedup ↺</div>
+      <div class="db-step">⑦ Reconcile</div>
       <div class="db-badge db-r">R baseline act_ref</div>
       <div class="db-badge db-w">W dedup_status</div>
       <div class="db-badge db-w">W repetition_count</div>
@@ -771,13 +771,13 @@ const details = {
     subtitle: 'NEW v3.13 — mandatory full-article fetch + summary + act_ref, before Rank',
     badge: 'green', badgeLabel: 'Shipped v3.13',
     cols: [
-      { heading: 'What it does', items: ['Follows each item URL, extracts full article (reuses extract_article)', 'One AI call → l2_summary (2-3 factual sentences) + act_ref (law/gazette ref)', 'MANDATORY: any item failure raises L2FetchError and STOPS the run', 'Feeds richer context to Rank and to announcement clustering', 'Enables cross-language dedup: the act_ref it extracts drives the Dedup ↺ reconciliation pass (v3.15)'] },
+      { heading: 'What it does', items: ['Follows each item URL, extracts full article (reuses extract_article)', 'One AI call → l2_summary (2-3 factual sentences) + act_ref (law/gazette ref)', 'MANDATORY: any item failure raises L2FetchError and STOPS the run', 'Feeds richer context to Rank and to announcement clustering', 'Enables cross-language dedup: the act_ref it extracts drives the Reconcile pass (v3.15)'] },
       { heading: 'Key file', items: ['agents/l2_fetcher.py', 'agents/url_sources_runner.py (extract_article, reused)', 'agents/agents_controller.py (after Glossary Match, before Rank)'] },
       { heading: 'Dependencies', items: ['requests (article fetch)', 'SAP AI Core (summary + act_ref)', 'Source Simulator precheck validates L2 at config time'] },
     ]
   },
   'act-ref-dedup': {
-    title: 'Cross-Language Dedup ↺ (Reconcile)',
+    title: 'Reconcile — cross-language dedup ↺',
     subtitle: 'v3.15 → v3.16 — runs after Law Match; keyed on law_id (act_ref fallback)',
     badge: 'green', badgeLabel: 'Shipped v3.15/v3.16',
     cols: [
