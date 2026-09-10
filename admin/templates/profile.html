@@ -90,8 +90,8 @@
 
     <form method="post" action="{{ url_for('update_profile_language', profile_id=profile.id) }}">
       <div class="kv-row">
-        <div class="kv-label">Analysis Language
-          <div class="kv-help">Language the AI uses to read &amp; analyze sources</div>
+        <div class="kv-label">Email Output Language
+          <div class="kv-help">Language for the email digest. News is collected and processed in each source's native language — this only affects how the email is formatted (a bilingual section is added when non-English).</div>
         </div>
         <select class="cfg-field" name="language">
           {% for code, name in language_names.items() %}

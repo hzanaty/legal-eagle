@@ -2998,7 +2998,6 @@ def admin_review_translate(profile_id: int):
     batch = [{
         "id": str(r["id"]),
         "title": (r["title"] or "")[:300],
-        "content": (r["content"] or "")[:600],
     } for r in rows]
     if not batch:
         return jsonify({"translations": []})
@@ -3006,9 +3005,9 @@ def admin_review_translate(profile_id: int):
     import json as _json
     prompt_content = _json.dumps(batch, ensure_ascii=False)
     system_msg = (
-        f"You are a professional legal translator. Translate the given items into {lang_name}. "
+        f"You are a professional legal translator. Translate the 'title' of each given item into {lang_name}. "
         "Return a JSON object with key 'translations', whose value is an array of objects, "
-        "each with: id (string), title (string), content (string). "
+        "each with: id (string), title (string). "
         "Keep translations concise and accurate. Preserve proper nouns."
     )
 
@@ -3029,7 +3028,6 @@ def admin_review_translate(profile_id: int):
         translations = [{
             "id": str(t.get("id", "")),
             "title": t.get("title", ""),
-            "content": t.get("content", ""),
         } for t in result.get("translations", [])]
         return jsonify({"translations": translations})
     except Exception as e:

@@ -172,7 +172,7 @@
 </defs></svg>
 
 <h1>Legal Eagle — System Lifecycle</h1>
-<p class="tagline">v3.14 shipped &nbsp;·&nbsp; V4 planned &nbsp;·&nbsp; Click any step for details</p>
+<p class="tagline">v3.15 shipped &nbsp;·&nbsp; V4 planned &nbsp;·&nbsp; Click any step for details</p>
 
 <!-- SETUP -->
 <div class="phase-block">
@@ -187,7 +187,13 @@
     <div class="step built" onclick="showDetail('glossary')">
       <span class="actor human" title="Human"><svg class="ic"><use href="#ic-human"/></svg></span>
       <div class="step-name">Glossary</div>
-      <div class="step-sub">Terms &amp; synonyms</div>
+      <div class="step-sub">Labels → member terms · v3.14</div>
+    </div>
+    <div class="inner-arrow">›</div>
+    <div class="step built" onclick="showDetail('rcm-titles')">
+      <span class="actor human" title="Human"><svg class="ic"><use href="#ic-human"/></svg></span>
+      <div class="step-name">RCM Titles</div>
+      <div class="step-sub">LOKA sync · grounding</div>
     </div>
     <div class="inner-arrow">›</div>
     <div class="step built" onclick="showDetail('sources')">
@@ -292,16 +298,16 @@
         <div class="step-sub">Full-article detail + act_ref (mandatory) · v3.13</div>
       </div>
       <div class="inner-arrow">›</div>
+      <div class="substep built" onclick="showDetail('act-ref-dedup')">
+        <span class="actor agent" title="Agent"><svg class="ic"><use href="#ic-agent"/></svg></span>
+        <div class="step-name">Dedup ↺</div>
+        <div class="step-sub">act_ref cross-language · v3.15</div>
+      </div>
+      <div class="inner-arrow">›</div>
       <div class="substep built" onclick="showDetail('rank')">
         <span class="actor agent" title="Agent"><svg class="ic"><use href="#ic-agent"/></svg></span>
         <div class="step-name">Rank</div>
         <div class="step-sub">3-tier significance 1–5 · v3.2</div>
-      </div>
-      <div class="inner-arrow">›</div>
-      <div class="substep built" onclick="showDetail('translate')">
-        <span class="actor agent" title="Agent"><svg class="ic"><use href="#ic-agent"/></svg></span>
-        <div class="step-name">Translate</div>
-        <div class="step-sub">SAP AI Core · v3.1</div>
       </div>
       <div class="inner-arrow">›</div>
       <div class="substep built" onclick="showDetail('save-db')">
@@ -388,9 +394,11 @@
       <div class="db-badge db-r">R ranking_grounding</div>
       <div class="db-badge db-w">W email_eligible</div>
     </div>
-    <div class="db-cell" onclick="showDetail('translate')">
-      <div class="db-step">⑦ Translate</div>
-      <div class="db-badge db-w">W translations</div>
+    <div class="db-cell" onclick="showDetail('act-ref-dedup')">
+      <div class="db-step">⑦ Dedup ↺</div>
+      <div class="db-badge db-r">R baseline act_ref</div>
+      <div class="db-badge db-w">W dedup_status</div>
+      <div class="db-badge db-w">W repetition_count</div>
     </div>
     <div class="db-cell" onclick="showDetail('save-db')">
       <div class="db-step">⑧ Save</div>
@@ -533,7 +541,7 @@ const details = {
     subtitle: 'Admin UI — happens before any run',
     badge: 'grey', badgeLabel: 'UI Only',
     cols: [
-      { heading: 'What it does', items: ['Defines Country + Line of Business pair', 'Sets schedule (cron or manual)', 'Sets date_scope (how far back to look)', 'Manages language settings per profile'] },
+      { heading: 'What it does', items: ['Defines Country + Line of Business pair', 'Sets schedule (cron or manual)', 'Sets date_scope (how far back to look)', '<b>Email Output Language</b> — controls the bilingual email digest only. Every pipeline stage processes items in their native source language; this setting does NOT affect collection, dedup, ranking, or grouping'] },
       { heading: 'Key file', items: ['admin/app.py — /admin/profile/&lt;id&gt;', 'admin/templates/profile.html', 'configurations/config_loader.py'] },
       { heading: 'Dependencies', items: ['SQLite config.db', 'Flask admin UI', 'No external APIs'] },
     ]
@@ -546,6 +554,16 @@ const details = {
       { heading: 'What it does', items: ['Manages Glossary Labels per LoB (HCM / FIN) — one canonical label groups many member terms', 'Add member terms in any language under a label (SGK · Sosyal Güvenlik · Social Security)', 'Synonyms and regex patterns per term', 'Re-match all re-labels a whole profile after edits', 'Drives keyword matching in Glossary Match (v3)'] },
       { heading: 'Key file', items: ['admin/app.py (label routes)', 'configurations/db.py (glossary_labels, glossary_terms, glossary_synonyms, glossary_patterns)', 'agents/glossary_labels_seed.py (seed migration)'] },
       { heading: 'Dependencies', items: ['SQLite config.db', 'No external APIs'] },
+    ]
+  },
+  'rcm-titles': {
+    title: 'RCM Reference Titles Sync',
+    subtitle: 'Setup — pull official SAP RCM regulation titles (via LOKA) to ground announcement wording',
+    badge: 'green', badgeLabel: 'Shipped v3.13',
+    cols: [
+      { heading: 'What it does', items: ['Run the <code>sync-rcm-titles</code> Claude command → LOKA MCP pulls regulation titles from JIRA', 'Upserts rows into rcm_reference_titles (per profile, keyed on jira_key)', 'The LOKA call is made by the Claude command (native MCP), NOT by Flask'] },
+      { heading: 'Why it matters', items: ['Grounds Announcement PASS 1 — English title style examples', 'Grounds Announcement PASS 2 — RCM body naming style', 'Without it, titles fall back to generic phrasing'] },
+      { heading: 'Key files', items: ['agents/rcm_reference_sync.py (persistence helper)', '.claude/commands/sync-rcm-titles.md (LOKA call)', 'configurations/db.py (rcm_reference_titles table)'] },
     ]
   },
   'sources': {
@@ -653,7 +671,7 @@ const details = {
     subtitle: 'Shipped v3.1 — DUPLICATEs preserved, entity + cosine dedup',
     badge: 'green', badgeLabel: 'Shipped v3.1',
     cols: [
-      { heading: 'What it does', items: ['Embedding-based semantic similarity (cosine)', 'Entity-canonical fingerprint for exact/near matches', 'Classifies: NEW | UPDATE | DUPLICATE (dedup_status)', '7-day rolling baseline window (SQLite)'] },
+      { heading: 'What it does', items: ['Dedup runs on <b>native-language</b> content — nothing is translated first', 'Re-fetch dups are rare by design (per-source anchor never re-fetches the same article); the real job is <b>cross-source</b> dedup — different outlets, possibly different languages, on the same event', 'First-pass signals: exact key · entity fingerprint (language-specific) · multilingual embedding cosine', 'Classifies: NEW | UPDATE | DUPLICATE (dedup_status)', 'Cross-language pairs are reconciled later by the act_ref pass after L2 Fetch', '<b>duplicate</b> = same story already in this run · <b>repeated</b> = act/entity seen ≥ 3× across the 7-day baseline'] },
       { heading: 'v3.1 shipped', items: ['DUPLICATEs saved with dedup_status — never dropped', 'Cosine-tiered thresholds (DUP ≥ 0.80; Jaccard AND-gate dropped)', 'Entity fingerprint + intra-run dedup', 'Graceful degrade to deterministic dedup if embeddings down'] },
       { heading: 'Key files', items: ['agents/compare_news.py', 'agents/sap_ai_client.py (embeddings)', 'agents/ai_cache.py (record/replay)'] },
     ]
@@ -673,7 +691,7 @@ const details = {
     subtitle: 'NEW in v3 Phase 3 (v3.3) — deterministic glossary matching + email rank gate; canonical Glossary Labels (v3.14)',
     badge: 'green', badgeLabel: 'Shipped v3.3',
     cols: [
-      { heading: 'What it does', items: ['Matches item text against each term + synonyms + regex patterns', 'Stamps the canonical Glossary Label name as topic_label (JSON array) — cross-language terms unify (v3.14)', 'Sets email_eligible = 1 for significance_rank ≥ 3 (configurable threshold, non-duplicate)', 'Persists topic_label + email_eligible to news_items via source_id/url/hash lookup'] },
+      { heading: 'What it does', items: ['Matches item text against each term + synonyms + regex patterns', 'Stamps the canonical Glossary Label name as topic_label (JSON array) — cross-language terms unify (v3.14)', 'Sets email_eligible = 1 for significance_rank ≥ 3 (configurable threshold, non-duplicate)', 'Persists topic_label + email_eligible to news_items via source_id/url/hash lookup', '<b>Glossary Gap</b>: flags rank ≥ 3 items with ZERO term matches (["General"]). Complete-miss only — does NOT detect partial gaps (an item that matched one label but should have matched more)'] },
       { heading: 'Key file', items: ['agents/glossary_match.py', 'configurations/config_loader.py (glossary helpers)', 'agents/agents_controller.py (Stage 4.4 + email gate)'] },
       { heading: 'Dependencies', items: ['SQLite glossary_terms + glossary_labels', 'No external API needed — fully deterministic'] },
     ]
@@ -683,19 +701,19 @@ const details = {
     subtitle: 'NEW v3.13 — mandatory full-article fetch + summary + act_ref, before Rank',
     badge: 'green', badgeLabel: 'Shipped v3.13',
     cols: [
-      { heading: 'What it does', items: ['Follows each item URL, extracts full article (reuses extract_article)', 'One AI call → l2_summary (2-3 factual sentences) + act_ref (law/gazette ref)', 'MANDATORY: any item failure raises L2FetchError and STOPS the run', 'Feeds richer context to Rank and to announcement clustering'] },
+      { heading: 'What it does', items: ['Follows each item URL, extracts full article (reuses extract_article)', 'One AI call → l2_summary (2-3 factual sentences) + act_ref (law/gazette ref)', 'MANDATORY: any item failure raises L2FetchError and STOPS the run', 'Feeds richer context to Rank and to announcement clustering', 'Enables cross-language dedup: the act_ref it extracts drives the Dedup ↺ reconciliation pass (v3.15)'] },
       { heading: 'Key file', items: ['agents/l2_fetcher.py', 'agents/url_sources_runner.py (extract_article, reused)', 'agents/agents_controller.py (after Glossary Match, before Rank)'] },
       { heading: 'Dependencies', items: ['requests (article fetch)', 'SAP AI Core (summary + act_ref)', 'Source Simulator precheck validates L2 at config time'] },
     ]
   },
-  'translate': {
-    title: 'Translator',
-    subtitle: 'Shipped v3.1 — extracted to agents/news_translator.py',
-    badge: 'green', badgeLabel: 'Shipped v3.1',
+  'act-ref-dedup': {
+    title: 'Cross-Language Dedup ↺ (act_ref reconciliation)',
+    subtitle: 'NEW v3.15 — runs after L2 Fetch, when the law/gazette reference is finally known',
+    badge: 'green', badgeLabel: 'Shipped v3.15',
     cols: [
-      { heading: 'What it does', items: ['Translates title + summary to recipient language', 'Stores translation in DB alongside original', 'Same-language input is a no-op'] },
-      { heading: 'v3.1 shipped', items: ['Extracted from email_sender.py into its own stage', 'AI-cache ready (record/replay via agents/ai_cache.py)', 'Behaviour-preserving refactor'] },
-      { heading: 'Key file', items: ['agents/news_translator.py', 'agents/sap_ai_client.py (GPT-4o translation prompts)'] },
+      { heading: 'Why it exists', items: ['The law/gazette ref is almost never in the headline — it surfaces only after L2 deep-fetch', 'So Compare (which runs before L2) cannot catch cross-language pairs', 'A Turkish + English article on the same law otherwise both pass as NEW — this fixes that'] },
+      { heading: 'What it does', items: ['For items Compare left as NEW that now carry an act_ref: match against baseline act_ref OR an earlier item this run', 'Match → re-classify duplicate (or update if a glossary-bearing delta exists)', 'Inherits repetition_count so cross-language re-announcements can reach "repeated" (≥ 3)', 'Only UPGRADES new items — never downgrades a duplicate'] },
+      { heading: 'Key files', items: ['agents/compare_news.py — reconcile_by_act_ref()', 'agents/agents_controller.py (after run_l2_fetch, before rank_items)', 'reuses _compute_delta + existing repetition logic'] },
     ]
   },
   'save-db': {
@@ -712,7 +730,7 @@ const details = {
     subtitle: 'Modified in v3.3 — AI digest grouped by Authority → Topic Label, decoupled from run',
     badge: 'green', badgeLabel: 'Shipped v3.3',
     cols: [
-      { heading: 'What it does', items: ['Run marks SUCCESS first — email is a follow-on step (never blocks run status)', 'Collects all email_eligible items (significance_rank ≥ 3, non-duplicate)', 'Groups by Authority → Topic Label; one AI call per authority+topic group', 'AI detects aspects per group → title + collective summary + source links', 'Writes news_aspects rows; assembles inline-CSS HTML digest (640px, SAP blue)', 'Rank badge on each topic block: green (rank ≥ 4) · amber (rank 3) · hidden below 3', 'Sends via Gmail SMTP; sets email_sent = 1 on all included items'] },
+      { heading: 'What it does', items: ['Run marks SUCCESS first — email is a follow-on step (never blocks run status)', 'Collects all email_eligible items (significance_rank ≥ 3, non-duplicate)', '<b>Translation happens HERE</b> — grouped summary is translated from the profile language → English for the bilingual digest (there is no standalone Translate pipeline stage)', 'Groups by Authority → Topic Label; one AI call per authority+topic group', 'AI detects aspects per group → title + collective summary + source links', 'Writes news_aspects rows; assembles inline-CSS HTML digest (640px, SAP blue)', 'Rank badge on each topic block: green (rank ≥ 4) · amber (rank 3) · hidden below 3', 'Sends via Gmail SMTP; sets email_sent = 1 on all included items'] },
       { heading: 'email_status lifecycle', items: ['PENDING → run complete, digest not yet started', 'SENDING → digest generation + send in progress', 'SENT → digest sent successfully', 'FAILED → Resend button appears in run log', 'SKIPPED → test mode run, no auto-send'] },
       { heading: 'Key files', items: ['agents/email_composer.py (NEW — digest AI generation + HTML assembly + news_aspects write)', 'agents/email_sender.py (refactored — pure SMTP send, no HTML assembly)', 'admin/app.py — POST /send-email + follow-on thread after run SUCCESS', 'admin/templates/run_status.html — email stage indicator + Resend button'] },
       { heading: 'Post-ship fixes (v3.3)', items: ['433c040 — profile_id missing from review_news render_template (JS syntax error var _profileId = ;)', '691ad09 — news_aspects harness assertions added; 26/26 passing (was 24/24 at ship)', 'd4e775d — rank badge added to email topic block (_rank_badge helper)'] },
@@ -784,8 +802,8 @@ const details = {
     subtitle: 'NEW v3.13 — the announcement_agent that builds persistent, cross-language announcements',
     badge: 'green', badgeLabel: 'Shipped v3.13',
     cols: [
-      { heading: 'Flow (one word each)', items: ['Select — pending, email-eligible items only (bounded cost)', 'Title — AI English title per item (grounded in L2 + RCM reference titles)', 'Embed — vectorize titles', 'Cluster — cosine, guarded by act_ref (primary) / date (fallback)', 'Assign — join draft / attach to frozen (added_after_publish) / new', 'Compose — unified title + RCM body JSON', 'Persist — write news_announcements + item membership'] },
-      { heading: 'The magic', items: ['Cross-language grouping: EN + local-language items on the SAME act (act_ref) collapse into ONE announcement', 'act_ref is primary identity — title wording differences do not split them', 'Persistent + profile-scoped: draft → done (published = frozen, never regenerated)', 'Incremental "Process New/Changed" re-groups only pending items; re-rank/re-match flips an item back to pending', 'A new item matching a frozen announcement joins it marked "added after publish" (RCM Pending-Republish signal)'] },
+      { heading: 'Flow (one word each)', items: ['Select — pending, email-eligible items only (bounded cost)', '<b>PASS 1 · Title</b> — AI English title per item, grounded in L2 summary + act_ref + RCM reference titles', 'Embed — vectorize titles', 'Cluster — cosine, guarded by act_ref (primary) / date (fallback)', 'Assign — join draft / attach to frozen (added_after_publish) / new', '<b>PASS 2 · Compose</b> — per resolved cluster, unified title + RCM body JSON', 'Persist — write news_announcements + item membership'] },
+      { heading: 'The magic', items: ['act_ref is PRIMARY identity — equal act_ref = ONE group regardless of title wording OR language', 'Cross-language grouping: EN + local-language items on the SAME act collapse into one announcement', 'Fallback when act_ref absent: title cosine ≥ 0.85 AND date within ~6 months', 'Persistent + profile-scoped: draft → done (published = frozen, never regenerated)', 'Incremental "Process New/Changed" re-groups only pending items; re-rank/re-match flips an item back to pending', 'A new item matching a frozen announcement joins it marked "added after publish" (RCM Pending-Republish signal)'] },
       { heading: 'Key files', items: ['agents/announcement_agent.py — build() + merge guard + 2 AI passes', 'agents/embeddings_util.py — get_embeddings + cosine (shared)', 'agents/rcm_reference_sync.py — LOKA title cache for grounding', 'admin/templates/announcements.html — Announcement tab UI'] },
       { heading: 'Harness', items: ['python3 tests/run_harness.py --version v3.13 → 15/15 (cross-language pair → 1 announcement)'] },
     ]

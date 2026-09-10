@@ -123,5 +123,32 @@ See auto-memory `reference_ranker_ai_call`.
 
 ---
 
+## 4. Partial glossary-gap detection (added 2026-09-10)
+
+**Problem:** the current Glossary Gap alert (`agents/glossary_match.py::flag_glossary_gaps`) is
+**binary** — it only fires when an item matched **zero** glossary terms (`topic_label == ["General"]`).
+It cannot detect a **partial** gap: an item that matched one label (e.g. "Social Security") but
+should also have matched others ("Employment", "Pension") that are not yet in the glossary. The
+matcher is deterministic substring/regex and has no notion of "which keywords in this item *qualify*
+as glossary-worthy but are missing."
+
+**Desired model:** for a rank ≥ 3 item that already has ≥ 1 label, an AI pass proposes **additional**
+candidate labels/terms it believes apply, surfaced in Review the same way the current gap "+ Add to
+Glossary" panel works — the reviewer confirms and the term is added + the item re-matched.
+
+**Reuse what exists:**
+- The v3.5 gap UI (`+ Add to Glossary` panel, `/glossary/suggest`, `/add-to-glossary`, Re-match 🔖)
+  is the confirm-and-add mechanism — extend it from "complete miss" to "partial miss".
+- Canonical Glossary Labels (v3.14) are the target vocabulary the AI suggests against.
+
+**Real work (needs its own spec):** an AI suggestion call (grounded in the profile's existing labels)
+that returns *missing* labels for an already-matched item; a new "partial gap" flag/badge distinct
+from the current complete-miss flag; Review surfacing + confirm flow.
+
+**Files (future):** `agents/glossary_match.py`, `admin/app.py` (suggest/add routes),
+`admin/templates/review_news.html`.
+
+---
+
 **Related:** `Roadmap/v3-pipeline-redesign.md` (§Phase 7 = V4, §14 table). Grounding-tool URLs also mirrored in auto-memory `l2a-capability-hub-mcps`.
 

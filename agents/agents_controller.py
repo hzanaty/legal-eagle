@@ -644,6 +644,12 @@ def run_profile_once(
             print("🌐 L2 Fetch: pulling full-article detail + act_ref (mandatory)…")
             from agents.l2_fetcher import run_l2_fetch
             run_l2_fetch(filtered_items)
+            # v3.15: cross-language dedup reconciliation. act_ref (language-independent)
+            # is only reliable after L2, so items Compare left as 'new' but that share an
+            # act with a baseline/earlier-run item are re-classified here (update/duplicate)
+            # before Rank honors dedup_status. Persisted by the add_news_item loop below.
+            from agents.compare_news import reconcile_by_act_ref
+            reconcile_by_act_ref(filtered_items, an_conn, profile_id)
             print("📊 Rank: scoring significance 1–5…")
             rank_items(filtered_items, profile_id, an_conn)      # → significance_rank (sees topic_label + L2)
             an_conn.close()

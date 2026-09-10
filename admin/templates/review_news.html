@@ -205,12 +205,7 @@
   <div class="filter-bar">
     <button type="button" class="filter-help-btn" onclick="openFilterHelp()" title="What do these filters mean?" aria-label="Filter help">?</button>
     <div class="review-lang">
-      <span title="Language used when you click Translate on an item">&#127760;</span>
-      <select id="reviewLang" onchange="setReviewLang(this.value)" title="Translation target language">
-        {% for code, name in language_names.items() %}
-        <option value="{{ code }}">{{ name }}</option>
-        {% endfor %}
-      </select>
+      <span title="Translate the native-language title to English">&#127760; title → EN</span>
     </div>
     <div class="filter-row">
       <span class="filter-label">Rank</span>
@@ -704,21 +699,20 @@
       }).catch(function(e){ btn.textContent = old; btn.disabled = false; alert('Network error: ' + e); });
   }
 
-  // ── Translate per item (side-by-side, into the header-selected language) ──
-  function setReviewLang(v) { try { localStorage.setItem('reviewLang', v); } catch(e){} }
+  // ── Translate per item (side-by-side): native title → English ──
   function translateItem(btn, itemId) {
-    var lang = document.getElementById('reviewLang').value;
+    // Review always translates the native-language TITLE to English — the L2 summary
+    // in the News Details accordion is already English, so only the title needs it.
     var card = btn.closest('.item-card, .src-card');
     var main = card.querySelector('.item-main, .src-card-body');
     var old = btn.textContent; btn.textContent = '…'; btn.disabled = true;
     fetch('/admin/profiles/' + _profileId + '/review/translate', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ item_ids: [parseInt(itemId)], target_lang: lang })
+      body: JSON.stringify({ item_ids: [parseInt(itemId)], target_lang: 'en' })
     }).then(function(r){ return r.json(); }).then(function(d){
       btn.textContent = old; btn.disabled = false;
       var tr = (d.translations && d.translations[0]) || null;
-      if (!tr) { alert('Translation failed.'); return; }
-      var langName = document.getElementById('reviewLang').selectedOptions[0].textContent;
+      if (!tr) { alert('Translation failed: ' + (d.error || 'unknown error')); return; }
       // Split the card: original stays on the left (main), translation panel on the right.
       var panel = card.querySelector('.item-tr');
       if (!panel) {
@@ -727,10 +721,9 @@
         main.parentNode.insertBefore(panel, main.nextSibling);  // right of the original
       }
       panel.innerHTML =
-        '<div class="item-tr-head">' + _esc(langName) +
+        '<div class="item-tr-head">English title' +
         ' <span class="item-tr-x" title="Hide translation" onclick="this.closest(\'.item-tr\').remove()">✕</span></div>' +
-        '<div class="item-tr-title">' + _esc(tr.title || '') + '</div>' +
-        '<div class="item-tr-body">' + _esc(tr.content || '') + '</div>';
+        '<div class="item-tr-title">' + _esc(tr.title || '') + '</div>';
     }).catch(function(e){ btn.textContent = old; btn.disabled = false; alert('Network error: ' + e); });
   }
   function _esc(s){ var d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
@@ -1042,8 +1035,5 @@
       btn.disabled = false;
     });
   }
-
-  // Restore the reviewer's chosen translation language (per-browser, no login needed)
-  (function(){ try { var v = localStorage.getItem('reviewLang'); if (v) { var s = document.getElementById('reviewLang'); if (s) s.value = v; } } catch(e){} })();
 </script>
 {% endblock %}

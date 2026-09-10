@@ -238,6 +238,88 @@ def entity_fingerprint(title: str, content: str) -> str:
     return " ".join(sorted(set(toks)))
 
 
+def _norm_act_ref(s: Optional[str]) -> str:
+    """Normalize an act/gazette reference for language-independent comparison."""
+    return (s or "").strip().lower()
+
+
+def reconcile_by_act_ref(items, conn, profile_id, days: int = WEEKLY_BASELINE_DAYS):
+    """Post-L2 cross-language dedup reconciliation (v3.15).
+
+    The law/gazette reference (``act_ref``) is language-independent but is almost
+    never present in the headline — it surfaces only after L2 deep-fetch. Compare
+    runs *before* L2, so a Turkish and an English article about the same law both
+    pass as ``new`` there. This pass runs AFTER ``run_l2_fetch`` (when act_ref is
+    known) and reconciles them:
+
+    - An item Compare left as ``new`` whose act_ref matches a **prior-run baseline**
+      item → re-classified ``update`` (kept visible; a recurring change), inheriting
+      the baseline's repetition_count + 1 so it can reach ``repeated`` (>= 3).
+    - An item whose act_ref matches only an **earlier item in this same run** →
+      re-classified ``duplicate`` (redundant same-event coverage collapses).
+
+    Only UPGRADES items Compare left as ``new`` — never downgrades a duplicate.
+    Mutates items in place; the controller's existing persist writes the new
+    dedup_status / repetition_status / repetition_count. Returns {"reconciled": n}.
+    """
+    # Baseline act_refs from PRIOR rows in the window. Current-run items were
+    # persisted by Compare with act_ref=NULL (glossary/L2 had not run yet), so a
+    # non-empty act_ref filter cannot return them — no item can match itself.
+    window_iso = (datetime.utcnow() - timedelta(days=days)).isoformat()
+    rows = conn.execute(
+        """SELECT title, content, act_ref, repetition_count
+           FROM news_items
+           WHERE profile_id=? AND COALESCE(act_ref,'')!=''
+             AND (first_seen_at >= ? OR last_seen_at >= ?)""",
+        (profile_id, window_iso, window_iso),
+    ).fetchall()
+    baseline_by_ref: Dict[str, Any] = {}
+    for r in rows:
+        ref = _norm_act_ref(r["act_ref"])
+        if ref and ref not in baseline_by_ref:
+            baseline_by_ref[ref] = dict(r)
+
+    # Deterministic order so "first sighting this run" is stable: published_at, then index.
+    order = sorted(range(len(items)), key=lambda i: ((items[i].get("published_at") or ""), i))
+    seen_this_run: Dict[str, Any] = {}   # act_ref -> the item that first owned it this run
+    reconciled = 0
+
+    for idx in order:
+        it = items[idx]
+        ref = _norm_act_ref(it.get("act_ref"))
+        if not ref:
+            continue
+        status = it.get("dedup_status") or "new"
+        if status != "new":
+            # Already duplicate/update from Compare — register as owner, don't reclassify.
+            seen_this_run.setdefault(ref, it)
+            continue
+
+        if ref in baseline_by_ref:
+            # Cross-run recurrence of the same act → keep visible as an update.
+            prior = int(baseline_by_ref[ref].get("repetition_count") or 0) + 1
+            it["dedup_status"] = "update"
+            it["repetition_count"] = prior
+            it["repetition_status"] = "repeated" if prior >= 3 else "update"
+            reconciled += 1
+        elif ref in seen_this_run:
+            # Same act already seen earlier THIS run (e.g. another language) → duplicate.
+            owner_count = int(seen_this_run[ref].get("repetition_count") or 0)
+            it["dedup_status"] = "duplicate"
+            it["repetition_count"] = owner_count
+            it["repetition_status"] = "repeated" if owner_count >= 3 else "duplicate"
+            reconciled += 1
+        else:
+            seen_this_run.setdefault(ref, it)
+            continue
+
+        seen_this_run.setdefault(ref, it)
+
+    if reconciled:
+        print(f"↺ act_ref reconciliation: {reconciled} cross-language item(s) re-classified (no longer 'new')")
+    return {"reconciled": reconciled}
+
+
 def run_compare_news_agent(
     current_items: List[Dict[str, Any]],
     outputs_dir: Optional[str] = "outputs",
