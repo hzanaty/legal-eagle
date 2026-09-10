@@ -99,6 +99,74 @@ def _english_title(item: dict, ref_titles: list[str]) -> str:
     return (item.get("title") or "")[:120]
 
 
+# ---- RCM Match (v3.17): pipeline-time entry point ----
+# Per item, generate the RCM-grounded English title (PASS 1, moved earlier so Review
+# grouping reuses it) and match it against the cached RCM reference titles to flag
+# whether this regulation is already tracked in RCM.
+
+def _persist_rcm(conn, items: list[dict], profile_id: int | None) -> None:
+    """Persist english_title / proposed_rcm_title / rcm_match_status to news_items."""
+    for it in items:
+        vals = (it.get("english_title"), it.get("proposed_rcm_title"), it.get("rcm_match_status"))
+        item_id = it.get("id")
+        if item_id:
+            conn.execute(
+                "UPDATE news_items SET english_title=?, proposed_rcm_title=?, rcm_match_status=? WHERE id=?",
+                (*vals, item_id),
+            )
+            continue
+        src_type = it.get("source_type", "RSS")
+        src_id = it.get("source_id") or it.get("guid") or it.get("tweet_id")
+        url = it.get("url") or it.get("link")
+        hash_sig = it.get("hash_signature")
+        pid = it.get("profile_id") or profile_id
+        if src_id and pid:
+            conn.execute(
+                "UPDATE news_items SET english_title=?, proposed_rcm_title=?, rcm_match_status=? "
+                "WHERE profile_id=? AND source_type=? AND source_id=?",
+                (*vals, pid, src_type, src_id),
+            )
+        elif url and pid:
+            conn.execute(
+                "UPDATE news_items SET english_title=?, proposed_rcm_title=?, rcm_match_status=? "
+                "WHERE profile_id=? AND source_type=? AND url=?",
+                (*vals, pid, src_type, url),
+            )
+        elif hash_sig and pid:
+            conn.execute(
+                "UPDATE news_items SET english_title=?, proposed_rcm_title=?, rcm_match_status=? "
+                "WHERE profile_id=? AND source_type=? AND hash_signature=?",
+                (*vals, pid, src_type, hash_sig),
+            )
+    conn.commit()
+
+
+def match_rcm_titles(conn, profile_id: int, items: list[dict]) -> dict:
+    """Per-item RCM Match: proposed_rcm_title (PASS 1) + tracked/net-new against cached titles.
+
+    Runs in the pipeline (after Reconcile). Persists english_title / proposed_rcm_title /
+    rcm_match_status so Review-time grouping reuses the titles instead of recomputing.
+    """
+    if not items:
+        return {"matched": 0}
+    ref_titles = _reference_titles(conn, profile_id, limit=50)
+    for it in items:
+        et = _english_title(it, ref_titles[:5])
+        it["english_title"] = et
+        it["proposed_rcm_title"] = et
+    if ref_titles:
+        ref_vecs = get_embeddings(ref_titles)
+        item_vecs = get_embeddings([it["english_title"] for it in items])
+        for it, iv in zip(items, item_vecs):
+            best = max((cosine(iv, rv) for rv in ref_vecs), default=0.0)
+            it["rcm_match_status"] = "tracked" if best >= TITLE_COSINE_THRESHOLD else "net-new"
+    else:
+        for it in items:
+            it["rcm_match_status"] = None
+    _persist_rcm(conn, items, profile_id)
+    return {"matched": len(items)}
+
+
 # ---- clustering guards ----
 
 def _parse_date(s: str | None):
@@ -207,12 +275,15 @@ def build(conn, profile_id: int, run_id: int) -> dict:
 
     ref_titles = _reference_titles(conn, profile_id)
 
-    # PASS 1 — English title per pending item (persisted as the clustering fingerprint)
+    # PASS 1 — English title per pending item (persisted as the clustering fingerprint).
+    # v3.17: reuse the title the RCM Match pipeline step already produced; only compute
+    # here for items that somehow lack one (e.g. older rows).
     for it in pending:
-        it["english_title"] = _english_title(it, ref_titles)
-        if it.get("id"):
-            conn.execute("UPDATE news_items SET english_title=? WHERE id=?",
-                         (it["english_title"], int(it["id"])))
+        if not it.get("english_title"):
+            it["english_title"] = _english_title(it, ref_titles)
+            if it.get("id"):
+                conn.execute("UPDATE news_items SET english_title=? WHERE id=?",
+                             (it["english_title"], int(it["id"])))
 
     # Embed pending titles + existing announcement titles
     pending_vecs = get_embeddings([it["english_title"] for it in pending])

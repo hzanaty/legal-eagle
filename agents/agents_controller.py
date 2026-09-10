@@ -657,6 +657,16 @@ def run_profile_once(
             # Reconcile: cross-language dedup keyed on law_id (act_ref fallback), post-Law-Match.
             from agents.compare_news import reconcile_by_act_ref
             reconcile_by_act_ref(filtered_items, an_conn, profile_id)
+            # v3.17: RCM Match — per-item proposed RCM title (announcement_agent pipeline entry),
+            # matched against cached RCM reference titles. Skips duplicates to bound AI cost.
+            try:
+                from agents.announcement_agent import match_rcm_titles
+                _rcm_cands = [i for i in filtered_items if (i.get("dedup_status") or "new") != "duplicate"]
+                if _rcm_cands:
+                    print("🏷️ RCM Match: proposing RCM titles + tracked/net-new…")
+                    match_rcm_titles(an_conn, profile_id, _rcm_cands)
+            except Exception as e:
+                print(f"⚠️ RCM Match skipped: {type(e).__name__}: {e}")
             print("📊 Rank: scoring significance 1–5…")
             rank_items(filtered_items, profile_id, an_conn)      # sees topic_label + L2 + law
             an_conn.close()

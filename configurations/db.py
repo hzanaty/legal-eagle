@@ -698,6 +698,16 @@ def create_schema_if_needed(conn: sqlite3.Connection) -> None:
             except Exception:
                 pass
 
+        # v3.17: RCM Match — per-item proposed RCM title + tracked/net-new status.
+        for _col, _decl in (
+            ("proposed_rcm_title", "TEXT"),
+            ("rcm_match_status", "TEXT"),   # 'tracked' | 'net-new' | NULL
+        ):
+            try:
+                conn.execute(f"ALTER TABLE news_items ADD COLUMN {_col} {_decl}")
+            except Exception:
+                pass
+
 
 # -----------------------
 # Profiles
@@ -1873,6 +1883,7 @@ def list_all_news_for_review(
                    repetition_status, repetition_count,
                    topic_label, email_eligible, email_sent, glossary_gap,
                    effective_date, l2_summary, act_ref, law_primary, law_secondary, law_reference,
+                   law_id, law_ref_status, cited_article, proposed_rcm_title, rcm_match_status,
                    (SELECT name FROM authorities WHERE authorities.id = news_items.authority_id) AS authority_name
             FROM news_items
             WHERE profile_id = ?

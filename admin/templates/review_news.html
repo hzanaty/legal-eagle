@@ -497,7 +497,15 @@
             {% endif %}
           {% endif %}
         </div>
+        {% if item.proposed_rcm_title %}
+        <div class="item-title">{{ item.proposed_rcm_title }}
+          {% if item.rcm_match_status == 'tracked' %}<span style="font-size:9px;font-weight:600;color:#0a6ed1;border:1px solid #0a6ed1;border-radius:8px;padding:0 5px;margin-left:4px;">RCM tracked</span>
+          {% elif item.rcm_match_status == 'net-new' %}<span style="font-size:9px;font-weight:600;color:#6a6d70;border:1px solid #b0b3b6;border-radius:8px;padding:0 5px;margin-left:4px;">net-new</span>{% endif %}
+        </div>
+        <div style="font-size:11px;color:#6a6d70;margin-bottom:2px;">src: {{ item.title or '(no title)' }}</div>
+        {% else %}
         <div class="item-title">{{ item.title or '(no title)' }}</div>
+        {% endif %}
         <div class="item-snippet">{{ (item.content or '')|strip_bare_urls|truncate(200, False, '…') }}</div>
         {% if item.l2_summary %}
         <span class="translation-toggle" onclick="toggleTr('l2-{{ item.item_source }}-{{ item.id }}')">&#9656; News Details</span>
