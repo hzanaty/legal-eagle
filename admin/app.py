@@ -2073,19 +2073,6 @@ def delete_law_ref_route(profile_id: int, law_id: int):
     return redirect(url_for("admin_profile_detail", profile_id=profile_id))
 
 
-@app.route("/admin/profiles/<int:profile_id>/law-refs/seed", methods=["POST"])
-def seed_law_refs_route(profile_id: int):
-    """One-click seed of the TR/HCM law set (idempotent upsert)."""
-    from agents.law_refs_seed import seed_law_refs, TR_HCM_LAWS
-    conn = get_connection()
-    create_schema_if_needed(conn)
-    n = seed_law_refs(conn, profile_id, TR_HCM_LAWS)
-    add_audit_log(conn, entity="law_refs", action="seed", details=f"{n} laws", profile_id=profile_id)
-    conn.close()
-    flash(f"Seeded {n} law references.", "success")
-    return redirect(url_for("admin_profile_detail", profile_id=profile_id))
-
-
 @app.route("/admin/profiles/<int:profile_id>/impact-rubric/update", methods=["POST"])
 def update_impact_rubric_route(profile_id: int):
     """Save the per-profile Impact-gate relevance rubric (v3.18)."""

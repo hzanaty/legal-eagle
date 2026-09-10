@@ -533,57 +533,71 @@
       <button type="submit" class="btn-add">Add Label</button>
     </form>
 
-    <div style="font-size:12px;font-weight:600;color:#32363a;margin:18px 0 8px">Authorities <span style="color:#6a6d70;font-weight:400">· {{ authorities|length if authorities else 0 }} configured</span></div>
-    <table class="auth-table">
-      <thead><tr><th>Name</th><th>Aliases</th><th style="width:120px"></th></tr></thead>
-      <tbody>
-        {% for a in authorities %}
-        <tr>
-          <td>{{ a.name }}</td>
-          <td style="color:#6a6d70">{{ a.aliases or '—' }}</td>
-          <td style="text-align:right">
-            <button class="btn-sm" onclick="openAuthModal({{ a.id }},'{{ a.name|e }}','{{ a.aliases|e }}')">Edit</button>
-            <form method="post" action="{{ url_for('delete_authority_route', profile_id=profile.id, auth_id=a.id) }}" style="display:inline;margin-left:4px;">
-              <button type="submit" class="btn-sm danger" onclick="return confirm('Delete authority \'{{ a.name|e }}\'?')">Del</button>
-            </form>
-          </td>
-        </tr>
-        {% else %}
-        <tr><td colspan="3" style="color:#6a6d70;text-align:center;padding:12px;">No authorities configured</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    <button class="btn-outline-add" onclick="openAuthModal(null,'','')">+ Add Authority</button>
+    <div style="font-size:12px;font-weight:600;color:#32363a;margin:18px 0 8px">Authorities &amp; Law References <span style="color:#6a6d70;font-weight:400">· {{ authorities|length if authorities else 0 }} authorities · {{ law_refs|length if law_refs else 0 }} laws</span></div>
+    <span class="kv-help" style="display:block;margin-bottom:8px">Define each issuing authority, then add the laws it issues underneath (parent → child). A matched law is the primary cross-language grouping identity. Gazette / Presidential-Decision / circular numbers are NOT laws — they stay on the news item.</span>
 
-    <div style="font-size:12px;font-weight:600;color:#32363a;margin:18px 0 8px">Law Reference <span style="color:#6a6d70;font-weight:400">· {{ law_refs|length if law_refs else 0 }} registered</span>
-      <form method="post" action="{{ url_for('seed_law_refs_route', profile_id=profile.id) }}" style="display:inline;margin-left:8px;">
-        <button type="submit" class="btn-sm" onclick="return confirm('Seed/refresh the TR-HCM law set?')">Seed TR/HCM</button>
-      </form>
+    {% for a in authorities %}
+    <div style="border:1px solid #e5e5e5;border-radius:6px;margin-bottom:8px;overflow:hidden;">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:#f7f7f7;">
+        <div style="font-weight:600;color:#32363a;">&#127963; {{ a.name }}{% if a.aliases %}<span style="color:#6a6d70;font-weight:400;font-size:11px;"> · {{ a.aliases }}</span>{% endif %}</div>
+        <div style="white-space:nowrap;">
+          <button class="btn-sm" onclick="openLawModal(null, {{ a.id }})">+ Add Law</button>
+          <button class="btn-sm" onclick="openAuthModal({{ a.id }},'{{ a.name|e }}','{{ a.aliases|e }}')">Edit</button>
+          <form method="post" action="{{ url_for('delete_authority_route', profile_id=profile.id, auth_id=a.id) }}" style="display:inline;">
+            <button type="submit" class="btn-sm danger" onclick="return confirm('Delete authority \'{{ a.name|e }}\'? Its laws will be unassigned.')">Del</button>
+          </form>
+        </div>
+      </div>
+      {% set alaws = law_refs|selectattr('authority_id','equalto',a.id)|list %}
+      {% if alaws %}
+      <table class="auth-table" style="margin:0;">
+        <thead><tr><th>Law (EN)</th><th>No.</th><th>Year</th><th>Status</th><th style="width:90px"></th></tr></thead>
+        <tbody>
+          {% for l in alaws %}
+          <tr data-law='{{ l|tojson }}'>
+            <td>{{ l.name_en }}{% if l.name_native %}<div style="color:#6a6d70;font-size:11px">{{ l.name_native }}</div>{% endif %}</td>
+            <td>{{ l.law_number or '—' }}</td>
+            <td>{{ l.law_year or '—' }}</td>
+            <td>{{ l.status or '—' }}</td>
+            <td style="text-align:right">
+              <button class="btn-sm" onclick="openLawModal(this.closest('tr'))">Edit</button>
+              <form method="post" action="{{ url_for('delete_law_ref_route', profile_id=profile.id, law_id=l.id) }}" style="display:inline;margin-left:4px;">
+                <button type="submit" class="btn-sm danger" onclick="return confirm('Delete law \'{{ l.name_en|e }}\'?')">Del</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div style="padding:8px 10px;color:#6a6d70;font-size:11px;">No laws under this authority yet — use “+ Add Law”.</div>
+      {% endif %}
     </div>
-    <span class="kv-help" style="display:block;margin-bottom:8px">Canonical monitored laws. A matched law is the primary cross-language grouping identity. Gazette / Presidential-Decision / circular numbers are NOT laws — they stay on the news item.</span>
-    <table class="auth-table">
-      <thead><tr><th>Law (EN)</th><th>No.</th><th>Year</th><th>Authority</th><th>Status</th><th style="width:110px"></th></tr></thead>
-      <tbody>
-        {% for l in law_refs %}
+    {% else %}
+    <div style="color:#6a6d70;padding:8px 0;">No authorities configured — add one to start.</div>
+    {% endfor %}
+
+    {% set orphan = law_refs|rejectattr('authority_id')|list %}
+    {% if orphan %}
+    <div style="border:1px dashed #d0a0a0;border-radius:6px;margin-bottom:8px;overflow:hidden;">
+      <div style="padding:8px 10px;font-weight:600;color:#a04040;background:#fbf3f3;">Unassigned (no authority)</div>
+      <table class="auth-table" style="margin:0;"><tbody>
+      {% for l in orphan %}
         <tr data-law='{{ l|tojson }}'>
-          <td>{{ l.name_en }}{% if l.name_native %}<div style="color:#6a6d70;font-size:11px">{{ l.name_native }}</div>{% endif %}</td>
-          <td>{{ l.law_number or '—' }}</td>
-          <td>{{ l.law_year or '—' }}</td>
-          <td style="color:#6a6d70">{{ l.authority_name or '—' }}</td>
-          <td>{{ l.status or '—' }}</td>
+          <td>{{ l.name_en }}</td><td>{{ l.law_number or '—' }}</td><td>{{ l.law_year or '—' }}</td><td>{{ l.status or '—' }}</td>
           <td style="text-align:right">
             <button class="btn-sm" onclick="openLawModal(this.closest('tr'))">Edit</button>
             <form method="post" action="{{ url_for('delete_law_ref_route', profile_id=profile.id, law_id=l.id) }}" style="display:inline;margin-left:4px;">
-              <button type="submit" class="btn-sm danger" onclick="return confirm('Delete law \'{{ l.name_en|e }}\'?')">Del</button>
+              <button type="submit" class="btn-sm danger" onclick="return confirm('Delete law?')">Del</button>
             </form>
           </td>
         </tr>
-        {% else %}
-        <tr><td colspan="6" style="color:#6a6d70;text-align:center;padding:12px;">No laws registered — use “Seed TR/HCM” or “+ Add Law”.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    <button class="btn-outline-add" onclick="openLawModal(null)">+ Add Law</button>
+      {% endfor %}
+      </tbody></table>
+    </div>
+    {% endif %}
+
+    <button class="btn-outline-add" onclick="openAuthModal(null,'','')">+ Add Authority</button>
   </div>
 
 </div>
@@ -623,11 +637,8 @@
           <input type="text" name="law_number" id="law-law_number" class="cfg-field" style="width:100%;" placeholder="e.g. 4447"></div>
         <div><label style="font-size:12px;color:#6a6d70;">Year</label>
           <input type="text" name="law_year" id="law-law_year" class="cfg-field" style="width:100%;" placeholder="e.g. 1999"></div>
-        <div><label style="font-size:12px;color:#6a6d70;">Issuing Authority</label>
-          <select name="authority_id" id="law-authority_id" class="cfg-field" style="width:100%;">
-            <option value="">—</option>
-            {% for a in authorities|default([]) %}<option value="{{ a.id }}">{{ a.name }}</option>{% endfor %}
-          </select></div>
+        <input type="hidden" name="authority_id" id="law-authority_id">
+        <div style="grid-column:1/3;font-size:11px;color:#6a6d70;">Authority: <span id="law-authority-name" style="font-weight:600;color:#32363a;">—</span> <span style="color:#9a9d9f;">(set by the section you add the law under)</span></div>
         <div><label style="font-size:12px;color:#6a6d70;">Status</label>
           <select name="status" id="law-status" class="cfg-field" style="width:100%;">
             <option value="">—</option>
@@ -692,7 +703,8 @@
   function closeAuthModal() { document.getElementById('auth-modal').style.display = 'none'; }
 
   var _LAW_FIELDS = ['name_en','name_native','law_number','law_year','authority_id','status','effective_date','source_url','key_articles'];
-  function openLawModal(row) {
+  var _AUTH_NAMES = { {% for a in authorities %}{{ a.id }}: {{ a.name|tojson }}{% if not loop.last %},{% endif %}{% endfor %} };
+  function openLawModal(row, authorityId) {
     var law = null;
     if (row) { try { law = JSON.parse(row.getAttribute('data-law')); } catch(e){ law = null; } }
     document.getElementById('law-modal-title').textContent = law ? 'Edit Law' : 'Add Law';
@@ -703,6 +715,11 @@
       var el = document.getElementById('law-' + f);
       if (el) el.value = (law && law[f] != null) ? law[f] : '';
     });
+    // Authority comes from the parent section: the edited law's authority, or the
+    // authority whose "+ Add Law" was clicked.
+    var authId = law ? law.authority_id : authorityId;
+    document.getElementById('law-authority_id').value = (authId != null ? authId : '');
+    document.getElementById('law-authority-name').textContent = _AUTH_NAMES[authId] || '—';
     document.getElementById('law-modal').style.display = 'flex';
   }
   function closeLawModal() { document.getElementById('law-modal').style.display = 'none'; }
