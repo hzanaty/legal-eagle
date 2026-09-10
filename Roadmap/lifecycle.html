@@ -322,6 +322,12 @@
         <div class="step-sub">Proposed RCM title + tracked/net-new · v3.17</div>
       </div>
       <div class="inner-arrow">›</div>
+      <div class="substep built" onclick="showDetail('impact')">
+        <span class="actor agent" title="Agent"><svg class="ic"><use href="#ic-agent"/></svg></span>
+        <div class="step-name">Impact</div>
+        <div class="step-sub">Relevance 0–3 + change flags + eff. date · v3.18</div>
+      </div>
+      <div class="inner-arrow">›</div>
       <div class="substep built" onclick="showDetail('rank')">
         <span class="actor agent" title="Agent"><svg class="ic"><use href="#ic-agent"/></svg></span>
         <div class="step-name">Rank</div>
@@ -714,6 +720,16 @@ const details = {
       { heading: 'Key files', items: ['agents/law_ref_matcher.py (match_law_refs + save_law_matches)', 'agents/glossary_match.py (_norm reuse)', 'agents/agents_controller.py (Analyze stage)'] },
     ]
   },
+  'impact': {
+    title: 'Impact Gate — relevance + change assessment',
+    subtitle: 'NEW v3.18 — one AI call over l2_summary, grounded by the per-profile rubric',
+    badge: 'green', badgeLabel: 'Shipped v3.18',
+    cols: [
+      { heading: 'Emits (for Rank)', items: ['operational_impact 0–3 (degree of payroll impact)', 'regulatory_change_confirmed (bool)', 'preparation_required (bool)', 'effective_date (moved here out of the ranker)'] },
+      { heading: 'What it does', items: ['Owns RELEVANCE (not Rank): operational_impact 0 + no glossary/law match → Noise', 'Grounded by an editable per-profile rubric (Setup → Relevance)', 'No hard drop — everything is scored, nothing discarded', 'Conservative fallback (impact=1) on AI failure so items stay visible'] },
+      { heading: 'Key files', items: ['agents/impact_gate.py — assess_impact() + DEFAULT_RUBRIC', 'admin/app.py — /impact-rubric/update + Setup textarea', 'setting key: impact_rubric'] },
+    ]
+  },
   'rcm-match': {
     title: 'RCM Match (announcement_agent pipeline entry)',
     subtitle: 'NEW v3.17 — per-item proposed RCM title + tracked/net-new against cached RCM titles',
@@ -727,6 +743,7 @@ const details = {
   'rank': {
     title: 'News Ranker — 3-Tier Ranking Engine',
     subtitle: 'Shipped v3.2 — 3-tier ranking engine (deterministic + AI + human override)',
+    badge: 'green', badgeLabel: 'Shipped v3.2',
     cols: [
       { heading: 'Tier 1 — Deterministic', items: ['Regex/keyword rules from ranking_signals table', 'Runs first — fastest and most explainable', 'Human-approved rules auto-extracted by grounding loop'] },
       { heading: 'Tier 2 — LLM (GPT-4o)', items: ['5–8 bootstrap examples as few-shot prompt', 'Up to 10 grounding summaries (human overrides)', 'Outputs rank 1–5 with reasoning text'] },

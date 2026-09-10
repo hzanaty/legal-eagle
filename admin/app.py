@@ -1094,6 +1094,9 @@ def admin_profile_detail(profile_id: int):
     # v3.13: RCM link + LOKA topic (for RCM reference sync)
     rcm_url = get_setting_value(profile_id, 'rcm_url', '')
     loka_topic = get_setting_value(profile_id, 'loka_topic', '')
+    # v3.18: per-profile Impact-gate relevance rubric
+    from agents.impact_gate import DEFAULT_RUBRIC as _DEFAULT_RUBRIC
+    impact_rubric = get_setting_value(profile_id, 'impact_rubric', _DEFAULT_RUBRIC)
 
     # DISABLED: ANS check — re-enable for BTP deployment
     # from agents.ans_sender import get_ans_sender
@@ -1124,6 +1127,7 @@ def admin_profile_detail(profile_id: int):
         monitor_enabled=monitor_enabled,
         rcm_url=rcm_url,
         loka_topic=loka_topic,
+        impact_rubric=impact_rubric,
         rcm_ref_titles=rcm_ref_titles,
         language_names=LANGUAGE_NAMES,
         ans_available=ans_available,
@@ -2079,6 +2083,15 @@ def seed_law_refs_route(profile_id: int):
     add_audit_log(conn, entity="law_refs", action="seed", details=f"{n} laws", profile_id=profile_id)
     conn.close()
     flash(f"Seeded {n} law references.", "success")
+    return redirect(url_for("admin_profile_detail", profile_id=profile_id))
+
+
+@app.route("/admin/profiles/<int:profile_id>/impact-rubric/update", methods=["POST"])
+def update_impact_rubric_route(profile_id: int):
+    """Save the per-profile Impact-gate relevance rubric (v3.18)."""
+    rubric = (request.form.get("impact_rubric", "") or "").strip()
+    set_setting_value(profile_id, "impact_rubric", rubric)
+    flash("Impact rubric saved.", "success")
     return redirect(url_for("admin_profile_detail", profile_id=profile_id))
 
 

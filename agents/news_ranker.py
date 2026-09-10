@@ -226,7 +226,10 @@ def rank_items(
     # Pass 3: apply final ranks + boosts
     for item, (t2_rank, t2_reasoning, effective_date) in zip(non_dupes, t2_results):
         t1_rank = t1_scores[id(item)]
-        item["effective_date"] = effective_date
+        # v3.18: the Impact gate now owns effective_date; only fall back to the ranker's
+        # extraction when Impact didn't set one (keeps behavior if Impact is skipped).
+        if not item.get("effective_date"):
+            item["effective_date"] = effective_date
         rank_for_scoring = t2_rank if _AI_RANK_REFINE else _FALLBACK_RANK
 
         if t1_rank is not None:

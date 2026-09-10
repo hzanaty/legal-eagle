@@ -184,6 +184,20 @@
     </script>
   </div>
 
+  <!-- ══ RELEVANCE (Impact gate rubric) ══ -->
+  <div class="cfg-section" id="sec-relevance">
+    <div class="cfg-section-title">Relevance</div>
+    <form method="post" action="{{ url_for('update_impact_rubric_route', profile_id=profile.id) }}">
+      <div class="kv-row" style="align-items:flex-start;">
+        <div class="kv-label">Impact Rubric
+          <div class="kv-help">Grounds the Impact gate — what counts as in-scope (payroll impact). Drives operational_impact 0–3 → Rank.</div>
+        </div>
+        <textarea name="impact_rubric" class="cfg-field" rows="4" style="flex:1;min-width:320px;">{{ impact_rubric or '' }}</textarea>
+        <button type="submit" class="btn-save">Save</button>
+      </div>
+    </form>
+  </div>
+
   <!-- ══ SOURCES ══ -->
   <div class="cfg-section" id="sec-sources">
     <div class="cfg-section-title">Sources</div>

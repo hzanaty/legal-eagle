@@ -708,6 +708,29 @@ def create_schema_if_needed(conn: sqlite3.Connection) -> None:
             except Exception:
                 pass
 
+        # v3.18: Impact gate — semantic signals consumed by the deterministic Rank.
+        for _col, _decl in (
+            ("operational_impact", "INTEGER"),          # 0-3 payroll operational impact
+            ("regulatory_change_confirmed", "INTEGER"), # 0/1
+            ("preparation_required", "INTEGER"),        # 0/1
+        ):
+            try:
+                conn.execute(f"ALTER TABLE news_items ADD COLUMN {_col} {_decl}")
+            except Exception:
+                pass
+
+        # v3.19: Timing + Rank fusion outputs.
+        for _col, _decl in (
+            ("timing_class", "TEXT"),       # immediate|upcoming|future|past|draft|none
+            ("timing_signal", "INTEGER"),   # 0-2 numeric for Rank
+            ("rank_score", "INTEGER"),
+            ("grounding_strength", "INTEGER"),
+        ):
+            try:
+                conn.execute(f"ALTER TABLE news_items ADD COLUMN {_col} {_decl}")
+            except Exception:
+                pass
+
 
 # -----------------------
 # Profiles

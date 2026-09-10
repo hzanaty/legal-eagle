@@ -667,6 +667,16 @@ def run_profile_once(
                     match_rcm_titles(an_conn, profile_id, _rcm_cands)
             except Exception as e:
                 print(f"⚠️ RCM Match skipped: {type(e).__name__}: {e}")
+            # v3.18: Impact gate — relevance + change assessment (+ effective_date) over
+            # the L2 summary, grounded by the per-profile rubric. Non-duplicates only.
+            try:
+                from agents.impact_gate import assess_impact
+                _imp_cands = [i for i in filtered_items if (i.get("dedup_status") or "new") != "duplicate"]
+                if _imp_cands:
+                    print("🎯 Impact: assessing operational impact + change signals…")
+                    assess_impact(_imp_cands, an_conn, profile_id)
+            except Exception as e:
+                print(f"⚠️ Impact gate skipped: {type(e).__name__}: {e}")
             print("📊 Rank: scoring significance 1–5…")
             rank_items(filtered_items, profile_id, an_conn)      # sees topic_label + L2 + law
             an_conn.close()
