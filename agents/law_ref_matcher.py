@@ -37,7 +37,7 @@ def _extract_article(text: str) -> str:
 
 def _load_laws(conn: sqlite3.Connection, profile_id: int) -> list[dict]:
     rows = conn.execute(
-        "SELECT id, name_en, name_native, law_number, authority_id "
+        "SELECT id, name_en, name_native, law_number, authority_id, status "
         "FROM law_refs WHERE profile_id=?",
         (profile_id,),
     ).fetchall()
@@ -68,6 +68,7 @@ def match_law_refs(items: list[dict], conn: sqlite3.Connection, profile_id: int)
         if law is not None:
             item["law_id"] = law["id"]
             item["law_ref_status"] = "registered"
+            item["law_status"] = law.get("status")   # for the Timing stage (draft detection)
             if law.get("authority_id"):
                 # Law-derived authority wins (more reliable than feed inference).
                 item["authority_id"] = law["authority_id"]

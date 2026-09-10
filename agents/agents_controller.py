@@ -677,7 +677,16 @@ def run_profile_once(
                     assess_impact(_imp_cands, an_conn, profile_id)
             except Exception as e:
                 print(f"⚠️ Impact gate skipped: {type(e).__name__}: {e}")
-            print("📊 Rank: scoring significance 1–5…")
+            # v3.19: Timing — deterministic timing_class + timing_signal (0-2) from
+            # effective_date + law status. Feeds the Rank gate. No AI call.
+            try:
+                from agents.timing import apply_timing
+                _timing_cands = [i for i in filtered_items if (i.get("dedup_status") or "new") != "duplicate"]
+                if _timing_cands:
+                    apply_timing(_timing_cands, an_conn, profile_id)
+            except Exception as e:
+                print(f"⚠️ Timing skipped: {type(e).__name__}: {e}")
+            print("📊 Rank: deterministic signal-fusion (significance 1–5)…")
             rank_items(filtered_items, profile_id, an_conn)      # sees topic_label + L2 + law
             an_conn.close()
             if not dry_run:

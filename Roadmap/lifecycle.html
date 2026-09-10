@@ -172,7 +172,7 @@
 </defs></svg>
 
 <h1>Legal Eagle — System Lifecycle</h1>
-<p class="tagline">v3.15 shipped &nbsp;·&nbsp; V4 planned &nbsp;·&nbsp; Click any step for details</p>
+<p class="tagline">v3.19 shipped &nbsp;·&nbsp; V4 planned &nbsp;·&nbsp; Click any step for details</p>
 
 <!-- SETUP -->
 <div class="phase-block">
@@ -328,10 +328,16 @@
         <div class="step-sub">Relevance 0–3 + change flags + eff. date · v3.18</div>
       </div>
       <div class="inner-arrow">›</div>
+      <div class="substep built" onclick="showDetail('timing')">
+        <span class="actor system" title="System"><svg class="ic"><use href="#ic-system"/></svg></span>
+        <div class="step-name">Timing</div>
+        <div class="step-sub">timing_class 0–2 (deterministic) · v3.19</div>
+      </div>
+      <div class="inner-arrow">›</div>
       <div class="substep built" onclick="showDetail('rank')">
-        <span class="actor agent" title="Agent"><svg class="ic"><use href="#ic-agent"/></svg></span>
+        <span class="actor system" title="System"><svg class="ic"><use href="#ic-system"/></svg></span>
         <div class="step-name">Rank</div>
-        <div class="step-sub">3-tier significance 1–5 · v3.2</div>
+        <div class="step-sub">Deterministic signal-fusion gates · v3.19</div>
       </div>
       <div class="inner-arrow">›</div>
       <div class="substep built" onclick="showDetail('save-db')">
@@ -740,14 +746,23 @@ const details = {
       { heading: 'Key files', items: ['agents/announcement_agent.py — match_rcm_titles() + _persist_rcm()', 'agents/embeddings_util.py (get_embeddings + cosine)', 'admin/templates/review_news.html (proposed-title headline + native sub-line)'] },
     ]
   },
-  'rank': {
-    title: 'News Ranker — 3-Tier Ranking Engine',
-    subtitle: 'Shipped v3.2 — 3-tier ranking engine (deterministic + AI + human override)',
-    badge: 'green', badgeLabel: 'Shipped v3.2',
+  'timing': {
+    title: 'Timing (deterministic)',
+    subtitle: 'NEW v3.19 — no AI call; derives the timing signal from effective_date + law status',
+    badge: 'green', badgeLabel: 'Shipped v3.19',
     cols: [
-      { heading: 'Tier 1 — Deterministic', items: ['Regex/keyword rules from ranking_signals table', 'Runs first — fastest and most explainable', 'Human-approved rules auto-extracted by grounding loop'] },
-      { heading: 'Tier 2 — LLM (GPT-4o)', items: ['5–8 bootstrap examples as few-shot prompt', 'Up to 10 grounding summaries (human overrides)', 'Outputs rank 1–5 with reasoning text'] },
-      { heading: 'Tier 3 — Human Override', items: ['Challenge button in Review UI', 'Extracts generalizable signal pattern', 'Auto-promotes to Tier 1 rule on confirmation', 'agents/news_ranker.py (to be created)'] },
+      { heading: 'What it does', items: ['timing_signal: 0 none/past · 1 upcoming/future/draft · 2 immediate (within ±30 days)', 'timing_class string for display (immediate/upcoming/future/past/draft/none)', 'Persisted so the Re-rank path recomputes consistently'] },
+      { heading: 'Key files', items: ['agents/timing.py — apply_timing()', 'reads effective_date (Impact) + law_status (Law Match)'] },
+    ]
+  },
+  'rank': {
+    title: 'Rank — Deterministic Signal-Fusion',
+    subtitle: 'v3.19 — a pure function of upstream signals (the AI judgment moved to Impact)',
+    badge: 'green', badgeLabel: 'Shipped v3.19',
+    cols: [
+      { heading: 'Inputs (signals)', items: ['glossary_match 0/1 · law_match 0/1 · rcm_match 0/1/2 · authority_match 0/1', 'operational_impact 0–3 (Impact) · timing 0–2 (Timing)', 'regulatory_change_confirmed + preparation_required (Impact)'] },
+      { heading: 'Gates', items: ['impact 0 + no glossary/law → 1 Noise; impact 0 + match → 2 Signal', 'impact ≥ 1 → 3 Watch (minimum)', 'change_confirmed AND preparation_required → ≥ 4 Legal Change', 'change_confirmed AND impact ≥ 2 AND timing == 2 → 5 Urgent'] },
+      { heading: 'Notes', items: ['grounding_strength (glossary+law+rcm+authority) is confidence, cannot bypass gates', 'Recurrence/REPEATED is context only (Reconcile), NOT scored here', 'Human Re-rank override preserved', 'agents/news_ranker.py — rank_items()'] },
     ]
   },
   'glossary_match': {

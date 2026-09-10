@@ -196,56 +196,75 @@ def _normalize_effective_date(value: Any) -> Optional[str]:
         return None
 
 
+def _has_glossary(item: Dict[str, Any]) -> bool:
+    label = item.get("topic_label")
+    if not label:
+        return False
+    try:
+        matches = json.loads(label)
+    except Exception:
+        return False
+    return any(m and m != "General" for m in matches)
+
+
+def _rank_reason(rank: int, oi: int, gs: int) -> str:
+    label = {1: "Noise — no operational impact & no glossary/law match",
+             2: "Signal — on-topic but no operational impact",
+             3: f"Watch — operational impact {oi}",
+             4: "Legal Change — confirmed change requiring preparation",
+             5: "Urgent — confirmed change, high impact, immediate"}.get(rank, "")
+    return f"{label}; grounding {gs}/5"
+
+
 def rank_items(
     items: List[Dict[str, Any]],
     profile_id: int,
-    db_conn,
+    db_conn=None,
 ) -> List[Dict[str, Any]]:
-    """Rank all items in place. Returns the same list with rank fields populated."""
-    signals = _load_signals(db_conn, profile_id)
-    grounding = _load_grounding(db_conn, profile_id)
+    """Deterministic signal-fusion rank (v3.19).
 
-    # Pass 1: stamp duplicates + compute Tier-1 scores
-    non_dupes = []
-    t1_scores = {}
+    Rank is now a PURE FUNCTION of the signals emitted upstream (Glossary, Law Match,
+    RCM Match, authority, Impact gate, Timing) — no AI call here (the AI judgment moved
+    to the Impact gate). Relevance is owned by Impact; Rank scores significance/urgency.
+    Recurrence/REPEATED is NOT scored (context only, set by Reconcile). `db_conn` is
+    accepted for signature compatibility but unused.
+    """
     for item in items:
         if item.get("dedup_status") == _DUPLICATE:
             item["significance_rank"] = 0
             item["rank_tier"] = _DUPLICATE
             item["rank_reasoning"] = "duplicate — skipped ranker"
+            item["rank_score"] = 0
+            item["grounding_strength"] = 0
             continue
-        text = f"{item.get('title', '')} {item.get('l2_summary', '') or ''} {item.get('content', '') or ''}"
-        t1_scores[id(item)] = _tier1_score(text, signals)
-        non_dupes.append(item)
 
-    # Pass 2: parallel Tier-2 AI scoring
-    print(f"[Ranker] Tier-2 AI scoring {len(non_dupes)} items ({_TIER2_WORKERS} workers)...")
-    with ThreadPoolExecutor(max_workers=_TIER2_WORKERS) as pool:
-        t2_results = list(pool.map(lambda it: _tier2_score(it, grounding), non_dupes))
+        g = 1 if _has_glossary(item) else 0
+        lm = 1 if item.get("law_id") else 0
+        rms = item.get("rcm_match_status")
+        rm = 2 if rms == "tracked" else (1 if rms == "net-new" else 0)
+        am = 1 if item.get("authority_id") else 0
+        oi = int(item.get("operational_impact") or 0)
+        tm = int(item.get("timing_signal") or 0)
+        rc = bool(item.get("regulatory_change_confirmed"))
+        pr = bool(item.get("preparation_required"))
 
-    # Pass 3: apply final ranks + boosts
-    for item, (t2_rank, t2_reasoning, effective_date) in zip(non_dupes, t2_results):
-        t1_rank = t1_scores[id(item)]
-        # v3.18: the Impact gate now owns effective_date; only fall back to the ranker's
-        # extraction when Impact didn't set one (keeps behavior if Impact is skipped).
-        if not item.get("effective_date"):
-            item["effective_date"] = effective_date
-        rank_for_scoring = t2_rank if _AI_RANK_REFINE else _FALLBACK_RANK
+        score = g + lm + rm + am + oi + tm
+        # Semantic gates first (relevance already handled by the Impact gate).
+        if oi == 0:
+            rank = 1 if (g == 0 and lm == 0) else 2
+        else:
+            rank = 3
+        if rc and pr:
+            rank = max(rank, 4)
+        if rc and oi >= 2 and tm == 2:
+            rank = 5
+        gs = g + lm + rm + am   # grounding strength — confidence, not a gate
 
-        if t1_rank is not None:
-            item["significance_rank"] = t1_rank
-            item["rank_tier"] = _TIER1
-            item["rank_reasoning"] = f"Tier 1 signal match (rank {t1_rank})"
-            if t1_rank >= 4:
-                _apply_boosts(item)
-                continue
-
-        final_rank = max(t1_rank or 0, rank_for_scoring)
-        item["significance_rank"] = final_rank
-        item["rank_tier"] = _TIER1 if t1_rank is not None else _TIER2
-        item["rank_reasoning"] = t2_reasoning if item["rank_tier"] == _TIER2 else item.get("rank_reasoning", "")
-        _apply_boosts(item)
-
+        item["significance_rank"] = rank
+        item["rank_tier"] = "fusion"
+        item["rank_reasoning"] = _rank_reason(rank, oi, gs)
+        item["rank_score"] = score
+        item["grounding_strength"] = gs
     return items
 
 

@@ -929,6 +929,38 @@ def delete_law_ref(conn: sqlite3.Connection, law_id: int) -> None:
         conn.execute("DELETE FROM law_refs WHERE id=?", (law_id,))
 
 
+def update_news_fields(conn: sqlite3.Connection, item: Dict[str, Any],
+                       fields: Dict[str, Any], profile_id: int | None = None) -> None:
+    """UPDATE arbitrary news_items columns for a pipeline item.
+
+    Uses the same id / source_id / url / hash_signature fallback as save_topic_labels
+    (pipeline items may not carry a DB id yet). Column names come from code, not user
+    input, so the f-string is safe.
+    """
+    if not fields:
+        return
+    set_clause = ", ".join(f"{c}=?" for c in fields)
+    vals = list(fields.values())
+    item_id = item.get("id")
+    if item_id:
+        conn.execute(f"UPDATE news_items SET {set_clause} WHERE id=?", (*vals, item_id))
+        return
+    src_type = item.get("source_type", "RSS")
+    src_id = item.get("source_id") or item.get("guid") or item.get("tweet_id")
+    url = item.get("url") or item.get("link")
+    hash_sig = item.get("hash_signature")
+    pid = item.get("profile_id") or profile_id
+    if src_id and pid:
+        conn.execute(f"UPDATE news_items SET {set_clause} WHERE profile_id=? AND source_type=? AND source_id=?",
+                     (*vals, pid, src_type, src_id))
+    elif url and pid:
+        conn.execute(f"UPDATE news_items SET {set_clause} WHERE profile_id=? AND source_type=? AND url=?",
+                     (*vals, pid, src_type, url))
+    elif hash_sig and pid:
+        conn.execute(f"UPDATE news_items SET {set_clause} WHERE profile_id=? AND source_type=? AND hash_signature=?",
+                     (*vals, pid, src_type, hash_sig))
+
+
 def list_tweet_accounts(conn: sqlite3.Connection, profile_id: int) -> List[Dict[str, Any]]:
     """
     Return tweet accounts with per-source config (handle, max_lookback_days, last_fetch_date).
