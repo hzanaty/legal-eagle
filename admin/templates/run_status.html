@@ -213,7 +213,7 @@
     <div class="test-banner" id="testBanner">&#9888; Test mode — dry-run · nothing saved, no email</div>
     <div class="stage-bar-wrap">
       <div class="stage-bar" id="stageBar">
-      {% for s in ['Starting','Collecting','Filtering','Attributing','Comparing','Glossary Match','L2 Fetch','Rank','Sending','Done'] %}
+      {% for s in ['Starting','Collecting','Filtering','Attributing','Comparing','L2 Fetch','Glossary Match','Law Match','Reconcile','RCM Match','Impact','Timing','Rank','Sending','Done'] %}
       <div class="stage-step">
         <div class="stage-pill" data-stage="{{ loop.index0 }}"><span class="stage-dot"></span>{{ s }}</div>
         {% if not loop.last %}<span class="stage-arrow">&rsaquo;</span>{% endif %}
@@ -396,16 +396,23 @@
       });
     }
     // Map pipeline log lines to stepper stages (monotonic advance).
-    // Stages: 0 Starting · 1 Collecting · 2 Filtering · 3 Attributing · 4 Comparing · 5 Glossary Match · 6 L2 Fetch · 7 Rank · 8 Sending · 9 Done
+    // Stages: 0 Starting · 1 Collecting · 2 Filtering · 3 Attributing · 4 Comparing · 5 L2 Fetch ·
+    //         6 Glossary Match · 7 Law Match · 8 Reconcile · 9 RCM Match · 10 Impact · 11 Timing ·
+    //         12 Rank · 13 Sending · 14 Done
     var MARKERS = [
       { re: /RSS items collected|monitored site items|tweets collected|RSS Parser|Fetching|collected/i, stage: 1 },
       { re: /📅 Filtering:/i, stage: 2 },
       { re: /Attribution stamped|Attribution stage|attribut/i, stage: 3 },
       { re: /semantic comparison|Compare News|comparison|dedup|new items and/i, stage: 4 },
-      { re: /🔖 Glossary Match|Glossary Match|Glossary gap|glossary/i, stage: 5 },
-      { re: /🌐 L2 Fetch|L2 Fetch/i, stage: 6 },
-      { re: /📊 Rank|Rank stage|ranking|\[Ranker\]|Effective-date/i, stage: 7 },
-      { re: /Email gate|Sending summary|Email preview|digest|Sending/i, stage: 8 }
+      { re: /🌐 L2 Fetch|L2 Fetch/i, stage: 5 },
+      { re: /🔖 Glossary Match|Glossary Match|Glossary gap/i, stage: 6 },
+      { re: /⚖ Law Match|Law Match/i, stage: 7 },
+      { re: /↺ Reconcile|reconciliation|Reconcile/i, stage: 8 },
+      { re: /🏷️ RCM Match|🏷 RCM Match|RCM Match/i, stage: 9 },
+      { re: /🎯 Impact|Impact:/i, stage: 10 },
+      { re: /🕒 Timing|Timing:/i, stage: 11 },
+      { re: /📊 Rank|Rank stage|ranking|\[Ranker\]|signal-fusion/i, stage: 12 },
+      { re: /Email gate|Sending summary|Email preview|digest|Sending/i, stage: 13 }
     ];
     function appendLine(text) {
       var div = document.createElement('div');
@@ -425,12 +432,12 @@
     var es = new EventSource('/admin/runs/' + runId + '/stream');
     es.onmessage = function(e) { appendLine(e.data); };
     es.addEventListener('done', function(e) {
-      // Sending (pill index 8) turns green ONLY if the digest was actually emailed;
+      // Sending (pill index 13) turns green ONLY if the digest was actually emailed;
       // if Send-email was off / test mode / send failed, it stays grey (skipped).
       var estatus = (meta.getAttribute('data-email-status') || '').toUpperCase();
       pills.forEach(function(p, idx) {
         p.classList.remove('active', 'done', 'skipped');
-        if (idx === 8) p.classList.add(estatus === 'SENT' ? 'done' : 'skipped');
+        if (idx === 13) p.classList.add(estatus === 'SENT' ? 'done' : 'skipped');
         else p.classList.add('done');
       });
       cur = pills.length;

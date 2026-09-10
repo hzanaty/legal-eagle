@@ -2,54 +2,82 @@
   {
     "stage": "Starting",
     "title": "Starting — pre-flight checks",
-    "blurb": "Parallel health checks (database, SAP AI Core, Gmail) run before any fetching. If a required system is unreachable the run aborts here."
+    "blurb": "Parallel health checks (database, SAP AI Core, Gmail) run before any fetching, plus a source-simulation precheck. If a required system is unreachable, or a URL source was never simulated, the run aborts here."
   },
   {
     "stage": "Collecting",
     "title": "Collecting — fetch from sources",
-    "blurb": "Pulls new items from every configured source (RSS, Twitter/X, crawled URL sources, email inbox). Each source is anchored to its own last-fetch date so nothing is re-pulled."
+    "blurb": "Pulls new items from every configured source (RSS, Twitter/X, crawled URL sources, email inbox) and stamps each item's publisher. Each source is anchored to its own last-fetch date so nothing is re-pulled."
   },
   {
     "stage": "Filtering",
-    "title": "Filtering — drop stale / irrelevant",
-    "blurb": "Applies each source's date window (lookback). The old binary keep/drop filter is retired — relevance is now enforced by the ranker's Rank 1 (Noise) tier, which scores items but never emails noise."
+    "title": "Filtering — drop stale by date",
+    "blurb": "Applies each source's date window (lookback). Date-only — relevance is decided later by the Impact gate, not here."
   },
   {
     "stage": "Attributing",
-    "title": "Attributing — issuing authority",
-    "blurb": "Stamps each item's publisher and authority. Configured feeds match directly; feeds with no configured authority get an AI-inferred one (flagged in Review)."
+    "title": "Attributing — publisher / authority",
+    "blurb": "Stamps each item's publisher and a first-pass authority. The authority is later confirmed (or derived from the matched law) in Law Match."
   },
   {
     "stage": "Comparing",
-    "title": "Comparing — dedupe & detect change",
-    "blurb": "Classifies each item against the baseline and stamps its status. Duplicates are kept (stamped rank 0), never dropped.",
+    "title": "Comparing — exact dedupe",
+    "blurb": "Cheap exact/near-duplicate detection (source id, URL, hash, entity fingerprint) before the expensive L2 fetch, so duplicates never cost an AI call. Duplicates are kept (stamped rank 0), never dropped.",
     "statuses": [
       {"label": "NEW", "meaning": "First time this item has been seen."},
-      {"label": "UPDATE", "meaning": "Seen before but changed since the last run (delta shown)."},
-      {"label": "REPEATED", "meaning": "The same story has recurred across 3 or more runs."},
       {"label": "DUPLICATE", "meaning": "Identical to another item — stamped rank 0, kept, never emailed."}
     ]
   },
   {
-    "stage": "Glossary Match",
-    "title": "Glossary Match — topic labels",
-    "blurb": "Matches each item against the profile glossary (deterministic, no AI) and assigns topic labels. Runs before Rank so a glossary match can floor an item's rank. Rank-significant items that match nothing are later flagged as glossary gaps."
+    "stage": "L2 Fetch",
+    "title": "L2 Fetch — full-article detail + law refs",
+    "blurb": "Follows each item's URL, extracts the full article, and makes one AI call for a factual English summary plus the law/act references. Runs FIRST among the semantic stages so everything downstream (Glossary, Law Match, Impact, Rank) works on the full article, not the headline. Grounded with the profile's registered laws. Mandatory: if any fetch fails, the run stops."
   },
   {
-    "stage": "L2 Fetch",
-    "title": "L2 Fetch — full-article detail + act reference",
-    "blurb": "Follows each item's URL, extracts the full article, and makes one AI call for a factual summary plus the law/act/gazette reference (act_ref). Runs before Rank so ranking sees the richer context. Mandatory: if any item's fetch fails, the run stops."
+    "stage": "Glossary Match",
+    "title": "Glossary Match — topic labels",
+    "blurb": "Matches the full-article summary against the profile glossary (deterministic, no AI) and assigns canonical topic labels. Rank-significant items that match nothing are later flagged as glossary gaps."
+  },
+  {
+    "stage": "Law Match",
+    "title": "Law Match — resolve the cited law",
+    "blurb": "Resolves the cited law to the profile's Law Reference registry (number-first, then name), giving each item a language-independent law_id — the primary cross-language grouping identity. Also resolves the issuing authority from the matched law. A cited law that isn't registered is flagged as 'suggested'."
+  },
+  {
+    "stage": "Reconcile",
+    "title": "Reconcile — cross-language dedupe & change",
+    "blurb": "Now that the law identity is known, reconciles items that Comparing left as NEW: a match against a prior run or an earlier item this run (even in another language) becomes UPDATE or DUPLICATE, and recurrence is tracked.",
+    "statuses": [
+      {"label": "UPDATE", "meaning": "Same law as a prior item, kept visible as a developing change."},
+      {"label": "REPEATED", "meaning": "The same law/story has recurred across 3 or more runs."},
+      {"label": "DUPLICATE", "meaning": "Same law as an earlier item this run (e.g. another language)."}
+    ]
+  },
+  {
+    "stage": "RCM Match",
+    "title": "RCM Match — proposed title",
+    "blurb": "Generates an English, RCM-styled title per item and matches it against the cached RCM reference titles: 'tracked' if it maps to an existing RCM regulation, else 'net-new'. The proposed title becomes the item's headline in Review and speeds announcement grouping."
+  },
+  {
+    "stage": "Impact",
+    "title": "Impact — relevance & change assessment",
+    "blurb": "One AI call over the summary, grounded by the profile's editable relevance rubric. Emits operational_impact (0–3), whether an actual regulatory change is confirmed, whether preparation is required, and the effective date. This is where relevance is decided — Rank then only scores significance."
+  },
+  {
+    "stage": "Timing",
+    "title": "Timing — when it takes effect",
+    "blurb": "Deterministic (no AI): classifies the effective date + law status into a timing signal — immediate, upcoming/future, or none/past — which feeds the Rank gate."
   },
   {
     "stage": "Rank",
-    "title": "Rank — significance 1–5",
-    "blurb": "A three-tier engine (deterministic signals, then grounded GPT-4o) scores significance 1–5. Email is sent only for rank ≥ threshold (default 3); a glossary match floors an item at rank 2.",
+    "title": "Rank — significance 1–5 (deterministic)",
+    "blurb": "A deterministic signal-fusion gate scores significance 1–5 from the upstream signals (glossary, law, RCM, authority, operational impact, timing, change flags) — no AI call. Relevance is already handled by Impact. Email is sent only for rank ≥ threshold (default 3).",
     "ranks": [
-      {"level": 5, "label": "Urgent", "meaning": "Enacted legislation with immediate compliance effect"},
-      {"level": 4, "label": "Legal Change", "meaning": "Upcoming regulatory change requiring preparation"},
+      {"level": 5, "label": "Urgent", "meaning": "Confirmed change, high operational impact, immediate effect"},
+      {"level": 4, "label": "Legal Change", "meaning": "Confirmed change requiring preparation"},
       {"level": 3, "label": "Watch", "meaning": "Operational impact — payroll, deadlines, rates"},
-      {"level": 2, "label": "Signal", "meaning": "Relevant case law or indirect implication"},
-      {"level": 1, "label": "Noise", "meaning": "Off-topic / macro / finance, no direct HR obligation"}
+      {"level": 2, "label": "Signal", "meaning": "On-topic (glossary/law match) but no operational impact"},
+      {"level": 1, "label": "Noise", "meaning": "No operational impact and no glossary/law match"}
     ]
   },
   {

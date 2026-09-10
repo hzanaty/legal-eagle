@@ -655,6 +655,7 @@ def run_profile_once(
             print("⚖ Law Match: resolving cited law → registry (law_id + authority)…")
             match_law_refs(filtered_items, an_conn, profile_id)
             # Reconcile: cross-language dedup keyed on law_id (act_ref fallback), post-Law-Match.
+            print("↺ Reconcile: cross-language dedup by law_id…")
             from agents.compare_news import reconcile_by_act_ref
             reconcile_by_act_ref(filtered_items, an_conn, profile_id)
             # v3.17: RCM Match — per-item proposed RCM title (announcement_agent pipeline entry),
@@ -683,6 +684,7 @@ def run_profile_once(
                 from agents.timing import apply_timing
                 _timing_cands = [i for i in filtered_items if (i.get("dedup_status") or "new") != "duplicate"]
                 if _timing_cands:
+                    print("🕒 Timing: classifying effective dates…")
                     apply_timing(_timing_cands, an_conn, profile_id)
             except Exception as e:
                 print(f"⚠️ Timing skipped: {type(e).__name__}: {e}")
