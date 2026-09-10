@@ -659,6 +659,45 @@ def create_schema_if_needed(conn: sqlite3.Connection) -> None:
         except Exception:
             pass
 
+        # v3.16: Law Reference registry — per-profile canonical law catalog. A resolved
+        # law_id is the primary cross-language grouping/dedup identity (act_ref stays a
+        # fallback). Gazette/Presidential-Decision/circular numbers are NOT laws — they
+        # remain news-level in news_items.law_reference, never here.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS law_refs (
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                profile_id     INTEGER NOT NULL,
+                name_en        TEXT NOT NULL,
+                name_native    TEXT,
+                law_number     TEXT,
+                law_year       TEXT,
+                authority_id   INTEGER,
+                effective_date TEXT,
+                status         TEXT,
+                source_url     TEXT,
+                key_articles   TEXT,
+                created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY(profile_id) REFERENCES profiles(id) ON DELETE CASCADE
+            );
+            """
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_law_refs_profile ON law_refs(profile_id)")
+
+        # v3.16: news_items law-identity columns.
+        #   law_id: FK into law_refs (resolved registered law) — primary grouping identity
+        #   law_ref_status: 'registered' | 'suggested' | NULL
+        #   cited_article: specific article/provision cited (metadata; does NOT split groups)
+        for _col, _decl in (
+            ("law_id", "INTEGER"),
+            ("law_ref_status", "TEXT"),
+            ("cited_article", "TEXT"),
+        ):
+            try:
+                conn.execute(f"ALTER TABLE news_items ADD COLUMN {_col} {_decl}")
+            except Exception:
+                pass
+
 
 # -----------------------
 # Profiles
@@ -790,6 +829,71 @@ def update_authority(conn: sqlite3.Connection, authority_id: int, name: str, ali
 def delete_authority(conn: sqlite3.Connection, authority_id: int) -> None:
     with conn:
         conn.execute("DELETE FROM authorities WHERE id=?", (authority_id,))
+
+
+def get_or_create_authority(conn: sqlite3.Connection, profile_id: int, name: str, aliases: str = "") -> int:
+    """Return the id of the authority with this name for the profile, creating it if absent."""
+    name = (name or "").strip()
+    if not name:
+        return -1
+    with conn:
+        conn.execute(
+            "INSERT OR IGNORE INTO authorities(profile_id, name, aliases) VALUES(?,?,?)",
+            (profile_id, name, aliases or ""),
+        )
+        row = conn.execute(
+            "SELECT id FROM authorities WHERE profile_id=? AND name=?", (profile_id, name)
+        ).fetchone()
+        return int(row["id"]) if row else -1
+
+
+# -----------------------
+# Law Reference registry (v3.16)
+# -----------------------
+
+_LAW_REF_FIELDS = (
+    "name_en", "name_native", "law_number", "law_year", "authority_id",
+    "effective_date", "status", "source_url", "key_articles",
+)
+
+
+def list_law_refs(conn: sqlite3.Connection, profile_id: int) -> List[Dict[str, Any]]:
+    """All registered laws for a profile, with the joined authority name."""
+    rows = conn.execute(
+        """SELECT lr.*, a.name AS authority_name
+           FROM law_refs lr LEFT JOIN authorities a ON a.id = lr.authority_id
+           WHERE lr.profile_id=? ORDER BY lr.name_en""",
+        (profile_id,),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_law_ref(conn: sqlite3.Connection, law_id: int) -> Optional[Dict[str, Any]]:
+    r = conn.execute("SELECT * FROM law_refs WHERE id=?", (law_id,)).fetchone()
+    return dict(r) if r else None
+
+
+def add_law_ref(conn: sqlite3.Connection, profile_id: int, fields: Dict[str, Any]) -> int:
+    cols = ["profile_id"] + [f for f in _LAW_REF_FIELDS]
+    vals = [profile_id] + [fields.get(f) for f in _LAW_REF_FIELDS]
+    ph = ",".join("?" * len(cols))
+    with conn:
+        cur = conn.execute(
+            f"INSERT INTO law_refs({','.join(cols)}) VALUES({ph})", vals
+        )
+        return int(cur.lastrowid)
+
+
+def update_law_ref(conn: sqlite3.Connection, law_id: int, fields: Dict[str, Any]) -> None:
+    sets = ", ".join(f"{f}=?" for f in _LAW_REF_FIELDS)
+    vals = [fields.get(f) for f in _LAW_REF_FIELDS] + [law_id]
+    with conn:
+        conn.execute(f"UPDATE law_refs SET {sets} WHERE id=?", vals)
+
+
+def delete_law_ref(conn: sqlite3.Connection, law_id: int) -> None:
+    with conn:
+        conn.execute("DELETE FROM law_refs WHERE id=?", (law_id,))
 
 
 def list_tweet_accounts(conn: sqlite3.Connection, profile_id: int) -> List[Dict[str, Any]]:

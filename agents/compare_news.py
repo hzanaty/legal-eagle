@@ -244,79 +244,90 @@ def _norm_act_ref(s: Optional[str]) -> str:
 
 
 def reconcile_by_act_ref(items, conn, profile_id, days: int = WEEKLY_BASELINE_DAYS):
-    """Post-L2 cross-language dedup reconciliation (v3.15).
+    """Post-L2/Law-Match dedup reconciliation (v3.15 → generalized v3.16).
 
-    The law/gazette reference (``act_ref``) is language-independent but is almost
-    never present in the headline — it surfaces only after L2 deep-fetch. Compare
-    runs *before* L2, so a Turkish and an English article about the same law both
-    pass as ``new`` there. This pass runs AFTER ``run_l2_fetch`` (when act_ref is
-    known) and reconciles them:
+    Identity is language-independent but only known after L2 + Law Match, so this runs
+    late. The primary key is the resolved **law_id** (registry law); ``act_ref`` is the
+    fallback when no law resolved. Compare runs *before* L2/Law-Match, so a Turkish and
+    an English article about the same law both pass as ``new`` there. Here:
 
-    - An item Compare left as ``new`` whose act_ref matches a **prior-run baseline**
-      item → re-classified ``update`` (kept visible; a recurring change), inheriting
-      the baseline's repetition_count + 1 so it can reach ``repeated`` (>= 3).
-    - An item whose act_ref matches only an **earlier item in this same run** →
-      re-classified ``duplicate`` (redundant same-event coverage collapses).
+    - A ``new`` item whose identity matches a **prior-run baseline** item → re-classified
+      ``update`` (recurring change), inheriting repetition_count + 1 so it can reach
+      ``repeated`` (>= 3).
+    - A ``new`` item whose identity matches only an **earlier item this run** (e.g. another
+      language) → re-classified ``duplicate``.
 
-    Only UPGRADES items Compare left as ``new`` — never downgrades a duplicate.
-    Mutates items in place; the controller's existing persist writes the new
-    dedup_status / repetition_status / repetition_count. Returns {"reconciled": n}.
+    Only UPGRADES items Compare left as ``new`` — never downgrades. Mutates in place.
+    Returns {"reconciled": n}.
     """
-    # Baseline act_refs from PRIOR rows in the window. Current-run items were
-    # persisted by Compare with act_ref=NULL (glossary/L2 had not run yet), so a
-    # non-empty act_ref filter cannot return them — no item can match itself.
+    # Baseline identities from PRIOR rows in the window. Current-run items were persisted
+    # by Compare with law_id=NULL and act_ref=NULL (Law Match / L2 had not run yet), so
+    # neither filter can return them — no item can match itself.
     window_iso = (datetime.utcnow() - timedelta(days=days)).isoformat()
     rows = conn.execute(
-        """SELECT title, content, act_ref, repetition_count
+        """SELECT act_ref, law_id, repetition_count
            FROM news_items
-           WHERE profile_id=? AND COALESCE(act_ref,'')!=''
+           WHERE profile_id=? AND (law_id IS NOT NULL OR COALESCE(act_ref,'')!='')
              AND (first_seen_at >= ? OR last_seen_at >= ?)""",
         (profile_id, window_iso, window_iso),
     ).fetchall()
+    baseline_by_law: Dict[Any, Any] = {}
     baseline_by_ref: Dict[str, Any] = {}
     for r in rows:
+        if r["law_id"] is not None and r["law_id"] not in baseline_by_law:
+            baseline_by_law[r["law_id"]] = dict(r)
         ref = _norm_act_ref(r["act_ref"])
         if ref and ref not in baseline_by_ref:
             baseline_by_ref[ref] = dict(r)
 
+    def _identity(it):
+        lid = it.get("law_id")
+        ref = _norm_act_ref(it.get("act_ref"))
+        return lid, ref
+
     # Deterministic order so "first sighting this run" is stable: published_at, then index.
     order = sorted(range(len(items)), key=lambda i: ((items[i].get("published_at") or ""), i))
-    seen_this_run: Dict[str, Any] = {}   # act_ref -> the item that first owned it this run
+    seen_law: Dict[Any, Any] = {}
+    seen_ref: Dict[str, Any] = {}
     reconciled = 0
+
+    def _register(it, lid, ref):
+        if lid is not None:
+            seen_law.setdefault(lid, it)
+        if ref:
+            seen_ref.setdefault(ref, it)
 
     for idx in order:
         it = items[idx]
-        ref = _norm_act_ref(it.get("act_ref"))
-        if not ref:
+        lid, ref = _identity(it)
+        if lid is None and not ref:
             continue
         status = it.get("dedup_status") or "new"
         if status != "new":
-            # Already duplicate/update from Compare — register as owner, don't reclassify.
-            seen_this_run.setdefault(ref, it)
+            _register(it, lid, ref)
             continue
 
-        if ref in baseline_by_ref:
-            # Cross-run recurrence of the same act → keep visible as an update.
-            prior = int(baseline_by_ref[ref].get("repetition_count") or 0) + 1
+        baseline = (baseline_by_law.get(lid) if lid is not None else None) or \
+                   (baseline_by_ref.get(ref) if ref else None)
+        run_owner = (seen_law.get(lid) if lid is not None else None) or \
+                    (seen_ref.get(ref) if ref else None)
+
+        if baseline is not None:
+            prior = int(baseline.get("repetition_count") or 0) + 1
             it["dedup_status"] = "update"
             it["repetition_count"] = prior
             it["repetition_status"] = "repeated" if prior >= 3 else "update"
             reconciled += 1
-        elif ref in seen_this_run:
-            # Same act already seen earlier THIS run (e.g. another language) → duplicate.
-            owner_count = int(seen_this_run[ref].get("repetition_count") or 0)
+        elif run_owner is not None:
+            owner_count = int(run_owner.get("repetition_count") or 0)
             it["dedup_status"] = "duplicate"
             it["repetition_count"] = owner_count
             it["repetition_status"] = "repeated" if owner_count >= 3 else "duplicate"
             reconciled += 1
-        else:
-            seen_this_run.setdefault(ref, it)
-            continue
-
-        seen_this_run.setdefault(ref, it)
+        _register(it, lid, ref)
 
     if reconciled:
-        print(f"↺ act_ref reconciliation: {reconciled} cross-language item(s) re-classified (no longer 'new')")
+        print(f"↺ identity reconciliation: {reconciled} cross-language item(s) re-classified (law_id/act_ref)")
     return {"reconciled": reconciled}
 
 

@@ -627,31 +627,38 @@ def run_profile_once(
         # Combine new and updates for the next stage
         final_items = new_items + update_items
 
-        # v3.8: ANALYZING stage — glossary tagging + three-tier ranking, consolidated into ONE
-        # stage (was separate Ranking + Tagging). Order matters: glossary match runs FIRST so
-        # topic_label is known when ranking, then rank, then the glossary-gap flag (which needs
-        # both rank and glossary). Lifecycle tags (new/update/repeated/duplicate) come from the
-        # Comparing stage and are untouched here.
+        # v3.16: ANALYZING stage, re-ordered so every semantic step sees the FULL article.
+        # L2 Fetch → Glossary Match → Law Match → Reconcile → Rank. Lifecycle tags come
+        # from Compare (exact dedup); Reconcile upgrades cross-language 'new' items by law_id.
         try:
             from agents.glossary_match import match_glossary, save_topic_labels, flag_glossary_gaps
+            from agents.law_ref_matcher import match_law_refs, save_law_matches
             from agents.news_ranker import rank_items
-            # Reads only (glossary terms + ranking signals/grounding); mutate items in memory.
+            # Reads only (glossary/law terms + ranking signals/grounding); mutate items in memory.
             an_conn = get_connection()
-            print("🔖 Glossary Match: matching items against glossary…")
-            match_glossary(filtered_items, an_conn, profile_id)  # → topic_label + best-effort act_ref
-            # v3.13: L2 Deep Fetch — MANDATORY, runs before Rank so ranking sees richer context.
-            # Any item failure raises L2FetchError which aborts the run (re-raised below).
-            print("🌐 L2 Fetch: pulling full-article detail + act_ref (mandatory)…")
+            # v3.13/v3.16: L2 Deep Fetch — MANDATORY, now runs FIRST (before Glossary/Law/Rank)
+            # so all downstream stages work on the full-article summary, not the headline.
+            # Grounded with the profile's registered laws for consistent law extraction.
+            print("🌐 L2 Fetch: pulling full-article detail + law refs (mandatory)…")
             from agents.l2_fetcher import run_l2_fetch
-            run_l2_fetch(filtered_items)
-            # v3.15: cross-language dedup reconciliation. act_ref (language-independent)
-            # is only reliable after L2, so items Compare left as 'new' but that share an
-            # act with a baseline/earlier-run item are re-classified here (update/duplicate)
-            # before Rank honors dedup_status. Persisted by the add_news_item loop below.
+            _law_rows = an_conn.execute(
+                "SELECT name_en, name_native, law_number FROM law_refs WHERE profile_id=?",
+                (profile_id,),
+            ).fetchall()
+            _known_laws = [
+                (f"{r['name_en']} (No. {r['law_number']})" if r["law_number"] else r["name_en"])
+                for r in _law_rows
+            ]
+            run_l2_fetch(filtered_items, known_laws=_known_laws)
+            print("🔖 Glossary Match: matching full-article text against glossary…")
+            match_glossary(filtered_items, an_conn, profile_id)  # now sees l2_summary
+            print("⚖ Law Match: resolving cited law → registry (law_id + authority)…")
+            match_law_refs(filtered_items, an_conn, profile_id)
+            # Reconcile: cross-language dedup keyed on law_id (act_ref fallback), post-Law-Match.
             from agents.compare_news import reconcile_by_act_ref
             reconcile_by_act_ref(filtered_items, an_conn, profile_id)
             print("📊 Rank: scoring significance 1–5…")
-            rank_items(filtered_items, profile_id, an_conn)      # → significance_rank (sees topic_label + L2)
+            rank_items(filtered_items, profile_id, an_conn)      # sees topic_label + L2 + law
             an_conn.close()
             if not dry_run:
                 # Persist rank fields + effective_date (upsert on source_id/url/hash_signature).
@@ -663,9 +670,10 @@ def run_profile_once(
                         _add_item(_it.get("profile_id") or profile_id, _rec)
                     except Exception:
                         pass
-                # Persist topic_label, then flag glossary gaps (rank + glossary both known now).
+                # Persist topic_label + law matches, then flag glossary gaps.
                 w_conn = get_connection()
                 save_topic_labels(filtered_items, w_conn, profile_id)
+                save_law_matches(filtered_items, w_conn, profile_id)
                 flag_glossary_gaps(filtered_items, w_conn, profile_id)
                 w_conn.close()
             ranked = sum(1 for i in filtered_items if (i.get("significance_rank") or 0) > 0)

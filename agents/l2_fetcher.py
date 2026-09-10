@@ -82,15 +82,25 @@ def _summarize(full_text: str, title: str) -> dict:
     return {"summary": (parsed.get("summary") or "").strip()}
 
 
-def extract_law_refs(summary_text: str, title: str) -> dict:
+def extract_law_refs(summary_text: str, title: str, known_laws: list[str] | None = None) -> dict:
     """Dedicated L2 sub-step (one AI call) — capture the legal-reference triplet.
 
     Reads the ENGLISH L2 summary (not the raw article) so output is always English
-    and bounded to the references that made the summary.
+    and bounded to the references that made the summary. When `known_laws` (the
+    profile's registered Law Reference names/numbers) is provided, the model is
+    grounded to prefer those exact canonical names — so extraction is consistent and
+    downstream Law Match resolves reliably.
 
     Returns {"primary": str, "secondary": str, "reference": str}.
     Empty strings when a field has no value.
     """
+    grounding = ""
+    if known_laws:
+        grounding = (
+            "\nKnown registered laws for this profile — when the item refers to one of "
+            "these, use its EXACT canonical name (+ number) for `primary`/`secondary`:\n"
+            + "\n".join(f"- {n}" for n in known_laws[:40]) + "\n"
+        )
     prompt = (
         "You are a legal-compliance analyst. Read the English regulatory summary and return "
         "STRICT JSON only (no markdown fences):\n"
@@ -111,7 +121,8 @@ def extract_law_refs(summary_text: str, title: str) -> dict:
         "Do NOT include verbose law names in parentheses — short-form only.\n\n"
         "KEY RULES:\n"
         "* Circulars, gazettes, and presidential decisions NEVER occupy primary or secondary.\n"
-        "* Output must be in English.\n\n"
+        "* Output must be in English.\n"
+        f"{grounding}\n"
         f"Title: {title}\n\n"
         f"Summary:\n{summary_text[:4000]}"
     )
@@ -140,7 +151,7 @@ def extract_law_refs(summary_text: str, title: str) -> dict:
         return {"primary": "", "secondary": "", "reference": ""}
 
 
-def fetch_l2_for_item(item: dict) -> dict:
+def fetch_l2_for_item(item: dict, known_laws: list[str] | None = None) -> dict:
     """Fetch + summarize one item. Mutates and returns the item dict.
 
     Sets item['l2_summary'], item['l2_fetched_at']; sets item['act_ref'] only when
@@ -161,7 +172,7 @@ def fetch_l2_for_item(item: dict) -> dict:
         result = _summarize(full_text, title)
         # Dedicated legal-reference sub-step reads the English summary (not the raw article)
         # so output is always English and bounded to what made the summary.
-        refs = extract_law_refs(result["summary"], title)
+        refs = extract_law_refs(result["summary"], title, known_laws=known_laws)
     except L2FetchError:
         raise
     except Exception as e:
@@ -179,13 +190,14 @@ def fetch_l2_for_item(item: dict) -> dict:
     return item
 
 
-def run_l2_fetch(items: list[dict]) -> list[dict]:
+def run_l2_fetch(items: list[dict], known_laws: list[str] | None = None) -> list[dict]:
     """Run mandatory L2 fetch across all items. Raises L2FetchError on first failure.
 
+    `known_laws` grounds legal-reference extraction with the profile's registered laws.
     Skips items already fetched this run (l2_fetched_at present with a summary).
     """
     for item in items:
         if item.get("l2_fetched_at") and item.get("l2_summary"):
             continue
-        fetch_l2_for_item(item)
+        fetch_l2_for_item(item, known_laws=known_laws)
     return items

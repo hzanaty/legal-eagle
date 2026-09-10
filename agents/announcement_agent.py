@@ -119,18 +119,21 @@ def _date_close(a: dict, b: dict) -> bool:
 
 
 def _same_group(item_a: dict, vec_a, item_b: dict, vec_b) -> bool:
-    """Merge guard: act-identity is primary, title cosine + date is the fallback.
+    """Merge guard: registry law_id is primary, act_ref next, title cosine + date last.
 
-    If both items carry an act_ref, that reference IS the identity signal — equal
-    act_ref merges them (this is what makes cross-language items group: same law,
-    different language/title wording). Only when an act_ref is missing do we fall
-    back to requiring title cosine >= threshold AND date proximity.
+    v3.16: when both items resolved to a registry law, equal ``law_id`` IS the identity
+    (this is what unifies cross-language items about the same law — different wording,
+    different article, same law). Falls back to act_ref equality, then to title cosine
+    >= threshold AND date proximity when neither carries a law identifier.
     """
+    la, lb = item_a.get("law_id"), item_b.get("law_id")
+    if la is not None and lb is not None:
+        return la == lb                 # PRIMARY: same registered law → same group
     ref_a = (item_a.get("act_ref") or "").strip().lower()
     ref_b = (item_b.get("act_ref") or "").strip().lower()
     if ref_a and ref_b:
-        return ref_a == ref_b          # PRIMARY: same act → same group (title wording irrelevant)
-    # FALLBACK: no act identifier on one side → need similar titles AND close dates.
+        return ref_a == ref_b           # secondary: same act reference
+    # FALLBACK: no shared identifier → need similar titles AND close dates.
     if cosine(vec_a, vec_b) < TITLE_COSINE_THRESHOLD:
         return False
     return _date_close(item_a, item_b)
@@ -227,15 +230,16 @@ def build(conn, profile_id: int, run_id: int) -> dict:
             ids = []
         act = ""
         pub = ""
+        law_id = None
         if ids:
             ph = ",".join("?" * len(ids))
             r = conn.execute(
-                f"SELECT act_ref, published_at FROM news_items WHERE id IN ({ph}) "
-                "AND act_ref IS NOT NULL LIMIT 1", ids
+                f"SELECT act_ref, law_id, published_at FROM news_items WHERE id IN ({ph}) "
+                "AND (act_ref IS NOT NULL OR law_id IS NOT NULL) LIMIT 1", ids
             ).fetchone()
             if r:
-                act, pub = r["act_ref"] or "", r["published_at"] or ""
-        return {"act_ref": act, "published_at": pub, "effective_date": a.get("first_published")}
+                act, law_id, pub = r["act_ref"] or "", r["law_id"], r["published_at"] or ""
+        return {"act_ref": act, "law_id": law_id, "published_at": pub, "effective_date": a.get("first_published")}
 
     assigned = [False] * len(pending)
 

@@ -540,6 +540,36 @@
       </tbody>
     </table>
     <button class="btn-outline-add" onclick="openAuthModal(null,'','')">+ Add Authority</button>
+
+    <div style="font-size:12px;font-weight:600;color:#32363a;margin:18px 0 8px">Law Reference <span style="color:#6a6d70;font-weight:400">· {{ law_refs|length if law_refs else 0 }} registered</span>
+      <form method="post" action="{{ url_for('seed_law_refs_route', profile_id=profile.id) }}" style="display:inline;margin-left:8px;">
+        <button type="submit" class="btn-sm" onclick="return confirm('Seed/refresh the TR-HCM law set?')">Seed TR/HCM</button>
+      </form>
+    </div>
+    <span class="kv-help" style="display:block;margin-bottom:8px">Canonical monitored laws. A matched law is the primary cross-language grouping identity. Gazette / Presidential-Decision / circular numbers are NOT laws — they stay on the news item.</span>
+    <table class="auth-table">
+      <thead><tr><th>Law (EN)</th><th>No.</th><th>Year</th><th>Authority</th><th>Status</th><th style="width:110px"></th></tr></thead>
+      <tbody>
+        {% for l in law_refs %}
+        <tr data-law='{{ l|tojson }}'>
+          <td>{{ l.name_en }}{% if l.name_native %}<div style="color:#6a6d70;font-size:11px">{{ l.name_native }}</div>{% endif %}</td>
+          <td>{{ l.law_number or '—' }}</td>
+          <td>{{ l.law_year or '—' }}</td>
+          <td style="color:#6a6d70">{{ l.authority_name or '—' }}</td>
+          <td>{{ l.status or '—' }}</td>
+          <td style="text-align:right">
+            <button class="btn-sm" onclick="openLawModal(this.closest('tr'))">Edit</button>
+            <form method="post" action="{{ url_for('delete_law_ref_route', profile_id=profile.id, law_id=l.id) }}" style="display:inline;margin-left:4px;">
+              <button type="submit" class="btn-sm danger" onclick="return confirm('Delete law \'{{ l.name_en|e }}\'?')">Del</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" style="color:#6a6d70;text-align:center;padding:12px;">No laws registered — use “Seed TR/HCM” or “+ Add Law”.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <button class="btn-outline-add" onclick="openLawModal(null)">+ Add Law</button>
   </div>
 
 </div>
@@ -559,6 +589,45 @@
       </div>
       <div style="display:flex;gap:8px;justify-content:flex-end;">
         <button type="button" onclick="closeAuthModal()" class="btn-sm">Cancel</button>
+        <button type="submit" class="btn-save">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Law Reference Modal -->
+<div id="law-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:6px;padding:24px;width:560px;max-width:92vw;max-height:88vh;overflow:auto;box-shadow:0 8px 24px rgba(0,0,0,0.15);">
+    <h3 id="law-modal-title" style="margin-bottom:16px;font-size:16px;">Add Law</h3>
+    <form id="law-modal-form" method="post">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div style="grid-column:1/3;"><label style="font-size:12px;color:#6a6d70;">Law / Regulation Name — English *</label>
+          <input type="text" name="name_en" id="law-name_en" required class="cfg-field" style="width:100%;"></div>
+        <div style="grid-column:1/3;"><label style="font-size:12px;color:#6a6d70;">Name — Native Language</label>
+          <input type="text" name="name_native" id="law-name_native" class="cfg-field" style="width:100%;"></div>
+        <div><label style="font-size:12px;color:#6a6d70;">Law Number</label>
+          <input type="text" name="law_number" id="law-law_number" class="cfg-field" style="width:100%;" placeholder="e.g. 4447"></div>
+        <div><label style="font-size:12px;color:#6a6d70;">Year</label>
+          <input type="text" name="law_year" id="law-law_year" class="cfg-field" style="width:100%;" placeholder="e.g. 1999"></div>
+        <div><label style="font-size:12px;color:#6a6d70;">Issuing Authority</label>
+          <select name="authority_id" id="law-authority_id" class="cfg-field" style="width:100%;">
+            <option value="">—</option>
+            {% for a in authorities|default([]) %}<option value="{{ a.id }}">{{ a.name }}</option>{% endfor %}
+          </select></div>
+        <div><label style="font-size:12px;color:#6a6d70;">Status</label>
+          <select name="status" id="law-status" class="cfg-field" style="width:100%;">
+            <option value="">—</option>
+            <option>Active</option><option>Partially Active</option><option>Repealed</option><option>Draft</option>
+          </select></div>
+        <div><label style="font-size:12px;color:#6a6d70;">Effective Date</label>
+          <input type="text" name="effective_date" id="law-effective_date" class="cfg-field" style="width:100%;" placeholder="YYYY-MM-DD"></div>
+        <div><label style="font-size:12px;color:#6a6d70;">Official Source URL</label>
+          <input type="text" name="source_url" id="law-source_url" class="cfg-field" style="width:100%;"></div>
+        <div style="grid-column:1/3;"><label style="font-size:12px;color:#6a6d70;">Key Articles (comma/semicolon separated)</label>
+          <input type="text" name="key_articles" id="law-key_articles" class="cfg-field" style="width:100%;" placeholder="e.g. 46-55; Temporary Articles 10; 36"></div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px;">
+        <button type="button" onclick="closeLawModal()" class="btn-sm">Cancel</button>
         <button type="submit" class="btn-save">Save</button>
       </div>
     </form>
@@ -607,6 +676,22 @@
     modal.style.display = 'flex';
   }
   function closeAuthModal() { document.getElementById('auth-modal').style.display = 'none'; }
+
+  var _LAW_FIELDS = ['name_en','name_native','law_number','law_year','authority_id','status','effective_date','source_url','key_articles'];
+  function openLawModal(row) {
+    var law = null;
+    if (row) { try { law = JSON.parse(row.getAttribute('data-law')); } catch(e){ law = null; } }
+    document.getElementById('law-modal-title').textContent = law ? 'Edit Law' : 'Add Law';
+    document.getElementById('law-modal-form').action = law
+      ? '/admin/profiles/{{ profile.id }}/law-refs/' + law.id + '/update'
+      : '/admin/profiles/{{ profile.id }}/law-refs/add';
+    _LAW_FIELDS.forEach(function(f){
+      var el = document.getElementById('law-' + f);
+      if (el) el.value = (law && law[f] != null) ? law[f] : '';
+    });
+    document.getElementById('law-modal').style.display = 'flex';
+  }
+  function closeLawModal() { document.getElementById('law-modal').style.display = 'none'; }
 
   // Scroll-spy for anchor bar
   (function(){

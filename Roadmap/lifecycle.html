@@ -196,6 +196,12 @@
       <div class="step-sub">LOKA sync · grounding</div>
     </div>
     <div class="inner-arrow">›</div>
+    <div class="step built" onclick="showDetail('law-reference')">
+      <span class="actor human" title="Human"><svg class="ic"><use href="#ic-human"/></svg></span>
+      <div class="step-name">Law Reference</div>
+      <div class="step-sub">Monitored-law registry · v3.16</div>
+    </div>
+    <div class="inner-arrow">›</div>
     <div class="step built" onclick="showDetail('sources')">
       <span class="actor human" title="Human"><svg class="ic"><use href="#ic-human"/></svg></span>
       <div class="step-name">Sources</div>
@@ -286,22 +292,28 @@
         <div class="step-sub">Dedup + classify · v3.1</div>
       </div>
       <div class="inner-arrow">›</div>
-      <div class="substep built" onclick="showDetail('glossary_match')">
-        <span class="actor agent" title="Agent"><svg class="ic"><use href="#ic-agent"/></svg></span>
-        <div class="step-name">Glossary Match</div>
-        <div class="step-sub">Glossary → topic labels + act_ref · v3.3/v3.13</div>
-      </div>
-      <div class="inner-arrow">›</div>
       <div class="substep built" onclick="showDetail('l2_fetch')">
         <span class="actor agent" title="Agent"><svg class="ic"><use href="#ic-agent"/></svg></span>
         <div class="step-name">L2 Fetch</div>
-        <div class="step-sub">Full-article detail + act_ref (mandatory) · v3.13</div>
+        <div class="step-sub">Full article + law refs · runs FIRST · v3.13/v3.16</div>
+      </div>
+      <div class="inner-arrow">›</div>
+      <div class="substep built" onclick="showDetail('glossary_match')">
+        <span class="actor agent" title="Agent"><svg class="ic"><use href="#ic-agent"/></svg></span>
+        <div class="step-name">Glossary Match</div>
+        <div class="step-sub">Topic labels (on l2_summary) · v3.3/v3.16</div>
+      </div>
+      <div class="inner-arrow">›</div>
+      <div class="substep built" onclick="showDetail('law_match')">
+        <span class="actor agent" title="Agent"><svg class="ic"><use href="#ic-agent"/></svg></span>
+        <div class="step-name">Law Match</div>
+        <div class="step-sub">Cited law → registry law_id + authority · v3.16</div>
       </div>
       <div class="inner-arrow">›</div>
       <div class="substep built" onclick="showDetail('act-ref-dedup')">
         <span class="actor agent" title="Agent"><svg class="ic"><use href="#ic-agent"/></svg></span>
         <div class="step-name">Dedup ↺</div>
-        <div class="step-sub">act_ref cross-language · v3.15</div>
+        <div class="step-sub">law_id cross-language reconcile · v3.15/v3.16</div>
       </div>
       <div class="inner-arrow">›</div>
       <div class="substep built" onclick="showDetail('rank')">
@@ -566,6 +578,16 @@ const details = {
       { heading: 'Key files', items: ['agents/rcm_reference_sync.py (persistence helper)', '.claude/commands/sync-rcm-titles.md (LOKA call)', 'configurations/db.py (rcm_reference_titles table)'] },
     ]
   },
+  'law-reference': {
+    title: 'Law Reference Registry',
+    subtitle: 'Setup (v3.16) — per-profile catalog of monitored laws; the anchor for cross-language identity',
+    badge: 'green', badgeLabel: 'Shipped v3.16',
+    cols: [
+      { heading: 'What it does', items: ['Each law = ID + EN name + native name + number + year + authority + effective date + status + source URL + key articles', 'A resolved law_id is the PRIMARY cross-language grouping/dedup identity (act_ref is fallback)', 'Status: Active / Partially Active / Repealed / Draft', 'Gazette / Presidential-Decision / circular numbers are NOT laws — they stay on the news item'] },
+      { heading: 'Setup', items: ['CRUD UI on the profile page (Knowledge section), sibling of Glossary', 'Issuing Authority = dropdown from the authorities table', '“Seed TR/HCM” one-click loads the 11-law starter set'] },
+      { heading: 'Key files', items: ['configurations/db.py (law_refs table + CRUD helpers)', 'agents/law_refs_seed.py (Turkey_HCM_Law_Reference.md seed)', 'admin/app.py (law-refs routes) + admin/templates/profile.html'] },
+    ]
+  },
   'sources': {
     title: 'Source Configuration',
     subtitle: 'Admin UI — RSS feeds, Twitter handles, URL sources',
@@ -676,6 +698,16 @@ const details = {
       { heading: 'Key files', items: ['agents/compare_news.py', 'agents/sap_ai_client.py (embeddings)', 'agents/ai_cache.py (record/replay)'] },
     ]
   },
+  'law_match': {
+    title: 'Law Match (+ Authority)',
+    subtitle: 'NEW v3.16 — deterministic resolver of a cited law to the Law Reference registry',
+    badge: 'green', badgeLabel: 'Shipped v3.16',
+    cols: [
+      { heading: 'What it does', items: ['Resolves the L2-extracted law_primary → a registry law_id (number-first, then EN/native name)', 'Sets law_ref_status: registered · suggested (cited but unregistered = law-ref gap) · none', 'Captures cited_article as metadata (does NOT split groups: Art. 36 & Art. 50 of one law still group)', 'Resolves authority from the matched law (config/AI-inference fallback for unmatched items)'] },
+      { heading: 'Why it matters', items: ['law_id is the language-independent identity for Reconcile + announcement grouping', 'A cross-language pair on the same law now collapses to ONE announcement', 'Runs after L2 Fetch (needs law_primary) + Glossary Match, before Reconcile'] },
+      { heading: 'Key files', items: ['agents/law_ref_matcher.py (match_law_refs + save_law_matches)', 'agents/glossary_match.py (_norm reuse)', 'agents/agents_controller.py (Analyze stage)'] },
+    ]
+  },
   'rank': {
     title: 'News Ranker — 3-Tier Ranking Engine',
     subtitle: 'Shipped v3.2 — 3-tier ranking engine (deterministic + AI + human override)',
@@ -707,13 +739,13 @@ const details = {
     ]
   },
   'act-ref-dedup': {
-    title: 'Cross-Language Dedup ↺ (act_ref reconciliation)',
-    subtitle: 'NEW v3.15 — runs after L2 Fetch, when the law/gazette reference is finally known',
-    badge: 'green', badgeLabel: 'Shipped v3.15',
+    title: 'Cross-Language Dedup ↺ (Reconcile)',
+    subtitle: 'v3.15 → v3.16 — runs after Law Match; keyed on law_id (act_ref fallback)',
+    badge: 'green', badgeLabel: 'Shipped v3.15/v3.16',
     cols: [
-      { heading: 'Why it exists', items: ['The law/gazette ref is almost never in the headline — it surfaces only after L2 deep-fetch', 'So Compare (which runs before L2) cannot catch cross-language pairs', 'A Turkish + English article on the same law otherwise both pass as NEW — this fixes that'] },
-      { heading: 'What it does', items: ['For items Compare left as NEW that now carry an act_ref: match against baseline act_ref OR an earlier item this run', 'Match → re-classify duplicate (or update if a glossary-bearing delta exists)', 'Inherits repetition_count so cross-language re-announcements can reach "repeated" (≥ 3)', 'Only UPGRADES new items — never downgrades a duplicate'] },
-      { heading: 'Key files', items: ['agents/compare_news.py — reconcile_by_act_ref()', 'agents/agents_controller.py (after run_l2_fetch, before rank_items)', 'reuses _compute_delta + existing repetition logic'] },
+      { heading: 'Why it exists', items: ['The law identity surfaces only after L2 + Law Match, so Compare (earlier) can\'t catch cross-language pairs', 'A Turkish + English article on the same law otherwise both pass as NEW — this fixes that'] },
+      { heading: 'What it does', items: ['For items Compare left as NEW: match by law_id first (act_ref fallback) against a prior-run baseline OR an earlier item this run', 'Baseline match → update (recurring change), repetition_count + 1 → can reach “repeated” (≥ 3)', 'Same-run match (another language) → duplicate', 'Only UPGRADES new items — never downgrades'] },
+      { heading: 'Key files', items: ['agents/compare_news.py — reconcile_by_act_ref() (law_id-keyed)', 'agents/agents_controller.py (after Law Match, before Rank)'] },
     ]
   },
   'save-db': {

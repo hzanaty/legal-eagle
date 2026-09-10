@@ -86,7 +86,9 @@ def match_glossary(items: list[dict], conn: sqlite3.Connection, profile_id: int)
     """
     rules = _load_match_rules(conn, profile_id)
     for item in items:
-        raw = f"{item.get('title', '')} {item.get('content', '')}"
+        # v3.16: Glossary Match now runs AFTER L2 Fetch, so match against the full-article
+        # summary too (not just the headline/snippet) for far better coverage.
+        raw = f"{item.get('title', '')} {item.get('content', '')} {item.get('l2_summary', '') or ''}"
         text = _norm(raw)
         labels: list[str] = []
         for rule in rules:

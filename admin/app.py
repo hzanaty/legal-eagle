@@ -1053,8 +1053,9 @@ def admin_profile_detail(profile_id: int):
         "FROM rcm_reference_titles WHERE profile_id=? ORDER BY synced_at DESC",
         (profile_id,),
     ).fetchall()
-    from configurations.db import list_labels
+    from configurations.db import list_labels, list_law_refs
     glossary_labels = list_labels(conn, profile_id)
+    law_refs = list_law_refs(conn, profile_id)
     conn.close()
 
     rss = load_rss_feeds(profile_id)
@@ -1118,6 +1119,7 @@ def admin_profile_detail(profile_id: int):
         receivers_with_lang=receivers_with_lang,
         glossary=glossary,
         glossary_labels=glossary_labels,
+        law_refs=law_refs,
         reset_quota_date=reset_quota_date,
         monitor_enabled=monitor_enabled,
         rcm_url=rcm_url,
@@ -2001,6 +2003,82 @@ def delete_authority_route(profile_id: int, auth_id: int):
     add_audit_log(conn, entity="authorities", action="delete", details=f"id={auth_id}", profile_id=profile_id)
     conn.close()
     flash("Authority deleted.", "success")
+    return redirect(url_for("admin_profile_detail", profile_id=profile_id))
+
+
+# --- Law Reference registry (v3.16) ---
+
+_LAW_REF_FORM_FIELDS = (
+    "name_en", "name_native", "law_number", "law_year", "authority_id",
+    "effective_date", "status", "source_url", "key_articles",
+)
+
+
+def _law_ref_form_fields():
+    """Collect the law-ref fields from request.form (authority_id → int or None)."""
+    f = {k: (request.form.get(k, "").strip() or None) for k in _LAW_REF_FORM_FIELDS}
+    if f.get("authority_id"):
+        try:
+            f["authority_id"] = int(f["authority_id"])
+        except ValueError:
+            f["authority_id"] = None
+    return f
+
+
+@app.route("/admin/profiles/<int:profile_id>/law-refs/add", methods=["POST"])
+def add_law_ref_route(profile_id: int):
+    from configurations.db import add_law_ref
+    fields = _law_ref_form_fields()
+    if not fields.get("name_en"):
+        flash("Law name (English) is required.", "error")
+        return redirect(url_for("admin_profile_detail", profile_id=profile_id))
+    conn = get_connection()
+    create_schema_if_needed(conn)
+    add_law_ref(conn, profile_id, fields)
+    add_audit_log(conn, entity="law_refs", action="add", details=fields["name_en"], profile_id=profile_id)
+    conn.close()
+    flash(f"Law '{fields['name_en']}' added.", "success")
+    return redirect(url_for("admin_profile_detail", profile_id=profile_id))
+
+
+@app.route("/admin/profiles/<int:profile_id>/law-refs/<int:law_id>/update", methods=["POST"])
+def update_law_ref_route(profile_id: int, law_id: int):
+    from configurations.db import update_law_ref
+    fields = _law_ref_form_fields()
+    if not fields.get("name_en"):
+        flash("Law name (English) is required.", "error")
+        return redirect(url_for("admin_profile_detail", profile_id=profile_id))
+    conn = get_connection()
+    create_schema_if_needed(conn)
+    update_law_ref(conn, law_id, fields)
+    add_audit_log(conn, entity="law_refs", action="update", details=f"id={law_id}", profile_id=profile_id)
+    conn.close()
+    flash("Law reference updated.", "success")
+    return redirect(url_for("admin_profile_detail", profile_id=profile_id))
+
+
+@app.route("/admin/profiles/<int:profile_id>/law-refs/<int:law_id>/delete", methods=["POST"])
+def delete_law_ref_route(profile_id: int, law_id: int):
+    from configurations.db import delete_law_ref
+    conn = get_connection()
+    create_schema_if_needed(conn)
+    delete_law_ref(conn, law_id)
+    add_audit_log(conn, entity="law_refs", action="delete", details=f"id={law_id}", profile_id=profile_id)
+    conn.close()
+    flash("Law reference deleted.", "success")
+    return redirect(url_for("admin_profile_detail", profile_id=profile_id))
+
+
+@app.route("/admin/profiles/<int:profile_id>/law-refs/seed", methods=["POST"])
+def seed_law_refs_route(profile_id: int):
+    """One-click seed of the TR/HCM law set (idempotent upsert)."""
+    from agents.law_refs_seed import seed_law_refs, TR_HCM_LAWS
+    conn = get_connection()
+    create_schema_if_needed(conn)
+    n = seed_law_refs(conn, profile_id, TR_HCM_LAWS)
+    add_audit_log(conn, entity="law_refs", action="seed", details=f"{n} laws", profile_id=profile_id)
+    conn.close()
+    flash(f"Seeded {n} law references.", "success")
     return redirect(url_for("admin_profile_detail", profile_id=profile_id))
 
 
