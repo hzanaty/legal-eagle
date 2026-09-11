@@ -389,78 +389,8 @@
     </div>
   </div>
 
-  {% if topics %}
-  <div class="view-toggle">
-    <button class="vtab active" id="vtab-ann" onclick="showView('ann')">&#127758; Announcements ({{ topics|length }} topics)</button>
-    <button class="vtab" id="vtab-items" onclick="showView('items')">&#128240; All Items</button>
-  </div>
-  {% endif %}
-
-  <!-- v3.4: Announcement hierarchy view -->
-  <div class="ann-container" id="annView" {% if not topics %}style="display:none"{% endif %}>
-    {% if topics %}
-      {% for topic in topics %}
-      <div class="topic-block">
-        <div class="topic-header" onclick="toggleTopic(this)">
-          <span class="topic-toggle-icon">&#9660;</span>
-          <span class="topic-name">{{ topic.topic_label|upper }}</span>
-          <span class="topic-meta-badge">{{ topic.announcements|length }} announcement{{ 's' if topic.announcements|length != 1 }} · {{ topic.source_count }} source{{ 's' if topic.source_count != 1 }}</span>
-        </div>
-        <div class="topic-body">
-          {% for ann in topic.announcements %}
-          <div class="ann-row">
-            <div class="ann-header" onclick="toggleAnn(this)">
-              <span class="ann-toggle-icon">&#9660;</span>
-              <span class="ann-title">{{ ann.title or '(untitled)' }}</span>
-              <span class="ann-src-count">{{ ann.sources|length }} source{{ 's' if ann.sources|length != 1 }}</span>
-              <span class="ann-status {% if ann.status == 'done' %}done{% endif %}">{% if ann.status == 'done' %}&#10003; Done{% if ann.jira_legal_change %} · {{ ann.jira_legal_change }}{% endif %}{% else %}{{ ann.status or 'draft' }}{% endif %}</span>
-              <button class="ann-preview-btn" onclick="event.stopPropagation(); openPreview({{ ann.id }})">Preview for RCM</button>
-            </div>
-            <div class="ann-body open">
-              {% if ann.announcement_md %}
-              <div class="ann-md-section">{{ ann.announcement_md|render_md }}</div>
-              {% endif %}
-              <div class="src-list">
-                {% for src in ann.sources %}
-                {% set r = src.significance_rank|default(0)|int %}
-                <div class="src-card" data-item-id="{{ src.id }}">
-                  <div class="src-rank-badge {% if r >= 5 %}rank-5{% elif r >= 4 %}rank-4{% elif r >= 3 %}rank-3{% elif r >= 2 %}rank-2{% elif r >= 1 %}rank-1{% else %}rank-d{% endif %}">
-                    {{ r if r > 0 else 'D' }}
-                  </div>
-                  <div class="src-card-body">
-                    <div class="src-title">{{ src.title or '(no title)' }}</div>
-                    <div class="src-meta">
-                      <span>{{ src.publisher or src.domain or 'Source' }} · {{ 'URL' if src.source_type and 'URL' in src.source_type else ('X' if src.source_type and 'weet' in src.source_type else (src.source_type|upper if src.source_type else 'RSS')) }}{% if src.authority_status == 'inferred' %} <span title="Authority inferred by AI" style="color:#e9730c;font-weight:700;">✦</span>{% endif %}</span>
-                      {% if src.authority_name %}<span class="authority-pill" title="Issuing authority">&#127963; {{ src.authority_name }}</span>{% endif %}
-                      {% if src.published_at %}<span>{{ src.published_at|truncate(16, True, '') }}</span>{% endif %}
-                      {% if src.first_seen_at %}<span title="Fetched" style="opacity:0.65;">↓ {{ src.first_seen_at|truncate(16, True, '') }}</span>{% endif %}
-                      {% if src.url %}<a href="{{ src.url }}" target="_blank" style="color:#0a6ed1;">Link</a>{% endif %}
-                    </div>
-                  </div>
-                  <div class="src-actions">
-                    <button class="act-btn" onclick="openChallenge({{ src.id }}, '{{ src.title|replace("'", "\\'") }}')" title="Re-rank (dispute the AI rank with a reason)">&#128681;</button>
-                    <button class="act-btn" onclick="rematchItem(this, {{ src.id }})" title="Re-match against the glossary">&#128278;</button>
-                    <button class="act-btn" onclick="translateItem(this, {{ src.id }})" title="Translate this item">&#127760;</button>
-                  </div>
-                </div>
-                {% endfor %}
-              </div>
-            </div>
-          </div>
-          {% endfor %}
-        </div>
-      </div>
-      {% endfor %}
-    {% else %}
-      <div class="ann-empty">
-        <div style="font-size:28px;margin-bottom:8px">&#128240;</div>
-        <div>No announcements yet — run the pipeline to generate them.</div>
-      </div>
-    {% endif %}
-  </div>
-
-  <!-- Existing flat item list -->
-  <div id="itemsView" {% if topics %}style="display:none"{% endif %}>
+  <!-- v3.30: Review is a flat item list only — grouped announcements live in the Announcement tab -->
+  <div id="itemsView">
   <div class="item-list" id="itemList">
     {% for item in items %}
     {% set raw = item.rank if item.rank is not none else item.relevance_score %}
@@ -596,17 +526,6 @@
 <script>
   var filters = { rank: 'all', status: 'all', src: 'all', lob: 'all', email: 'all' };
   var _profileId = {{ profile_id }};
-
-  // ── View toggle ──
-  function showView(which) {
-    document.getElementById('annView').style.display = which === 'ann' ? 'flex' : 'none';
-    document.getElementById('itemsView').style.display = which === 'items' ? 'flex' : 'none';
-    document.getElementById('vtab-ann') && document.getElementById('vtab-ann').classList.toggle('active', which === 'ann');
-    document.getElementById('vtab-items') && document.getElementById('vtab-items').classList.toggle('active', which === 'items');
-  }
-  // Ann view needs flex direction
-  var _av = document.getElementById('annView');
-  if (_av && _av.style.display !== 'none') { _av.style.display = 'flex'; _av.style.flexDirection = 'column'; }
 
   // ── Collapse / expand ──
   function toggleTopic(header) {
@@ -899,8 +818,7 @@
 
   // ── v3.5: Glossary gap ──
   function filterGapsOnly() {
-    // Ensure the All-Items view is showing, then activate the existing LoB=gap chip
-    showView('items');
+    // Activate the existing LoB=gap chip on the flat item list
     var chip = document.querySelector('.fchip.gap[data-dim="lob"][data-val="gap"]');
     if (chip) setFilter(chip);
   }
