@@ -777,13 +777,13 @@ const details = {
     ]
   },
   'act-ref-dedup': {
-    title: 'Reconcile — cross-language dedup ↺',
-    subtitle: 'v3.15 → v3.16 — runs after Law Match; keyed on law_id (act_ref fallback)',
-    badge: 'green', badgeLabel: 'Shipped v3.15/v3.16',
+    title: 'Reconcile — repeat / update / cross-language',
+    subtitle: 'v3.15 → v3.29 — runs after Law Match; law_id narrows candidates, same_legal_event() confirms',
+    badge: 'green', badgeLabel: 'Shipped v3.15/v3.29',
     cols: [
-      { heading: 'Why it exists', items: ['The law identity surfaces only after L2 + Law Match, so Compare (earlier) can\'t catch cross-language pairs', 'A Turkish + English article on the same law otherwise both pass as NEW — this fixes that'] },
-      { heading: 'What it does', items: ['For items Compare left as NEW: match by law_id first (act_ref fallback) against a prior-run baseline OR an earlier item this run', 'Baseline match → update (recurring change), repetition_count + 1 → can reach “repeated” (≥ 3)', 'Same-run match (another language) → duplicate', 'Only UPGRADES new items — never downgrades'] },
-      { heading: 'Key files', items: ['agents/compare_news.py — reconcile_by_act_ref() (law_id-keyed)', 'agents/agents_controller.py (after Law Match, before Rank)'] },
+      { heading: 'Why it exists', items: ['The law identity surfaces only after L2 + Law Match, so Compare (earlier) can\'t catch cross-language pairs', 'A Turkish + English article on the same event otherwise both pass as NEW — this fixes that', 'Same law ≠ same event: Law 4447 tourism wage-support vs an unemployment-eligibility change must stay separate'] },
+      { heading: 'What it does', items: ['For items Compare left as NEW: law_id (act_ref fallback) NARROWS candidates against a prior-run baseline OR an earlier item this run', 'same_legal_event() CONFIRMS same underlying event — core signal is L2 semantic similarity; cited_article / effective-date / authority corroborate where available (not mandatory ANDs)', 'Confirmed baseline match → update (recurring change), repetition_count + 1 → can reach “repeated” (≥ 3)', 'Confirmed same-run match (another language) → duplicate', 'Same law but different event → stays NEW (independent)', 'Only UPGRADES new items — never downgrades'] },
+      { heading: 'Key files', items: ['agents/compare_news.py — reconcile_by_act_ref() (candidate → same_legal_event confirm)', 'agents/legal_event.py — same_legal_event() shared helper', 'agents/agents_controller.py (after Law Match, before Rank)'] },
     ]
   },
   'save-db': {

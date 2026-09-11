@@ -41,7 +41,7 @@
   {
     "stage": "Reconcile",
     "title": "Reconcile — cross-language dedupe & change",
-    "blurb": "Now that the law identity is known, reconciles items that Comparing left as NEW: a match against a prior run or an earlier item this run (even in another language) becomes UPDATE or DUPLICATE, and recurrence is tracked.",
+    "blurb": "Now that the law identity is known, reconciles items that Comparing left as NEW: law_id (act_ref fallback) narrows candidates, then same_legal_event() confirms the same underlying event — its core signal is L2 semantic similarity, with cited article / effective date / authority corroborating where available. A confirmed match against a prior run or an earlier item this run (even in another language) becomes UPDATE or DUPLICATE and recurrence is tracked; the same law about a different event stays NEW.",
     "statuses": [
       {"label": "UPDATE", "meaning": "Same law as a prior item, kept visible as a developing change."},
       {"label": "REPEATED", "meaning": "The same law/story has recurred across 3 or more runs."},
@@ -51,7 +51,7 @@
   {
     "stage": "RCM Match",
     "title": "RCM Match — proposed title",
-    "blurb": "Generates an English, RCM-styled title per item and matches it against the cached RCM reference titles: 'tracked' if it maps to an existing RCM regulation, else 'net-new'. The proposed title becomes the item's headline in Review and speeds announcement grouping."
+    "blurb": "Generates an English, RCM-styled title per item that becomes the item's headline in Review and feeds announcement grouping. The tracked-vs-net-new determination (does it map to an existing RCM regulation?) is decided per announcement group, not per item."
   },
   {
     "stage": "Impact",
