@@ -42,8 +42,25 @@ def _get_ai_client():
 
 
 def _assess_one(item: dict, rubric: str) -> dict:
-    text = (item.get("l2_summary") or item.get("content") or "")[:2000]
+    # v3.31: reason on the L2 summary + preserved impact_evidence + glossary/law/authority
+    # context — NEVER re-read the full article.
+    summary = (item.get("l2_summary") or item.get("content") or "")[:1500]
     title = item.get("title") or ""
+    evidence = item.get("impact_evidence")
+    if evidence is None:
+        try:
+            evidence = json.loads(item.get("impact_evidence_json") or "[]")
+        except Exception:
+            evidence = []
+    evidence_block = "\n".join(f"  - {e}" for e in (evidence or [])) or "  (none extracted)"
+    ctx = []
+    if item.get("topic_label"):
+        ctx.append(f"glossary labels: {item.get('topic_label')}")
+    if item.get("law_primary"):
+        ctx.append(f"law: {item.get('law_primary')}" + (f" (status: {item.get('law_status')})" if item.get('law_status') else ""))
+    if item.get("primary_authority"):
+        ctx.append(f"responsible authority: {item.get('primary_authority')}")
+    context_block = "; ".join(ctx) or "(none)"
     prompt = (
         "You are a payroll-compliance relevance analyst. Using the scope rubric below, assess "
         "one news item and return STRICT JSON only (no fences):\n"
@@ -53,11 +70,15 @@ def _assess_one(item: dict, rubric: str) -> dict:
         "operational_impact: 0 = out of scope / no payroll impact; 1 = indirect or minor; "
         "2 = clear operational impact (rates, thresholds, deadlines, process); "
         "3 = major direct change to how payroll is calculated/paid/deducted.\n"
-        "regulatory_change_confirmed: true only if the item reports an ACTUAL enacted/decided "
-        "regulatory change (not speculation, opinion, or a general discussion).\n"
+        "regulatory_change_confirmed: true only if an ACTUAL enacted/decided regulatory change "
+        "(not speculation, opinion, or a general discussion).\n"
         "preparation_required: true if the change requires configuration/process preparation.\n"
-        "effective_date: the date the change takes effect if explicitly stated, else null.\n\n"
-        f"Title: {title}\n\nSummary: {text}"
+        "effective_date: the date the change takes effect if explicitly stated, else null.\n"
+        "Base your judgment on the IMPACT EVIDENCE clauses below (the operative details); the summary "
+        "may compress them away.\n\n"
+        f"Title: {title}\n\nSummary: {summary}\n\n"
+        f"Impact evidence (verbatim clauses):\n{evidence_block}\n\n"
+        f"Context: {context_block}"
     )
 
     def _call():
