@@ -1,20 +1,24 @@
 """
-L2 Deep Fetch Agent (v3.13) — MANDATORY pipeline step, runs after Glossary Match
-and before Rank.
+L2 Deep Fetch Agent — MANDATORY pipeline step (runs right after Compare, before
+Glossary/Law/Impact/Rank). "Read rich once": ONE AI call over the FULL article
+returns everything downstream needs, so nothing re-reads the long article.
 
-For each item it follows the item URL, extracts the full article text (reusing
-`extract_article` from url_sources_runner), then makes ONE AI call to produce:
-  - l2_summary : 2-3 sentence factual summary in English (what regulation, what changed, effective when)
-  - act_ref    : the law/act/gazette reference (clustering key), or "" when none stated
+Single article-grounded call (`_analyze_article`) → STRICT JSON:
+  - summary          : 2-3 factual English sentences (stays short)
+  - law_primary      : the operative law (+ specific article after an em-dash), or ""
+  - law_secondary    : the other main law directly cited, or ""
+  - references        : ordered list of NON-law citations, each {type, number, label}
+                        (presidential decisions, gazettes, circulars, decrees, communiques …)
+                        — every identifier preserved, never collapsed
+  - impact_evidence  : compact list of the EXACT clauses that may indicate operational
+                        HCM/payroll impact (verbatim snippets) — consumed by the Impact gate
+  - primary_authority: the government body PRIMARILY RESPONSIBLE for the overall
+                        regulatory/policy subject (subject-owner rule) — mapped to a
+                        registered authority downstream (or left unknown)
 
-A second sub-step (`extract_law_refs`) runs against the English l2_summary to produce the
-3-field legal-reference triplet (law_primary, law_secondary, law_reference) — in English,
-bounded to what made the summary, never reading the raw (possibly foreign-language) article.
-
-Failure policy — MANDATORY: any item whose fetch or extraction hard-fails raises
-L2FetchError, which stops the run (the controller marks it failed and logs the item).
-There is no silent degradation. A genuinely-absent act_ref (article has none) is NOT
-a failure — act_ref is simply left empty.
+References/laws/authority are extracted from the ARTICLE, never from the generated
+summary. Failure policy — MANDATORY: any fetch/extraction hard-failure raises
+L2FetchError and stops the run.
 """
 
 import json
@@ -26,7 +30,7 @@ import requests
 from agents.ai_cache import cached_chat
 from agents.url_sources_runner import extract_article
 
-_UA = "Mozilla/5.0 (compatible; LegalEagle/3.13; +https://sap.com)"
+_UA = "Mozilla/5.0 (compatible; LegalEagle; +https://sap.com)"
 _TIMEOUT = 30
 
 
@@ -54,109 +58,88 @@ def _fetch_html(url: str) -> str:
     return resp.text
 
 
-def _summarize(full_text: str, title: str) -> dict:
-    """One AI call → {summary}. Raises on unparseable AI output."""
+def _analyze_article(full_text: str, title: str,
+                     known_laws: list[str] | None = None,
+                     known_authorities: list[str] | None = None) -> dict:
+    """ONE AI call over the full article → the structured L2 output (see module docstring)."""
+    laws_block = ""
+    if known_laws:
+        laws_block = ("\nRegistered laws for this profile — when the item refers to one, use its "
+                      "EXACT canonical name (+ number) for law_primary/law_secondary:\n"
+                      + "\n".join(f"- {n}" for n in known_laws[:40]) + "\n")
+    auth_block = ""
+    if known_authorities:
+        auth_block = ("\nKnown authorities for this profile — prefer the exact matching name for "
+                      "primary_authority when one fits:\n"
+                      + "\n".join(f"- {n}" for n in known_authorities[:40]) + "\n")
+
     prompt = (
-        "You are a legal-compliance analyst. Read the following regulatory article "
-        "and return STRICT JSON only (no markdown fences):\n"
-        '{"summary": "..."}\n\n'
-        "- summary: 2-3 factual sentences — what regulation, what changed, effective when. "
-        "Do not editorialize or add anything not in the text.\n\n"
-        f"Title: {title}\n\n"
-        f"Article:\n{full_text[:8000]}"
+        "You are a legal-compliance analyst. Read the FULL regulatory article below and return "
+        "STRICT JSON only (no markdown fences), all values in English:\n"
+        '{"summary": "...", "law_primary": "...", "law_secondary": "...", '
+        '"references": [{"type": "...", "number": "...", "label": "..."}], '
+        '"impact_evidence": ["..."], "primary_authority": "..."}\n\n'
+        "FIELDS:\n"
+        "- summary: 2-3 factual sentences — what regulation, what changed, effective when. No editorializing.\n"
+        "- law_primary: the operative law that creates/changes the obligation, with the specific article "
+        "after an em-dash when stated (e.g. \"Unemployment Insurance Law No. 4447 — temporary Article 36\"). "
+        "\"\" if none. law_secondary: the other main law directly cited, else \"\".\n"
+        "- references: an ARRAY of every NON-law citation, each as {type, number, label}. "
+        "type ∈ presidential_decision | official_gazette | circular | decree | communique | other. "
+        "PRESERVE each identifier/number; NEVER collapse two references into one; [] if none. "
+        "Example: [{\"type\":\"presidential_decision\",\"number\":\"11752\",\"label\":\"Presidential Decision No. 11752\"},"
+        "{\"type\":\"official_gazette\",\"number\":\"33362\",\"label\":\"Official Gazette No. 33362\"}].\n"
+        "- impact_evidence: the EXACT clauses/sentences (verbatim, short) that may indicate operational "
+        "HCM/payroll impact (how to calculate, pay, or deduct; who it applies to; conditions). [] if none.\n"
+        "- primary_authority: the government body PRIMARILY RESPONSIBLE for the overall subject — the one "
+        "that OWNS / PREPARES / ISSUES / ADMINISTERS the change/program. Do NOT pick a body merely mentioned "
+        "as an affected body, implementation participant, system owner, data-sharing party, or beneficiary. "
+        "\"\" if unclear.\n\n"
+        "KEY RULES:\n"
+        "* Circulars, gazettes, presidential decisions, decrees NEVER go in law_primary/law_secondary — only in references.\n"
+        "* Extract from the ARTICLE, not from your own summary.\n"
+        f"{laws_block}{auth_block}\n"
+        f"Title: {title}\n\nArticle:\n{full_text[:8000]}"
     )
 
     def _call():
         client = _get_ai_client()
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[{"role": "user", "content": prompt}],
-            timeout=30.0,
+        r = client.chat.completions.create(
+            model="gpt-4o", messages=[{"role": "user", "content": prompt}], timeout=40.0,
         )
-        return response.choices[0].message.content.strip()
+        return r.choices[0].message.content.strip()
 
     raw = cached_chat(prompt, _call)
     raw = re.sub(r"^```json?\s*", "", raw.strip())
     raw = re.sub(r"\s*```$", "", raw.strip())
     parsed = json.loads(raw)
-    return {"summary": (parsed.get("summary") or "").strip()}
+
+    refs = []
+    for r in (parsed.get("references") or []):
+        if not isinstance(r, dict):
+            continue
+        label = (r.get("label") or "").strip()
+        if not label:
+            continue
+        refs.append({"type": (r.get("type") or "other").strip(),
+                     "number": (str(r.get("number")).strip() if r.get("number") else ""),
+                     "label": label})
+    evidence = [str(e).strip() for e in (parsed.get("impact_evidence") or []) if str(e).strip()]
+    return {
+        "summary": (parsed.get("summary") or "").strip(),
+        "law_primary": (parsed.get("law_primary") or "").strip(),
+        "law_secondary": (parsed.get("law_secondary") or "").strip(),
+        "references": refs,
+        "impact_evidence": evidence,
+        "primary_authority": (parsed.get("primary_authority") or "").strip(),
+    }
 
 
-def extract_law_refs(summary_text: str, title: str, known_laws: list[str] | None = None) -> dict:
-    """Dedicated L2 sub-step (one AI call) — capture the legal-reference triplet.
+def fetch_l2_for_item(item: dict, known_laws: list[str] | None = None,
+                      known_authorities: list[str] | None = None) -> dict:
+    """Fetch the full article + one structured analysis call. Mutates and returns the item.
 
-    Reads the ENGLISH L2 summary (not the raw article) so output is always English
-    and bounded to the references that made the summary. When `known_laws` (the
-    profile's registered Law Reference names/numbers) is provided, the model is
-    grounded to prefer those exact canonical names — so extraction is consistent and
-    downstream Law Match resolves reliably.
-
-    Returns {"primary": str, "secondary": str, "reference": str}.
-    Empty strings when a field has no value.
-    """
-    grounding = ""
-    if known_laws:
-        grounding = (
-            "\nKnown registered laws for this profile — when the item refers to one of "
-            "these, use its EXACT canonical name (+ number) for `primary`/`secondary`:\n"
-            + "\n".join(f"- {n}" for n in known_laws[:40]) + "\n"
-        )
-    prompt = (
-        "You are a legal-compliance analyst. Read the English regulatory summary and return "
-        "STRICT JSON only (no markdown fences):\n"
-        '{"primary": "...", "secondary": "...", "reference": "..."}\n\n'
-        "primary   = the law whose article/provision is the SUBJECT of this news item "
-        "(the operative law that creates/changes the obligation). Include the specific "
-        "article or provision after an em-dash when mentioned. "
-        "Example: \"Unemployment Insurance Law No. 4447 — temporary Article 36\". "
-        "Leave \"\" if no law is the operative subject.\n\n"
-        "secondary = the other main law directly cited alongside primary "
-        "(the amending law, or the law being amended). One entry only. Leave \"\" if none.\n\n"
-        "reference = all remaining legal references listed in this order: "
-        "(1) any lesser laws by short form (e.g. \"Law No. 2634\"), "
-        "(2) presidential decisions and decrees (e.g. \"Presidential Decision No. 11752\"), "
-        "(3) circulars (e.g. \"SGK 2026/21 Circular\"), "
-        "(4) official gazettes and other publication references (e.g. \"Official Gazette No. 33362\"). "
-        "Join multiple with ' · '. Leave \"\" if none. "
-        "Do NOT include verbose law names in parentheses — short-form only.\n\n"
-        "KEY RULES:\n"
-        "* Circulars, gazettes, and presidential decisions NEVER occupy primary or secondary.\n"
-        "* Output must be in English.\n"
-        f"{grounding}\n"
-        f"Title: {title}\n\n"
-        f"Summary:\n{summary_text[:4000]}"
-    )
-
-    def _call():
-        client = _get_ai_client()
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[{"role": "user", "content": prompt}],
-            timeout=30.0,
-        )
-        return response.choices[0].message.content.strip()
-
-    try:
-        raw = cached_chat(prompt, _call)
-        raw = re.sub(r"^```json?\s*", "", raw.strip())
-        raw = re.sub(r"\s*```$", "", raw.strip())
-        parsed = json.loads(raw)
-        return {
-            "primary": (parsed.get("primary") or "").strip(),
-            "secondary": (parsed.get("secondary") or "").strip(),
-            "reference": (parsed.get("reference") or "").strip(),
-        }
-    except Exception as e:
-        print(f"    ⚠️  extract_law_refs failed: {e}")
-        return {"primary": "", "secondary": "", "reference": ""}
-
-
-def fetch_l2_for_item(item: dict, known_laws: list[str] | None = None) -> dict:
-    """Fetch + summarize one item. Mutates and returns the item dict.
-
-    Sets item['l2_summary'], item['l2_fetched_at']; sets item['act_ref'] only when
-    the article names one AND the item doesn't already carry one (glossary_match
-    may have filled it from L1). Raises L2FetchError on any hard failure.
+    Raises L2FetchError on any hard failure (mandatory stage).
     """
     url = item.get("url") or item.get("link")
     if not url:
@@ -169,35 +152,40 @@ def fetch_l2_for_item(item: dict, known_laws: list[str] | None = None) -> dict:
         if not full_text.strip():
             raise L2FetchError(f"no article text extracted from {url}")
         title = item.get("title") or article.get("title") or ""
-        result = _summarize(full_text, title)
-        # Dedicated legal-reference sub-step reads the English summary (not the raw article)
-        # so output is always English and bounded to what made the summary.
-        refs = extract_law_refs(result["summary"], title, known_laws=known_laws)
+        res = _analyze_article(full_text, title, known_laws=known_laws, known_authorities=known_authorities)
     except L2FetchError:
         raise
     except Exception as e:
         raise L2FetchError(f"L2 fetch failed for {url}: {type(e).__name__}: {e}") from e
 
-    item["l2_summary"] = result["summary"]
+    item["l2_summary"] = res["summary"]
     item["l2_fetched_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-    item["law_primary"] = refs["primary"]
-    item["law_secondary"] = refs["secondary"]
-    item["law_reference"] = refs["reference"]
-    # act_ref = the primary law (clustering identity); L2 is authoritative over the
-    # L1 best-effort value glossary_match may have set.
-    if refs["primary"]:
-        item["act_ref"] = refs["primary"]
+    item["law_primary"] = res["law_primary"]
+    item["law_secondary"] = res["law_secondary"]
+    # Structured references (v3.25) + a derived joined string for back-compat display.
+    item["references"] = res["references"]
+    item["law_references_json"] = json.dumps(res["references"], ensure_ascii=False)
+    item["law_reference"] = " · ".join(r["label"] for r in res["references"])
+    # Impact evidence (v3.31) — consumed by the Impact gate, never re-reading the article.
+    item["impact_evidence"] = res["impact_evidence"]
+    item["impact_evidence_json"] = json.dumps(res["impact_evidence"], ensure_ascii=False)
+    # Responsible-authority candidate (v3.26) — mapped to a registered authority downstream.
+    item["primary_authority"] = res["primary_authority"]
+    # act_ref = the operative law (clustering candidate key); L2 is authoritative.
+    if res["law_primary"]:
+        item["act_ref"] = res["law_primary"]
     return item
 
 
-def run_l2_fetch(items: list[dict], known_laws: list[str] | None = None) -> list[dict]:
-    """Run mandatory L2 fetch across all items. Raises L2FetchError on first failure.
+def run_l2_fetch(items: list[dict], known_laws: list[str] | None = None,
+                 known_authorities: list[str] | None = None) -> list[dict]:
+    """Run the mandatory L2 analysis across all items. Raises L2FetchError on first failure.
 
-    `known_laws` grounds legal-reference extraction with the profile's registered laws.
-    Skips items already fetched this run (l2_fetched_at present with a summary).
+    `known_laws` / `known_authorities` ground law and responsible-authority extraction.
+    Skips items already analyzed this run.
     """
     for item in items:
         if item.get("l2_fetched_at") and item.get("l2_summary"):
             continue
-        fetch_l2_for_item(item, known_laws=known_laws)
+        fetch_l2_for_item(item, known_laws=known_laws, known_authorities=known_authorities)
     return items

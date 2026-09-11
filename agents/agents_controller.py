@@ -639,7 +639,7 @@ def run_profile_once(
             # v3.13/v3.16: L2 Deep Fetch — MANDATORY, now runs FIRST (before Glossary/Law/Rank)
             # so all downstream stages work on the full-article summary, not the headline.
             # Grounded with the profile's registered laws for consistent law extraction.
-            print("🌐 L2 Fetch: pulling full-article detail + law refs (mandatory)…")
+            print("🌐 L2 Fetch: one article-grounded call (summary + laws + refs + evidence + authority)…")
             from agents.l2_fetcher import run_l2_fetch
             _law_rows = an_conn.execute(
                 "SELECT name_en, name_native, law_number FROM law_refs WHERE profile_id=?",
@@ -649,7 +649,20 @@ def run_profile_once(
                 (f"{r['name_en']} (No. {r['law_number']})" if r["law_number"] else r["name_en"])
                 for r in _law_rows
             ]
-            run_l2_fetch(filtered_items, known_laws=_known_laws)
+            _known_authorities = [r["name"] for r in an_conn.execute(
+                "SELECT name FROM authorities WHERE profile_id=? ORDER BY name", (profile_id,)
+            ).fetchall()]
+            run_l2_fetch(filtered_items, known_laws=_known_laws, known_authorities=_known_authorities)
+            # Persist the new structured L2 fields (references / impact evidence / primary_authority).
+            if not dry_run:
+                from configurations.db import update_news_fields as _upd
+                for _it in filtered_items:
+                    _upd(an_conn, _it, {
+                        "law_references_json": _it.get("law_references_json"),
+                        "impact_evidence_json": _it.get("impact_evidence_json"),
+                        "primary_authority": _it.get("primary_authority"),
+                    }, profile_id)
+                an_conn.commit()
             print("🔖 Glossary Match: matching full-article text against glossary…")
             match_glossary(filtered_items, an_conn, profile_id)  # now sees l2_summary
             print("⚖ Law Match: resolving cited law → registry (law_id + authority)…")

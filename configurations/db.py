@@ -731,6 +731,17 @@ def create_schema_if_needed(conn: sqlite3.Connection) -> None:
             except Exception:
                 pass
 
+        # v3.25/v3.26/v3.31: structured L2 outputs.
+        for _col, _decl in (
+            ("law_references_json", "TEXT"),   # JSON array of {type, number, label}
+            ("impact_evidence_json", "TEXT"),  # JSON array of verbatim operative clauses
+            ("primary_authority", "TEXT"),     # AI responsible-authority name (mapped → authority_id)
+        ):
+            try:
+                conn.execute(f"ALTER TABLE news_items ADD COLUMN {_col} {_decl}")
+            except Exception:
+                pass
+
 
 # -----------------------
 # Profiles
@@ -1939,6 +1950,8 @@ def list_all_news_for_review(
                    topic_label, email_eligible, email_sent, glossary_gap,
                    effective_date, l2_summary, act_ref, law_primary, law_secondary, law_reference,
                    law_id, law_ref_status, cited_article, proposed_rcm_title, rcm_match_status,
+                   law_references_json, impact_evidence_json, primary_authority,
+                   operational_impact, timing_class,
                    (SELECT name FROM authorities WHERE authorities.id = news_items.authority_id) AS authority_name
             FROM news_items
             WHERE profile_id = ?

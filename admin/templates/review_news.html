@@ -486,7 +486,7 @@
           {% if item.effective_date %}<span class="eff-date" title="Date the change comes into force">⏱ Effective {{ item.effective_date }}</span>{% endif %}
           {% if item.law_primary %}<span class="law-pill" title="Primary law / article">&#9878; {{ item.law_primary }}</span>{% endif %}
           {% if item.law_secondary %}<span class="law-pill secondary" title="Secondary law / article">&sect; {{ item.law_secondary }}</span>{% endif %}
-          {% if item.law_reference %}<span class="law-pill reference" title="Reference (gazette / decision / circular / decree no.)"># {{ item.law_reference }}</span>{% endif %}
+          {% if item.law_references_json %}{% for ref in (item.law_references_json|fromjson) %}<span class="law-pill reference" title="{{ ref.type }}"># {{ ref.label }}</span>{% endfor %}{% elif item.law_reference %}<span class="law-pill reference" title="Reference (gazette / decision / circular / decree no.)"># {{ item.law_reference }}</span>{% endif %}
           {% for term in item.topic_label|fromjson %}{% if term != 'General' %}<span class="glossary-pill" title="Matched glossary term">{{ term }}</span>{% endif %}{% endfor %}
           {% if item.is_gap %}<span class="gap-badge">&#9888; Gap — no glossary match</span>{% endif %}
           {% if score != 0 %}
