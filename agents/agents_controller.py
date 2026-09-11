@@ -723,60 +723,6 @@ def run_profile_once(
                 raise
             print(f"⚠️ Analyzing stage failed: {e}")
 
-        # v3.8: EFFECTIVE-DATE ELEVATION — a glossary-matched (relevant) item that carries an
-        # effective date (extracted by the ranker) is a definite, dated legal change → force rank 5.
-        # Items with no glossary match are noise: discard their effective date and leave rank untouched.
-        # Runs after TAG (glossary match known) and before the EMAIL gate (so eligibility sees rank 5).
-        try:
-            import json as _json
-            _GENERAL = _json.dumps(["General"])
-            eff_conn = get_connection()
-            elevated = 0
-            for _it in filtered_items:
-                if (_it.get("rank_tier") or "").lower() == "duplicate":
-                    continue
-                _label = _it.get("topic_label")
-                _matched = bool(_label) and _label != _GENERAL
-                _eff = _it.get("effective_date")
-
-                if _matched and _eff:
-                    if int(_it.get("significance_rank") or 0) < 5:
-                        _it["significance_rank"] = 5
-                        _it["rank_reasoning"] = (_it.get("rank_reasoning") or "") + " [effective-date → 5]"
-                        elevated += 1
-                elif not _matched and _eff:
-                    # Not relevant → do not capture an effective date (noise).
-                    _it["effective_date"] = None
-
-                # Persist final rank + effective_date. Direct UPDATE by identifier; also clears the
-                # date to NULL for non-matched items (COALESCE in upsert can't clear).
-                _src_type = _it.get("source_type", "RSS")
-                _src_id   = _it.get("source_id") or _it.get("guid") or _it.get("tweet_id")
-                _url      = _it.get("url") or _it.get("link")
-                _hash     = _it.get("hash_signature")
-                _rank_val = _it.get("significance_rank")
-                _eff_val  = _it.get("effective_date")
-                if _src_id:
-                    eff_conn.execute(
-                        "UPDATE news_items SET significance_rank=?, effective_date=?, rank_reasoning=? WHERE profile_id=? AND source_type=? AND source_id=?",
-                        (_rank_val, _eff_val, _it.get("rank_reasoning"), profile_id, _src_type, _src_id),
-                    )
-                elif _url:
-                    eff_conn.execute(
-                        "UPDATE news_items SET significance_rank=?, effective_date=?, rank_reasoning=? WHERE profile_id=? AND source_type=? AND url=?",
-                        (_rank_val, _eff_val, _it.get("rank_reasoning"), profile_id, _src_type, _url),
-                    )
-                elif _hash:
-                    eff_conn.execute(
-                        "UPDATE news_items SET significance_rank=?, effective_date=?, rank_reasoning=? WHERE profile_id=? AND source_type=? AND hash_signature=?",
-                        (_rank_val, _eff_val, _it.get("rank_reasoning"), profile_id, _src_type, _hash),
-                    )
-            eff_conn.commit()
-            eff_conn.close()
-            dated = sum(1 for i in filtered_items if i.get("effective_date"))
-            print(f"📆 Effective-date stage — {dated} relevant item(s) carry an effective date; {elevated} elevated to rank 5")
-        except Exception as e:
-            print(f"⚠️ Effective-date stage failed: {e}")
 
         # v3.3: EMAIL RANK GATE — set email_eligible=1 for items with rank >= threshold and not duplicate.
         try:
