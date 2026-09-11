@@ -663,9 +663,16 @@ def run_profile_once(
                         "primary_authority": _it.get("primary_authority"),
                     }, profile_id)
                 an_conn.commit()
+            # v3.26: resolve the responsible authority — map L2's primary_authority (AI subject-owner)
+            # to a registered authority. Publisher stays source-derived; Law Match never sets authority.
+            try:
+                from agents.authority_attributor import resolve_primary_authority
+                resolve_primary_authority(filtered_items, an_conn, profile_id)
+            except Exception as e:
+                print(f"⚠️ Authority resolution skipped: {type(e).__name__}: {e}")
             print("🔖 Glossary Match: matching full-article text against glossary…")
             match_glossary(filtered_items, an_conn, profile_id)  # now sees l2_summary
-            print("⚖ Law Match: resolving cited law → registry (law_id + authority)…")
+            print("⚖ Law Match: resolving cited law → registry (law_id only)…")
             match_law_refs(filtered_items, an_conn, profile_id)
             # Reconcile: cross-language dedup keyed on law_id (act_ref fallback), post-Law-Match.
             print("↺ Reconcile: cross-language dedup by law_id…")

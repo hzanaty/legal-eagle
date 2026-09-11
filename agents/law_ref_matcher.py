@@ -69,10 +69,8 @@ def match_law_refs(items: list[dict], conn: sqlite3.Connection, profile_id: int)
             item["law_id"] = law["id"]
             item["law_ref_status"] = "registered"
             item["law_status"] = law.get("status")   # for the Timing stage (draft detection)
-            if law.get("authority_id"):
-                # Law-derived authority wins (more reliable than feed inference).
-                item["authority_id"] = law["authority_id"]
-                item["authority_status"] = "law"
+            # v3.26: Law Match sets law identity ONLY — it never sets authority. The item's
+            # authority is the responsible body from attribution (configured / L2 primary_authority).
         elif cited:
             item["law_id"] = None
             item["law_ref_status"] = "suggested"   # cited but unregistered → law-ref gap

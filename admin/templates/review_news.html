@@ -478,8 +478,8 @@
       <div class="rank-badge {% if score >= 1 %}rank-{{ score }}{% else %}rank-d{% endif %}">{% if score == 0 %}D{% elif score >= 1 %}{{ score }}{% else %}?{% endif %}</div>
       <div class="item-main">
         <div class="item-meta">
-          <span class="source-pill">{{ item.publisher or item.domain or 'Source' }} · {{ 'URL' if item.source_type and 'URL' in item.source_type else ('X' if item.source_type and 'weet' in item.source_type else (item.source_type|upper if item.source_type else 'RSS')) }}{% if item.authority_status == 'inferred' %} <span title="Authority inferred by AI" style="color:#e9730c;font-weight:700;">✦</span>{% endif %}</span>
-          {% if item.authority_name %}<span class="authority-pill" title="Issuing authority{% if item.authority_status == 'inferred' %} — AI-inferred{% elif item.authority_status == 'configured' %} — configured{% endif %}">&#127963; {{ item.authority_name }}</span>{% endif %}
+          <span class="source-pill" title="Publisher / source">{{ item.publisher or item.domain or 'Source' }}</span>
+          {% if item.authority_name %}<span class="authority-pill" title="Responsible authority{% if item.authority_status == 'inferred' %} — AI-inferred{% elif item.authority_status == 'configured' %} — configured{% endif %}">&#127963; {{ item.authority_name }}{% if item.authority_status == 'inferred' %} <span style="color:#e9730c;font-weight:700;" title="AI-inferred">✦</span>{% endif %}</span>{% endif %}
           {% if item.status %}<span class="status-pill status-{{ item.status|lower }}">{{ item.status }}</span>{% endif %}
           <span class="pub-date" title="Article publish date">{% if item.published_at %}{{ item.published_at|truncate(16, True, '') }}{% else %}—{% endif %}</span>
           {% if item.first_seen_at %}<span class="pub-date" title="Fetched" style="opacity:0.65;">↓ {{ item.first_seen_at|truncate(16, True, '') }}</span>{% endif %}

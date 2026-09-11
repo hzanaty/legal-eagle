@@ -1,28 +1,23 @@
 """
-Authority Attributor — the ATTRIBUTE stage (v3.2).
+Authority Attributor — publisher + authority attribution.
 
-Stamps each fetched news item with its source attribution:
-  - publisher:        display name of the source (from feed config)
-  - authority_id:     FK to the `authorities` table
-  - authority_status: 'configured' (from feed config) |
-                      'inferred'   (AI match, v3.2)   |
-                      'unknown'    (no match)
+FINAL RULE (v3.26):
+  - publisher  = SOURCE IDENTITY, always derived from the source: configured
+                 publisher_name if set, else the site domain (leading "www." stripped)
+                 for URL/RSS, or "@handle" for tweets. NEVER the authority.
+  - authority  = the government body PRIMARILY RESPONSIBLE for the article's overall
+                 subject. It is resolved in two ways:
+                   * CONFIGURED — a feed/source with a configured authority_id (at ingest, here).
+                   * INFERRED   — the AI subject-owner reasoning happens in L2
+                                  (`primary_authority`); `resolve_primary_authority()` maps
+                                  that name to a registered authority post-L2. No match → unknown.
+  - Law Match NEVER determines authority.
 
-v3.1 implemented the *configured* path only.  v3.2 adds the *inferred* path:
-when a feed has no configured authority_id the attributor calls AI with
-(title, content, authorities list) to pick the best match.  On success
-authority_status='inferred'; on no match authority_status='unknown' as before.
-
-AI calls are wrapped via ai_cache for offline harness determinism.
+`attribute_items` (ingest) does publisher + any CONFIGURED authority only — no AI.
 """
-import json
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List
 from urllib.parse import urlparse
-
-from configurations.config_loader import creds
-from agents.sap_ai_client import SAPAICoreClient
-from agents.ai_cache import cached_chat
 
 CONFIGURED = "configured"
 INFERRED = "inferred"
@@ -36,19 +31,12 @@ def build_feed_config(rss_feeds: List[Dict[str, Any]]) -> Dict[str, Dict[str, An
         url = f.get("url") if isinstance(f, dict) else None
         if not url:
             continue
-        cfg[url] = {
-            "publisher": f.get("publisher_name"),
-            "authority_id": f.get("authority_id"),
-        }
+        cfg[url] = {"publisher": f.get("publisher_name"), "authority_id": f.get("authority_id")}
     return cfg
 
 
 def build_url_config(url_sources: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
-    """Map URL-source host (netloc) -> {publisher, authority_id} from loaded url_source rows.
-
-    URL-scraped items carry no `feed_url`, so they are matched to their configured publisher/authority
-    by HOST (the netloc of the source URL), which equals the article link's netloc for same-site scrapes.
-    """
+    """Map URL-source host (netloc) -> {publisher, authority_id} from loaded url_source rows."""
     cfg: Dict[str, Dict[str, Any]] = {}
     for s in url_sources or []:
         url = s.get("url") if isinstance(s, dict) else None
@@ -59,143 +47,15 @@ def build_url_config(url_sources: List[Dict[str, Any]]) -> Dict[str, Dict[str, A
         except Exception:
             host = None
         if host:
-            cfg[host] = {
-                "publisher": s.get("publisher_name"),
-                "authority_id": s.get("authority_id"),
-            }
+            cfg[host] = {"publisher": s.get("publisher_name"), "authority_id": s.get("authority_id")}
     return cfg
 
 
-def _get_ai_client() -> SAPAICoreClient:
-    sap_cfg = creds.get("sap_aicore", {})
-    return SAPAICoreClient(
-        base_url=sap_cfg["base_url"],
-        auth_url=sap_cfg["auth_url"],
-        client_id=sap_cfg["client_id"],
-        client_secret=sap_cfg["client_secret"],
-        chat_deployment_id=sap_cfg["chat_deployment_id"],
-        embeddings_deployment_id=sap_cfg["embeddings_deployment_id"],
-    )
-
-
-def _infer_authority(
-    title: str, content: str, authorities: List[Dict[str, Any]]
-) -> Tuple[Optional[int], Optional[str]]:
-    """Call AI to match item to the best known authority.
-
-    Returns (authority_id, authority_name) on a confident match, (None, None)
-    when no authority fits or AI is unavailable.
-    """
-    if not authorities:
-        return None, None
-
-    auth_list = "\n".join(f"  - ID {a['id']}: {a['name']}" for a in authorities)
-    prompt = (
-        "You are an authority attribution assistant for regulatory news.\n"
-        f"News item title: {title!r}\n"
-        f"Content snippet: {(content or '')[:300]!r}\n\n"
-        "Which regulatory authority from the list below is the most likely original "
-        "source of this news? If none match well, respond with authority_id null.\n\n"
-        f"Known authorities:\n{auth_list}\n\n"
-        'Respond with JSON only: {"authority_id": <integer id or null>, "authority_name": "<name or null>"}'
-    )
-
-    def _call() -> str:
-        resp = _get_ai_client().chat.completions.create(
-            model="gpt-4o",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0,
-            response_format={"type": "json_object"},
-        )
-        return resp.choices[0].message.content
-
-    try:
-        raw = cached_chat(prompt, _call)
-        match = re.search(r"\{[^}]+\}", raw, re.DOTALL)
-        if match:
-            parsed = json.loads(match.group())
-            aid = parsed.get("authority_id")
-            if aid and aid != "null":
-                known = {a["id"]: a["name"] for a in authorities}
-                aid_int = int(aid)
-                if aid_int in known:
-                    return aid_int, known[aid_int]
-    except Exception:
-        pass
-    return None, None
-
-
-def attribute_items(
-    items: List[Dict[str, Any]],
-    feed_config: Optional[Dict[str, Dict[str, Any]]] = None,
-    db_conn=None,
-    profile_id: Optional[int] = None,
-    url_config: Optional[Dict[str, Dict[str, Any]]] = None,
-) -> List[Dict[str, Any]]:
-    """Stamp publisher / authority_id / authority_status onto each item in place.
-
-    An RSS item is matched to its feed via ``item['feed_url']``. A URL-scraped item (no feed_url)
-    is matched to its source by HOST via ``url_config``. Configured path → status 'configured'.
-    Inferred path (v3.2): no configured authority_id + db_conn + profile_id → AI picks best match.
-    Finally, `publisher` is always given a sensible fallback (host / @handle) so it is never blank.
-    """
-    feed_config = feed_config or {}
-    url_config = url_config or {}
-
-    # Load authorities once for the inferred path (only when DB is available).
-    authorities: List[Dict[str, Any]] = []
-    if db_conn is not None and profile_id is not None:
-        try:
-            from configurations.db import list_authorities
-            authorities = list_authorities(db_conn, profile_id)
-        except Exception:
-            pass
-
-    def _host_of(it: Dict[str, Any]) -> Optional[str]:
-        u = it.get("link") or it.get("url") or ""
-        try:
-            return urlparse(u).netloc or it.get("source") or None
-        except Exception:
-            return it.get("source") or None
-
-    for it in items:
-        # 1) Configured via RSS feed_url
-        cfg = feed_config.get(it.get("feed_url")) if it.get("feed_url") else None
-        # 2) Configured via URL-source host (for URL-scraped items)
-        if cfg is None:
-            host = _host_of(it)
-            if host and host in url_config:
-                cfg = url_config[host]
-        if cfg is not None:
-            if cfg.get("publisher"):
-                it["publisher"] = cfg.get("publisher")
-            if cfg.get("authority_id"):
-                it["authority_id"] = cfg.get("authority_id")
-                it["authority_status"] = CONFIGURED
-                _ensure_publisher(it)
-                continue
-
-        # 3) No configured authority — try AI inference if DB context is available.
-        if authorities:
-            aid, aname = _infer_authority(
-                it.get("title", ""), it.get("content", ""), authorities
-            )
-            if aid is not None:
-                it["authority_id"] = aid
-                it["authority_status"] = INFERRED
-                if not it.get("publisher"):
-                    it["publisher"] = aname
-                _ensure_publisher(it)
-                continue
-
-        it.setdefault("authority_status", UNKNOWN)
-        _ensure_publisher(it)
-
-    return items
-
-
 def _ensure_publisher(it: Dict[str, Any]) -> None:
-    """Guarantee a non-empty display publisher: keep existing, else host, else @handle, else 'Source'."""
+    """Guarantee a source-identity publisher: existing → @handle (tweets) → domain (www. stripped) → 'Source'.
+
+    Never the authority — publisher is where we consumed the item from.
+    """
     if it.get("publisher"):
         return
     handle = it.get("handle") or it.get("account")
@@ -203,9 +63,91 @@ def _ensure_publisher(it: Dict[str, Any]) -> None:
         it["publisher"] = "@" + str(handle).lstrip("@")
         return
     u = it.get("link") or it.get("url") or ""
-    host = ""
     try:
         host = urlparse(u).netloc
     except Exception:
         host = ""
+    if host.lower().startswith("www."):
+        host = host[4:]
     it["publisher"] = host or it.get("source") or "Source"
+
+
+def attribute_items(
+    items: List[Dict[str, Any]],
+    feed_config: Dict[str, Dict[str, Any]] | None = None,
+    db_conn=None,
+    profile_id: int | None = None,
+    url_config: Dict[str, Dict[str, Any]] | None = None,
+) -> List[Dict[str, Any]]:
+    """Ingest-time attribution: stamp publisher (+ CONFIGURED authority only). No AI here.
+
+    The AI responsible-authority is inferred later in L2 (`primary_authority`) and mapped by
+    `resolve_primary_authority()`. `db_conn`/`profile_id` are kept for signature compatibility.
+    """
+    feed_config = feed_config or {}
+    url_config = url_config or {}
+
+    def _host_of(it: Dict[str, Any]):
+        u = it.get("link") or it.get("url") or ""
+        try:
+            return urlparse(u).netloc or it.get("source") or None
+        except Exception:
+            return it.get("source") or None
+
+    for it in items:
+        cfg = feed_config.get(it.get("feed_url")) if it.get("feed_url") else None
+        if cfg is None:
+            host = _host_of(it)
+            if host and host in url_config:
+                cfg = url_config[host]
+        if cfg is not None:
+            if cfg.get("publisher"):
+                it["publisher"] = cfg.get("publisher")   # configured source identity
+            if cfg.get("authority_id"):
+                it["authority_id"] = cfg.get("authority_id")
+                it["authority_status"] = CONFIGURED
+        it.setdefault("authority_status", UNKNOWN)
+        _ensure_publisher(it)   # publisher = source identity, never the authority
+    return items
+
+
+def _norm_name(s) -> str:
+    return (s or "").strip().lower()
+
+
+def resolve_primary_authority(items: List[Dict[str, Any]], conn, profile_id: int) -> dict:
+    """Post-L2: map each item's `primary_authority` (AI subject-owner name) → a registered authority_id.
+
+    Name/alias match against the profile's authorities (exact, then loose contains). No match →
+    left as-is (unknown). Never creates authorities; never overrides a CONFIGURED authority.
+    Persists authority_id/authority_status.
+    """
+    from configurations.db import list_authorities, update_news_fields
+    auths = list_authorities(conn, profile_id)
+    by_name: Dict[str, int] = {}
+    for a in auths:
+        by_name[_norm_name(a["name"])] = a["id"]
+        for al in (a.get("aliases") or "").split(","):
+            aln = _norm_name(al)
+            if aln:
+                by_name.setdefault(aln, a["id"])
+    resolved = 0
+    for it in items:
+        if it.get("authority_status") == CONFIGURED:
+            continue
+        name = _norm_name(it.get("primary_authority"))
+        if not name:
+            continue
+        aid = by_name.get(name)
+        if aid is None:
+            for nm, i in by_name.items():
+                if nm and (nm in name or name in nm):
+                    aid = i
+                    break
+        if aid is not None:
+            it["authority_id"] = aid
+            it["authority_status"] = INFERRED
+            update_news_fields(conn, it, {"authority_id": aid, "authority_status": INFERRED}, profile_id)
+            resolved += 1
+    conn.commit()
+    return {"resolved": resolved}
