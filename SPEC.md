@@ -1,7 +1,7 @@
 # Legal Eagle 3.8 — Technical Specification
 
-**Version:** 3.14 (Glossary Labels — canonical multilingual topic grouping; matcher stamps the canonical label as `topic_label`; announce inclusion decoupled from the email flag and gated on rank; RCM config in its own Configure section)  
-**Last Updated:** 2026-09-08
+**Version:** 3.31 (effective_date prompt fix — forbids publication/gazette dates as effective_date; user-friendly per-item [IMPACT] + [RANK] pipeline logs with plain-language gate descriptions; version annotations removed from log messages)  
+**Last Updated:** 2026-09-11
 
 This document provides the technical specification for Legal Eagle, an AI-powered regulatory compliance monitoring system for SAP Localization.
 

@@ -260,6 +260,38 @@ def rank_items(
             rank = 5
         gs = g + lm + rm + am   # grounding strength — confidence, not a gate
 
+        if rc and oi >= 2 and tm == 2:
+            gate = "rank5(rc+oi>=2+tm=2)"
+        elif rc and pr:
+            gate = "rank4(rc+pr)"
+        elif oi > 0:
+            gate = "rank3(oi>0)"
+        elif g or lm:
+            gate = "rank2(topic-match)"
+        else:
+            gate = "rank1(noise)"
+        _rank_labels = {1: "Noise", 2: "Signal", 3: "Watch", 4: "Legal Change", 5: "Urgent"}
+        _gate_descs = {
+            "rank5(rc+oi>=2+tm=2)": "confirmed change + high impact + imminent",
+            "rank4(rc+pr)":          "confirmed change + preparation required",
+            "rank3(oi>0)":           "operational impact detected",
+            "rank2(topic-match)":    "topic matched, no operational impact",
+            "rank1(noise)":          "no topic match, no operational impact",
+        }
+        _grounding = []
+        if g:       _grounding.append("glossary✓")
+        if lm:      _grounding.append("law✓")
+        if rm == 2: _grounding.append("rcm=tracked")
+        elif rm:    _grounding.append("rcm=net-new")
+        if am:      _grounding.append("authority✓")
+        _gs_str = " ".join(_grounding) or "no grounding"
+        print(
+            f"  ↳ [RANK {rank}/{_rank_labels.get(rank, '?')}] "
+            f"\"{(item.get('title') or '')[:52]}\" "
+            f"| gate: {_gate_descs.get(gate, gate)} "
+            f"| {_gs_str}"
+        )
+
         item["significance_rank"] = rank
         item["rank_tier"] = "fusion"
         item["rank_reasoning"] = _rank_reason(rank, oi, gs)

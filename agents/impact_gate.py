@@ -73,7 +73,12 @@ def _assess_one(item: dict, rubric: str) -> dict:
         "regulatory_change_confirmed: true only if an ACTUAL enacted/decided regulatory change "
         "(not speculation, opinion, or a general discussion).\n"
         "preparation_required: true if the change requires configuration/process preparation.\n"
-        "effective_date: the date the change takes effect if explicitly stated, else null.\n"
+        "effective_date: the date when the measure becomes legally or operationally applicable. "
+        "If the article explicitly says the measure is effective immediately / enters into force "
+        "upon publication / applies from the publication date, then use that date. "
+        "Do not assume publication, approval, Gazette, decision, or article date is the effective "
+        "date unless the article explicitly links that date to entry into force/applicability. "
+        "If no explicit effective/applicability date is stated, return null.\n"
         "Base your judgment on the IMPACT EVIDENCE clauses below (the operative details); the summary "
         "may compress them away.\n\n"
         f"Title: {title}\n\nSummary: {summary}\n\n"
@@ -96,6 +101,14 @@ def _assess_one(item: dict, rubric: str) -> dict:
         m = re.search(r"\{.*\}", raw, re.DOTALL)
         parsed = json.loads(m.group() if m else raw)
         oi = max(0, min(3, int(parsed.get("operational_impact", 0) or 0)))
+        _impact_labels = {0: "out-of-scope", 1: "minor", 2: "operational", 3: "major"}
+        print(
+            f"  ↳ [IMPACT] \"{(item.get('title') or '')[:52]}\" "
+            f"→ {_impact_labels.get(oi, str(oi))} \xb7 "
+            f"change={'yes' if parsed.get('regulatory_change_confirmed') else 'no'} \xb7 "
+            f"prep={'yes' if parsed.get('preparation_required') else 'no'} \xb7 "
+            f"eff={parsed.get('effective_date') or 'none'}"
+        )
         return {
             "operational_impact": oi,
             "regulatory_change_confirmed": 1 if parsed.get("regulatory_change_confirmed") else 0,

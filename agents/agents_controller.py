@@ -224,7 +224,7 @@ def run_controller():
 
         # 5.2. Relevance filter DELETED in v3.1 (B6) — all in-date items pass through.
         filtered_items = all_news_items
-        print(f"🧹 Relevance filter removed (v3.1) — {len(filtered_items)} items pass to comparison")
+        print(f"🧹 {len(filtered_items)} items passed to pipeline stages")
 
         # 5.2. Compare AFTER filtering (only relevant items are processed)
         outputs_dir = f"outputs/{profile_slug}"

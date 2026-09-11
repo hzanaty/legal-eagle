@@ -1,6 +1,13 @@
 # CHANGELOG
 
-## v3.14 — 2026-09-08
+## v3.31 — 2026-09-11
+### effective_date prompt fix · user-friendly per-item signal observability
+
+- **effective_date instruction tightened** — `impact_gate.py` hardcoded field definition now explicitly forbids using publication, approval, Gazette, decision, or article dates as `effective_date` unless the article explicitly links that date to entry into force / applicability. Aligns with matching guidance added to the Impact Rubric config.
+- **[IMPACT] per-item log** — after each AI call, `_assess_one()` prints a readable summary: impact level (out-of-scope / minor / operational / major), whether change was confirmed, prep required, and effective date.
+- **[RANK] per-item log + gate attribution** — `rank_items()` prints each item's final rank with label (Watch / Legal Change / Urgent…), the plain-language gate that fired, and grounding signals (glossary✓ law✓ rcm=tracked authority✓). Eliminates the need for DB queries to diagnose ranking decisions.
+- **Version annotations removed from log messages** — `"(v3.1)"` tag stripped from the "items passed to pipeline stages" log line in `agents_controller.py`.
+
 ### Glossary Labels · announce decoupled from email · RCM config section
 
 - **Glossary Labels (canonical, multilingual topic grouping)** — a **label** is one canonical

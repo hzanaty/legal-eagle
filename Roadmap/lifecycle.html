@@ -719,11 +719,11 @@ const details = {
   },
   'impact': {
     title: 'Impact Gate — relevance + change assessment',
-    subtitle: 'NEW v3.18 — one AI call over l2_summary, grounded by the per-profile rubric',
-    badge: 'green', badgeLabel: 'Shipped v3.18',
+    subtitle: 'v3.31 — effective_date prompt forbids publication/gazette dates; [IMPACT] per-item log',
+    badge: 'green', badgeLabel: 'Shipped v3.31',
     cols: [
-      { heading: 'Emits (for Rank)', items: ['operational_impact 0–3 (degree of payroll impact)', 'regulatory_change_confirmed (bool)', 'preparation_required (bool)', 'effective_date (moved here out of the ranker)'] },
-      { heading: 'What it does', items: ['Owns RELEVANCE (not Rank): operational_impact 0 + no glossary/law match → Noise', 'Grounded by an editable per-profile rubric (Setup → Relevance)', 'No hard drop — everything is scored, nothing discarded', 'Conservative fallback (impact=1) on AI failure so items stay visible'] },
+      { heading: 'Emits (for Rank)', items: ['operational_impact 0–3 (degree of payroll impact)', 'regulatory_change_confirmed (bool)', 'preparation_required (bool)', 'effective_date — entry-into-force date only; publication/approval/gazette/decision dates excluded (v3.31)'] },
+      { heading: 'What it does', items: ['Owns RELEVANCE (not Rank): operational_impact 0 + no glossary/law match → Noise', 'Grounded by an editable per-profile rubric (Setup → Relevance)', 'No hard drop — everything is scored, nothing discarded', 'Conservative fallback (impact=1) on AI failure so items stay visible', '[IMPACT] readable log per item: "minor · change=no · prep=no · eff=none" format (v3.31)'] },
       { heading: 'Key files', items: ['agents/impact_gate.py — assess_impact() + DEFAULT_RUBRIC', 'admin/app.py — /impact-rubric/update + Setup textarea', 'setting key: impact_rubric'] },
     ]
   },
@@ -748,12 +748,12 @@ const details = {
   },
   'rank': {
     title: 'Rank — Deterministic Signal-Fusion',
-    subtitle: 'v3.19 — a pure function of upstream signals (the AI judgment moved to Impact)',
-    badge: 'green', badgeLabel: 'Shipped v3.19',
+    subtitle: 'v3.31 — [RANK] per-item log with gate attribution; gates unchanged from v3.19',
+    badge: 'green', badgeLabel: 'Shipped v3.31',
     cols: [
       { heading: 'Inputs (signals)', items: ['glossary_match 0/1 · law_match 0/1 · rcm_match 0/1/2 · authority_match 0/1', 'operational_impact 0–3 (Impact) · timing 0–2 (Timing)', 'regulatory_change_confirmed + preparation_required (Impact)'] },
       { heading: 'Gates', items: ['impact 0 + no glossary/law → 1 Noise; impact 0 + match → 2 Signal', 'impact ≥ 1 → 3 Watch (minimum)', 'change_confirmed AND preparation_required → ≥ 4 Legal Change', 'change_confirmed AND impact ≥ 2 AND timing == 2 → 5 Urgent'] },
-      { heading: 'Notes', items: ['grounding_strength (glossary+law+rcm+authority) is confidence, cannot bypass gates', 'Recurrence/REPEATED is context only (Reconcile), NOT scored here', 'Human Re-rank override preserved', 'agents/news_ranker.py — rank_items()'] },
+      { heading: 'Notes', items: ['grounding_strength (glossary+law+rcm+authority) is confidence, cannot bypass gates', 'Recurrence/REPEATED is context only (Reconcile), NOT scored here', 'Human Re-rank override preserved', '[RANK] readable log per item: rank+label / plain-language gate / grounding signals (v3.31)', 'agents/news_ranker.py — rank_items()'] },
     ]
   },
   'glossary_match': {
