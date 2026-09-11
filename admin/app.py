@@ -2510,10 +2510,13 @@ def announcement_template(ann_id: int):
         except Exception:
             item_ids = []
         sources = []
+        _l2_summaries = []
         if item_ids:
             ph = ",".join("?" * len(item_ids))
             for s in conn.execute(f"SELECT * FROM news_items WHERE id IN ({ph})", item_ids).fetchall():
                 s = dict(s)
+                if s.get("l2_summary"):
+                    _l2_summaries.append(s["l2_summary"])
                 sources.append({
                     "title": s.get("title"),
                     "url": s.get("url"),
@@ -2522,12 +2525,16 @@ def announcement_template(ann_id: int):
                     "significance_rank": s.get("significance_rank"),
                 })
 
-        # RCM template fill — lazy, once per announcement
+        # RCM template fill — lazy (v3.29: body generated on-demand here, not at grouping),
+        # grounded on the members' L2 summaries.
         rcm_json_str = ann.get("announcement_rcm_json")
         if not rcm_json_str:
             from agents.rcm_filler import fill_rcm_template
             from configurations.db import save_announcement_rcm
-            filled = fill_rcm_template(ann, sources)
+            _ann_for_fill = dict(ann)
+            if not _ann_for_fill.get("announcement_md") and _l2_summaries:
+                _ann_for_fill["announcement_md"] = "\n".join(_l2_summaries)
+            filled = fill_rcm_template(_ann_for_fill, sources)
             rcm_json_str = _json.dumps(filled)
             save_announcement_rcm(conn, ann_id, rcm_json_str)
         try:

@@ -265,7 +265,8 @@ def reconcile_by_act_ref(items, conn, profile_id, days: int = WEEKLY_BASELINE_DA
     # neither filter can return them — no item can match itself.
     window_iso = (datetime.utcnow() - timedelta(days=days)).isoformat()
     rows = conn.execute(
-        """SELECT act_ref, law_id, repetition_count
+        """SELECT act_ref, law_id, repetition_count, l2_summary, cited_article,
+                  authority_id, published_at, effective_date, title
            FROM news_items
            WHERE profile_id=? AND (law_id IS NOT NULL OR COALESCE(act_ref,'')!='')
              AND (first_seen_at >= ? OR last_seen_at >= ?)""",
@@ -284,6 +285,34 @@ def reconcile_by_act_ref(items, conn, profile_id, days: int = WEEKLY_BASELINE_DA
         lid = it.get("law_id")
         ref = _norm_act_ref(it.get("act_ref"))
         return lid, ref
+
+    # v3.29: law_id/act_ref only NARROW candidates; confirm same legal event via L2 semantic
+    # similarity (core) + corroborators. Embed once; degrade to "trust the candidate" if
+    # embeddings are unavailable (never lose dedup on an AI outage).
+    from agents.legal_event import same_legal_event
+    from agents.embeddings_util import get_embeddings, cosine as _cos
+    _base_dicts = []
+    _seen_ids = set()
+    for _d in list(baseline_by_law.values()) + list(baseline_by_ref.values()):
+        if id(_d) not in _seen_ids:
+            _seen_ids.add(id(_d)); _base_dicts.append(_d)
+    _l2 = lambda d: (d.get("l2_summary") or d.get("title") or "").strip()
+    _have_vecs = False
+    try:
+        _embs = get_embeddings([_l2(it) for it in items] + [_l2(b) for b in _base_dicts])
+        for _i, _it in enumerate(items):
+            _it["_l2vec"] = _embs[_i]
+        for _k, _b in enumerate(_base_dicts):
+            _b["_l2vec"] = _embs[len(items) + _k]
+        _have_vecs = True
+    except Exception as _e:
+        print(f"    ⚠️  reconcile embeddings unavailable ({type(_e).__name__}); confirming on law/act candidate only")
+
+    def _confirm(a, b) -> bool:
+        va, vb = a.get("_l2vec"), b.get("_l2vec")
+        if not _have_vecs or va is None or vb is None:
+            return True   # embeddings down → trust the law_id/act_ref candidate match
+        return same_legal_event(a, b, _cos(va, vb))
 
     # Deterministic order so "first sighting this run" is stable: published_at, then index.
     order = sorted(range(len(items)), key=lambda i: ((items[i].get("published_at") or ""), i))
@@ -312,13 +341,13 @@ def reconcile_by_act_ref(items, conn, profile_id, days: int = WEEKLY_BASELINE_DA
         run_owner = (seen_law.get(lid) if lid is not None else None) or \
                     (seen_ref.get(ref) if ref else None)
 
-        if baseline is not None:
+        if baseline is not None and _confirm(it, baseline):
             prior = int(baseline.get("repetition_count") or 0) + 1
             it["dedup_status"] = "update"
             it["repetition_count"] = prior
             it["repetition_status"] = "repeated" if prior >= 3 else "update"
             reconciled += 1
-        elif run_owner is not None:
+        elif run_owner is not None and _confirm(it, run_owner):
             owner_count = int(run_owner.get("repetition_count") or 0)
             it["dedup_status"] = "duplicate"
             it["repetition_count"] = owner_count
@@ -326,8 +355,12 @@ def reconcile_by_act_ref(items, conn, profile_id, days: int = WEEKLY_BASELINE_DA
             reconciled += 1
         _register(it, lid, ref)
 
+    # Clean the transient embedding vectors off the items.
+    for _it in items:
+        _it.pop("_l2vec", None)
+
     if reconciled:
-        print(f"↺ identity reconciliation: {reconciled} cross-language item(s) re-classified (law_id/act_ref)")
+        print(f"↺ identity reconciliation: {reconciled} same-event item(s) re-classified (law_id/act_ref → confirmed)")
     return {"reconciled": reconciled}
 
 

@@ -24,10 +24,11 @@ from datetime import datetime
 
 from agents.ai_cache import cached_chat
 from agents.embeddings_util import get_embeddings, cosine
+from agents.legal_event import same_legal_event, STRONG_SIM, _date_close as _event_date_close
 from configurations import db
 
-TITLE_COSINE_THRESHOLD = 0.85       # merge if titles are at least this similar
-DATE_WINDOW_DAYS = 183              # ~6 months, fallback guard when act_ref is absent
+TITLE_COSINE_THRESHOLD = 0.85       # RCM-history title match (tracked vs net-new)
+DATE_WINDOW_DAYS = 183              # ~6 months
 
 # Verbatim 4th Introduction bullet mandated by the RCM template.
 _DISCLAIMER = (
@@ -187,24 +188,22 @@ def _date_close(a: dict, b: dict) -> bool:
 
 
 def _same_group(item_a: dict, vec_a, item_b: dict, vec_b) -> bool:
-    """Merge guard: registry law_id is primary, act_ref next, title cosine + date last.
+    """Candidate → confirm (v3.29). `vec_*` are L2-summary embeddings.
 
-    v3.16: when both items resolved to a registry law, equal ``law_id`` IS the identity
-    (this is what unifies cross-language items about the same law — different wording,
-    different article, same law). Falls back to act_ref equality, then to title cosine
-    >= threshold AND date proximity when neither carries a law identifier.
+    `law_id`/`act_ref` only NARROW candidates; `same_legal_event()` (L2 semantic core +
+    corroborating article/date/authority) confirms they describe the same underlying event.
+    Same law but different events → NOT grouped. When neither shares a law identity, fall
+    back to a strong pure-semantic match + date proximity.
     """
+    sim = cosine(vec_a, vec_b)
     la, lb = item_a.get("law_id"), item_b.get("law_id")
-    if la is not None and lb is not None:
-        return la == lb                 # PRIMARY: same registered law → same group
     ref_a = (item_a.get("act_ref") or "").strip().lower()
     ref_b = (item_b.get("act_ref") or "").strip().lower()
-    if ref_a and ref_b:
-        return ref_a == ref_b           # secondary: same act reference
-    # FALLBACK: no shared identifier → need similar titles AND close dates.
-    if cosine(vec_a, vec_b) < TITLE_COSINE_THRESHOLD:
-        return False
-    return _date_close(item_a, item_b)
+    candidate = (la is not None and la == lb) or (ref_a and ref_a == ref_b)
+    if candidate:
+        return same_legal_event(item_a, item_b, sim)   # confirm same event
+    # No shared law identity → require a strong semantic match AND date proximity.
+    return sim >= STRONG_SIM and _event_date_close(item_a, item_b)
 
 
 # ---- PASS 2: RCM body ----
@@ -260,6 +259,59 @@ def _first_published(cluster_items: list[dict]) -> str:
     return min(dates) if dates else ""
 
 
+def _l2_text(it: dict) -> str:
+    """Text used for the semantic-event embedding — the L2 summary (falls back to title)."""
+    return (it.get("l2_summary") or it.get("english_title") or it.get("title") or "").strip()
+
+
+def _compose_group_title(members: list[dict], ref_titles: list[str]) -> str:
+    """AI: ONE unified English title for a confirmed same-event group. Title only (no body)."""
+    examples = "\n".join(f"- {t}" for t in ref_titles) or "(none available)"
+    src = "\n".join(
+        f"- {m.get('english_title') or m.get('title','')}: {(m.get('l2_summary') or '')[:200]}"
+        for m in members
+    )
+    prompt = (
+        "You are an SAP legal-compliance RCM editor. These news items describe the SAME legal event. "
+        "Produce ONE unified, act-name-based English title. Follow the style of these RCM titles:\n"
+        f"{examples}\n\nItems:\n{src}\n\n"
+        'Return STRICT JSON only: {"title": "..."}'
+    )
+    try:
+        parsed = json.loads(_chat(prompt))
+        t = (parsed.get("title") or "").strip()
+        if t:
+            return t
+    except Exception as e:
+        print(f"    ⚠️  compose_group_title failed: {e}")
+    return members[0].get("english_title") or members[0].get("title", "")
+
+
+def _ann_pseudo(conn, a: dict) -> dict:
+    """Represent an existing announcement as a pseudo-item for `_same_group` (from a member row)."""
+    try:
+        ids = json.loads(a.get("item_ids_json") or "[]")
+    except Exception:
+        ids = []
+    act, pub, law_id, l2, cited, auth = "", "", None, "", None, None
+    if ids:
+        ph = ",".join("?" * len(ids))
+        r = conn.execute(
+            f"SELECT act_ref, law_id, published_at, l2_summary, cited_article, authority_id "
+            f"FROM news_items WHERE id IN ({ph}) LIMIT 1", ids
+        ).fetchone()
+        if r:
+            act = r["act_ref"] or ""
+            law_id = r["law_id"]
+            pub = r["published_at"] or ""
+            l2 = r["l2_summary"] or ""
+            cited = r["cited_article"]
+            auth = r["authority_id"]
+    return {"act_ref": act, "law_id": law_id, "published_at": pub,
+            "effective_date": a.get("first_published"), "l2_summary": l2,
+            "cited_article": cited, "authority_id": auth}
+
+
 # ---- main entry ----
 
 def build(conn, profile_id: int, run_id: int) -> dict:
@@ -285,42 +337,25 @@ def build(conn, profile_id: int, run_id: int) -> dict:
                 conn.execute("UPDATE news_items SET english_title=? WHERE id=?",
                              (it["english_title"], int(it["id"])))
 
-    # Embed pending titles + existing announcement titles
-    pending_vecs = get_embeddings([it["english_title"] for it in pending])
+    # Grouping vectors = L2-SUMMARY embeddings (the semantic-event core), not titles.
+    pending_vecs = get_embeddings([_l2_text(it) for it in pending])
 
     drafts = db.get_draft_announcements(conn, profile_id)
     done = db.get_done_announcements(conn, profile_id)
     existing = drafts + done
-    existing_vecs = get_embeddings([a.get("title") or "" for a in existing]) if existing else []
-
-    # Represent each existing announcement as a pseudo-item for the guard (act_ref from any member)
-    def _ann_pseudo(a: dict) -> dict:
-        try:
-            ids = json.loads(a.get("item_ids_json") or "[]")
-        except Exception:
-            ids = []
-        act = ""
-        pub = ""
-        law_id = None
-        if ids:
-            ph = ",".join("?" * len(ids))
-            r = conn.execute(
-                f"SELECT act_ref, law_id, published_at FROM news_items WHERE id IN ({ph}) "
-                "AND (act_ref IS NOT NULL OR law_id IS NOT NULL) LIMIT 1", ids
-            ).fetchone()
-            if r:
-                act, law_id, pub = r["act_ref"] or "", r["law_id"], r["published_at"] or ""
-        return {"act_ref": act, "law_id": law_id, "published_at": pub, "effective_date": a.get("first_published")}
+    pseudos = [_ann_pseudo(conn, a) for a in existing]
+    existing_vecs = get_embeddings(
+        [(pseudos[i].get("l2_summary") or existing[i].get("title") or "") for i in range(len(existing))]
+    ) if existing else []
 
     assigned = [False] * len(pending)
 
-    # Assign each pending item to an existing announcement if it matches one.
-    # _same_group already encodes the merge policy (act-identity primary); among
-    # multiple matches pick the highest-cosine one, but do not re-impose a floor.
+    # Assign each pending item to an existing announcement it belongs to (candidate → confirm
+    # via _same_group). Among multiple confirmed matches, pick the highest-cosine one.
     for i, it in enumerate(pending):
         best_idx, best_cos = -1, -1.0
-        for j, a in enumerate(existing):
-            if _same_group(it, pending_vecs[i], _ann_pseudo(a), existing_vecs[j]):
+        for j, p in enumerate(pseudos):
+            if _same_group(it, pending_vecs[i], p, existing_vecs[j]):
                 c = cosine(pending_vecs[i], existing_vecs[j])
                 if c > best_cos:
                     best_cos, best_idx = c, j
@@ -331,12 +366,11 @@ def build(conn, profile_id: int, run_id: int) -> dict:
             if is_done:
                 stats["joined_frozen"] += 1
             else:
-                # draft grew → regenerate its title/body from full membership
                 _regenerate_draft(conn, profile_id, int(a["id"]), ref_titles)
                 stats["joined_draft"] += 1
             assigned[i] = True
 
-    # Cluster the still-unassigned pending items among themselves
+    # Cluster the still-unassigned pending items among themselves (same candidate→confirm rule)
     remaining = [(i, it) for i, it in enumerate(pending) if not assigned[i]]
     clusters: list[list[int]] = []
     for i, it in remaining:
@@ -352,13 +386,13 @@ def build(conn, profile_id: int, run_id: int) -> dict:
 
     for cl in clusters:
         cluster_items = [pending[i] for i in cl]
-        rcm = _compose_rcm(cluster_items, ref_titles)
+        title = _compose_group_title(cluster_items, ref_titles)   # AI title only
         item_ids = [int(it["id"]) for it in cluster_items if it.get("id")]
         ann_id = db.insert_announcement(
             conn, profile_id, run_id,
             topic_label=_topic_label(cluster_items),
-            title=rcm.get("title", ""),
-            rcm_json=json.dumps(rcm),
+            title=title,
+            rcm_json="",   # v3.29: RCM body deferred — generated on-demand at "Preview for RCM"
             first_published=_first_published(cluster_items),
             source_links=_source_links(cluster_items),
             item_ids=item_ids,
@@ -385,7 +419,7 @@ def _topic_label(cluster_items: list[dict]) -> str:
 
 
 def _regenerate_draft(conn, profile_id: int, announcement_id: int, ref_titles: list[str]) -> None:
-    """Recompute a draft announcement's title + RCM body from its full current membership."""
+    """Recompute a draft announcement's unified TITLE from full membership (body deferred to Preview)."""
     row = conn.execute(
         "SELECT item_ids_json FROM news_announcements WHERE id=?", (announcement_id,)
     ).fetchone()
@@ -399,11 +433,11 @@ def _regenerate_draft(conn, profile_id: int, announcement_id: int, ref_titles: l
     members = [dict(r) for r in conn.execute(
         f"SELECT * FROM news_items WHERE id IN ({ph})", ids
     ).fetchall()]
-    rcm = _compose_rcm(members, ref_titles)
+    title = _compose_group_title(members, ref_titles)
     db.update_announcement_content(
         conn, announcement_id,
-        title=rcm.get("title", ""),
-        rcm_json=json.dumps(rcm),
+        title=title,
+        rcm_json="",   # v3.29: body regenerated on-demand at Preview, not here
         source_links=_source_links(members),
         item_ids=ids,
         first_published=_first_published(members),
