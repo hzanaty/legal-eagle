@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List
 from urllib.parse import urlparse
 
-from configurations.config_loader import creds, add_news_item, get_weekly_baseline
+from configurations.config_loader import creds, add_news_item, get_weekly_baseline, get_baseline_days
 from agents.sap_ai_client import SAPAICoreClient
 from agents.ai_cache import cached_embeddings
 import numpy as np
@@ -46,7 +46,7 @@ DEDUP_COSINE_DUP = 0.80
 DEDUP_COSINE_UPDATE = 0.72
 JACCARD_DUP_MIN = 0.70
 JACCARD_UPDATE_MIN = 0.40
-WEEKLY_BASELINE_DAYS = 7
+_BASELINE_DAYS_DEFAULT = 7  # fallback; per-profile override via settings key "baseline_days"
 
 
 def _truncate_text(s: str, max_chars: int = MAX_CHARS_PER_ITEM) -> str:
@@ -243,7 +243,7 @@ def _norm_act_ref(s: Optional[str]) -> str:
     return (s or "").strip().lower()
 
 
-def reconcile_by_act_ref(items, conn, profile_id, days: int = WEEKLY_BASELINE_DAYS):
+def reconcile_by_act_ref(items, conn, profile_id, days: int = None):
     """Post-L2/Law-Match dedup reconciliation (v3.15 → generalized v3.16).
 
     Identity is language-independent but only known after L2 + Law Match, so this runs
@@ -255,11 +255,17 @@ def reconcile_by_act_ref(items, conn, profile_id, days: int = WEEKLY_BASELINE_DA
       ``update`` (recurring change), inheriting repetition_count + 1 so it can reach
       ``repeated`` (>= 3).
     - A ``new`` item whose identity matches only an **earlier item this run** (e.g. another
-      language) → re-classified ``duplicate``.
+      language or a follow-up reminder) → re-classified ``update`` with REPEATED status.
 
     Only UPGRADES items Compare left as ``new`` — never downgrades. Mutates in place.
     Returns {"reconciled": n}.
     """
+    if days is None:
+        from configurations.db import get_setting as _gs
+        try:
+            days = max(1, int(_gs(conn, profile_id, "baseline_days", "7") or 7))
+        except (TypeError, ValueError):
+            days = _BASELINE_DAYS_DEFAULT
     # Baseline identities from PRIOR rows in the window. Current-run items were persisted
     # by Compare with law_id=NULL and act_ref=NULL (Law Match / L2 had not run yet), so
     # neither filter can return them — no item can match itself.
@@ -348,10 +354,15 @@ def reconcile_by_act_ref(items, conn, profile_id, days: int = WEEKLY_BASELINE_DA
             it["repetition_status"] = "repeated" if prior >= 3 else "update"
             reconciled += 1
         elif run_owner is not None and _confirm(it, run_owner):
+            # Same run, same legal event → follow-up/reminder, not a copy.
+            # Route through full pipeline so ranker, impact gate, and announcements see it.
             owner_count = int(run_owner.get("repetition_count") or 0)
-            it["dedup_status"] = "duplicate"
+            it["dedup_status"] = "update"
+            it["is_update"] = True
+            it["delta"] = []
+            it["_repeated_followup"] = True
             it["repetition_count"] = owner_count
-            it["repetition_status"] = "repeated" if owner_count >= 3 else "duplicate"
+            it["repetition_status"] = "repeated"
             reconciled += 1
         _register(it, lid, ref)
 
@@ -427,11 +438,12 @@ def run_compare_news_agent(
 
     snapshot_path = out_dir / "all_news.json"
 
-    # Load weekly baseline FIRST (before persisting current items)
+    # Load baseline FIRST (before persisting current items)
     # This ensures we can detect a truly empty baseline for the "no history" shortcut
     profile_id = current_items[0].get("profile_id") or 1 if current_items else 1
-    baseline_items = get_weekly_baseline(profile_id, days=WEEKLY_BASELINE_DAYS)
-    print(f"📚 Weekly baseline size: {len(baseline_items)} (profile_id={profile_id}, days={WEEKLY_BASELINE_DAYS})")
+    _baseline_days = get_baseline_days(profile_id)
+    baseline_items = get_weekly_baseline(profile_id, days=_baseline_days)
+    print(f"📚 Baseline size: {len(baseline_items)} (profile_id={profile_id}, days={_baseline_days})")
     
     # DEBUG: Log first 3 baseline items to understand what's being loaded
     if baseline_items:
@@ -458,6 +470,18 @@ def run_compare_news_agent(
         fp = entity_fingerprint(b.get("title", ""), b.get("content", ""))
         if fp:
             by_fp[fp] = b
+
+    # Sort oldest-first so the original article is processed before follow-ups.
+    # This ensures the earlier article is registered as NEW and the later article
+    # is correctly identified as a follow-up (REPEATED) rather than a duplicate.
+    try:
+        from agents.news_filter import parse_date_string as _pds
+        from datetime import datetime as _dt_cls
+        current_items.sort(
+            key=lambda it: _pds(it.get("published_at") or it.get("date") or "") or _dt_cls.min
+        )
+    except Exception:
+        pass
 
     # Semantic structures. Embeddings are only needed when there is something to
     # compare against (a non-empty baseline) or when the AI cache is active for
@@ -513,18 +537,34 @@ def run_compare_news_agent(
         url = item.get("link") or item.get("url")
         source_id = item.get("tweet_id") or item.get("guid") or item.get("id")
 
-        # 1) Exact / canonical duplicate (vs baseline AND already-kept current items)
+        # 1) Exact / canonical duplicate (vs baseline AND already-kept current items).
+        # Fingerprint check uses by_fp (baseline only) — same-run fp matches are follow-ups,
+        # not duplicates, and are handled separately below.
         is_dup = (
             (source_id and str(source_id) in seen_source_ids)
             or (url and str(url) in seen_urls)
             or (curr_sig and curr_sig in by_sig)
-            or (curr_fp and curr_fp in seen_fps)
+            or (curr_fp and curr_fp in by_fp)   # baseline-only fingerprint dedup
+        )
+        # Same-run fingerprint match: a different article about the same legal entity
+        # arrived in the same run — it is a follow-up/reminder, not a copy.
+        is_fp_intrarun = (
+            not is_dup
+            and bool(curr_fp)
+            and curr_fp in seen_fps
         )
 
         classification = "new"
         semantic_prior_count = 0  # repetition carried from a cosine-matched (reworded) prior
         if is_dup:
             classification = "duplicate"
+        elif is_fp_intrarun:
+            # Different article, same legal entity, same run → follow-up.
+            # Route through the full pipeline; UI shows it as REPEATED.
+            classification = "update"
+            item["is_update"] = True
+            item["delta"] = []
+            item["_repeated_followup"] = True
         elif use_embeddings and i < len(curr_emb):
             # 2) Semantic comparison vs baseline + kept-current embeddings
             curr_vec = np.array(curr_emb[i].embedding)
@@ -536,7 +576,16 @@ def run_compare_news_agent(
             # paraphrased news). High cosine ⇒ duplicate; mid cosine with a genuine
             # glossary-bearing delta ⇒ update; otherwise new.
             if best_cos >= DEDUP_COSINE_DUP:
-                classification = "duplicate"
+                if best_j >= len(base_vecs):
+                    # Match is against a same-run article (kept_current), not a baseline item.
+                    # Two different articles about the same topic arriving in the same run is a
+                    # follow-up, not a copy. Route as update so it flows through the full pipeline.
+                    classification = "update"
+                    item["is_update"] = True
+                    item["delta"] = []
+                    item["_repeated_followup"] = True
+                else:
+                    classification = "duplicate"
             elif best_cos >= DEDUP_COSINE_UPDATE:
                 baseline_text = all_texts[best_j] if 0 <= best_j < len(all_texts) else ""
                 deltas = _compute_delta(curr_text, baseline_text, glossary_terms)
@@ -562,6 +611,8 @@ def run_compare_news_agent(
         prior_count = max(exact_prior_count, semantic_prior_count)
         item["repetition_count"] = prior_count
         if prior_count >= 3:
+            item["repetition_status"] = "repeated"
+        elif item.pop("_repeated_followup", False):
             item["repetition_status"] = "repeated"
         elif classification == "duplicate":
             item["repetition_status"] = "duplicate"

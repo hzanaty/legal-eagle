@@ -298,6 +298,16 @@ def get_weekly_baseline(profile_id: int, days: int = 7) -> List[Dict[str, Any]]:
     return list_baseline_items(conn, profile_id, days)
 
 
+def get_baseline_days(profile_id: int) -> int:
+    """Per-profile deduplication window in days (settings key: baseline_days). Fallback: 7."""
+    conn = _get_conn()
+    val = get_setting(conn, profile_id, "baseline_days", "7")
+    try:
+        return max(1, int(val or 7))
+    except (TypeError, ValueError):
+        return 7
+
+
 def get_reviewed_baseline(profile_id: int, min_score: int = 4) -> List[Dict[str, Any]]:
     """
     Retrieve high-quality reviewed news items to use as a comparison baseline.

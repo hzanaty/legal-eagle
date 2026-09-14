@@ -1,21 +1,30 @@
-## Current State: v3.31 — effective_date fix + per-item signal observability (2026-09-11)
+## Current State: v3.32 — REPEATED classification fix + configurable baseline window (2026-09-14)
+
+### ✅ v3.32 COMPLETE
+
+**v3.32 changes:**
+- `agents/compare_news.py` — `reconcile_by_act_ref` same-run branch: was marking second article with same `act_ref`/`law_id` as `dedup_status = "duplicate"`. Now sets `dedup_status = "update"` + `_repeated_followup = True` + `repetition_status = "repeated"`. Root cause: reconcile runs after L2 fetch sets `act_ref`, so two articles about the same law in one run triggered the duplicate branch.
+- `agents/compare_news.py` — removed `WEEKLY_BASELINE_DAYS = 7` hardcoded constant; replaced with `_BASELINE_DAYS_DEFAULT = 7` (private fallback) + per-profile lookup via `get_baseline_days()`.
+- `configurations/config_loader.py` — added `get_baseline_days(profile_id)`: reads `"baseline_days"` from the per-profile `settings` table, falling back to 7.
+- `agents/source_simulator.py` — date detection tier 3: content-based parse using `parse_date_string` when no `<time>` tag or class-name hint is present.
+- `Roadmap/v3/xanadu-gov-site/` — full Xanadu Republic of Xanadu Ministry of HR demo site: 7 articles, real file:// URLs, including the two Royal Decree No. 18/2026 articles that validate the REPEATED fix.
+
+**Root cause of REPEATED/DUPLICATE misclassification (the trigger for v3.32):**
+- Two articles about Royal Decree No. 18/2026 (Aug 20 original + Sep 5 reminder) both passed compare_news as "new" (different fingerprints, empty baseline).
+- L2 fetch set the same `act_ref` on both. `reconcile_by_act_ref` fired, found the Sep 5 article as a same-run match, and wrongly set `dedup_status = "duplicate"`.
+- Fix: same-run act_ref matches are follow-ups, not copies — route as "update" + "repeated".
+
+---
 
 ### ✅ v3.31 COMPLETE (committed `bf7200e`, pushed to origin/main)
 
 **v3.31 changes:**
-- `agents/impact_gate.py` — hardcoded `effective_date:` field definition tightened: publication/approval/Gazette/decision dates forbidden unless article explicitly links them to entry into force.
-- Per-item `[IMPACT]` log: `↳ [IMPACT] "Title…" → minor · change=no · prep=no · eff=none`
-- Per-item `[RANK]` log: `↳ [RANK 3/Watch] "Title…" | gate: operational impact detected | glossary✓ rcm=net-new`
-- Version annotation `(v3.1)` stripped from existing log message in `agents_controller.py`
-
-**Root cause of OVP rank-5 false positive (the trigger for v3.31):**
-- Impact Gate AI misclassified a policy program (OVP) as `regulatory_change_confirmed=true` — fix: Impact Rubric calibration (Admin > Config, user-managed)
-- AI used publication date as `effective_date` — fix: tightened hardcoded prompt instruction (code change)
-- Both fixes together prevent rank-5 from firing on non-enacted programs
+- `agents/impact_gate.py` — hardcoded `effective_date:` field definition tightened.
+- Per-item `[IMPACT]` and `[RANK]` logs added.
 
 ---
 
-## Current Pipeline Architecture (v3.31)
+## Current Pipeline Architecture (v3.32)
 
 **Stages (in order):** Collect → Glossary Match → L2 Fetch → Impact Gate → Timing → Rank → Announce
 

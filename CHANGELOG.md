@@ -1,6 +1,14 @@
 # CHANGELOG
 
-## v3.31 — 2026-09-11
+## v3.32 — 2026-09-14
+### REPEATED classification fix · configurable baseline window
+
+- **REPEATED classification fixed** — `reconcile_by_act_ref` same-run branch was setting `dedup_status = "duplicate"` for follow-up articles sharing the same `act_ref`/`law_id` as an earlier article in the same run. Root cause: reconcile runs after L2 fetch sets `act_ref`, so two articles about the same law in one run (e.g. an original decree + a countdown reminder) triggered the duplicate branch instead of the follow-up branch. Fix: same-run act_ref/law_id matches are classified as `dedup_status = "update"` + `repetition_status = "repeated"`, routing them through the full pipeline (ranker, impact gate, announcement grouping). The original article remains `dedup_status = "new"`.
+- **Configurable baseline window** — removed the hardcoded `WEEKLY_BASELINE_DAYS = 7` constant. Replaced with `get_baseline_days(profile_id)` in `config_loader.py` that reads a per-profile `"baseline_days"` setting (existing `settings` table), falling back to 7. The window is no longer tied to "weekly" — it reflects the actual publication cadence of each profile's sources.
+- **Source simulator date detection tier 3** — `source_simulator.py` now falls back to content-based date parsing (using `parse_date_string`) when no `<time>` tag or CSS class hint is found in the article container.
+- **Xanadu demo site** — `Roadmap/v3/xanadu-gov-site/` — full Republic of Xanadu Ministry of Human Resources demo site with 7 articles, proper styling, and `file://` URLs compatible with the URL source scraper. Includes the Royal Decree No. 18/2026 pair (Aug 20 original + Sep 5 countdown) that drove the REPEATED fix.
+
+
 ### effective_date prompt fix · user-friendly per-item signal observability
 
 - **effective_date instruction tightened** — `impact_gate.py` hardcoded field definition now explicitly forbids using publication, approval, Gazette, decision, or article dates as `effective_date` unless the article explicitly links that date to entry into force / applicability. Aligns with matching guidance added to the Impact Rubric config.
