@@ -190,8 +190,15 @@ def run_l2_fetch(items: list[dict], known_laws: list[str] | None = None,
     `known_laws` / `known_authorities` ground law and responsible-authority extraction.
     Skips items already analyzed this run.
     """
-    for item in items:
+    total = len(items)
+    for idx, item in enumerate(items, 1):
         if item.get("l2_fetched_at") and item.get("l2_summary"):
+            title = (item.get("title") or "")[:70]
+            print(f"   ↳ [{idx}/{total}] \"{title}\" — skipped (already enriched)")
             continue
         fetch_l2_for_item(item, known_laws=known_laws, known_authorities=known_authorities)
+        title = (item.get("title") or "")[:70]
+        laws = sum(1 for k in ("law_primary", "law_secondary") if item.get(k))
+        refs = len(item.get("references") or [])
+        print(f"   ↳ [{idx}/{total}] \"{title}\" — OK (laws={laws}, refs={refs})")
     return items

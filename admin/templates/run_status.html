@@ -288,7 +288,7 @@
         {% for run in runs|default([]) %}
         <a class="history-pill {% if run.status == 'failed' or run.status == 'Failed' %}failed{% else %}success{% endif %}"
            href="{{ url_for('admin_profile_runs', profile_id=selected_profile.id) }}?run_id={{ run.id }}">
-          {{ (run.started_at or '')|truncate(10, True, '') }} · {% if run.status in ('failed','Failed') %}Error{% else %}{{ run.filtered_count|default(0) }} items{% endif %}
+          #{{ run.id }} · {{ (run.started_at or '')|truncate(10, True, '') }} · {% if run.status in ('failed','Failed') %}Error{% else %}{{ run.filtered_count|default(0) }} items{% endif %}
         </a>
         {% endfor %}
       </div>

@@ -85,19 +85,32 @@ def _check_url(label: str, url: str) -> Dict[str, Any]:
         return _result(label, "warn", WARN, f"{type(e).__name__}")
 
 
-def run_health_checks(profile_id: int, check_email: bool = True) -> List[Dict[str, Any]]:
-    """Run all dependency checks in parallel and return a list of result dicts."""
+def run_health_checks(
+    profile_id: int,
+    check_email: bool = True,
+    selected_urls: list[str] | None = None,
+) -> List[Dict[str, Any]]:
+    """Run all dependency checks in parallel and return a list of result dicts.
+
+    If selected_urls is provided, only RSS/URL sources whose URL is in that set are checked.
+    """
     tasks = [("db", _check_db, ()), ("ai", _check_ai_core, ())]
     if check_email:
         tasks.append(("gmail", _check_gmail, ()))
+    _sel = set(selected_urls) if selected_urls is not None else None
     try:
         for f in load_rss_feeds(profile_id):
             url = f["url"] if isinstance(f, dict) else f
+            if _sel is not None and url not in _sel:
+                continue
             tasks.append(("src", _check_url, (f"RSS: {url}", url)))
         for s in load_url_sources(profile_id):
             url = s.get("url")
-            if url:
-                tasks.append(("src", _check_url, (f"URL: {url}", url)))
+            if not url:
+                continue
+            if _sel is not None and url not in _sel:
+                continue
+            tasks.append(("src", _check_url, (f"URL: {url}", url)))
     except Exception:
         pass
 

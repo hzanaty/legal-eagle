@@ -629,21 +629,21 @@ const details = {
   },
   'health-check': {
     title: 'Health Check',
-    subtitle: 'Shipped v3.1 — runs before any fetching begins',
-    badge: 'green', badgeLabel: 'Shipped v3.1',
+    subtitle: 'Shipped v3.1 — runs before any fetching begins; scoped to selected sources (v3.33)',
+    badge: 'green', badgeLabel: 'Updated v3.33',
     cols: [
-      { heading: 'What it does', items: ['HTTP HEAD check on all RSS/URL sources', 'Twitter Bearer token validation', 'Gmail SMTP connect → login → quit', 'SAP AI Core minimal chat call', 'DB writability test write'] },
-      { heading: 'Key file', items: ['agents/health_check.py (to be created)', 'Source warnings → log and continue', 'Hard blocks (AI Core / Gmail / DB) → abort run early'] },
+      { heading: 'What it does', items: ['HTTP HEAD check on all RSS/URL sources', 'Twitter Bearer token validation', 'Gmail SMTP connect → login → quit', 'SAP AI Core minimal chat call', 'DB writability test write', 'v3.33: only checks sources selected for the run (not all sources in profile)'] },
+      { heading: 'Key file', items: ['agents/health_check.py — run_health_checks(profile_id, check_email, selected_urls)', 'Source warnings → log and continue', 'Hard blocks (AI Core / Gmail / DB) → abort run early'] },
       { heading: 'Dependencies', items: ['requests (HTTP HEAD)', 'smtplib (Gmail SMTP)', 'agents/sap_ai_client.py', 'configurations/db.py'] },
     ]
   },
   'rss': {
     title: 'RSS Parser',
-    subtitle: 'Unchanged in v3 — fetches and parses RSS feeds',
-    badge: 'green', badgeLabel: 'Unchanged',
+    subtitle: 'Updated v3.33 — URL validation on save + bozo error detection',
+    badge: 'green', badgeLabel: 'Updated v3.33',
     cols: [
-      { heading: 'What it does', items: ['Fetches each RSS feed URL', 'Parses entries: title, link, published date, summary', 'Uses last_fetch_date as lookback window', 'Returns flat list of raw items'] },
-      { heading: 'Key file', items: ['agents/rss_parser.py', 'parse_rss_feed(url) → list of items'] },
+      { heading: 'What it does', items: ['Fetches each RSS feed URL', 'Parses entries: title, link, published date, summary', 'Uses last_fetch_date as lookback window (delta mode)', 'Returns flat list of raw items', 'v3.33: feedparser bozo → raises RuntimeError (anchor preserved on failure)', 'v3.33: admin form rejects relative URLs (no http:// scheme)'] },
+      { heading: 'Key file', items: ['agents/rss_parser.py — parse_rss_feed(url)', 'admin/app.py — add_rss() scheme validation'] },
       { heading: 'Dependencies', items: ['feedparser', 'requests', 'SQLite rss_feeds (last_fetch_date)'] },
     ]
   },
@@ -818,11 +818,11 @@ const details = {
   },
   'log-monitor': {
     title: 'Log Monitor',
-    subtitle: 'Admin UI — live SSE streaming during run, unchanged in v3',
-    badge: 'grey', badgeLabel: 'UI Only',
+    subtitle: 'Admin UI — live SSE streaming during run; per-item L2 progress lines (v3.33)',
+    badge: 'grey', badgeLabel: 'Updated v3.33',
     cols: [
-      { heading: 'What it does', items: ['Streams run logs in real time via SSE', 'Shows step-by-step progress per agent', 'Cancel button to abort mid-run', 'Run history table (past runs + timestamps)'] },
-      { heading: 'Key file', items: ['admin/app.py — /admin/run/&lt;id&gt; (SSE endpoint)', 'admin/templates/run_status.html'] },
+      { heading: 'What it does', items: ['Streams run logs in real time via SSE', 'Shows step-by-step progress per agent', 'Cancel button to abort mid-run', 'Run history pills with Run ID prefix (v3.33: #N · date · items)', 'v3.33: L2 Fetch emits per-item lines: ↳ [i/N] "title…" — OK (laws=X, refs=Y)'] },
+      { heading: 'Key file', items: ['admin/app.py — /admin/run/&lt;id&gt; (SSE endpoint)', 'admin/templates/run_status.html', 'agents/l2_fetcher.py — run_l2_fetch() per-item progress'] },
       { heading: 'Dependencies', items: ['Flask SSE (server-sent events)', 'SQLite run_logs table', 'SQLite runs table (history)'] },
     ]
   },

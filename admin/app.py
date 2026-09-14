@@ -1247,6 +1247,10 @@ def add_rss(profile_id: int):
     if not url:
         flash("RSS URL is required.", "error")
         return redirect(url_for("admin_profile_detail", profile_id=profile_id))
+    from urllib.parse import urlparse as _urlparse
+    if _urlparse(url).scheme not in ("http", "https"):
+        flash("RSS URL must start with http:// or https://", "error")
+        return redirect(url_for("admin_profile_detail", profile_id=profile_id))
     publisher_name = request.form.get("publisher_name", "").strip() or None
     auth_raw = request.form.get("authority_id", "").strip()
     authority_id = int(auth_raw) if auth_raw.isdigit() else None

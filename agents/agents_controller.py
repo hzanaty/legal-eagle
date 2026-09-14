@@ -379,7 +379,9 @@ def run_profile_once(
         # 0) HEALTH CHECK stage (v3.1, F2): parallel pre-run reachability checks.
         # A HARD failure (DB, or Gmail when actually sending) aborts before fetch.
         # AI Core / source warnings are logged and the run proceeds.
-        health = run_health_checks(profile_id, check_email=not skip_email)
+        _sel_urls = [f["url"] if isinstance(f, dict) else f for f in RSS_FEED_URLS] + \
+                    [s["url"] for s in URL_SOURCES if s.get("url")]
+        health = run_health_checks(profile_id, check_email=not skip_email, selected_urls=_sel_urls)
         print(summarize(health))
         _hard = hard_failures(health)
         if _hard:
@@ -639,7 +641,7 @@ def run_profile_once(
             # v3.13/v3.16: L2 Deep Fetch — MANDATORY, now runs FIRST (before Glossary/Law/Rank)
             # so all downstream stages work on the full-article summary, not the headline.
             # Grounded with the profile's registered laws for consistent law extraction.
-            print("🌐 L2 Fetch: one article-grounded call (summary + laws + refs + evidence + authority)…")
+            print(f"🌐 L2 Fetch: {len(filtered_items)} item(s) — article-grounded call (summary + laws + refs + evidence + authority)…")
             from agents.l2_fetcher import run_l2_fetch
             _law_rows = an_conn.execute(
                 "SELECT name_en, name_native, law_number FROM law_refs WHERE profile_id=?",
@@ -670,12 +672,12 @@ def run_profile_once(
                 resolve_primary_authority(filtered_items, an_conn, profile_id)
             except Exception as e:
                 print(f"⚠️ Authority resolution skipped: {type(e).__name__}: {e}")
-            print("🔖 Glossary Match: matching full-article text against glossary…")
+            print(f"🔖 Glossary Match: {len(filtered_items)} item(s)…")
             match_glossary(filtered_items, an_conn, profile_id)  # now sees l2_summary
-            print("⚖ Law Match: resolving cited law → registry (law_id only)…")
+            print(f"⚖ Law Match: {len(filtered_items)} item(s)…")
             match_law_refs(filtered_items, an_conn, profile_id)
             # Reconcile: cross-language dedup keyed on law_id (act_ref fallback), post-Law-Match.
-            print("↺ Reconcile: cross-language dedup by law_id…")
+            print(f"↺ Reconcile: {len(filtered_items)} item(s)…")
             from agents.compare_news import reconcile_by_act_ref
             reconcile_by_act_ref(filtered_items, an_conn, profile_id)
             # v3.17: RCM Match — per-item proposed RCM title (announcement_agent pipeline entry),

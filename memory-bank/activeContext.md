@@ -1,8 +1,29 @@
-## Current State: v3.32 — REPEATED classification fix + configurable baseline window (2026-09-14)
+## Current State: v3.33 — pipeline observability + RSS hardening (2026-09-14)
+
+### ✅ v3.33 COMPLETE
+
+**v3.33 changes:**
+- `admin/templates/run_status.html` — history pills now prefix `#N ·` (run ID) so each pill is uniquely identifiable.
+- `agents/health_check.py` — `run_health_checks()` accepts `selected_urls`; skips sources not selected for the current run.
+- `agents/agents_controller.py` — passes `selected_urls` to health check; stage preambles include item count (e.g., `🌐 L2 Fetch: 2 item(s) —…`).
+- `admin/app.py` — `add_rss()` rejects relative URLs (no `http://` scheme) with a flash error.
+- `agents/rss_parser.py` — `feedparser` bozo failures raise `RuntimeError`; delta anchor preserved on feed failure.
+- `agents/l2_fetcher.py` — `run_l2_fetch()` emits per-item progress: `↳ [i/N] "title…" — OK (laws=X, refs=Y)`.
+
+---
 
 ### ✅ v3.32 COMPLETE
 
 **v3.32 changes:**
+- `agents/compare_news.py` — same-run act_ref match now routes as update+repeated instead of duplicate.
+- `agents/compare_news.py` — removed hardcoded `WEEKLY_BASELINE_DAYS = 7`; uses `get_baseline_days()` per profile.
+- `configurations/config_loader.py` — added `get_baseline_days(profile_id)`.
+- `agents/source_simulator.py` — date detection tier 3: content-based parse.
+- `Roadmap/v3/xanadu-gov-site/` — Xanadu demo site with REPEATED validation articles.
+
+---
+
+## Current Pipeline Architecture (v3.33)
 - `agents/compare_news.py` — `reconcile_by_act_ref` same-run branch: was marking second article with same `act_ref`/`law_id` as `dedup_status = "duplicate"`. Now sets `dedup_status = "update"` + `_repeated_followup = True` + `repetition_status = "repeated"`. Root cause: reconcile runs after L2 fetch sets `act_ref`, so two articles about the same law in one run triggered the duplicate branch.
 - `agents/compare_news.py` — removed `WEEKLY_BASELINE_DAYS = 7` hardcoded constant; replaced with `_BASELINE_DAYS_DEFAULT = 7` (private fallback) + per-profile lookup via `get_baseline_days()`.
 - `configurations/config_loader.py` — added `get_baseline_days(profile_id)`: reads `"baseline_days"` from the per-profile `settings` table, falling back to 7.
@@ -24,7 +45,7 @@
 
 ---
 
-## Current Pipeline Architecture (v3.32)
+## Current Pipeline Architecture (v3.33)
 
 **Stages (in order):** Collect → Glossary Match → L2 Fetch → Impact Gate → Timing → Rank → Announce
 

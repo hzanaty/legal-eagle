@@ -5,6 +5,9 @@ from agents.news_filter import parse_date_string
 
 def parse_rss_feed(url):
     feed = feedparser.parse(url)
+    if feed.bozo and not feed.entries:
+        exc = getattr(feed, "bozo_exception", None)
+        raise RuntimeError(f"feedparser bozo — {type(exc).__name__}: {exc}")
     rss_items = []
     skipped_no_date = 0
 
