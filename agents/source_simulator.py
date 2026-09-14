@@ -13,7 +13,6 @@ testable without a browser or AI.
 from __future__ import annotations
 
 import json
-import re
 from collections import Counter
 from typing import Any, Dict, List, Optional
 from urllib.parse import urljoin
@@ -65,9 +64,22 @@ def _css_from(tag) -> str:
     return (f"{tag.name}." + ".".join(classes)) if classes else tag.name
 
 
+_SKIP_TAGS = frozenset([
+    "html", "body", "head", "script", "style", "nav", "header", "footer",
+    # inline/sub-field elements are never article containers
+    "span", "a", "time", "em", "strong", "b", "i", "small", "abbr",
+    "cite", "label", "code", "sup", "sub", "br", "img", "input",
+])
+
+
 def detect_containers(html: str, min_count: int = 3) -> List[Dict[str, Any]]:
     """Find repeating elements (tag + class) appearing >= min_count times.
-    Returns candidates sorted by count desc with sample texts."""
+    Returns candidates sorted by count desc with sample texts.
+
+    Inline/sub-field tags (span, a, time, etc.) are excluded — they are field
+    elements inside a card, not the card itself. Candidates must also contain
+    at least one link, since article cards almost always link to their detail page.
+    """
     soup = BeautifulSoup(html, "html.parser")
     counter: Counter = Counter()
     for tag in soup.find_all(True):
@@ -81,7 +93,7 @@ def detect_containers(html: str, min_count: int = 3) -> List[Dict[str, Any]]:
         if count < min_count:
             break
         tag_name = selector.split(".")[0]
-        if tag_name in ("html", "body", "head", "script", "style", "nav", "header", "footer"):
+        if tag_name in _SKIP_TAGS:
             continue
         # `selector` is already a valid CSS selector: "div.news-item" or "div.a.b"
         # (element carrying all listed classes) — use it directly.
@@ -90,6 +102,10 @@ def detect_containers(html: str, min_count: int = 3) -> List[Dict[str, Any]]:
         except Exception:
             continue
         if len(matches) < min_count:
+            continue
+        # Require at least one internal link — article cards link to their detail page.
+        # This filters out pure-text containers like paragraphs or heading groups.
+        if not any(m.find("a", href=True) for m in matches[:3]):
             continue
         candidates.append({
             "selector": selector,
@@ -114,15 +130,31 @@ def map_fields(html: str, container_selector: str) -> Dict[str, Optional[str]]:
             result["title"] = result["link"]
             break
 
-    date_pattern = re.compile(r'\b(\d{1,2}[.\-/]\d{1,2}[.\-/]\d{2,4}|\d{4}[.\-/]\d{1,2}[.\-/]\d{1,2})\b')
+    # Tier 1: explicit <time> tag
     time_tag = first.find("time")
     if time_tag:
         result["date"] = _css_from(time_tag)
-    else:
+    # Tier 2: element whose CSS class signals a date (works regardless of format)
+    if not result["date"]:
+        _date_class_hints = ("date", "published", "timestamp", "pubdate", "post-date", "entry-date")
         for el in first.find_all(True):
-            if date_pattern.search(el.get_text(strip=True)):
+            classes = " ".join(el.get("class", [])).lower()
+            if any(h in classes for h in _date_class_hints):
                 result["date"] = _css_from(el)
                 break
+    # Tier 3: content-based — any short element whose text parses as a valid date.
+    # Uses the same dateutil-backed parser as the rest of the pipeline, so it handles
+    # numeric (DD/MM/YYYY, YYYY-MM-DD), ISO, and named-month formats (e.g. "05 September 2026").
+    if not result["date"]:
+        try:
+            from agents.news_filter import parse_date_string as _pds
+            for el in first.find_all(True):
+                txt = el.get_text(strip=True)
+                if 5 <= len(txt) <= 80 and _pds(txt) is not None:
+                    result["date"] = _css_from(el)
+                    break
+        except Exception:
+            pass
 
     byline_hints = ("author", "byline", "kurum", "source", "publisher", "creator")
     for el in first.find_all(True):

@@ -53,6 +53,12 @@ def _get_ai_client():
 
 
 def _fetch_html(url: str) -> str:
+    if url.startswith("file://"):
+        from urllib.parse import urlparse
+        from urllib.request import url2pathname
+        path = url2pathname(urlparse(url).path)
+        with open(path, "r", encoding="utf-8", errors="replace") as fh:
+            return fh.read()
     resp = requests.get(url, headers={"User-Agent": _UA}, timeout=_TIMEOUT)
     resp.raise_for_status()
     return resp.text
