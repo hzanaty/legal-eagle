@@ -16,7 +16,7 @@ Open `http://localhost:8000/`.
 
 - `social-insurance-contribution-reform.html` is the original confirmed legal change.
 - `social-insurance-rate-countdown.html` is a later reminder of the same change.
-- Both repeat Royal Decree No. 18/2026, Social Insurance Act No. 7/2025 Article 14, and the 12 September 2026 effective date to support deterministic announcement grouping.
+- Both repeat Royal Decree No. 18/2026, Social Insurance Act No. 7/2026 Article 14, and the 12 September 2026 effective date to support deterministic announcement grouping.
 - Other articles deliberately range from relevant-but-not-new to obvious noise.
 - Every navigation and “Read full notice” link resolves to a real static page.
 - The MoU article uses an AI-generated flags-and-documents image with no people.
