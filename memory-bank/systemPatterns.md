@@ -18,6 +18,89 @@ Each agent within the system operates independently but communicates through def
 
 ---
 
+## BTP Data Backup/Restore Workflow (v3.34) — CRITICAL PATTERN
+
+### THE PROBLEM
+- BTP Cloud Foundry containers are **ephemeral** — database is local to container filesystem
+- On `cf push`, `cf restart`, or `cf restage`, new container may spin up on different Diego Cell
+- Old container's database is **LOST** → All config and production data gone
+- Users have to reconfigure everything from scratch
+
+### THE SOLUTION: Three-Script Approach (NO API ENDPOINTS)
+
+**Uses only `cf` CLI commands** to directly manage database files. **NO HTTP API endpoints in `admin/app.py`.**
+
+### EXACT WORKFLOW (MANDATORY)
+
+```bash
+# Step 1: BACKUP (before any deployment)
+python3 scripts/btp_backup.py --output backup.json
+# → Downloads config.db from BTP container
+# → Exports all 21 tables to local JSON file
+
+# Step 2: DO YOUR DEPLOYMENT
+cf push
+# or
+cf restart legal-eagle-ui
+
+# Step 3: CHECK if data was lost (MANDATORY)
+python3 scripts/btp_check.py --file backup.json
+# → Downloads current BTP database
+# → Shows comparison table:
+#     Table         | Backup | BTP Now | Status
+#     profiles      | 4      | 4       | ✅ OK
+#     rss_feeds     | 12     | 0       | ❌ LOST
+#     news_items    | 500    | 0       | ❌ LOST
+#     ...
+# → Recommendation: restore if >50% rows lost
+
+# Step 4: RESTORE only if needed
+python3 scripts/btp_restore.py --file backup.json
+# → Asks confirmation: "Type 'restore' to proceed"
+# → Downloads current BTP db
+# → Imports backup data into local copy
+# → Uploads modified db back to BTP
+# → Says: "Restart BTP for changes to take effect"
+cf restart legal-eagle-ui
+```
+
+### THE THREE SCRIPTS (SEPARATE, EACH DOES ONE JOB)
+
+| Script | Input | Does | Output |
+|--------|-------|------|--------|
+| `btp_backup.py` | BTP app running | `cf download` → export to JSON | Local `btp_backup_YYYYMMDD_HHMMSS.json` |
+| `btp_check.py` | Backup JSON file | `cf download` BTP → compare vs backup | Comparison table + recommendation |
+| `btp_restore.py` | Backup JSON file | Download current → import backup → upload | "Restart BTP for changes to take effect" |
+
+### KEY DESIGN POINTS (NEVER CHANGE)
+
+1. ✅ **NO API endpoints** — Uses only `cf` CLI (`cf download`, `cf upload-file`)
+2. ✅ **Check step is MANDATORY** — Shows comparison table, user decides
+3. ✅ **Confirmation required** — Restore asks "Type 'restore'" before proceeding
+4. ✅ **Separate scripts** — Each script has ONE clear job, no mixing
+5. ✅ **Local SQLite processing** — Uses temp databases for speed
+6. ✅ **Transparent** — User sees exactly what data was lost/kept
+
+### WHY THIS DESIGN
+
+- **Simpler**: No HTTP endpoints to maintain, debug, or secure
+- **Faster**: Local processing, no network latency
+- **Safer**: Check step prevents accidental overwrites
+- **Transparent**: User can see the comparison before deciding
+- **Reliable**: Uses only `cf` CLI, no custom endpoints
+
+### WHEN TO USE
+
+| Scenario | Commands |
+|----------|----------|
+| Before `cf push` | `btp_backup.py` |
+| Before `cf restart` | `btp_backup.py` |
+| Before `cf restage` | `btp_backup.py` |
+| After any of above | `btp_check.py` (check if lost) |
+| If data lost | `btp_restore.py` |
+
+---
+
 ## 🔴 GOLDEN RULES: Command Execution (MUST FOLLOW EVERY TASK — NO EXCEPTIONS)
 
 These rules exist because violating them causes commands to hang as "Pending" or "Skipped" in Cline, requiring the user to interrupt manually.

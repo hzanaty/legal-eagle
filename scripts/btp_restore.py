@@ -1,65 +1,105 @@
 #!/usr/bin/env python3
 """
-BTP Restore Script — Import ALL data back to BTP database from backup JSON.
+BTP Restore Script — Restore data from backup JSON back to BTP database.
 
-This script imports a previously exported backup to restore BTP data after
-a restart/restage/push that lost the database.
+Uses `cf` commands to upload database to BTP container.
 
 Usage:
-    python scripts/btp_restore.py \
-      --file btp_backup_20260917_221500.json \
-      --url https://legal-eagle-ui.cfapps.eu21.hana.ondemand.com \
-      --secret <admin_secret>
+    python scripts/btp_restore.py --file btp_backup_20260917_221500.json
 
 Workflow:
-1. Before restart:  python btp_backup.py → creates backup
+1. Before restart:  python btp_backup.py
 2. Do restart:      cf restart legal-eagle-ui
-3. After restart:   python btp_restore.py --file btp_backup_*.json
-
-The script will:
-1. Read the backup JSON file
-2. Call /api/import-all on the BTP instance
-3. Display summary of restored data
+3. After restart:   python btp_check.py --file btp_backup.json (check if lost)
+4. If needed:       python btp_restore.py --file btp_backup.json
 """
 
 import json
 import argparse
 import sys
+import subprocess
 from pathlib import Path
-import requests
-import os
+import sqlite3
 
 
-def restore_btp(backup_file: str, url: str, secret: str) -> bool:
-    """Import ALL data to BTP instance."""
+def run_command(cmd, capture=True):
+    """Run shell command."""
+    try:
+        result = subprocess.run(cmd, shell=True, capture_output=capture, text=True, timeout=120)
+        if result.returncode != 0:
+            print(f"❌ Command failed: {cmd}")
+            if result.stderr:
+                print(f"   {result.stderr}")
+            return None
+        return result.stdout.strip() if capture else True
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        return None
+
+
+def import_json_to_db(json_file: str, db_path: str) -> bool:
+    """Import JSON backup data into SQLite database."""
+    try:
+        with open(json_file) as f:
+            data = json.load(f)
+        
+        conn = sqlite3.connect(db_path)
+        conn.execute("PRAGMA foreign_keys = OFF")
+        
+        # Clear tables
+        tables_to_clear = [
+            "run_logs", "runs", "news_announcements", "filtered_news", "news_items",
+            "rcm_reference_titles", "ranking_grounding", "ranking_signals",
+            "law_refs", "glossary_patterns", "glossary_synonyms", "glossary_terms",
+            "glossary_labels", "email_receivers", "url_sources", "tweet_accounts",
+            "rss_feeds", "authorities", "settings", "profiles", "audit_log",
+        ]
+        for table in tables_to_clear:
+            try:
+                conn.execute(f"DELETE FROM {table}")
+            except:
+                pass
+        conn.commit()
+        
+        # Import data
+        total = 0
+        for table, rows in data.items():
+            if not rows or table.startswith("_"):
+                continue
+            try:
+                cols = list(rows[0].keys())
+                placeholders = ", ".join("?" for _ in cols)
+                col_names = ", ".join(cols)
+                for row in rows:
+                    conn.execute(
+                        f"INSERT OR REPLACE INTO {table} ({col_names}) VALUES ({placeholders})",
+                        [row.get(c) for c in cols],
+                    )
+                    total += 1
+                conn.commit()
+            except Exception as e:
+                print(f"⚠️  Error in {table}: {e}")
+                conn.rollback()
+        
+        conn.execute("PRAGMA foreign_keys = ON")
+        conn.close()
+        
+        return total
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        return 0
+
+
+def restore_btp(backup_file: str) -> bool:
+    """Restore data from backup to BTP using cf commands."""
     
-    # Load backup file
     backup_path = Path(backup_file)
     if not backup_path.exists():
-        print(f"❌ Error: Backup file not found: {backup_file}")
+        print(f"❌ Backup file not found: {backup_file}")
         return False
     
-    print(f"📂 Loading backup: {backup_path.absolute()}")
-    
-    try:
-        with open(backup_path, "r") as f:
-            data = json.load(f)
-    except json.JSONDecodeError as e:
-        print(f"❌ Error: Invalid JSON in backup file: {e}")
-        return False
-    except Exception as e:
-        print(f"❌ Error reading backup file: {e}")
-        return False
-    
-    # Normalize URL
-    if not url.startswith("http"):
-        url = f"https://{url}"
-    url = url.rstrip("/")
-    import_url = f"{url}/api/import-all"
-    
-    print(f"🔄 Connecting to: {url}")
-    print(f"⚠️  WARNING: This will clear all existing data on BTP!")
-    print(f"📥 Restoring {len([t for t in data if not t.startswith('_')])} tables...")
+    print(f"📂 Backup file: {backup_path.absolute()}")
+    print(f"⚠️  WARNING: This will clear all existing BTP data!")
     
     # Confirm
     confirm = input("\n⚠️  Type 'restore' to proceed (or anything else to cancel): ").strip()
@@ -67,87 +107,57 @@ def restore_btp(backup_file: str, url: str, secret: str) -> bool:
         print("❌ Cancelled")
         return False
     
-    try:
-        # Call import endpoint with Bearer token
-        headers = {
-            "Authorization": f"Bearer {secret}",
-            "Content-Type": "application/json"
-        }
-        
-        response = requests.post(
-            import_url,
-            json=data,
-            headers=headers,
-            timeout=120
-        )
-        
-        if response.status_code == 403:
-            print("❌ Error: Unauthorized (invalid admin secret)")
-            return False
-        elif response.status_code != 200:
-            print(f"❌ Error: HTTP {response.status_code}")
-            print(f"Response: {response.text[:500]}")
-            return False
-        
-        result = response.json()
-        
-        print(f"\n✅ Restore complete!")
-        print(f"📊 Summary:")
-        print(f"   • Rows imported: {result.get('rows_imported', 0)}")
-        print(f"   • Status: {result.get('status', 'unknown')}")
-        
-        metadata = data.get("_metadata", {})
-        if metadata:
-            print(f"\n📋 Backup info:")
-            print(f"   • Exported: {metadata.get('export_timestamp', 'unknown')}")
-            print(f"   • Version: {metadata.get('version', 'unknown')}")
-        
-        return True
-        
-    except requests.ConnectionError:
-        print(f"❌ Error: Cannot connect to {url}")
-        print("   Verify the URL is correct and BTP app is running")
+    # Check cf CLI
+    if not run_command("cf --version"):
+        print("❌ cf CLI not found")
         return False
-    except requests.Timeout:
-        print("❌ Error: Request timeout (restore may still be in progress)")
+    
+    # Create temp database for import
+    print("\n🔄 Preparing restore...")
+    temp_dir = Path("/tmp/legal_eagle_restore")
+    temp_dir.mkdir(exist_ok=True)
+    temp_db = temp_dir / "config.db"
+    
+    # Download current BTP database
+    print("📥 Downloading current BTP database...")
+    download_cmd = f"cf download legal-eagle-ui /home/vcap/app/configurations/config.db -o {temp_db}"
+    if not run_command(download_cmd, capture=False):
+        print("❌ Could not download database")
         return False
-    except Exception as e:
-        print(f"❌ Error: {e}")
+    
+    # Import from backup JSON into temp database
+    print("📊 Importing backup data...")
+    rows_imported = import_json_to_db(str(backup_path), str(temp_db))
+    if rows_imported == 0:
+        print("❌ No data imported")
         return False
+    
+    print(f"✅ Imported {rows_imported} rows")
+    
+    # Upload modified database back to BTP
+    print("📤 Uploading restored database to BTP...")
+    upload_cmd = f"cf upload-file legal-eagle-ui {temp_db} /home/vcap/app/configurations/config.db"
+    if not run_command(upload_cmd, capture=False):
+        print("⚠️  Could not upload via cf upload-file")
+        print("   BTP may not support this operation")
+        print("   Alternative: Restart BTP manually and re-import")
+        return False
+    
+    print(f"\n✅ Restore complete!")
+    print(f"📊 Summary:")
+    print(f"   • Rows imported: {rows_imported}")
+    print(f"\n⚠️  IMPORTANT: Restart BTP app for changes to take effect:")
+    print(f"   cf restart legal-eagle-ui")
+    
+    return True
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Restore ALL data to BTP Legal Eagle instance from backup"
-    )
-    parser.add_argument(
-        "--file",
-        "-f",
-        required=True,
-        help="Backup JSON file to restore"
-    )
-    parser.add_argument(
-        "--url",
-        default="https://legal-eagle-ui.cfapps.eu21.hana.ondemand.com",
-        help="BTP app URL (default: %(default)s)"
-    )
-    parser.add_argument(
-        "--secret",
-        required=False,
-        help="Admin secret (or set LEGAL_EAGLE_ADMIN_SECRET env var)"
-    )
-    
+    parser = argparse.ArgumentParser(description="Restore data from backup to BTP")
+    parser.add_argument("--file", "-f", required=True, help="Backup JSON file")
     args = parser.parse_args()
     
-    # Get secret from arg or environment
-    secret = args.secret or os.environ.get("LEGAL_EAGLE_ADMIN_SECRET")
-    
-    if not secret:
-        print("❌ Error: Admin secret not provided")
-        print("   Use --secret flag or set LEGAL_EAGLE_ADMIN_SECRET environment variable")
-        sys.exit(1)
-    
-    success = restore_btp(args.file, args.url, secret)
+    success = restore_btp(args.file)
     sys.exit(0 if success else 1)
 
 
