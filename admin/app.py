@@ -2972,6 +2972,150 @@ def admin_import_config():
     return redirect(url_for("admin_dashboard"))
 
 
+# ============================================================================
+# BTP Backup/Restore API (v3.34) — Export/import ALL data (config + production)
+# ============================================================================
+
+@app.route("/api/export-all", methods=["GET"])
+def api_export_all():
+    """
+    Export ALL database tables (config + production) as JSON.
+    Protected by admin secret query parameter or Bearer token.
+    """
+    # Check admin secret
+    secret = request.args.get("secret", "") or request.headers.get("Authorization", "").replace("Bearer ", "")
+    expected = os.environ.get("LEGAL_EAGLE_ADMIN_SECRET", "")
+    if not expected or secret != expected:
+        return jsonify({"error": "Unauthorized"}), 403
+    
+    _ensure_schema()
+    conn = get_connection()
+    
+    # All tables to export (config + production)
+    tables_to_export = [
+        "profiles", "settings", "authorities",
+        "rss_feeds", "tweet_accounts", "url_sources", "email_receivers",
+        "glossary_labels", "glossary_terms", "glossary_synonyms", "glossary_patterns",
+        "law_refs", "ranking_signals", "ranking_grounding", "rcm_reference_titles",
+        "news_items", "filtered_news", "news_announcements",
+        "runs", "run_logs", "audit_log",
+    ]
+    
+    export_data = {}
+    cursor = conn.cursor()
+    
+    for table in tables_to_export:
+        try:
+            cursor.execute(f"PRAGMA table_info({table})")
+            columns = [row[1] for row in cursor.fetchall()]
+            
+            if not columns:
+                export_data[table] = []
+                continue
+            
+            cursor.execute(f"SELECT * FROM {table}")
+            rows = cursor.fetchall()
+            
+            export_data[table] = [
+                {col: row[i] for i, col in enumerate(columns)}
+                for row in rows
+            ]
+        except Exception as e:
+            print(f"⚠️ Error exporting table {table}: {e}")
+            export_data[table] = []
+    
+    conn.close()
+    
+    # Add metadata
+    export_data["_metadata"] = {
+        "export_timestamp": datetime.utcnow().isoformat(),
+        "version": "v3.34",
+    }
+    
+    return jsonify(export_data), 200
+
+
+@app.route("/api/import-all", methods=["POST"])
+def api_import_all():
+    """
+    Import ALL database tables (config + production) from JSON.
+    Protected by admin secret in Bearer token or _secret field.
+    Clears and reimports all data.
+    """
+    secret = request.headers.get("Authorization", "").replace("Bearer ", "")
+    if not secret and request.is_json:
+        secret = request.get_json().get("_secret", "")
+    
+    expected = os.environ.get("LEGAL_EAGLE_ADMIN_SECRET", "")
+    if not expected or secret != expected:
+        return jsonify({"error": "Unauthorized"}), 403
+    
+    _ensure_schema()
+    
+    try:
+        if not request.is_json:
+            return jsonify({"error": "Content-Type must be application/json"}), 400
+        
+        data = request.get_json()
+        metadata = data.pop("_metadata", {})
+        
+        conn = get_connection()
+        conn.execute("PRAGMA foreign_keys = OFF")
+        
+        # Clear all tables (reverse dependency order)
+        tables_to_clear = [
+            "run_logs", "runs", "news_announcements", "filtered_news", "news_items",
+            "rcm_reference_titles", "ranking_grounding", "ranking_signals",
+            "law_refs", "glossary_patterns", "glossary_synonyms", "glossary_terms",
+            "glossary_labels", "email_receivers", "url_sources", "tweet_accounts",
+            "rss_feeds", "authorities", "settings", "profiles", "audit_log",
+        ]
+        
+        for table in tables_to_clear:
+            try:
+                conn.execute(f"DELETE FROM {table}")
+            except Exception:
+                pass
+        
+        conn.commit()
+        
+        # Import data
+        total_imported = 0
+        cursor = conn.cursor()
+        
+        for table, rows in data.items():
+            if not rows or table.startswith("_"):
+                continue
+            
+            try:
+                cols = list(rows[0].keys())
+                placeholders = ", ".join("?" for _ in cols)
+                col_names = ", ".join(cols)
+                
+                for row in rows:
+                    cursor.execute(
+                        f"INSERT OR REPLACE INTO {table} ({col_names}) VALUES ({placeholders})",
+                        [row.get(c) for c in cols],
+                    )
+                    total_imported += 1
+                
+                conn.commit()
+            except Exception as e:
+                print(f"⚠️ Error importing table {table}: {e}")
+                conn.rollback()
+        
+        conn.execute("PRAGMA foreign_keys = ON")
+        conn.close()
+        
+        return jsonify({
+            "status": "success",
+            "rows_imported": total_imported,
+        }), 200
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/admin/profiles/<int:profile_id>/preflight")
 def admin_preflight(profile_id: int):
     """Pre-run checklist — returns JSON {checks: [{label, ok, message}], ready: bool}."""
