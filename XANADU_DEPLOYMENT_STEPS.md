@@ -1,6 +1,27 @@
-# Xanadu Gov Site & Legal Eagle BTP Deployment — Final Steps
+# BTP Deployment Workflow — Data Backup/Restore (v3.34+)
 
-## ✅ What's Been Done
+> **NEW:** Starting from v3.34, always backup before deploying to preserve your data!
+
+## 📋 Quick Workflow (v3.34+)
+
+```bash
+# ✅ BEFORE any cf push/restart/restage
+python3 scripts/btp_backup.py --secret prod-secure-secret-2026
+
+# 🚀 DO your deployment
+cf push
+# or
+cf restart legal-eagle-ui
+
+# ✅ AFTER deployment completes
+python3 scripts/btp_restore.py --file btp_backup_20260917_221500.json --secret prod-secure-secret-2026
+```
+
+**Why?** BTP containers are ephemeral — SQLite database is lost on every deployment. The backup/restore scripts preserve your configuration and workflow data.
+
+---
+
+## ✅ What's Been Done (Xanadu Setup)
 
 1. **Xanadu Gov Site Deployed to GitHub Pages**
    - Location: `/docs` folder in legal-eagle repo
