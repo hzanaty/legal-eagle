@@ -385,6 +385,121 @@ For questions about these differences:
 
 ---
 
+## 14. BTP Data Backup/Restore (v3.34)
+
+### The Problem (Ephemeral Database)
+
+When `cf restart`, `cf restage`, or `cf push` is executed on BTP:
+- The container may be recreated on a different Diego Cell
+- SQLite database file (`config.db`) is local to that container
+- New container = **brand new empty database**
+- **All config and production data is lost**
+
+### The Solution: Backup Before, Restore After
+
+**Three-step workflow:**
+
+```bash
+# Step 1: Before any restart/restage/push
+python scripts/btp_backup.py --secret <admin-secret>
+# Creates: btp_backup_20260917_221500.json
+
+# Step 2: Do your restart/restage/push
+cf restart legal-eagle-ui
+# or
+cf push
+
+# Step 3: After app is running again
+python scripts/btp_restore.py --file btp_backup_20260917_221500.json --secret <admin-secret>
+# Restores all data from backup
+```
+
+### New API Endpoints
+
+Both endpoints are protected by admin secret (query parameter or Bearer token):
+
+**Export All Data:**
+```bash
+GET /api/export-all?secret=<admin-secret>
+# or
+curl -H "Authorization: Bearer <admin-secret>" https://legal-eagle-ui.cfapps.eu21.hana.ondemand.com/api/export-all
+
+# Returns:
+{
+  "profiles": [...],
+  "rss_feeds": [...],
+  "news_items": [...],
+  "runs": [...],
+  "_metadata": {
+    "export_timestamp": "2026-09-17T22:15:00.000000",
+    "version": "v3.34"
+  }
+}
+```
+
+**Import All Data:**
+```bash
+POST /api/import-all
+Content-Type: application/json
+Authorization: Bearer <admin-secret>
+
+{
+  "profiles": [...],
+  "rss_feeds": [...],
+  ...same as export format...
+}
+
+# Returns:
+{
+  "status": "success",
+  "rows_imported": 1234
+}
+```
+
+### Local Scripts
+
+**`scripts/btp_backup.py`**
+```bash
+python scripts/btp_backup.py \
+  --url https://legal-eagle-ui.cfapps.eu21.hana.ondemand.com \
+  --secret prod-secure-secret-2026 \
+  --output my_backup.json
+```
+
+**`scripts/btp_restore.py`**
+```bash
+python scripts/btp_restore.py \
+  --file my_backup.json \
+  --url https://legal-eagle-ui.cfapps.eu21.hana.ondemand.com \
+  --secret prod-secure-secret-2026
+```
+
+Both scripts can read admin secret from `LEGAL_EAGLE_ADMIN_SECRET` environment variable.
+
+### What Gets Backed Up?
+
+**Config tables (preserved across environments):**
+- profiles, settings, authorities
+- rss_feeds, tweet_accounts, url_sources, email_receivers
+- glossary_labels, glossary_terms, glossary_synonyms, glossary_patterns
+- law_refs, ranking_signals, ranking_grounding, rcm_reference_titles
+
+**Production tables (workflow data):**
+- news_items, filtered_news, news_announcements
+- runs, run_logs, audit_log
+
+### When to Use
+
+| Scenario | Action |
+|----------|--------|
+| **Before `cf push`** | Run `btp_backup.py` |
+| **Before `cf restart`** | Run `btp_backup.py` |
+| **Before `cf restage`** | Run `btp_backup.py` |
+| **After any restart/push** | Run `btp_restore.py` if needed |
+| **Regular backups** | Add to scheduled tasks / cron |
+
+---
+
 **Last Updated:** 2026-09-17  
-**Version:** v3.33  
+**Version:** v3.34  
 **Scope:** Legal Eagle BTP Deployment

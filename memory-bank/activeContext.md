@@ -1,4 +1,25 @@
-## Current State: v3.33 — pipeline observability + RSS hardening (2026-09-14)
+## Current State: v3.34 — BTP Backup/Restore System (2026-09-17)
+
+### 🚀 v3.34 IN PROGRESS
+
+**v3.34 changes (BTP Data Persistence):**
+- `admin/app.py` — new endpoints: `/api/export-all` (GET) + `/api/import-all` (POST)
+  - Export ALL database tables (config + production) as JSON
+  - Import ALL tables from JSON backup (clears existing data first)
+  - Both protected by admin secret (query param or Bearer token)
+- `scripts/btp_backup.py` — local CLI script to export BTP database to JSON file
+  - Usage: `python btp_backup.py --url <btp-url> --secret <admin-secret> --output backup.json`
+  - Auto-generates timestamped filename if not specified
+- `scripts/btp_restore.py` — local CLI script to import backup JSON to BTP
+  - Usage: `python btp_restore.py --file backup.json --url <btp-url> --secret <admin-secret>`
+  - Requires confirmation before restoring (dangerous operation)
+
+**Problem Solved:**
+- BTP uses ephemeral SQLite → data lost on restart/restage/push
+- Solution: Export before restart, import after restart
+- Workflow: `btp_backup.py` → `cf restart` → `btp_restore.py`
+
+---
 
 ### ✅ v3.33 COMPLETE
 

@@ -1,6 +1,31 @@
 # CHANGELOG
 
-## v3.32 — 2026-09-14
+## v3.34 — 2026-09-17
+### BTP Data Persistence: Backup/Restore API + CLI Scripts
+
+- **BTP Ephemeral Database Problem** — SQLite database lives in the container filesystem. On `cf push`, `cf restart`, or `cf restage`, Cloud Foundry may create a new container on a different Diego Cell, resulting in a brand-new empty database. All config and production data is lost.
+- **Solution: Export/Import API** — New endpoints `/api/export-all` (GET) and `/api/import-all` (POST) in `admin/app.py`:
+  - Export: returns ALL tables (config + production data) as JSON; protected by admin secret
+  - Import: clears all data and reimports from JSON; protected by admin secret; requires confirmation
+- **Local CLI Scripts**:
+  - `scripts/btp_backup.py` — exports BTP database to timestamped JSON file
+  - `scripts/btp_restore.py` — imports JSON backup into BTP database
+  - Both read admin secret from arg or `LEGAL_EAGLE_ADMIN_SECRET` env var
+- **Workflow**: `python btp_backup.py` → `cf push` → `python btp_restore.py --file backup.json`
+- **Documentation**:
+  - `BTP_DEPLOYMENT_DIFFERENCES.md` Section 14 — full backup/restore workflow and API reference
+  - `memory-bank/activeContext.md` — updated current version to v3.34
+
+**Files Changed:**
+- `admin/app.py` — `/api/export-all`, `/api/import-all` (143 lines)
+- `scripts/btp_backup.py` — new local tool (163 lines)
+- `scripts/btp_restore.py` — new local tool (160 lines)
+- `BTP_DEPLOYMENT_DIFFERENCES.md` — Section 14 added
+- `memory-bank/activeContext.md` — version bumped to v3.34
+
+---
+
+## v3.33 — 2026-09-14
 ### REPEATED classification fix · configurable baseline window
 
 - **REPEATED classification fixed** — `reconcile_by_act_ref` same-run branch was setting `dedup_status = "duplicate"` for follow-up articles sharing the same `act_ref`/`law_id` as an earlier article in the same run. Root cause: reconcile runs after L2 fetch sets `act_ref`, so two articles about the same law in one run (e.g. an original decree + a countdown reminder) triggered the duplicate branch instead of the follow-up branch. Fix: same-run act_ref/law_id matches are classified as `dedup_status = "update"` + `repetition_status = "repeated"`, routing them through the full pipeline (ranker, impact gate, announcement grouping). The original article remains `dedup_status = "new"`.

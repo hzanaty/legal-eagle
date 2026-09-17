@@ -1,3 +1,41 @@
+## v3.34 (2026-09-17) — BTP Data Persistence: Backup/Restore System
+
+**Problem Addressed:**
+- BTP Cloud Foundry containers are ephemeral — SQLite database lost on every `cf push`, `cf restart`, or `cf restage`
+- Users had to reconfigure everything after each deployment
+
+**Solution:**
+- New API endpoints for data export/import:
+  - `GET /api/export-all?secret=<admin_secret>` — exports all tables (config + production) as JSON
+  - `POST /api/import-all` — imports all tables from JSON, clears existing data first
+  - Both protected by admin secret (query param or Bearer token)
+- New CLI scripts (local):
+  - `scripts/btp_backup.py` — exports BTP database to timestamped JSON file
+  - `scripts/btp_restore.py` — imports JSON backup to BTP (requires confirmation)
+  - Both read admin secret from env var or command-line arg
+
+**Workflow:**
+```bash
+# Before any deployment operation
+python scripts/btp_backup.py --secret prod-secure-secret-2026
+
+# Do your deployment
+cf push
+
+# After deployment completes
+python scripts/btp_restore.py --file btp_backup_20260917_221500.json --secret prod-secure-secret-2026
+```
+
+**Files Changed:**
+- `admin/app.py` — `api_export_all()` + `api_import_all()` (143 lines)
+- `scripts/btp_backup.py` — NEW (163 lines)
+- `scripts/btp_restore.py` — NEW (160 lines)
+- `BTP_DEPLOYMENT_DIFFERENCES.md` — Section 14: Backup/Restore workflow
+- `CHANGELOG.md` — v3.34 entry
+- `memory-bank/activeContext.md` — version bumped
+
+---
+
 ## v3.0–v3.5 (2026-09-04 → 2026-09-05) — Pipeline Redesign (consolidated catch-up)
 
 > **Consolidated entry.** The memory-bank drifted after v2.32 — v3.0–v3.5 were never recorded here while they shipped (tracked instead in `CHANGELOG.md`, `Roadmap/v3-pipeline-redesign.md`, `docs/lifecycle.html`, and auto-memory). This single entry brings `progress.md` current; per-version bullet detail + file lists live in `CHANGELOG.md`.
