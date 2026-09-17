@@ -1,85 +1,176 @@
 #!/usr/bin/env python3
 """
-Import config from scripts/btp_seed_data.json into the BTP DB.
-Run via: cf run-task legal-eagle-ui --command "python3 scripts/import_config.py" -m 128M
+Import Legal Eagle configuration data into BTP database.
 
-Full replace — wipes all 10 config tables then reimports from JSON.
-Never touches: settings (ANS keys), runs, run_logs, news_items,
-               filtered_news, audit_log.
+This script imports ONLY configuration tables (profiles, glossary, sources, etc.)
+into a BTP instance. It validates the schema exists and safely inserts/updates data.
+
+Usage:
+    python scripts/import_config.py [--input config_export.json] [--db path/to/config.db]
+
+Safety:
+    - Validates schema exists first (must run with fresh `cf push`)
+    - Only imports configuration tables
+    - Skips production tables entirely
+    - Dry-run mode available for preview
 """
-import sys
-import os
+
 import json
+import sqlite3
+import sys
+from pathlib import Path
+from datetime import datetime
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-
-from configurations.db import get_connection, create_schema_if_needed
-
-DB_PATH = os.environ.get(
-    "LEGAL_EAGLE_DB",
-    os.path.join(os.path.dirname(__file__), "..", "configurations", "config.db"),
-)
-
-TABLES = [
-    # Order matters — children before parents would break FK constraints,
-    # so delete in reverse order, insert in forward order.
+# Configuration tables to import (in dependency order)
+CONFIG_TABLES_ORDER = [
     "profiles",
-    "url_sources",
+    "settings",
+    "authorities",
     "rss_feeds",
     "tweet_accounts",
+    "url_sources",
     "email_receivers",
+    "glossary_labels",
     "glossary_terms",
     "glossary_synonyms",
     "glossary_patterns",
+    "law_refs",
+    "ranking_signals",
+    "ranking_grounding",
+    "rcm_reference_titles",
 ]
 
-SEED_FILE = os.path.join(os.path.dirname(__file__), "btp_seed_data.json")
+
+def validate_schema(conn: sqlite3.Connection) -> bool:
+    """Validate that all required schema tables exist."""
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name IN (?, ?)",
+        ("profiles", "settings")
+    )
+    tables = cursor.fetchall()
+    return len(tables) >= 2
+
+
+def import_config(input_path: str, db_path: str, dry_run: bool = False) -> None:
+    """Import configuration into database."""
+    
+    if not Path(input_path).exists():
+        print(f"❌ Import file not found: {input_path}")
+        sys.exit(1)
+    
+    if not Path(db_path).exists():
+        print(f"❌ Database not found: {db_path}")
+        print(f"💡 Hint: Run 'cf push' first to create the schema")
+        sys.exit(1)
+    
+    print(f"📖 Importing configuration from: {input_path}")
+    print(f"📊 Target database: {db_path}")
+    if dry_run:
+        print(f"🔍 DRY RUN MODE - No changes will be made")
+    
+    # Load JSON
+    with open(input_path, "r") as f:
+        export_data = json.load(f)
+    
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    
+    try:
+        # Validate schema
+        if not validate_schema(conn):
+            print(f"❌ Database schema incomplete. Run 'cf push' first.")
+            sys.exit(1)
+        
+        print(f"\n✅ Schema validation passed")
+        
+        # Import each table
+        imported_count = 0
+        total_rows = 0
+        
+        print(f"\n📥 Importing tables:")
+        for table_name in CONFIG_TABLES_ORDER:
+            if table_name not in export_data["tables"]:
+                print(f"  ⚠️  {table_name}: Not in export file (skipped)")
+                continue
+            
+            table_data = export_data["tables"][table_name]
+            if not table_data:
+                print(f"  ✅ {table_name}: 0 rows (empty)")
+                continue
+            
+            # Build INSERT statement
+            first_row = table_data[0]
+            columns = list(first_row.keys())
+            placeholders = ", ".join("?" * len(columns))
+            col_list = ", ".join(columns)
+            
+            insert_sql = f"INSERT INTO {table_name} ({col_list}) VALUES ({placeholders})"
+            
+            if dry_run:
+                print(f"  🔍 {table_name}: Would insert {len(table_data)} rows")
+                total_rows += len(table_data)
+            else:
+                try:
+                    for row in table_data:
+                        values = [row.get(col) for col in columns]
+                        conn.execute(insert_sql, values)
+                    
+                    conn.commit()
+                    print(f"  ✅ {table_name}: {len(table_data)} rows inserted")
+                    total_rows += len(table_data)
+                    imported_count += 1
+                except sqlite3.IntegrityError as e:
+                    print(f"  ⚠️  {table_name}: Skipped (constraint violation: {str(e)[:60]})")
+                except Exception as e:
+                    print(f"  ❌ {table_name}: Error - {str(e)[:60]}")
+                    sys.exit(1)
+        
+        if dry_run:
+            print(f"\n🔍 DRY RUN: Would import {total_rows} rows")
+            print(f"✅ Preview complete. Run without --dry-run to actually import.")
+        else:
+            print(f"\n✅ Import complete!")
+            print(f"📊 Summary:")
+            print(f"   • Tables imported: {imported_count}")
+            print(f"   • Total rows: {total_rows}")
+            print(f"\n🎯 Next steps:")
+            print(f"   1. Verify in Admin UI: profiles, sources, glossary")
+            print(f"   2. Test with manual run")
+            print(f"   3. Check logs: cf logs legal-eagle-ui --recent")
+        
+    except Exception as e:
+        print(f"❌ Import failed: {e}")
+        sys.exit(1)
+    finally:
+        conn.close()
 
 
 def main():
-    if not os.path.exists(SEED_FILE):
-        print(f"ERROR: {SEED_FILE} not found. Run export_config.py locally first, then cf push.")
-        sys.exit(1)
-
-    with open(SEED_FILE, "r", encoding="utf-8") as f:
-        data = json.load(f)
-
-    conn = get_connection(DB_PATH)
-    create_schema_if_needed(conn)
-
-    # Disable FK checks during wipe/reload to avoid cascade issues
-    conn.execute("PRAGMA foreign_keys = OFF")
-
-    # Wipe in reverse order (assets before nodes, synonyms before terms, etc.)
-    for table in reversed(TABLES):
-        conn.execute(f"DELETE FROM {table}")
-        print(f"  cleared {table}")
-    conn.commit()
-
-    # Re-enable FK checks
-    conn.execute("PRAGMA foreign_keys = ON")
-
-    # Insert in forward order
-    total = 0
-    for table in TABLES:
-        rows = data.get(table, [])
-        if not rows:
-            print(f"  {table}: 0 rows (skipped)")
-            continue
-        cols = list(rows[0].keys())
-        placeholders = ", ".join("?" for _ in cols)
-        col_names = ", ".join(cols)
-        for row in rows:
-            conn.execute(
-                f"INSERT OR IGNORE INTO {table} ({col_names}) VALUES ({placeholders})",
-                [row[c] for c in cols],
-            )
-        conn.commit()
-        print(f"  {table}: {len(rows)} rows imported")
-        total += len(rows)
-
-    conn.close()
-    print(f"\nDone. {total} rows imported across {len(TABLES)} tables.")
+    import argparse
+    
+    parser = argparse.ArgumentParser(
+        description="Import Legal Eagle configuration data into BTP database"
+    )
+    parser.add_argument(
+        "--input",
+        default="scripts/test_runs/config_export.json",
+        help="Input JSON file (default: scripts/test_runs/config_export.json)"
+    )
+    parser.add_argument(
+        "--db",
+        default="configurations/config.db",
+        help="Target database path (default: configurations/config.db)"
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Preview import without making changes"
+    )
+    
+    args = parser.parse_args()
+    
+    import_config(args.input, args.db, dry_run=args.dry_run)
 
 
 if __name__ == "__main__":

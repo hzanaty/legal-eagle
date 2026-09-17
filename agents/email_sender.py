@@ -1,11 +1,16 @@
 import smtplib
 import json
+import os
 from datetime import datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import List, Dict, Any
 from agents.sap_ai_client import SAPAICoreClient
 from configurations.config_loader import creds
+
+# BTP Deployment: Email feature flag (disabled on BTP for compliance)
+# Set LEGAL_EAGLE_EMAIL_ENABLED=false on BTP to disable email sending
+EMAIL_ENABLED = os.environ.get("LEGAL_EAGLE_EMAIL_ENABLED", "true").lower() == "true"
 
 # Flag-inspired colours per country (bilingual card top half).
 COUNTRY_COLORS = {
@@ -283,7 +288,16 @@ def send_email(
 
     Monolingual mode (profile_lang == en):
       Sends a standard single-language email to all receivers.
+    
+    BTP Deployment:
+      If EMAIL_ENABLED is false, this function returns False silently and logs
+      a message. Configure LEGAL_EAGLE_EMAIL_ENABLED=true to enable email sending.
     """
+    # BTP feature flag: email disabled for compliance
+    if not EMAIL_ENABLED:
+        print("[EMAIL] Email sending disabled on this environment")
+        return False
+    
     EMAIL_SENDER = GMAIL_CREDS["email_sender"]
     APP_PASSWORD = GMAIL_CREDS["app_password"]
 
