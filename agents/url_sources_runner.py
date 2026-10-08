@@ -33,20 +33,9 @@ DEFAULT_HEADERS = {
 }
 
 
-def scrape_url_source_with_config(source: dict) -> list:
-    """Scrape a URL source using stored simulator config (v3.1, F9).
-
-    Reads container_selector + field_selectors discovered by the Source Simulator
-    instead of re-detecting structure each run. Returns a list of item dicts
-    ({title, link, date, author, source, source_type}). Returns [] when the source
-    has no stored config (un-simulated) — the caller then uses the legacy runner.
-    """
+def _scrape_single_url(url: str, container_selector: str, source: dict) -> list:
+    """Fetch one URL and extract items using stored container + field selectors."""
     import json as _json
-
-    url = source.get("url")
-    container_selector = source.get("container_selector")
-    if not container_selector:
-        return []  # not simulated → caller falls back to legacy path
 
     if bool(source.get("requires_js")):
         from agents.source_simulator import fetch_page_playwright
@@ -87,6 +76,38 @@ def scrape_url_source_with_config(source: dict) -> list:
         if it["title"] or it["link"] != url:
             items.append(it)
     return items
+
+
+def scrape_url_source_with_config(source: dict) -> list:
+    """Scrape a URL source using stored simulator config (v3.1, F9).
+
+    Reads container_selector + field_selectors discovered by the Source Simulator
+    instead of re-detecting structure each run. Returns a list of item dicts
+    ({title, link, date, author, source, source_type}). Returns [] when the source
+    has no stored config (un-simulated).
+
+    When url_date_template is set, generates one URL per day going back N days
+    and applies the stored selector to each dated page.
+    """
+    url = source.get("url")
+    container_selector = source.get("container_selector")
+    if not container_selector:
+        return []
+
+    url_date_template = (source.get("url_date_template") or "").strip()
+    days = source.get("days")
+
+    if url_date_template:
+        dated_urls = _generate_dated_urls(url_date_template, days or 30)
+        all_items = []
+        for dated_url, date_str in dated_urls:
+            page_items = _scrape_single_url(dated_url, container_selector, source)
+            for it in page_items:
+                it["date"] = date_str  # URL date is authoritative for dated pages
+            all_items.extend(page_items)
+        return all_items
+
+    return _scrape_single_url(url, container_selector, source)
 
 
 def http_get(url: str, timeout: int = 20, retries: int = 3, backoff_sec: float = 1.0) -> Tuple[int, str]:
@@ -1071,14 +1092,33 @@ def gosi_click_discover(url: str, detail_pattern: Optional[str] = None, timeout_
 # Date-template URL generation (Mechanism B)
 # -------------------------------
 
+def _normalize_date_template(template: str) -> str:
+    """Normalise any date-template style to {DD}.{MM}.{YYYY} placeholders.
+
+    Accepts three input styles:
+      {DD}.{MM}.{YYYY}  — explicit placeholders (passthrough)
+      DD.MM.YYYY        — plain, no special characters (preferred)
+      08.05.2026        — literal old date stored from a previous visit
+    """
+    if any(p in template for p in ('{DD}', '{MM}', '{YYYY}')):
+        return template
+    if 'DD.MM.YYYY' in template:
+        return template.replace('DD.MM.YYYY', '{DD}.{MM}.{YYYY}')
+    m = re.search(r'\d{2}\.\d{2}\.\d{4}', template)
+    if m:
+        return template[:m.start()] + '{DD}.{MM}.{YYYY}' + template[m.end():]
+    return template
+
+
 def _generate_dated_urls(template: str, days: int | None) -> List[Tuple[str, str]]:
     """
-    Generate one URL per day by substituting {DD}, {MM}, {YYYY} in template.
+    Generate one URL per day by substituting date placeholders in template.
 
     days=None or days=0 → today only (1 URL).
     days=N → last N days starting from today (most recent first).
     Returns list of (url, date_str) tuples where date_str is YYYY-MM-DD.
     """
+    template = _normalize_date_template(template)
     days_count = max(1, days) if days else 1
     today = datetime.now()
     result = []
@@ -2407,7 +2447,7 @@ def run_unified_sources(url_sources: List[Dict[str, str]], profile_slug: Optiona
         # Mechanism B: URL-per-day generation via template
         if url_date_template:
             try:
-                dated_urls = _generate_dated_urls(url_date_template, days)
+                dated_urls = _generate_dated_urls(url_date_template, days or 30)
                 print(f"[Source {idx+1}] Mechanism B: {len(dated_urls)} dated URL(s) to fetch")
                 template_items: List[Dict] = []
                 for dated_url, date_str in dated_urls:

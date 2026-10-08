@@ -1,5 +1,33 @@
 # CHANGELOG
 
+## v3.35 — 2026-10-08
+### Dated URL sources fix + lifecycle documentation
+
+- **Bug: dated URL sources produced 0 items** — `scrape_url_source_with_config()` was fetching the base URL once and applying the stored selector, ignoring `url_date_template` entirely. Sources like Resmi Gazette (daily gazette URL `https://resmigazete.gov.tr/{DD}.{MM}.{YYYY}`) collected 0 items every run.
+- **Fix: dated URL generation inside the scraper** — `scrape_url_source_with_config()` now checks `url_date_template`; if set, calls `_generate_dated_urls(template, days or 30)` to compose one URL per day going back N days, scrapes each with the stored selector via the new `_scrape_single_url()` helper, and injects the URL's date as authoritative (overrides any date the page itself returns).
+- **Fix: simulation uses a dated URL** — the simulate endpoint (`/api/simulate`) and the Simulate button now compose yesterday's dated URL when `url_date_template` is present, so simulation actually tests the same path that the scraper takes during a run.
+- **Lifecycle documentation** — `Roadmap/lifecycle.html`:
+  - "Select Profile" step renamed to "Run Orchestrator" — makes clear this step triggers `agents_controller.py` which drives the entire Run phase in FULL or DELTA mode per source.
+  - URL Scrape detail: new `url_date_template` column describing how dated URL generation works end-to-end.
+  - Sources setup detail: `url_date_template` field listed and explained.
+
+**Root cause:** `scrape_url_source_with_config()` was the simulated-source path but had no dated URL logic. `agents_controller.py` passes the source dict (including `url_date_template`) but the scraper was not reading it. The date injection guard `if not it.get("date")` also silently skipped injection whenever the page returned any non-empty string (even an unparseable Turkish date string).
+
+- **Run Now → autorun flow** — "Run Now" button replaced with a link to the run_status page with `?autorun=1`; page auto-submits the run form on load, so the user lands on the run status page with sources visible before the run fires.
+- **Source selection persistence** — chip selections saved to `localStorage` per profile; restored on next page load so the user's last-used source set is pre-selected.
+- **Toggle all** — "Deselect all" replaced with "Toggle selection" (checks all if any are unchecked, unchecks all if all are checked).
+- **History pill timestamp** — truncation extended to 16 chars to show full `YYYY-MM-DDTHH:MM` timestamp.
+
+**Files changed:**
+- `agents/url_sources_runner.py` — `_scrape_single_url()` helper (extracted); `scrape_url_source_with_config()` rewritten with dated URL branch; date injection changed to unconditional `it["date"] = date_str`
+- `admin/app.py` — `/api/simulate` endpoint composes dated URL when `url_date_template` is in payload
+- `admin/templates/profile.html` — Simulate button passes `url_date_template` to `startSimulation()`
+- `admin/templates/base.html` — "Run Now" → `<a>` link with `?autorun=1`; `text-decoration: none; display: inline-block` on `.btn-run-now`
+- `admin/templates/run_status.html` — form wraps full left panel; source persistence + toggle-all; history pill 16-char timestamp
+- `Roadmap/lifecycle.html` — "Run Orchestrator" step + `url_date_template` documentation
+
+---
+
 ## v3.34 — 2026-09-17
 ### BTP Data Persistence: Backup/Restore API + CLI Scripts
 

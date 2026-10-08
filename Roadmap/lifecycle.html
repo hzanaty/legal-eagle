@@ -227,9 +227,9 @@
     <div class="substep-group">
       <div class="substep-label">① Start</div>
       <div class="substep built" onclick="showDetail('run-select')">
-        <span class="actor human" title="Human"><svg class="ic"><use href="#ic-human"/></svg></span>
-        <div class="step-name">Select Profile</div>
-        <div class="step-sub">Manual / Scheduled</div>
+        <span class="actor system" title="System"><svg class="ic"><use href="#ic-system"/></svg></span>
+        <div class="step-name">Run Orchestrator</div>
+        <div class="step-sub">Triggered by profile selection</div>
       </div>
       <div class="inner-arrow">›</div>
       <div class="substep built" onclick="showDetail('health-check')">
@@ -380,7 +380,7 @@
   <div style="display:flex;align-items:flex-start;flex-wrap:wrap;gap:6px;padding:10px 14px;flex:1;">
 
     <div class="db-cell" onclick="showDetail('run-select')">
-      <div class="db-step">① Start</div>
+      <div class="db-step">① Orchestrate</div>
       <div class="db-badge db-r">R profiles</div>
       <div class="db-badge db-r">R sources</div>
     </div>
@@ -602,7 +602,7 @@ const details = {
     subtitle: 'Admin UI — RSS feeds, Twitter handles, URL sources',
     badge: 'grey', badgeLabel: 'UI Only',
     cols: [
-      { heading: 'What it does', items: ['Add/remove RSS feed URLs', 'Add Twitter handles to monitor', 'Add static/dynamic crawl URLs', 'Set per-source max_lookback_days'] },
+      { heading: 'What it does', items: ['Add/remove RSS feed URLs', 'Add Twitter handles to monitor', 'Add URL sources — must be simulated before first run', 'Set <code>url_date_template</code> for sites that require date-composed URLs (e.g. gazette archives): scraper generates one URL per day going back N days', 'Set per-source max_lookback_days'] },
       { heading: 'Key file', items: ['admin/app.py', 'admin/templates/profile.html', 'configurations/db.py (rss_feeds, tweet_accounts, crawl_urls, snap_urls)'] },
       { heading: 'Dependencies', items: ['SQLite config.db', 'No external APIs at config time'] },
     ]
@@ -618,13 +618,13 @@ const details = {
     ]
   },
   'run-select': {
-    title: 'Select Profile & Trigger Run',
-    subtitle: 'Manual trigger from Admin UI or scheduled cron',
-    badge: 'grey', badgeLabel: 'UI Only',
+    title: 'Run Orchestrator',
+    subtitle: 'Triggered by profile selection (manual or scheduled) — drives the entire Run phase',
+    badge: 'grey', badgeLabel: 'Core',
     cols: [
-      { heading: 'What it does', items: ['Pick profile from dashboard', 'Manual: "Run Now" button', 'Scheduled: cron-based controller loop', 'Opens live log streaming view (SSE)'] },
-      { heading: 'Key file', items: ['admin/app.py — /admin/run/&lt;id&gt;', 'agents/agents_controller.py — run_controller() + run_profile_once()'] },
-      { heading: 'Dependencies', items: ['SQLite config.db', 'Flask SSE (server-sent events)', 'No external APIs at trigger time'] },
+      { heading: 'What it does', items: ['Profile selection (manual: Run button / scheduled: cron) triggers the orchestrator', '<code>agents_controller.py</code> drives every phase in sequence: health check → collect (RSS, Twitter, URL, Email) → process (filter, compare, L2, rank…) → finish (email, baseline)', 'For URL sources: computes FULL mode (first run) or DELTA mode (since last successful fetch) per source, then passes enriched source dicts to the scraper'] },
+      { heading: 'Key file', items: ['agents/agents_controller.py — run_profile_once()', 'admin/app.py — /admin/profiles/&lt;id&gt;/runs (trigger endpoint)'] },
+      { heading: 'Dependencies', items: ['SQLite config.db (profile + source config)', 'Flask SSE (live log streaming)', 'All downstream agents (called in sequence)'] },
     ]
   },
   'health-check': {
@@ -662,9 +662,9 @@ const details = {
     subtitle: 'Shipped v3.1 — per-source anchor + Source Simulator (F9)',
     badge: 'green', badgeLabel: 'Shipped v3.1',
     cols: [
-      { heading: 'What it does', items: ['Static scraping via requests + BeautifulSoup4', 'Dynamic scraping via Playwright (JS-rendered)', 'Unified runner across both modes', 'Optional Brightdata proxy support'] },
-      { heading: 'v3.1 shipped', items: ['Per-source last_successful_fetch replaces global days window', 'Source Simulator (F9): 1-field add + ⚡ auto-discovery of selectors', 'scrape_url_source_with_config() reads stored selectors', 'Force-fetch mode overrides anchor (bounded by date_scope)'] },
-      { heading: 'Key file', items: ['agents/url_sources_runner.py', 'agents/source_simulator.py (F9)', 'run_unified_sources(sources) → items'] },
+      { heading: 'What it does', items: ['Static scraping via requests + BeautifulSoup4', 'Dynamic scraping via Playwright (JS-rendered)', 'Every URL source must be simulated first — stored container_selector is used each run', 'Optional Brightdata proxy support'] },
+      { heading: 'url_date_template', items: ['Set on a source when the site requires date-composed URLs (e.g. gazette archives)', 'At run time: scraper generates one URL per day going back N days and applies the stored container_selector to each page', 'At simulate time: simulator uses yesterday\'s dated URL so the discovered selector is validated on the exact page format used at run time', 'Date is injected per item when the page does not include one'] },
+      { heading: 'Key files', items: ['agents/url_sources_runner.py — scrape_url_source_with_config() + _scrape_single_url()', 'agents/source_simulator.py (F9 simulation)', 'agents/agents_controller.py — prepares sources with FULL/DELTA window before calling scraper'] },
     ]
   },
   'email-inbox': {

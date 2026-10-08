@@ -101,20 +101,21 @@
 <div class="run-body">
   <!-- Left panel -->
   <div class="run-left">
+  <form method="POST" action="{{ url_for('admin_start_run', profile_id=selected_profile.id) }}" id="startRunForm">
     <div class="section-block">
       <div class="section-block-title">Sources</div>
 
       {% if rss_feeds %}
-      <input type="hidden" name="has_rss_sources" value="1" form="startRunForm">
+      <input type="hidden" name="has_rss_sources" value="1">
       <div class="source-group">
         <div class="source-group-header">
           <span class="source-group-label">&#128225; RSS <span class="source-group-count">{{ rss_feeds|length }}</span></span>
-          <span class="source-toggle" onclick="deselectAll('rss')">Deselect all</span>
+          <span class="source-toggle" onclick="toggleAll('rss')">Toggle selection</span>
         </div>
         <div class="chip-list">
           {% for feed in rss_feeds %}
-          <label class="chip" onclick="toggleChip(this)">
-            <input type="checkbox" name="selected_rss" value="{{ feed.url }}" checked form="startRunForm">
+          <label class="chip" onclick="toggleChip(this, event)">
+            <input type="checkbox" name="selected_rss" value="{{ feed.url }}" checked>
             {{ feed.publisher_name or feed.url|truncate(28, True, '…') }}
           </label>
           {% endfor %}
@@ -123,16 +124,16 @@
       {% endif %}
 
       {% if tweets %}
-      <input type="hidden" name="has_twitter_sources" value="1" form="startRunForm">
+      <input type="hidden" name="has_twitter_sources" value="1">
       <div class="source-group">
         <div class="source-group-header">
           <span class="source-group-label">&#128038; Twitter <span class="source-group-count">{{ tweets|length }}</span></span>
-          <span class="source-toggle" onclick="deselectAll('twitter')">Deselect all</span>
+          <span class="source-toggle" onclick="toggleAll('twitter')">Toggle selection</span>
         </div>
         <div class="chip-list">
           {% for h in tweets %}
-          <label class="chip" onclick="toggleChip(this)">
-            <input type="checkbox" name="selected_twitter" value="{{ h.handle }}" checked form="startRunForm">
+          <label class="chip" onclick="toggleChip(this, event)">
+            <input type="checkbox" name="selected_twitter" value="{{ h.handle }}" checked>
             @{{ h.handle }}
           </label>
           {% endfor %}
@@ -141,16 +142,16 @@
       {% endif %}
 
       {% if url_sources %}
-      <input type="hidden" name="has_url_sources" value="1" form="startRunForm">
+      <input type="hidden" name="has_url_sources" value="1">
       <div class="source-group">
         <div class="source-group-header">
           <span class="source-group-label">&#127760; URL Sources <span class="source-group-count">{{ url_sources|length }}</span></span>
-          <span class="source-toggle" onclick="deselectAll('urls')">Deselect all</span>
+          <span class="source-toggle" onclick="toggleAll('urls')">Toggle selection</span>
         </div>
         <div class="chip-list">
           {% for s in url_sources %}
-          <label class="chip" onclick="toggleChip(this)">
-            <input type="checkbox" name="selected_urls" value="{{ s.url }}" checked form="startRunForm">
+          <label class="chip" onclick="toggleChip(this, event)">
+            <input type="checkbox" name="selected_urls" value="{{ s.url }}" checked>
             {{ s.url|truncate(28, True, '…') }}
           </label>
           {% endfor %}
@@ -200,12 +201,11 @@
     </div>
 
     <div class="run-footer">
-      <form method="POST" action="{{ url_for('admin_start_run', profile_id=selected_profile.id) }}" id="startRunForm">
-        <input type="hidden" name="test_mode" id="testModeVal" value="0">
-        <input type="hidden" name="send_email" id="sendEmailVal" value="0">
-        <button type="submit" class="btn-start" id="btnStart">&#9654; Start Run</button>
-      </form>
+      <input type="hidden" name="test_mode" id="testModeVal" value="0">
+      <input type="hidden" name="send_email" id="sendEmailVal" value="0">
+      <button type="submit" class="btn-start" id="btnStart">&#9654; Start Run</button>
     </div>
+  </form>
   </div>
 
   <!-- Right panel -->
@@ -288,7 +288,7 @@
         {% for run in runs|default([]) %}
         <a class="history-pill {% if run.status == 'failed' or run.status == 'Failed' %}failed{% else %}success{% endif %}"
            href="{{ url_for('admin_profile_runs', profile_id=selected_profile.id) }}?run_id={{ run.id }}">
-          #{{ run.id }} · {{ (run.started_at or '')|truncate(10, True, '') }} · {% if run.status in ('failed','Failed') %}Error{% else %}{{ run.filtered_count|default(0) }} items{% endif %}
+          #{{ run.id }} · {{ (run.started_at or '')|truncate(16, True, '') }} · {% if run.status in ('failed','Failed') %}Error{% else %}{{ run.filtered_count|default(0) }} items{% endif %}
         </a>
         {% endfor %}
       </div>
@@ -348,17 +348,58 @@
   }
   // Default: not sending → email pre-checks shown as skipped
   _setEmailChecksSkipped(true);
-  function toggleChip(label) {
+  function toggleChip(label, e) {
+    if (e) e.preventDefault();
     var cb = label.querySelector('input');
     cb.checked = !cb.checked;
     label.classList.toggle('deselected', !cb.checked);
+    _saveSelections({{ selected_profile.id }});
   }
-  function deselectAll(type) {
-    document.querySelectorAll('input[name="selected_' + type + '"]').forEach(function(cb) {
-      cb.checked = false;
-      cb.closest('.chip').classList.add('deselected');
+  function toggleAll(type) {
+    var boxes = document.querySelectorAll('input[name="selected_' + type + '"]');
+    var allChecked = Array.from(boxes).every(function(cb) { return cb.checked; });
+    boxes.forEach(function(cb) {
+      cb.checked = !allChecked;
+      cb.closest('.chip').classList.toggle('deselected', allChecked);
     });
+    _saveSelections({{ selected_profile.id }});
   }
+  // ── Source selection persistence (localStorage per profile) ──
+  function _saveSelections(pid) {
+    try {
+      var get = function(name) {
+        return Array.from(document.querySelectorAll('input[name="' + name + '"]:checked')).map(function(cb){ return cb.value; });
+      };
+      localStorage.setItem('src_sel_' + pid, JSON.stringify({rss: get('selected_rss'), twitter: get('selected_twitter'), urls: get('selected_urls')}));
+    } catch(e) {}
+  }
+  function _restoreSelections(pid) {
+    try {
+      var raw = localStorage.getItem('src_sel_' + pid);
+      if (!raw) return;
+      var saved = JSON.parse(raw);
+      ['rss', 'twitter', 'urls'].forEach(function(type) {
+        var sel = new Set(saved[type] || []);
+        document.querySelectorAll('input[name="selected_' + type + '"]').forEach(function(cb) {
+          var on = sel.has(cb.value);
+          cb.checked = on;
+          cb.closest('.chip').classList.toggle('deselected', !on);
+        });
+      });
+    } catch(e) {}
+  }
+  (function() {
+    var pid = {{ selected_profile.id }};
+    _restoreSelections(pid);
+    var form = document.getElementById('startRunForm');
+    if (form) {
+      form.addEventListener('submit', function() { _saveSelections(pid); });
+      if (new URLSearchParams(location.search).get('autorun') === '1') {
+        setTimeout(function() { form.submit(); }, 50);
+      }
+    }
+  })();
+
   function resendDigest(runId, profileId) {
     var btn = document.querySelector('.btn-resend');
     if (btn) { btn.textContent = '⏳ Sending…'; btn.disabled = true; }

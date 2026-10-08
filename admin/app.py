@@ -1361,7 +1361,18 @@ def simulate_url_source(profile_id: int):
                 ai_client=ai_client,
             )
         else:
-            gen = run_simulation(url, ai_client=ai_client, max_depth=data.get("max_depth", 5))
+            sim_url = url
+            url_date_template = data.get("url_date_template", "").strip()
+            if url_date_template:
+                from datetime import datetime as _dt, timedelta as _td
+                from agents.url_sources_runner import _normalize_date_template
+                yesterday = _dt.now() - _td(days=1)
+                tpl = _normalize_date_template(url_date_template)
+                sim_url = (tpl
+                           .replace("{DD}", yesterday.strftime("%d"))
+                           .replace("{MM}", yesterday.strftime("%m"))
+                           .replace("{YYYY}", yesterday.strftime("%Y")))
+            gen = run_simulation(sim_url, ai_client=ai_client, max_depth=data.get("max_depth", 5))
         for event in gen:
             yield f"data: {_json.dumps(event)}\n\n"
 

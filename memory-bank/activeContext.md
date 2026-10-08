@@ -1,4 +1,14 @@
-## Current State: v3.34 — BTP Backup/Restore System (2026-09-17)
+## Current State: v3.35 — Dated URL sources fix (2026-10-08)
+
+### ✅ v3.35 COMPLETE
+
+**v3.35 changes (Dated URL sources + lifecycle docs):**
+- `agents/url_sources_runner.py` — `_scrape_single_url()` helper extracted; `scrape_url_source_with_config()` now handles `url_date_template`: generates N dated URLs (default 30), scrapes each, URL date is always authoritative (`it["date"] = date_str` unconditional)
+- `admin/app.py` — `/api/simulate` composes yesterday's dated URL when `url_date_template` is in payload
+- `admin/templates/profile.html` — Simulate button forwards `url_date_template` to `startSimulation()`
+- `Roadmap/lifecycle.html` — "Select Profile" → "Run Orchestrator"; `url_date_template` column in URL Scrape detail; `url_date_template` in Sources setup detail
+
+---
 
 ### ✅ v3.34 COMPLETE
 
