@@ -1,3 +1,18 @@
+## Versioning Roadmap
+
+| Version | Status | Focus |
+|---|---|---|
+| V3.x | **Current** | Standalone Flask app — monitoring pipeline, admin UI |
+| V4 | Planning | MCP Server — expose Legal Eagle to colleagues via Claude/Joule Work Desktop |
+| V5 | Planning | Intelligence — Legal Event model, Context Resolver 2.0, SAP Impact Assessment |
+| Flying Legal Eagle | Future | Autonomous LPM Agent — uses Legal Eagle MCP + enterprise MCPs |
+
+V4 roadmap: `Roadmap/v4-mcp-roadmap.md`
+V5 roadmap: `Roadmap/v5-roadmap.md`
+Flying Legal Eagle: `Roadmap/Flying_Legal_Eagle_Autonomous_LPM_Agent.md`
+
+---
+
 ## Current State: v3.35 — Dated URL sources fix (2026-10-08)
 
 ### ✅ v3.35 COMPLETE

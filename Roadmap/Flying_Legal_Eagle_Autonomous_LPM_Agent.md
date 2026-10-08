@@ -38,6 +38,17 @@ Its role is not only to monitor, but to decide what deserves attention, investig
 
 ## 2. Evolution Path
 
+### Version Sequence
+
+| Version | What ships |
+|---|---|
+| **V3.x** | Current — standalone Flask app, admin UI only |
+| **V4** | Legal Eagle as an MCP Server — expose capabilities to colleagues and agents (see `v4-mcp-roadmap.md`) |
+| **V5** | Intelligence — Legal Event model, Context Resolver 2.0, SAP Impact Assessment (see `v5-roadmap.md`) |
+| **Flying Legal Eagle** | Autonomous LPM Agent — uses Legal Eagle MCP + enterprise MCPs |
+
+---
+
 ### Today — Legal Eagle as a Tool
 
 Legal Eagle is a standalone tool composed of internal modules.
@@ -53,13 +64,15 @@ The modules execute defined parts of the monitoring pipeline, for example:
 
 These are internal modules, not autonomous agents.
 
-### Next — Legal Eagle as an MCP Server
+### V4 — Legal Eagle as an MCP Server
 
 Legal Eagle evolves into an **MCP server**.
 
 Selected Legal Eagle capabilities are exposed through MCP tools, while the existing internal modules remain underneath.
 
-Examples of future MCP tools could include:
+Full V4 specification: `Roadmap/v4-mcp-roadmap.md`
+
+MCP tools include:
 
 - `run_monitoring`
 - `get_profile_config`

@@ -1,9 +1,9 @@
-# Legal Eagle V4 Roadmap
+# Legal Eagle V5 Roadmap
 
 ## Status
-**Planning — architecture refreshed October 2026**
+**Planning — scheduled after V4 MCP Server (see `v4-mcp-roadmap.md`)**
 
-V4 evolves Legal Eagle from a pipeline of loosely connected enrichment/ranking steps into a clearer legal-intelligence lifecycle:
+V5 evolves Legal Eagle from a pipeline of loosely connected enrichment/ranking steps into a clearer legal-intelligence lifecycle:
 
 **News → Context Resolver → Legal Event → SAP Scope / Impact Assessment → Classification / Priority**
 
