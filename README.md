@@ -18,7 +18,7 @@ Starting from a solid foundation as a Regulatory Intelligence Engine, Legal Eagl
 
 This isn't a future dream—**Stage 1 is operational today**. Each subsequent stage builds on this working foundation through modular expansion, not rewrites.
 
-📄 **Full Strategic Vision**: See [Big_Picture.md](Big_Picture.md) for the complete evolution roadmap
+📄 **Full Strategic Vision**: See [docs/roadmap/Big_Picture.md](docs/roadmap/Big_Picture.md) for the complete evolution roadmap
 
 ---
 
@@ -63,7 +63,7 @@ Legal Eagle automatically:
 
 **Current Deployments**: Saudi Arabia, Turkey, Spain, UAE, Greece (more countries being added)
 
-📋 **Technical Details**: See [SPEC.md](SPEC.md) for complete technical architecture
+📋 **Technical Details**: See [docs/SPEC.md](docs/SPEC.md) for complete technical architecture
 
 ---
 
@@ -154,7 +154,7 @@ Transform the current Flask/Jinja2 admin UI to a modern SAPUI5 application while
 
 **Timeline**: 5-week migration with page-by-page incremental approach
 
-📄 **Migration Plan**: See [UI5_MIGRATION_ROADMAP.md](UI5_MIGRATION_ROADMAP.md)
+📄 **Migration Plan**: See [docs/roadmap/UI5_MIGRATION_ROADMAP.md](docs/roadmap/UI5_MIGRATION_ROADMAP.md)
 
 ---
 
@@ -312,13 +312,13 @@ Each profile allows you to configure:
 ## 📖 Documentation
 
 ### Strategic & Planning
-- **[Big_Picture.md](Big_Picture.md)** — Strategic evolution plan (Journalist → Executive Advisor)
-- **[UI5_MIGRATION_ROADMAP.md](UI5_MIGRATION_ROADMAP.md)** — UI5/Fiori migration detailed plan
+- **[docs/roadmap/Big_Picture.md](docs/roadmap/Big_Picture.md)** — Strategic evolution plan (Journalist → Executive Advisor)
+- **[docs/roadmap/UI5_MIGRATION_ROADMAP.md](docs/roadmap/UI5_MIGRATION_ROADMAP.md)** — UI5/Fiori migration detailed plan
 
 ### Technical & Operations
-- **[SPEC.md](SPEC.md)** — Technical specification (v3 current architecture)
+- **[docs/SPEC.md](docs/SPEC.md)** — Technical specification (v3 current architecture)
 - **[CHANGELOG.md](CHANGELOG.md)** — Version history and release notes
-- **[BTP_DEPLOYMENT.md](BTP_DEPLOYMENT.md)** — SAP BTP Cloud Foundry deployment guide
+- **[docs/deployment/BTP_DEPLOYMENT.md](docs/deployment/BTP_DEPLOYMENT.md)** — SAP BTP Cloud Foundry deployment guide
 
 ### User Guide
 - **README.md** (this file) — Vision, current capabilities, getting started
@@ -342,7 +342,7 @@ python admin/app.py
 ```bash
 cf push
 ```
-See [BTP_DEPLOYMENT.md](BTP_DEPLOYMENT.md) for complete deployment guide.
+See [docs/deployment/BTP_DEPLOYMENT.md](docs/deployment/BTP_DEPLOYMENT.md) for complete deployment guide.
 
 ---
 
@@ -356,10 +356,9 @@ legal-eagle/
 ├── scripts/                  # Utilities, migrations, admin launchers
 ├── outputs/                  # Generated artifacts (JSON, HTML, logs)
 ├── memory-bank/              # Project memory and documentation
-├── Big_Picture.md            # Strategic evolution roadmap
+├── docs/                     # Documentation (SPEC, deployment guides, roadmaps)
 ├── README.md                 # This file
-├── SPEC.md                   # Technical specification
-└── UI5_MIGRATION_ROADMAP.md  # UI5/Fiori migration plan
+└── CHANGELOG.md              # Version history
 ```
 
 ---

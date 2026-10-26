@@ -93,13 +93,13 @@ Help me to achieve the goals of this project Legal Eagle through building agents
 4. Create temporary files or space to test the new solution
 5. I do testing then decide
 6. After decision, you update current code version
-7. Update current documentation in SPEC.md file with the new version
+7. Update current documentation in `docs/SPEC.md` with the new version
 
 ---
 
 ## Technical Reference
 
-For detailed technical information, consult **`SPEC.md`** in the project root:
+For detailed technical information, consult **`docs/SPEC.md`**:
 - Architecture diagrams and data flow
 - Database schema (SQLite tables, columns, indexes)
 - API reference for all agents and configuration modules
@@ -108,8 +108,8 @@ For detailed technical information, consult **`SPEC.md`** in the project root:
 
 When implementing changes:
 - Follow existing code patterns in the respective directories
-- Update `SPEC.md` to reflect significant architectural or API changes
-- Keep file organization consistent with Section 11 (File Structure) in SPEC.md
+- Update `docs/SPEC.md` to reflect significant architectural or API changes
+- Keep file organization consistent with Section 11 (File Structure) in `docs/SPEC.md`
 
 ---
 
@@ -128,7 +128,7 @@ When implementing changes:
 - **Admin UI**: Flask application → `admin/`
 - **Scripts**: CLI utilities, schedulers, testing → `scripts/`
 - **Outputs**: Generated artifacts → `outputs/{country}_{lob}/`
-- **Documentation**: User/technical docs → Root directory
+- **Documentation**: User/technical docs → `docs/` directory (`README.md` + `CHANGELOG.md` remain at root)
 
 ### Testing Guidelines
 - **Test scripts**: Place in `scripts/` directory (prefix with `test_`)
@@ -142,7 +142,7 @@ When implementing changes:
 2. **Plan**: Propose solution with pros/cons before coding
 3. **Test in isolation**: Create test script in `scripts/test_runs/`
 4. **Integrate**: Update main controller (`agents/agents_controller.py`)
-5. **Document**: Update `SPEC.md` with new functionality
+5. **Document**: Update `docs/SPEC.md` with new functionality
 6. **Verify**: Run full pipeline to ensure no regressions
 
 ### Backend → Frontend Sync Rule (CRITICAL)
@@ -161,7 +161,7 @@ Steps for backend→frontend sync:
 2. Update Admin UI templates in `admin/templates/`
 3. Update Flask routes in `admin/app.py` if needed
 4. Test the UI to ensure the feature is visible and functional
-5. Document UI changes in `SPEC.md` and `CHANGELOG.md`
+5. Document UI changes in `docs/SPEC.md` and `CHANGELOG.md`
 
 ### Add + Edit Consistency Rule (CRITICAL)
 **When adding UI fields, they must be present in BOTH Add and Edit modes.**
@@ -182,7 +182,7 @@ Examples:
 ### Environment Variables
 - All secrets in environment variables (never in code or database)
 - Use `LEGAL_EAGLE_` prefix for project-specific vars
-- Document new env vars in `SPEC.md` Section 8.1
+- Document new env vars in `docs/SPEC.md` Section 8.1
 - Provide sensible defaults where possible
 
 ---
@@ -209,7 +209,7 @@ The `memory-bank/` directory contains critical project state that MUST be consul
 1. **UPDATE `memory-bank/progress.md`** - Add version entry with all changes
 2. **UPDATE `memory-bank/activeContext.md`** - Update current version and architecture
 3. **UPDATE `memory-bank/techContext.md`** - If database schema or APIs changed
-4. **UPDATE `SPEC.md`** - Update technical documentation
+4. **UPDATE `docs/SPEC.md`** - Update technical documentation
 5. **UPDATE `CHANGELOG.md`** - Add user-facing changes
 
 ### Version Numbering

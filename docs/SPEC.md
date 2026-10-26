@@ -1774,8 +1774,18 @@ legal-eagle/
 │   └── projectbrief.md              # Project overview
 │
 ├── docs/                            # Documentation
-│   ├── README.md                    # User guide
-│   └── lifecycle.html               # Pipeline lifecycle diagram (updated each version)
+│   ├── SPEC.md                      # Technical specification (this file)
+│   ├── deployment/                  # Deployment guides
+│   │   ├── BTP_DEPLOYMENT.md
+│   │   ├── BTP_DEPLOYMENT_PLAN.md
+│   │   ├── BTP_DEPLOYMENT_DIFFERENCES.md
+│   │   ├── BTP_BACKUP_RESTORE_README.md
+│   │   └── XANADU_DEPLOYMENT_STEPS.md
+│   └── roadmap/                     # Roadmaps and future planning
+│       ├── lifecycle.html           # Pipeline lifecycle diagram (updated each version)
+│       ├── Big_Picture.md
+│       ├── v4-mcp-roadmap.md
+│       └── v5-roadmap-reinnovation.md
 │
 ├── Resources/                       # Static assets served via /Resources/<path>
 │   ├── ERGANI_II_MindMap_v2.html    # Greece ERGANI II MindMap (v2.30)
@@ -1792,8 +1802,7 @@ legal-eagle/
 ├── runtime.txt                      # Python version
 ├── README.md                        # Project README
 ├── CHANGELOG.md                     # Version history
-├── SPEC.md                          # Technical spec (this file)
-└── BTP_DEPLOYMENT.md                # Deployment guide
+└── docs/                            # Documentation (see docs/ tree above)
 ```
 
 ---
@@ -1872,7 +1881,7 @@ legal-eagle/
 
 For information about planned UI5/Fiori migration and other strategic initiatives, see:
 - **[UI5_MIGRATION_ROADMAP.md](UI5_MIGRATION_ROADMAP.md)** — Detailed UI5/Fiori migration plan
-- **[README.md](README.md)** — Roadmap section for all planned enhancements
+- **[../README.md](../README.md)** — Roadmap section for all planned enhancements
 
 ---
 

@@ -875,9 +875,9 @@ Stick with Hybrid approach (Flask + UI5) unless there's a strategic mandate to m
 ---
 
 **Related Documentation:**
-- [SPEC.md](SPEC.md) — Current v2.12 technical specification
-- [README.md](README.md) — Project overview and user guide
-- [CHANGELOG.md](CHANGELOG.md) — Version history
+- [../SPEC.md](../SPEC.md) — Current v2.12 technical specification
+- [../../README.md](../../README.md) — Project overview and user guide
+- [../../CHANGELOG.md](../../CHANGELOG.md) — Version history
 
 ---
 
