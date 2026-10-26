@@ -19,7 +19,7 @@ snapshots/
 
 # Superpowers local files (Claude tooling, not part of project)
 .superpowers/
-xanadu/superpowers/
+docs/xanadu/superpowers/
 .claude/
 # Test run artifacts (ignore local test outputs written by scripts)
 scripts/test_runs/

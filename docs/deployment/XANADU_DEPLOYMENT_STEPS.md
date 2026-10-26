@@ -24,8 +24,8 @@ python3 scripts/btp_restore.py --file btp_backup_20260917_221500.json --secret p
 ## ✅ What's Been Done (Xanadu Setup)
 
 1. **Xanadu Gov Site Deployed to GitHub Pages**
-   - Location: `/docs` folder in legal-eagle repo
-   - URL: `https://pages.github.tools.sap/I077750/legal-eagle/xanadu.html`
+   - Location: `/docs/xanadu` folder in legal-eagle repo
+   - URL: `https://pages.github.tools.sap/I077750/legal-eagle/xanadu/xanadu.html`
    - Status: Live and accessible ✅
 
 2. **GitHub Pages Enabled**
@@ -51,7 +51,7 @@ python3 scripts/update_url_sources_to_github_pages.py
 ```
 ✅ Updated profile_id X:
    FROM: file:///Users/i077750/Documents/GitHub/legal-eagle/Roadmap/v3/xanadu-gov-site/public/index.html
-   TO:   https://pages.github.tools.sap/I077750/legal-eagle/xanadu.html
+   TO:   https://pages.github.tools.sap/I077750/legal-eagle/xanadu/xanadu.html
 
 📊 Summary: Updated N URL source(s)
 ```
@@ -79,13 +79,13 @@ This will:
 
 | Component | Status | Location |
 |-----------|--------|----------|
-| Xanadu Site | ✅ Deployed | `https://pages.github.tools.sap/I077750/legal-eagle/xanadu.html` |
+| Xanadu Site | ✅ Deployed | `https://pages.github.tools.sap/I077750/legal-eagle/xanadu/xanadu.html` |
 | Legal Eagle App | ✅ On BTP | `https://legal-eagle-ui.cfapps.eu21.hana.ondemand.com` |
 | URL Sources | ⏳ Pending | Update locally, then push to GitHub |
 | BTP Deployment | ⏳ Pending | `cf push` after updating |
 
 ## 🚀 After Deployment
 
-- BTP will fetch news from `https://pages.github.tools.sap/I077750/legal-eagle/xanadu.html` (public URL)
+- BTP will fetch news from `https://pages.github.tools.sap/I077750/legal-eagle/xanadu/xanadu.html` (public URL)
 - No more `file://` paths from local filesystem
 - Admin UI will show live news from Xanadu Government website
