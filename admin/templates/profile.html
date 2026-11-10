@@ -326,7 +326,7 @@
         <span class="sim-badge sim-pending">&#9203; Pending</span>
         {% endif %}
         <span class="row-date">{% if s.last_successful_fetch_relative %}{{ s.last_successful_fetch_relative }}{% else %}Never{% endif %}</span>
-        <button type="button" class="btn-sm" style="background:#7c3aed;color:#fff;" onclick="startSimulation('{{ s.url|e }}', '{{ s.url_date_template|e or '' }}')">&#9889; Simulate</button>
+        <button type="button" class="btn-sm" style="background:#7c3aed;color:#fff;" onclick="startSimulation('{{ s.url|e }}', '{{ (s.url_date_template or '')|e }}')">&#9889; Simulate</button>
         <button type="button" class="btn-sm" onclick="toggleEditRow('urledit-{{ loop.index }}')">Edit</button>
         {% if s.last_successful_fetch %}
         <form method="post" action="{{ url_for('reset_url_source_fetch', profile_id=profile.id) }}" onsubmit="return confirm('Reset to FULL mode? Clears last-fetch timestamp so the next run fetches the full lookback window.');">
@@ -393,6 +393,7 @@
           fetch("/admin/profiles/" + _sim.profileId + "/urls/simulate", {
             method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)
           }).then(function(resp){
+            if (!resp.ok) { document.getElementById('simulator-body').innerHTML += '<p style="color:#b42318">&#10007; Server error ' + resp.status + '</p>'; return; }
             var reader = resp.body.getReader(), dec = new TextDecoder(), buf = '';
             (function read(){ reader.read().then(function(r){
               if (r.done) return;
@@ -401,6 +402,8 @@
               parts.forEach(function(p){ var m=p.match(/^data: (.*)$/m); if(m){ try{ onEvent(JSON.parse(m[1])); }catch(e){} } });
               read();
             }); })();
+          }).catch(function(err){
+            document.getElementById('simulator-body').innerHTML += '<p style="color:#b42318">&#10007; Request failed: ' + err + '</p>';
           });
         }
         function startSimulation(url, urlDateTemplate) {

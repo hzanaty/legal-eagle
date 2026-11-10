@@ -135,3 +135,68 @@ def test_scrape_uses_stored_selectors():
 
 def test_scrape_returns_empty_when_unsimulated():
     assert scrape_url_source_with_config({"url": "http://x", "container_selector": None}) == []
+
+
+# ── Regression: url_date_template NULL renders as empty string (not "None") ──
+
+def _jinja_render_url_date_template(value):
+    """Render the fixed Jinja expression for url_date_template given a DB value."""
+    from jinja2 import Environment
+    env = Environment()
+    tmpl = env.from_string("{{ (s.url_date_template or '')|e }}")
+
+    class _S:
+        url_date_template = value
+
+    return tmpl.render(s=_S())
+
+
+def test_url_date_template_null_renders_empty():
+    """NULL from DB must render as '' so JS receives falsy value and skips the template branch."""
+    assert _jinja_render_url_date_template(None) == ""
+
+
+def test_url_date_template_empty_string_renders_empty():
+    assert _jinja_render_url_date_template("") == ""
+
+
+def test_url_date_template_valid_renders_passthrough():
+    tpl = "https://example.com/{DD}.{MM}.{YYYY}"
+    assert _jinja_render_url_date_template(tpl) == tpl
+
+
+def _derive_sim_url(source_url, url_date_template_str):
+    """Replicate the simulate route's sim_url derivation for unit testing."""
+    from agents.url_sources_runner import _normalize_date_template
+    from datetime import datetime, timedelta
+    sim_url = source_url
+    template = (url_date_template_str or "").strip()
+    if template:
+        yesterday = datetime.now() - timedelta(days=1)
+        tpl = _normalize_date_template(template)
+        sim_url = (tpl
+                   .replace("{DD}", yesterday.strftime("%d"))
+                   .replace("{MM}", yesterday.strftime("%m"))
+                   .replace("{YYYY}", yesterday.strftime("%Y")))
+    return sim_url
+
+
+def test_sim_url_null_template_uses_source_url():
+    """When url_date_template is NULL/empty, sim_url must equal the source URL unchanged."""
+    url = "https://hzanaty.github.io/xanadu-gov/xanadu.html"
+    assert _derive_sim_url(url, None) == url
+    assert _derive_sim_url(url, "") == url
+
+
+def test_sim_url_valid_template_produces_dated_url():
+    """A valid dated template must produce a URL with today's date substituted."""
+    from datetime import datetime, timedelta
+    yesterday = datetime.now() - timedelta(days=1)
+    result = _derive_sim_url(
+        "https://example.com/",
+        "https://example.com/{DD}.{MM}.{YYYY}"
+    )
+    assert yesterday.strftime("%d") in result
+    assert yesterday.strftime("%m") in result
+    assert yesterday.strftime("%Y") in result
+    assert result.startswith("https://example.com/")
