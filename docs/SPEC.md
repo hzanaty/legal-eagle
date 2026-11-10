@@ -5,6 +5,8 @@
 
 This document provides the technical specification for Legal Eagle, an AI-powered regulatory compliance monitoring system for SAP Localization.
 
+**AI collaboration governance:** See [AI_GOVERNANCE.md](AI_GOVERNANCE.md) for the canonical operating model. Cline's project-scoped entry is `.clinerules/ai-governance.md` (setup recorded 2026-10-26). This reference does not change approved product behavior or the specification version.
+
 ---
 
 ## Table of Contents

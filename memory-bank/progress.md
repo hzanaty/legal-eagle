@@ -1,3 +1,12 @@
+## Governance v1.0 adoption (2026-10-26) — Cline setup only
+
+- Product Manager authorized the previously discussed Cline persistent-instruction setup; no implementation plan or product release is approved by this entry.
+- Added `.clinerules/ai-governance.md` referencing `docs/AI_GOVERNANCE.md`, with role boundaries, human approval requirements, and conflict escalation.
+- Preserved `.clinerules/rules.md` and the constitution; Claude's own instruction setup remains outside this task.
+- Installed Cline 4.1.23 source supports Markdown discovery in `.clinerules/` and inclusion of enabled rules. A fresh-session prompt has not been observed.
+- Added setup references to active context and specification, and an unreleased changelog entry as required by existing repository instructions. No production, schema, API, roadmap, or product-version changes; no application tests needed or run.
+- Pending Product Decision: reconcile legacy implementation/documentation-write duties with governance ownership. No legacy rules were silently rewritten. Strategy catch-up is deferred.
+
 ## v3.34 (2026-09-17) — BTP Data Persistence: Backup/Restore System
 
 **Problem Addressed:**

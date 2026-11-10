@@ -1,3 +1,7 @@
+## Governance setup — 2026-10-26
+
+Cline's project instruction entry is `.clinerules/ai-governance.md`, referencing the canonical `docs/AI_GOVERNANCE.md`. The Product Manager authorized this setup only; strategy catch-up and plan building are deferred to a separate task. Product version and architecture are unchanged. Existing rules are preserved; legacy implementation duties and blanket documentation-write requirements need reconciliation with governance ownership before future cross-role work.
+
 ## Versioning Roadmap
 
 | Version | Status | Focus |

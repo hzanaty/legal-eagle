@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## v3.39 — 2026-11-10
+### Governance setup + GitHub Pages rename
+
+- **Rename:** `docs/xanadu/xanadu.html` → `docs/xanadu/index.html` so GitHub Pages serves the site at the bare directory URL without a filename suffix.
+- Added `.clinerules/ai-governance.md` — short reference to `docs/AI_GOVERNANCE.md` defining Cline's role and approval boundaries. Product Manager authorized setup; no production implementation plan involved.
+- Added `docs/AI_GOVERNANCE.md` and project-level `CLAUDE.md` governance constitution defining role boundaries (Sonnet = Implementation Engineer, Opus = Independent Design Reviewer).
+
 ## v3.35 — 2026-10-08
 ### Dated URL sources fix + lifecycle documentation
 
