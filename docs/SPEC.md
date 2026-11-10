@@ -1,11 +1,28 @@
 # Legal Eagle 3.8 — Technical Specification
 
-**Version:** 3.31 (effective_date prompt fix — forbids publication/gazette dates as effective_date; user-friendly per-item [IMPACT] + [RANK] pipeline logs with plain-language gate descriptions; version annotations removed from log messages)  
-**Last Updated:** 2026-09-11
+**Version:** 3.8 (Analyzing stage — tagging merged into ranking; authority name surfaced on Review card; URL publish-date capture via multi-tier date string parsing. Patches v3.40–v3.43 absorbed: Xanadu test-feed date shift, xanadu.html rename + docs/index.html redirect, simulator hang fix — Jinja `None`→empty + `import re` + `_simPost` error handling.)  
+**Last Updated:** 2026-11-10
 
 This document provides the technical specification for Legal Eagle, an AI-powered regulatory compliance monitoring system for SAP Localization.
 
 **AI collaboration governance:** See [AI_GOVERNANCE.md](AI_GOVERNANCE.md) for the canonical operating model. Cline's project-scoped entry is `.clinerules/ai-governance.md` (setup recorded 2026-10-26). This reference does not change approved product behavior or the specification version.
+
+---
+
+## Versioning Convention
+
+| Change type | Example | Rule |
+|---|---|---|
+| **Major milestone** | v3.9 | New pipeline phase or significant feature from the roadmap. Updates the SPEC title and resets the patch counter. |
+| **Minor patch** | v3.81, v3.82 | Bug fix, regression fix, or small improvement within the current milestone. |
+
+**Determining the next version number:**
+
+1. Read the `Version:` field at the top of this file — it is always the authoritative current version.
+2. If the version is a whole milestone (e.g. `3.8`), the next minor patch is `3.81`.
+3. If the version is already a patch (e.g. `3.81`), the next minor patch increments the last digit (`3.82`).
+4. A new major milestone (e.g. `3.9`) is only assigned when a roadmap phase is fully delivered and tested — never for a bug fix alone.
+5. Update this file's `Version:` field and `Last Updated:` date in the same commit that delivers the change.
 
 ---
 
