@@ -374,20 +374,18 @@ def reconcile_by_act_ref(items, conn, profile_id, days: int = None):
                 run_candidates.append(_c)
 
         base_max = _max_confirmed_count(it, base_candidates)
-        if base_max >= 0:
-            # Prior-run confirmed same legal event → REPEATED (rule 4)
-            # Count = max(confirmed baseline counts) + 1; scoped to this event chain.
+        run_max = _max_confirmed_count(it, run_candidates)
+        overall_max = max(base_max, run_max)
+        if overall_max >= 0:
+            # Confirmed same legal event (from history, same-run, or both) → REPEATED.
+            # Count = max across both candidate groups + 1 so same-run reminders do not
+            # reset to the historical baseline when a higher count was already assigned
+            # to an earlier same-run item (Task 4D.1 fix).
             it["repetition_status"] = "repeated"
-            it["repetition_count"] = base_max + 1
-            reconciled += 1
-        else:
-            run_max = _max_confirmed_count(it, run_candidates)
+            it["repetition_count"] = overall_max + 1
             if run_max >= 0:
-                # Same-run confirmed same legal event → REPEATED (rule 4)
-                it["repetition_status"] = "repeated"
-                it["repetition_count"] = run_max + 1
                 it["_repeated_followup"] = True
-                reconciled += 1
+            reconciled += 1
 
         _register(it, lid, ref)
 

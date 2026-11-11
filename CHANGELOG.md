@@ -26,7 +26,22 @@ Step 8 repetition bookkeeping is now complete, and News Review presents confirme
 - REPEATED description updated to explain the count badge meaning (no longer references the obsolete "3 or more runs" threshold).
 - DUPLICATE description updated for clarity.
 
-**Test file created:** `tests/test_review_status_v391.py` — 15 focused tests covering all 12 mandatory acceptance criteria; **15/15 passing**. Task 4C regression 10/10 passing. Task 4A regression 11/11 passing.
+**Test file created:** `tests/test_review_status_v391.py` — 20 focused tests covering all 12 mandatory acceptance criteria plus 5 new Task 4D.1 counter-fix tests; **20/20 passing**. Task 4C regression 10/10 passing. Task 4A regression 11/11 passing.
+
+### Task 4D.1 — Repetition Counter Fix: Unified Max Across Both Candidate Groups
+
+Corrected a bookkeeping error where same-run reminders arriving after a historical match was found would reset to the historical baseline count instead of advancing from the highest count already assigned in the same run.
+
+**Bug:** `reconcile_by_act_ref()` used an if/else that checked historical candidates first; if a baseline match existed, same-run candidates were never consulted. With a historical original (count=0) and three same-run reminders, all three received count=1 instead of 1, 2, 3.
+
+**Fix (`agents/compare_news.py`):** Both candidate groups are now evaluated unconditionally. `repetition_count = max(base_max, run_max) + 1`. `_repeated_followup` is still set whenever `run_max ≥ 0`. No change to semantic matching thresholds or AI call count.
+
+**Tests added to `tests/test_review_status_v391.py`:**
+- Historical original + three same-run reminders → 1, 2, 3
+- Historical count 2 + two same-run reminders → 3, 4
+- Distinct events same law maintain independent counters under combined history+same-run
+- All-new same-run reminders receive sequential counts (regression)
+- No confirmed match remains NEW with count 0 (regression)
 
 ### Task 4C — Reconcile: Correct Event Matching
 

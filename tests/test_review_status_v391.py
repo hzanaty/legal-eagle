@@ -528,6 +528,165 @@ def test_12_legacy_repeated_zero_count_no_fabrication():
     print("✅ Criterion 12 passed: legacy counts do not produce fabricated numbers")
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION C: Task 4D.1 — repetition counter fix (historical + same-run combined)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def test_4d1_historical_original_three_same_run_reminders():
+    """Task 4D.1: historical original (count=0) + three same-run reminders → 1, 2, 3."""
+    conn = _make_reconcile_db()
+    _insert_baseline(conn, law_id=1, l2_summary="GROUP_A original",
+                     repetition_count=0, days_ago=1)
+
+    r_a = _make_item(law_id=1, l2_summary="GROUP_A reminder A")
+    r_a["published_at"] = "2026-11-10T08:00:00"
+    r_b = _make_item(law_id=1, l2_summary="GROUP_A reminder B")
+    r_b["published_at"] = "2026-11-10T09:00:00"
+    r_c = _make_item(law_id=1, l2_summary="GROUP_A reminder C")
+    r_c["published_at"] = "2026-11-10T10:00:00"
+
+    _run([r_a, r_b, r_c], conn)
+
+    assert r_a["repetition_status"] == "repeated", (
+        f"Task 4D.1 fail: r_a expected REPEATED, got {r_a['repetition_status']!r}"
+    )
+    assert r_a["repetition_count"] == 1, (
+        f"Task 4D.1 fail: r_a expected count=1, got {r_a['repetition_count']}"
+    )
+    assert r_b["repetition_status"] == "repeated", (
+        f"Task 4D.1 fail: r_b expected REPEATED, got {r_b['repetition_status']!r}"
+    )
+    assert r_b["repetition_count"] == 2, (
+        f"Task 4D.1 fail: r_b expected count=2, got {r_b['repetition_count']}"
+    )
+    assert r_c["repetition_status"] == "repeated", (
+        f"Task 4D.1 fail: r_c expected REPEATED, got {r_c['repetition_status']!r}"
+    )
+    assert r_c["repetition_count"] == 3, (
+        f"Task 4D.1 fail: r_c expected count=3, got {r_c['repetition_count']}"
+    )
+    print("✅ Task 4D.1: historical original + 3 same-run reminders → 1, 2, 3")
+
+
+def test_4d1_historical_count_2_two_same_run_reminders():
+    """Task 4D.1: historical chain max count=2 + two same-run reminders → 3, 4."""
+    conn = _make_reconcile_db()
+    _insert_baseline(conn, law_id=1, l2_summary="GROUP_A original",
+                     repetition_count=0, days_ago=4)
+    _insert_baseline(conn, law_id=1, l2_summary="GROUP_A reminder 1",
+                     repetition_count=1, days_ago=3)
+    _insert_baseline(conn, law_id=1, l2_summary="GROUP_A reminder 2",
+                     repetition_count=2, days_ago=2)
+
+    r_d = _make_item(law_id=1, l2_summary="GROUP_A reminder D")
+    r_d["published_at"] = "2026-11-10T08:00:00"
+    r_e = _make_item(law_id=1, l2_summary="GROUP_A reminder E")
+    r_e["published_at"] = "2026-11-10T09:00:00"
+
+    _run([r_d, r_e], conn)
+
+    assert r_d["repetition_status"] == "repeated", (
+        f"Task 4D.1 fail: r_d expected REPEATED, got {r_d['repetition_status']!r}"
+    )
+    assert r_d["repetition_count"] == 3, (
+        f"Task 4D.1 fail: r_d expected count=3, got {r_d['repetition_count']}"
+    )
+    assert r_e["repetition_status"] == "repeated", (
+        f"Task 4D.1 fail: r_e expected REPEATED, got {r_e['repetition_status']!r}"
+    )
+    assert r_e["repetition_count"] == 4, (
+        f"Task 4D.1 fail: r_e expected count=4, got {r_e['repetition_count']}"
+    )
+    print("✅ Task 4D.1: historical count 2 + 2 same-run reminders → 3, 4")
+
+
+def test_4d1_distinct_events_same_law_independent_counters_combined():
+    """Task 4D.1: two distinct events under same law maintain independent counters
+    when both historical and same-run candidates are present for each event."""
+    conn = _make_reconcile_db()
+    # GROUP_A: 2-deep chain in history; GROUP_B: 1-deep in history
+    _insert_baseline(conn, law_id=1, l2_summary="GROUP_A original",
+                     repetition_count=0, days_ago=3)
+    _insert_baseline(conn, law_id=1, l2_summary="GROUP_A first reminder",
+                     repetition_count=1, days_ago=2)
+    _insert_baseline(conn, law_id=1, l2_summary="GROUP_B original",
+                     repetition_count=0, days_ago=2)
+
+    # Same run: GROUP_A second reminder, GROUP_B first reminder, GROUP_A third reminder
+    a_r2 = _make_item(law_id=1, l2_summary="GROUP_A second reminder")
+    a_r2["published_at"] = "2026-11-10T08:00:00"
+    b_r1 = _make_item(law_id=1, l2_summary="GROUP_B first reminder")
+    b_r1["published_at"] = "2026-11-10T09:00:00"
+    a_r3 = _make_item(law_id=1, l2_summary="GROUP_A third reminder")
+    a_r3["published_at"] = "2026-11-10T10:00:00"
+
+    _run([a_r2, b_r1, a_r3], conn)
+
+    # GROUP_A chain: history max=1 → a_r2 gets 2; a_r3 must use max(history=1, run=2)=2 → 3
+    assert a_r2["repetition_count"] == 2, (
+        f"Task 4D.1 fail: a_r2 expected count=2, got {a_r2['repetition_count']}"
+    )
+    assert a_r3["repetition_count"] == 3, (
+        f"Task 4D.1 fail: a_r3 expected count=3, got {a_r3['repetition_count']}"
+    )
+    # GROUP_B chain: history max=0 → b_r1 gets 1 (must not be polluted by GROUP_A counts)
+    assert b_r1["repetition_status"] == "repeated", (
+        f"Task 4D.1 fail: b_r1 expected REPEATED"
+    )
+    assert b_r1["repetition_count"] == 1, (
+        f"Task 4D.1 fail: b_r1 expected count=1, got {b_r1['repetition_count']}"
+    )
+    print("✅ Task 4D.1: distinct events same law maintain independent counters under combined history+same-run")
+
+
+def test_4d1_all_new_same_run_sequential_counts():
+    """Task 4D.1: all-new same-run reminders (no history) receive sequential counts 1, 2, 3."""
+    conn = _make_reconcile_db()
+
+    item_1 = _make_item(law_id=1, l2_summary="GROUP_A first in run")
+    item_1["published_at"] = "2026-11-10T07:00:00"
+    item_2 = _make_item(law_id=1, l2_summary="GROUP_A second in run")
+    item_2["published_at"] = "2026-11-10T08:00:00"
+    item_3 = _make_item(law_id=1, l2_summary="GROUP_A third in run")
+    item_3["published_at"] = "2026-11-10T09:00:00"
+    item_4 = _make_item(law_id=1, l2_summary="GROUP_A fourth in run")
+    item_4["published_at"] = "2026-11-10T10:00:00"
+
+    _run([item_1, item_2, item_3, item_4], conn)
+
+    assert item_1["repetition_status"] == "new", "Task 4D.1 fail: first in run must stay NEW"
+    assert item_1["repetition_count"] == 0
+    assert item_2["repetition_count"] == 1, (
+        f"Task 4D.1 fail: second in run expected count=1, got {item_2['repetition_count']}"
+    )
+    assert item_3["repetition_count"] == 2, (
+        f"Task 4D.1 fail: third in run expected count=2, got {item_3['repetition_count']}"
+    )
+    assert item_4["repetition_count"] == 3, (
+        f"Task 4D.1 fail: fourth in run expected count=3, got {item_4['repetition_count']}"
+    )
+    print("✅ Task 4D.1: all-new same-run reminders receive sequential counts 1, 2, 3")
+
+
+def test_4d1_no_confirmed_match_stays_new():
+    """Task 4D.1: items with no confirmed same-event match remain NEW with count=0."""
+    conn = _make_reconcile_db()
+    _insert_baseline(conn, law_id=1, l2_summary="GROUP_A historical",
+                     repetition_count=2, days_ago=1)
+
+    item_b = _make_item(law_id=1, l2_summary="GROUP_B unrelated article")
+
+    _run([item_b], conn)
+
+    assert item_b["repetition_status"] == "new", (
+        f"Task 4D.1 fail: unconfirmed item must stay NEW, got {item_b['repetition_status']!r}"
+    )
+    assert item_b["repetition_count"] == 0, (
+        f"Task 4D.1 fail: unconfirmed item must keep count=0, got {item_b['repetition_count']}"
+    )
+    print("✅ Task 4D.1: unconfirmed items remain NEW with count=0")
+
+
 # ── Runner ───────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
@@ -547,6 +706,11 @@ if __name__ == "__main__":
         test_11_duplicate_does_not_increment_count,
         test_12_legacy_repeated_zero_count_no_fabrication,
         test_1b_new_item_status_in_review,
+        test_4d1_historical_original_three_same_run_reminders,
+        test_4d1_historical_count_2_two_same_run_reminders,
+        test_4d1_distinct_events_same_law_independent_counters_combined,
+        test_4d1_all_new_same_run_sequential_counts,
+        test_4d1_no_confirmed_match_stays_new,
     ]
     passed = 0
     failed = 0
