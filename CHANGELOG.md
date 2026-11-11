@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## v3.91 — 2026-11-11
+### Task 4A — Restrict Comparing to NEW/DUPLICATE only
+
+Step 4 (Comparing) now classifies strictly as **NEW** or **DUPLICATE** using reliable technical identity only (source_id, URL, content hash). Cosine similarity, entity fingerprinting, and the `is_fp_intrarun` path are removed — legal-event identity belongs to Reconcile (Step 8). REPEATED and UPDATE are never assigned by Step 4.
+
+**Changes:**
+- `agents/compare_news.py` — removed embedding generation, cosine-based classification, `is_fp_intrarun` path, mid-cosine UPDATE branch, and `prior_count >= 3 → REPEATED` promotion; added `seen_sigs` set for same-run content-hash dedup; `update_items` always returns `[]` (controller compatibility preserved for Task 4B)
+- `tests/test_compare_news_v391.py` — 11 focused tests covering all mandatory scenarios; 11/11 passing
+- `docs/plans/plan_v3.91.md` — V3.91 investigation report + Task 4A implementation plan
+- `CLAUDE.md` — governance role boundaries updated (Opus owns `docs/plans/` and `docs/roadmap/`; Sonnet owns source, tests, and `docs/SPEC.md` post-execution) + 6-step development workflow documented
+
+**Deferred (identified dead code, no external callers):** `_compute_delta()`, `_has_meaningful_delta()`, `_get_ai_client()`, `_embed_texts()`, `DEDUP_COSINE_DUP/UPDATE`, `JACCARD_*` constants — cleanup scheduled for a separate task after V3.91 ships.
+
 ## v3.39 — 2026-11-10
 ### Governance setup + GitHub Pages rename
 
