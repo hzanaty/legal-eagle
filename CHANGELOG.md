@@ -1,6 +1,20 @@
 # CHANGELOG
 
 ## v3.91 — 2026-11-11
+### Task 4C — Reconcile: Correct Event Matching
+
+Step 8 (Reconcile) has been corrected to comply with the approved business rules for NEW vs REPEATED classification.
+
+**Bugs corrected in `reconcile_by_act_ref()` (`agents/compare_news.py`):**
+
+1. **Multi-candidate fix** — `baseline_by_law` and `baseline_by_ref` now hold lists of all candidates per law_id/act_ref (previously only the first candidate was retained). This allows distinct legal developments under the same law to each be independently recognized as NEW or REPEATED.
+2. **`dedup_status` never changed** — Reconcile no longer sets `dedup_status = "update"`. Only `repetition_status` is mutated; `dedup_status` remains `"new"` for both NEW and REPEATED articles (rule 6).
+3. **No occurrence-count threshold** — A confirmed same-event match immediately sets `repetition_status = "repeated"`, regardless of prior occurrence count. The old `>= 3` promotion delay is removed (rule 4).
+4. **Same-run tracking uses lists** — `seen_law` and `seen_ref` now hold lists of same-run candidates (previously only the first per identity); `_register` appends; a new `_first_confirmed()` helper scans all candidates.
+5. **Embedding failure preserves NEW** — `_confirm()` now returns `False` when embeddings are unavailable (previously returned `True`, causing false REPEATED on AI outage). Aligns with rule 8: if semantic evidence is unavailable, preserve NEW.
+
+**Test file created:** `tests/test_reconcile_v391.py` — 10 focused tests covering all mandatory scenarios; 10/10 passing. Task 4A regression 11/11 passing. Task 4B regression 6/6 + 4/4 passing.
+
 ### Task 4B — Controller Routing: DUPLICATE Bypass
 
 DUPLICATE items returned by Comparing now stop before all expensive downstream stages. They remain persisted and visible in News Review (handled by compare_news, tested in Task 4A), but never enter L2 Fetch, Authority Resolution, Glossary Match, Law Match, Reconcile, RCM Match, Impact Gate, Timing, or Rank.

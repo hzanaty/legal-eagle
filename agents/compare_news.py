@@ -244,20 +244,23 @@ def _norm_act_ref(s: Optional[str]) -> str:
 
 
 def reconcile_by_act_ref(items, conn, profile_id, days: int = None):
-    """Post-L2/Law-Match dedup reconciliation (v3.15 → generalized v3.16).
+    """Post-L2/Law-Match repetition reconciliation (v3.91).
 
     Identity is language-independent but only known after L2 + Law Match, so this runs
     late. The primary key is the resolved **law_id** (registry law); ``act_ref`` is the
     fallback when no law resolved. Compare runs *before* L2/Law-Match, so a Turkish and
     an English article about the same law both pass as ``new`` there. Here:
 
-    - A ``new`` item whose identity matches a **prior-run baseline** item → re-classified
-      ``update`` (recurring change), inheriting repetition_count + 1 so it can reach
-      ``repeated`` (>= 3).
-    - A ``new`` item whose identity matches only an **earlier item this run** (e.g. another
-      language or a follow-up reminder) → re-classified ``update`` with REPEATED status.
+    - law_id/act_ref match narrows candidates; ``same_legal_event()`` confirms the same
+      underlying legal development via L2 semantic similarity + corroborators.
+    - A confirmed match → ``repetition_status = "repeated"`` immediately, regardless of
+      prior occurrence count.
+    - ``dedup_status`` is never changed; only ``repetition_status`` is updated.
+    - If embeddings are unavailable, NEW is preserved — no false repetition on AI outage.
+    - All candidates under the same law_id/act_ref are checked, not just the first, so
+      distinct legal developments under the same law can each be recognized.
 
-    Only UPGRADES items Compare left as ``new`` — never downgrades. Mutates in place.
+    Only upgrades items Compare left as ``new`` — never downgrades. Mutates in place.
     Returns {"reconciled": n}.
     """
     if days is None:
@@ -278,30 +281,34 @@ def reconcile_by_act_ref(items, conn, profile_id, days: int = None):
              AND (first_seen_at >= ? OR last_seen_at >= ?)""",
         (profile_id, window_iso, window_iso),
     ).fetchall()
-    baseline_by_law: Dict[Any, Any] = {}
-    baseline_by_ref: Dict[str, Any] = {}
+    # Keep ALL candidates per law_id / act_ref so distinct events under the same law
+    # can each be recognized separately; share the dict object for O(1) dedup below.
+    baseline_by_law: Dict[Any, List] = {}
+    baseline_by_ref: Dict[str, List] = {}
     for r in rows:
-        if r["law_id"] is not None and r["law_id"] not in baseline_by_law:
-            baseline_by_law[r["law_id"]] = dict(r)
+        d = dict(r)
+        if r["law_id"] is not None:
+            baseline_by_law.setdefault(r["law_id"], []).append(d)
         ref = _norm_act_ref(r["act_ref"])
-        if ref and ref not in baseline_by_ref:
-            baseline_by_ref[ref] = dict(r)
+        if ref:
+            baseline_by_ref.setdefault(ref, []).append(d)
 
     def _identity(it):
         lid = it.get("law_id")
         ref = _norm_act_ref(it.get("act_ref"))
         return lid, ref
 
-    # v3.29: law_id/act_ref only NARROW candidates; confirm same legal event via L2 semantic
-    # similarity (core) + corroborators. Embed once; degrade to "trust the candidate" if
-    # embeddings are unavailable (never lose dedup on an AI outage).
+    # law_id/act_ref only NARROW candidates; confirm same legal event via L2 semantic
+    # similarity (core) + corroborators. Embed once.
     from agents.legal_event import same_legal_event
     from agents.embeddings_util import get_embeddings, cosine as _cos
-    _base_dicts = []
-    _seen_ids = set()
-    for _d in list(baseline_by_law.values()) + list(baseline_by_ref.values()):
-        if id(_d) not in _seen_ids:
-            _seen_ids.add(id(_d)); _base_dicts.append(_d)
+    _base_dicts: List = []
+    _seen_ids: set = set()
+    for _lst in list(baseline_by_law.values()) + list(baseline_by_ref.values()):
+        for _d in _lst:
+            if id(_d) not in _seen_ids:
+                _seen_ids.add(id(_d))
+                _base_dicts.append(_d)
     _l2 = lambda d: (d.get("l2_summary") or d.get("title") or "").strip()
     _have_vecs = False
     try:
@@ -312,25 +319,32 @@ def reconcile_by_act_ref(items, conn, profile_id, days: int = None):
             _b["_l2vec"] = _embs[len(items) + _k]
         _have_vecs = True
     except Exception as _e:
-        print(f"    ⚠️  reconcile embeddings unavailable ({type(_e).__name__}); confirming on law/act candidate only")
+        print(f"    ⚠️  reconcile embeddings unavailable ({type(_e).__name__}); preserving NEW (no false repetition on AI outage)")
 
     def _confirm(a, b) -> bool:
         va, vb = a.get("_l2vec"), b.get("_l2vec")
         if not _have_vecs or va is None or vb is None:
-            return True   # embeddings down → trust the law_id/act_ref candidate match
+            return False  # embeddings unavailable → preserve NEW (rule 8)
         return same_legal_event(a, b, _cos(va, vb))
+
+    def _first_confirmed(it, candidates) -> bool:
+        """Return True when any candidate confirms the same legal event."""
+        for c in candidates:
+            if _confirm(it, c):
+                return True
+        return False
 
     # Deterministic order so "first sighting this run" is stable: published_at, then index.
     order = sorted(range(len(items)), key=lambda i: ((items[i].get("published_at") or ""), i))
-    seen_law: Dict[Any, Any] = {}
-    seen_ref: Dict[str, Any] = {}
+    seen_law: Dict[Any, List] = {}
+    seen_ref: Dict[str, List] = {}
     reconciled = 0
 
     def _register(it, lid, ref):
         if lid is not None:
-            seen_law.setdefault(lid, it)
+            seen_law.setdefault(lid, []).append(it)
         if ref:
-            seen_ref.setdefault(ref, it)
+            seen_ref.setdefault(ref, []).append(it)
 
     for idx in order:
         it = items[idx]
@@ -342,28 +356,34 @@ def reconcile_by_act_ref(items, conn, profile_id, days: int = None):
             _register(it, lid, ref)
             continue
 
-        baseline = (baseline_by_law.get(lid) if lid is not None else None) or \
-                   (baseline_by_ref.get(ref) if ref else None)
-        run_owner = (seen_law.get(lid) if lid is not None else None) or \
-                    (seen_ref.get(ref) if ref else None)
+        # Gather unique baseline candidates (prior runs within window)
+        _seen_cid: set = set()
+        base_candidates: List = []
+        for _c in (baseline_by_law.get(lid) or []) + (baseline_by_ref.get(ref) or [] if ref else []):
+            if id(_c) not in _seen_cid:
+                _seen_cid.add(id(_c))
+                base_candidates.append(_c)
 
-        if baseline is not None and _confirm(it, baseline):
-            prior = int(baseline.get("repetition_count") or 0) + 1
-            it["dedup_status"] = "update"
-            it["repetition_count"] = prior
-            it["repetition_status"] = "repeated" if prior >= 3 else "update"
-            reconciled += 1
-        elif run_owner is not None and _confirm(it, run_owner):
-            # Same run, same legal event → follow-up/reminder, not a copy.
-            # Route through full pipeline so ranker, impact gate, and announcements see it.
-            owner_count = int(run_owner.get("repetition_count") or 0)
-            it["dedup_status"] = "update"
-            it["is_update"] = True
-            it["delta"] = []
-            it["_repeated_followup"] = True
-            it["repetition_count"] = owner_count
+        # Gather unique same-run candidates
+        _seen_rid: set = set()
+        run_candidates: List = []
+        for _c in (seen_law.get(lid) or []) + (seen_ref.get(ref) or [] if ref else []):
+            if id(_c) not in _seen_rid:
+                _seen_rid.add(id(_c))
+                run_candidates.append(_c)
+
+        if _first_confirmed(it, base_candidates):
+            # Prior-run confirmed same legal event → REPEATED immediately (rule 4)
+            # dedup_status stays "new" per rule 6; no occurrence-count threshold
             it["repetition_status"] = "repeated"
             reconciled += 1
+        elif _first_confirmed(it, run_candidates):
+            # Same-run confirmed same legal event → REPEATED (rule 4)
+            # dedup_status stays "new" per rule 6
+            it["repetition_status"] = "repeated"
+            it["_repeated_followup"] = True
+            reconciled += 1
+
         _register(it, lid, ref)
 
     # Clean the transient embedding vectors off the items.
@@ -371,7 +391,7 @@ def reconcile_by_act_ref(items, conn, profile_id, days: int = None):
         _it.pop("_l2vec", None)
 
     if reconciled:
-        print(f"↺ identity reconciliation: {reconciled} same-event item(s) re-classified (law_id/act_ref → confirmed)")
+        print(f"↺ identity reconciliation: {reconciled} same-event item(s) re-classified as REPEATED (law_id/act_ref → confirmed)")
     return {"reconciled": reconciled}
 
 
