@@ -82,6 +82,7 @@
   .status-pill { font-size: 10px; font-weight: 700; border-radius: 3px; padding: 1px 6px; }
   .status-new { background: #e8f5e9; color: #107e3e; } .status-update { background: #e3f2fd; color: #0a6ed1; }
   .status-repeated { background: #fff3e0; color: #e9730c; } .status-dup { background: #f5f5f5; color: #aaa; }
+  .status-duplicate { background: #f5f5f5; color: #aaa; }
   .gap-badge { font-size: 10px; font-weight: 700; background: #fff3e0; color: #e9730c; border: 1px solid #ffe0b2; border-radius: 3px; padding: 1px 6px; }
   .item-title { font-size: 12px; font-weight: 600; color: #32363a; margin-bottom: 2px; line-height: 1.4; }
   .item-snippet { font-size: 11px; color: #6a6d70; line-height: 1.5; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
@@ -223,7 +224,6 @@
       <div class="chip-group">
         <div class="fchip active" data-dim="status" data-val="all" onclick="setFilter(this)">All</div>
         <div class="fchip" data-dim="status" data-val="NEW" onclick="setFilter(this)">NEW</div>
-        <div class="fchip" data-dim="status" data-val="UPDATE" onclick="setFilter(this)">UPDATE</div>
         <div class="fchip" data-dim="status" data-val="REPEATED" onclick="setFilter(this)">REPEATED</div>
         <div class="fchip" data-dim="status" data-val="DUPLICATE" onclick="setFilter(this)">DUPLICATE</div>
       </div>
@@ -410,7 +410,7 @@
         <div class="item-meta">
           <span class="source-pill" title="Publisher / source">{{ item.publisher or item.domain or 'Source' }}</span>
           {% if item.authority_name %}<span class="authority-pill" title="Responsible authority{% if item.authority_status == 'inferred' %} — AI-inferred{% elif item.authority_status == 'configured' %} — configured{% endif %}">&#127963; {{ item.authority_name }}{% if item.authority_status == 'inferred' %} <span style="color:#e9730c;font-weight:700;" title="AI-inferred">✦</span>{% endif %}</span>{% endif %}
-          {% if item.status %}<span class="status-pill status-{{ item.status|lower }}">{{ item.status }}</span>{% endif %}
+          {% if item.status %}{% set _rep_count = item.repetition_count|int if item.repetition_count else 0 %}{% set _status_label = ('REPEATED (' ~ _rep_count ~ ')') if (item.status == 'REPEATED' and _rep_count >= 1) else item.status %}<span class="status-pill status-{{ item.status|lower }}">{{ _status_label }}</span>{% endif %}
           <span class="pub-date" title="Article publish date">{% if item.published_at %}{{ item.published_at|truncate(16, True, '') }}{% else %}—{% endif %}</span>
           {% if item.first_seen_at %}<span class="pub-date" title="Fetched" style="opacity:0.65;">↓ {{ item.first_seen_at|truncate(16, True, '') }}</span>{% endif %}
           {% if item.effective_date %}<span class="eff-date" title="Date the change comes into force">⏱ Effective {{ item.effective_date }}</span>{% endif %}

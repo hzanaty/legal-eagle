@@ -327,12 +327,13 @@ def reconcile_by_act_ref(items, conn, profile_id, days: int = None):
             return False  # embeddings unavailable → preserve NEW (rule 8)
         return same_legal_event(a, b, _cos(va, vb))
 
-    def _first_confirmed(it, candidates) -> bool:
-        """Return True when any candidate confirms the same legal event."""
+    def _max_confirmed_count(it, candidates) -> int:
+        """Return max repetition_count among semantically confirmed candidates, or -1 if none."""
+        max_count = -1
         for c in candidates:
             if _confirm(it, c):
-                return True
-        return False
+                max_count = max(max_count, int(c.get("repetition_count") or 0))
+        return max_count
 
     # Deterministic order so "first sighting this run" is stable: published_at, then index.
     order = sorted(range(len(items)), key=lambda i: ((items[i].get("published_at") or ""), i))
@@ -372,17 +373,21 @@ def reconcile_by_act_ref(items, conn, profile_id, days: int = None):
                 _seen_rid.add(id(_c))
                 run_candidates.append(_c)
 
-        if _first_confirmed(it, base_candidates):
-            # Prior-run confirmed same legal event → REPEATED immediately (rule 4)
-            # dedup_status stays "new" per rule 6; no occurrence-count threshold
+        base_max = _max_confirmed_count(it, base_candidates)
+        if base_max >= 0:
+            # Prior-run confirmed same legal event → REPEATED (rule 4)
+            # Count = max(confirmed baseline counts) + 1; scoped to this event chain.
             it["repetition_status"] = "repeated"
+            it["repetition_count"] = base_max + 1
             reconciled += 1
-        elif _first_confirmed(it, run_candidates):
-            # Same-run confirmed same legal event → REPEATED (rule 4)
-            # dedup_status stays "new" per rule 6
-            it["repetition_status"] = "repeated"
-            it["_repeated_followup"] = True
-            reconciled += 1
+        else:
+            run_max = _max_confirmed_count(it, run_candidates)
+            if run_max >= 0:
+                # Same-run confirmed same legal event → REPEATED (rule 4)
+                it["repetition_status"] = "repeated"
+                it["repetition_count"] = run_max + 1
+                it["_repeated_followup"] = True
+                reconciled += 1
 
         _register(it, lid, ref)
 

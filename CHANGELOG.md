@@ -1,6 +1,33 @@
 # CHANGELOG
 
 ## v3.91 — 2026-11-11
+### Task 4D — News Review Status Compatibility & Repetition Counter
+
+Step 8 repetition bookkeeping is now complete, and News Review presents confirmed repetition counts alongside REPEATED status badges.
+
+**Reconcile bookkeeping (`agents/compare_news.py`):**
+- Replaced `_first_confirmed()` helper with `_max_confirmed_count()`, which scans ALL confirmed candidates and returns the maximum `repetition_count` among them (or -1 if none confirm). This enables event-specific cumulative counting without a separate event registry.
+- Both confirmed-match branches (prior-run and same-run) now set `it["repetition_count"] = max_confirmed_count + 1`, so: original = 0, first repeat = 1, second repeat = 2, and so on.
+- Counts are automatically scoped to the same legal development: semantic confirmation via `same_legal_event()` ensures that candidates from different events under the same law do not contribute to each other's count chains.
+- Duplicate observations do not increment the counter — they are not passed to Reconcile and their stored count stays at 0 (same as the original), so they cannot inflate future counts even when present in the baseline.
+
+**News Review UI (`admin/templates/review_news.html`):**
+- STATUS filter row updated: `All | NEW | REPEATED | DUPLICATE`. The UPDATE chip is removed.
+- Individual status badges for REPEATED items now display `REPEATED (n)` when `n ≥ 1`. Legacy items with `repetition_count = 0` or NULL display plain `REPEATED` (no fabricated count).
+- `data-status` attribute on each card continues to hold the raw status value (`REPEATED`, not `REPEATED (1)`), so the REPEATED filter chip correctly matches all REPEATED items regardless of count.
+- Added `.status-duplicate` CSS class to correctly style DUPLICATE status badges (was missing — the existing `.status-dup` class was unreachable from the template's `status-{{ item.status|lower }}` expression).
+
+**Historical compatibility:**
+- Legacy rows with `repetition_status = 'update'` remain visible in the review list with `status = 'UPDATE'`. The removed UPDATE filter chip does not cause these records to disappear — they are accessible under the All filter.
+- No destructive migration or rank rewrite is performed.
+
+**Help text (`configurations/review_help.json`):**
+- UPDATE entry removed from the Status section.
+- REPEATED description updated to explain the count badge meaning (no longer references the obsolete "3 or more runs" threshold).
+- DUPLICATE description updated for clarity.
+
+**Test file created:** `tests/test_review_status_v391.py` — 15 focused tests covering all 12 mandatory acceptance criteria; **15/15 passing**. Task 4C regression 10/10 passing. Task 4A regression 11/11 passing.
+
 ### Task 4C — Reconcile: Correct Event Matching
 
 Step 8 (Reconcile) has been corrected to comply with the approved business rules for NEW vs REPEATED classification.
