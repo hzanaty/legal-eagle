@@ -483,155 +483,43 @@ def run_compare_news_agent(
     except Exception:
         pass
 
-    # Semantic structures. Embeddings are only needed when there is something to
-    # compare against (a non-empty baseline) or when the AI cache is active for
-    # deterministic replay. First-ever runs with no baseline stay AI-free.
-    curr_texts = [_get_text_signature(i) for i in current_items]
-    glossary_terms = _extract_glossary_terms(glossary)
-    use_embeddings = bool(baseline_items) or bool(os.environ.get("LEGAL_EAGLE_AI_CACHE"))
-    baseline_texts = [_get_text_signature(b) for b in baseline_items]
-    baseline_tokens = [tokenize(t) for t in baseline_texts]
-    baseline_emb: List[Any] = []
-    curr_emb: List[Any] = []
-    if use_embeddings:
-        print("🔍 Generating embeddings for semantic comparison (weekly baseline)...")
-        try:
-            client = _get_ai_client()
-            if baseline_texts:
-                baseline_emb = cached_embeddings(baseline_texts, lambda t: _embed_texts(t, client))
-            curr_emb = cached_embeddings(curr_texts, lambda t: _embed_texts(t, client))
-        except Exception as e:
-            # Embeddings unavailable (AI Core down / no cache) — degrade to
-            # deterministic dedup (exact id/url/hash/fingerprint) rather than
-            # aborting the whole run. Near-duplicates fall through as 'new'.
-            print(f"⚠️ Embeddings unavailable ({type(e).__name__}); using deterministic dedup only.")
-            use_embeddings = False
-            baseline_emb = []
-            curr_emb = []
-
+    # v3.91 (Task 4A): Step 4 classifies strictly as NEW or DUPLICATE using reliable
+    # technical identity only (source_id, URL, content hash). Cosine similarity and
+    # entity fingerprinting are intentionally excluded — legal-event identity belongs
+    # to Reconcile (Step 8). REPEATED is never assigned here.
     new_items: List[Dict[str, Any]] = []
-    update_items: List[Dict[str, Any]] = []
+    update_items: List[Dict[str, Any]] = []  # always empty; preserved for Task 4B controller compat
 
-    # Intra-run state: items kept so far this run become comparison targets too,
-    # so a second occurrence of the same story within one run is caught (C3).
+    # Same-run dedup sets — initialised from baseline keys so a same-run re-submission
+    # of a previously-seen article is still caught by source identity / URL / hash.
     seen_source_ids = set(by_source_id.keys())
     seen_urls = set(by_url.keys())
-    seen_fps = set(by_fp.keys())
-    kept_current: List[Dict[str, Any]] = []  # {vec, tokens, text}
-
-    def _best_semantic(curr_vec, targets):
-        best_cos, best_j = -1.0, -1
-        for j, tv in enumerate(targets):
-            denom = (np.linalg.norm(curr_vec) * np.linalg.norm(tv))
-            if denom == 0:
-                continue
-            cos = float(np.dot(curr_vec, tv) / denom)
-            if cos > best_cos:
-                best_cos, best_j = cos, j
-        return best_cos, best_j
+    seen_sigs = set(by_sig.keys())
 
     for i, item in enumerate(current_items):
-        curr_text = curr_texts[i]
         curr_sig = hash_signature(item.get("title", ""), item.get("content", ""))
         curr_fp = entity_fingerprint(item.get("title", ""), item.get("content", ""))
         url = item.get("link") or item.get("url")
         source_id = item.get("tweet_id") or item.get("guid") or item.get("id")
 
-        # 1) Exact / canonical duplicate (vs baseline AND already-kept current items).
-        # Fingerprint check uses by_fp (baseline only) — same-run fp matches are follow-ups,
-        # not duplicates, and are handled separately below.
         is_dup = (
             (source_id and str(source_id) in seen_source_ids)
             or (url and str(url) in seen_urls)
-            or (curr_sig and curr_sig in by_sig)
-            or (curr_fp and curr_fp in by_fp)   # baseline-only fingerprint dedup
-        )
-        # Same-run fingerprint match: a different article about the same legal entity
-        # arrived in the same run — it is a follow-up/reminder, not a copy.
-        is_fp_intrarun = (
-            not is_dup
-            and bool(curr_fp)
-            and curr_fp in seen_fps
+            or (curr_sig and curr_sig in seen_sigs)
         )
 
-        classification = "new"
-        semantic_prior_count = 0  # repetition carried from a cosine-matched (reworded) prior
-        if is_dup:
-            classification = "duplicate"
-        elif is_fp_intrarun:
-            # Different article, same legal entity, same run → follow-up.
-            # Route through the full pipeline; UI shows it as REPEATED.
-            classification = "update"
-            item["is_update"] = True
-            item["delta"] = []
-            item["_repeated_followup"] = True
-        elif use_embeddings and i < len(curr_emb):
-            # 2) Semantic comparison vs baseline + kept-current embeddings
-            curr_vec = np.array(curr_emb[i].embedding)
-            base_vecs = [np.array(b.embedding) for b in baseline_emb]
-            cur_vecs = [k["vec"] for k in kept_current]
-            all_texts = baseline_texts + [k["text"] for k in kept_current]
-            best_cos, best_j = _best_semantic(curr_vec, base_vecs + cur_vecs)
-            # Cosine-tiered classification (Jaccard AND-gate dropped — unreliable on
-            # paraphrased news). High cosine ⇒ duplicate; mid cosine with a genuine
-            # glossary-bearing delta ⇒ update; otherwise new.
-            if best_cos >= DEDUP_COSINE_DUP:
-                if best_j >= len(base_vecs):
-                    # Match is against a same-run article (kept_current), not a baseline item.
-                    # Two different articles about the same topic arriving in the same run is a
-                    # follow-up, not a copy. Route as update so it flows through the full pipeline.
-                    classification = "update"
-                    item["is_update"] = True
-                    item["delta"] = []
-                    item["_repeated_followup"] = True
-                else:
-                    classification = "duplicate"
-            elif best_cos >= DEDUP_COSINE_UPDATE:
-                baseline_text = all_texts[best_j] if 0 <= best_j < len(all_texts) else ""
-                deltas = _compute_delta(curr_text, baseline_text, glossary_terms)
-                if deltas:
-                    classification = "update"
-                    item["is_update"] = True
-                    item["delta"] = deltas
-                    # A reworded re-announcement of a recurring change is a REPEAT, not a
-                    # fresh update. Carry the matched prior's repetition_count so the ranker's
-                    # REPEATED elevation can fire on a semantic (non-exact-key) match.
-                    if 0 <= best_j < len(baseline_emb):
-                        semantic_prior_count = int(
-                            (baseline_items[best_j] or {}).get("repetition_count") or 0
-                        )
-                else:
-                    classification = "new"
-
+        classification = "duplicate" if is_dup else "new"
         item["dedup_status"] = classification
-        # v3.2: REPEATED status — set based on how many times this entity has appeared.
-        # Exact-key match (guid/url/hash/fingerprint) OR a semantic re-announcement both count.
+
         matched = _find_matched_baseline(item, by_source_id, by_url, by_sig, by_fp)
-        exact_prior_count = int((matched or {}).get("repetition_count") or 0)
-        prior_count = max(exact_prior_count, semantic_prior_count)
-        item["repetition_count"] = prior_count
-        if prior_count >= 3:
-            item["repetition_status"] = "repeated"
-        elif item.pop("_repeated_followup", False):
-            item["repetition_status"] = "repeated"
-        elif classification == "duplicate":
-            item["repetition_status"] = "duplicate"
-        elif classification == "update":
-            item["repetition_status"] = "update"
-        else:
-            item["repetition_status"] = "new"
+        item["repetition_count"] = int((matched or {}).get("repetition_count") or 0)
+        item["repetition_status"] = "duplicate" if classification == "duplicate" else "new"
+
         if classification == "new":
             new_items.append(item)
-            # register as a comparison target for the rest of this run
             seen_source_ids.add(str(source_id)) if source_id else None
             seen_urls.add(str(url)) if url else None
-            seen_fps.add(curr_fp) if curr_fp else None
-            if use_embeddings and i < len(curr_emb):
-                kept_current.append({"vec": np.array(curr_emb[i].embedding),
-                                     "tokens": tokenize(curr_text), "text": curr_text})
-        elif classification == "update":
-            update_items.append(item)
-            seen_fps.add(curr_fp) if curr_fp else None
+            seen_sigs.add(curr_sig) if curr_sig else None
 
     # Persist ALL current items (with dedup_status) — duplicates are preserved (F7),
     # never dropped, so they remain queryable and visible (collapsed) in Review.
@@ -647,7 +535,7 @@ def run_compare_news_agent(
         print("🧪 Dry-run: skipping DB persistence (nothing saved to news_items).")
 
     dup_count = sum(1 for it in current_items if it.get("dedup_status") == "duplicate")
-    print(f"✅ New: {len(new_items)} | Updates: {len(update_items)} | Duplicates (kept): {dup_count}")
+    print(f"✅ New: {len(new_items)} | Duplicates (kept): {dup_count}")
 
     # Save single rolling snapshot for manual inspection
     try:
