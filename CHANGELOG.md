@@ -1,6 +1,14 @@
 # CHANGELOG
 
 ## v3.91 — 2026-11-11
+### Task 4B — Controller Routing: DUPLICATE Bypass
+
+DUPLICATE items returned by Comparing now stop before all expensive downstream stages. They remain persisted and visible in News Review (handled by compare_news, tested in Task 4A), but never enter L2 Fetch, Authority Resolution, Glossary Match, Law Match, Reconcile, RCM Match, Impact Gate, Timing, or Rank.
+
+**Changes:**
+- `agents/agents_controller.py` — after Comparing, only `new_items` is routed to the analyzing stage and email rank gate; obsolete `update_items` wiring removed (was permanently `[]` after Task 4A); all-duplicate input skips the analyzing block without errors or unnecessary AI calls; `final_items` for the email digest is now `new_items` only
+- `tests/test_controller_4b.py` — 6 focused integration tests covering: new+dup routing (mandatory), duplicate not email-eligible, all-duplicate no-AI-calls, all-new full pipeline, skip_comparison=True, update_items not routed; 6/6 passing; Task 4A regression suite 11/11 passing
+
 ### Task 4A — Restrict Comparing to NEW/DUPLICATE only
 
 Step 4 (Comparing) now classifies strictly as **NEW** or **DUPLICATE** using reliable technical identity only (source_id, URL, content hash). Cosine similarity, entity fingerprinting, and the `is_fp_intrarun` path are removed — legal-event identity belongs to Reconcile (Step 8). REPEATED and UPDATE are never assigned by Step 4.

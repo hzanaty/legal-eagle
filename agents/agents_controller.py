@@ -623,134 +623,138 @@ def run_profile_once(
             skip_persist=dry_run,
         )
         new_items = compare_result.get("new_items", [])
-        update_items = compare_result.get("update_items", [])
-        print(f"✅ {len(new_items)} new items and {len(update_items)} updates after semantic comparison.")
+        print(f"✅ {len(new_items)} new item(s) after semantic comparison (duplicates kept in DB, bypassed here).")
 
-        # Combine new and updates for the next stage
-        final_items = new_items + update_items
+        # Only NEW items enter the expensive downstream stages.
+        # DUPLICATE items were already persisted by compare_news and remain
+        # visible in News Review, but must not consume AI quota.
+        final_items = new_items
 
         # v3.16: ANALYZING stage, re-ordered so every semantic step sees the FULL article.
         # L2 Fetch → Glossary Match → Law Match → Reconcile → Rank. Lifecycle tags come
         # from Compare (exact dedup); Reconcile upgrades cross-language 'new' items by law_id.
-        try:
-            from agents.glossary_match import match_glossary, save_topic_labels, flag_glossary_gaps
-            from agents.law_ref_matcher import match_law_refs, save_law_matches
-            from agents.news_ranker import rank_items
-            # Reads only (glossary/law terms + ranking signals/grounding); mutate items in memory.
-            an_conn = get_connection()
-            # v3.13/v3.16: L2 Deep Fetch — MANDATORY, now runs FIRST (before Glossary/Law/Rank)
-            # so all downstream stages work on the full-article summary, not the headline.
-            # Grounded with the profile's registered laws for consistent law extraction.
-            print(f"🌐 L2 Fetch: {len(filtered_items)} item(s) — article-grounded call (summary + laws + refs + evidence + authority)…")
-            from agents.l2_fetcher import run_l2_fetch
-            _law_rows = an_conn.execute(
-                "SELECT name_en, name_native, law_number FROM law_refs WHERE profile_id=?",
-                (profile_id,),
-            ).fetchall()
-            _known_laws = [
-                (f"{r['name_en']} (No. {r['law_number']})" if r["law_number"] else r["name_en"])
-                for r in _law_rows
-            ]
-            _known_authorities = [r["name"] for r in an_conn.execute(
-                "SELECT name FROM authorities WHERE profile_id=? ORDER BY name", (profile_id,)
-            ).fetchall()]
-            run_l2_fetch(filtered_items, known_laws=_known_laws, known_authorities=_known_authorities)
-            # Persist the new structured L2 fields (references / impact evidence / primary_authority).
-            if not dry_run:
-                from configurations.db import update_news_fields as _upd
-                for _it in filtered_items:
-                    _upd(an_conn, _it, {
-                        "law_references_json": _it.get("law_references_json"),
-                        "impact_evidence_json": _it.get("impact_evidence_json"),
-                        "primary_authority": _it.get("primary_authority"),
-                    }, profile_id)
-                an_conn.commit()
-            # v3.26: resolve the responsible authority — map L2's primary_authority (AI subject-owner)
-            # to a registered authority. Publisher stays source-derived; Law Match never sets authority.
+        # v3.91 (Task 4B): only NEW items enter this block; DUPLICATE items were already
+        # persisted by compare_news and remain visible in News Review.
+        if not new_items:
+            print(f"ℹ️  All {len(filtered_items)} collected item(s) are duplicate — skipping analysis stages.")
+        else:
             try:
-                from agents.authority_attributor import resolve_primary_authority
-                resolve_primary_authority(filtered_items, an_conn, profile_id)
+                from agents.glossary_match import match_glossary, save_topic_labels, flag_glossary_gaps
+                from agents.law_ref_matcher import match_law_refs, save_law_matches
+                from agents.news_ranker import rank_items
+                # Reads only (glossary/law terms + ranking signals/grounding); mutate items in memory.
+                an_conn = get_connection()
+                # v3.13/v3.16: L2 Deep Fetch — MANDATORY, now runs FIRST (before Glossary/Law/Rank)
+                # so all downstream stages work on the full-article summary, not the headline.
+                # Grounded with the profile's registered laws for consistent law extraction.
+                print(f"🌐 L2 Fetch: {len(new_items)} item(s) — article-grounded call (summary + laws + refs + evidence + authority)…")
+                from agents.l2_fetcher import run_l2_fetch
+                _law_rows = an_conn.execute(
+                    "SELECT name_en, name_native, law_number FROM law_refs WHERE profile_id=?",
+                    (profile_id,),
+                ).fetchall()
+                _known_laws = [
+                    (f"{r['name_en']} (No. {r['law_number']})" if r["law_number"] else r["name_en"])
+                    for r in _law_rows
+                ]
+                _known_authorities = [r["name"] for r in an_conn.execute(
+                    "SELECT name FROM authorities WHERE profile_id=? ORDER BY name", (profile_id,)
+                ).fetchall()]
+                run_l2_fetch(new_items, known_laws=_known_laws, known_authorities=_known_authorities)
+                # Persist the new structured L2 fields (references / impact evidence / primary_authority).
+                if not dry_run:
+                    from configurations.db import update_news_fields as _upd
+                    for _it in new_items:
+                        _upd(an_conn, _it, {
+                            "law_references_json": _it.get("law_references_json"),
+                            "impact_evidence_json": _it.get("impact_evidence_json"),
+                            "primary_authority": _it.get("primary_authority"),
+                        }, profile_id)
+                    an_conn.commit()
+                # v3.26: resolve the responsible authority — map L2's primary_authority (AI subject-owner)
+                # to a registered authority. Publisher stays source-derived; Law Match never sets authority.
+                try:
+                    from agents.authority_attributor import resolve_primary_authority
+                    resolve_primary_authority(new_items, an_conn, profile_id)
+                except Exception as e:
+                    print(f"⚠️ Authority resolution skipped: {type(e).__name__}: {e}")
+                print(f"🔖 Glossary Match: {len(new_items)} item(s)…")
+                match_glossary(new_items, an_conn, profile_id)  # now sees l2_summary
+                print(f"⚖ Law Match: {len(new_items)} item(s)…")
+                match_law_refs(new_items, an_conn, profile_id)
+                # Reconcile: cross-language dedup keyed on law_id (act_ref fallback), post-Law-Match.
+                print(f"↺ Reconcile: {len(new_items)} item(s)…")
+                from agents.compare_news import reconcile_by_act_ref
+                reconcile_by_act_ref(new_items, an_conn, profile_id)
+                # v3.17: RCM Match — per-item proposed RCM title (announcement_agent pipeline entry),
+                # matched against cached RCM reference titles. All items in new_items are non-duplicate.
+                try:
+                    from agents.announcement_agent import match_rcm_titles
+                    if new_items:
+                        print("🏷️ RCM Match: proposing RCM titles + tracked/net-new…")
+                        match_rcm_titles(an_conn, profile_id, new_items)
+                except Exception as e:
+                    print(f"⚠️ RCM Match skipped: {type(e).__name__}: {e}")
+                # v3.18: Impact gate — relevance + change assessment (+ effective_date) over
+                # the L2 summary, grounded by the per-profile rubric.
+                try:
+                    from agents.impact_gate import assess_impact
+                    if new_items:
+                        print("🎯 Impact: assessing operational impact + change signals…")
+                        assess_impact(new_items, an_conn, profile_id)
+                except Exception as e:
+                    print(f"⚠️ Impact gate skipped: {type(e).__name__}: {e}")
+                # v3.19: Timing — deterministic timing_class + timing_signal (0-2) from
+                # effective_date + law status. Feeds the Rank gate. No AI call.
+                try:
+                    from agents.timing import apply_timing
+                    if new_items:
+                        print("🕒 Timing: classifying effective dates…")
+                        apply_timing(new_items, an_conn, profile_id)
+                except Exception as e:
+                    print(f"⚠️ Timing skipped: {type(e).__name__}: {e}")
+                print("📊 Rank: deterministic signal-fusion (significance 1–5)…")
+                rank_items(new_items, profile_id, an_conn)      # sees topic_label + L2 + law
+                an_conn.close()
+                if not dry_run:
+                    # Persist rank fields + effective_date (upsert on source_id/url/hash_signature).
+                    from configurations.config_loader import add_news_item as _add_item
+                    from agents.compare_news import _build_item_record
+                    for _it in new_items:
+                        try:
+                            _rec = _build_item_record(_it)
+                            _add_item(_it.get("profile_id") or profile_id, _rec)
+                        except Exception:
+                            pass
+                    # Persist topic_label + law matches, then flag glossary gaps.
+                    w_conn = get_connection()
+                    save_topic_labels(new_items, w_conn, profile_id)
+                    save_law_matches(new_items, w_conn, profile_id)
+                    flag_glossary_gaps(new_items, w_conn, profile_id)
+                    w_conn.close()
+                ranked = sum(1 for i in new_items if (i.get("significance_rank") or 0) > 0)
+                tagged = sum(1 for i in new_items if i.get("topic_label") and i["topic_label"] != '["General"]')
+                gaps = sum(1 for i in new_items if i.get("glossary_gap"))
+                print(f"📊 Rank stage complete — {tagged}/{len(new_items)} glossary-matched · {ranked}/{len(new_items)} ranked > 0")
+                if gaps:
+                    print(f"⚠️  Glossary gap check — {gaps}/{len(new_items)} rank≥3 item(s) had NO glossary match (candidates to add)")
+                else:
+                    print(f"✅ Glossary gap check — 0 gaps (all rank≥3 items matched a glossary term)")
             except Exception as e:
-                print(f"⚠️ Authority resolution skipped: {type(e).__name__}: {e}")
-            print(f"🔖 Glossary Match: {len(filtered_items)} item(s)…")
-            match_glossary(filtered_items, an_conn, profile_id)  # now sees l2_summary
-            print(f"⚖ Law Match: {len(filtered_items)} item(s)…")
-            match_law_refs(filtered_items, an_conn, profile_id)
-            # Reconcile: cross-language dedup keyed on law_id (act_ref fallback), post-Law-Match.
-            print(f"↺ Reconcile: {len(filtered_items)} item(s)…")
-            from agents.compare_news import reconcile_by_act_ref
-            reconcile_by_act_ref(filtered_items, an_conn, profile_id)
-            # v3.17: RCM Match — per-item proposed RCM title (announcement_agent pipeline entry),
-            # matched against cached RCM reference titles. Skips duplicates to bound AI cost.
-            try:
-                from agents.announcement_agent import match_rcm_titles
-                _rcm_cands = [i for i in filtered_items if (i.get("dedup_status") or "new") != "duplicate"]
-                if _rcm_cands:
-                    print("🏷️ RCM Match: proposing RCM titles + tracked/net-new…")
-                    match_rcm_titles(an_conn, profile_id, _rcm_cands)
-            except Exception as e:
-                print(f"⚠️ RCM Match skipped: {type(e).__name__}: {e}")
-            # v3.18: Impact gate — relevance + change assessment (+ effective_date) over
-            # the L2 summary, grounded by the per-profile rubric. Non-duplicates only.
-            try:
-                from agents.impact_gate import assess_impact
-                _imp_cands = [i for i in filtered_items if (i.get("dedup_status") or "new") != "duplicate"]
-                if _imp_cands:
-                    print("🎯 Impact: assessing operational impact + change signals…")
-                    assess_impact(_imp_cands, an_conn, profile_id)
-            except Exception as e:
-                print(f"⚠️ Impact gate skipped: {type(e).__name__}: {e}")
-            # v3.19: Timing — deterministic timing_class + timing_signal (0-2) from
-            # effective_date + law status. Feeds the Rank gate. No AI call.
-            try:
-                from agents.timing import apply_timing
-                _timing_cands = [i for i in filtered_items if (i.get("dedup_status") or "new") != "duplicate"]
-                if _timing_cands:
-                    print("🕒 Timing: classifying effective dates…")
-                    apply_timing(_timing_cands, an_conn, profile_id)
-            except Exception as e:
-                print(f"⚠️ Timing skipped: {type(e).__name__}: {e}")
-            print("📊 Rank: deterministic signal-fusion (significance 1–5)…")
-            rank_items(filtered_items, profile_id, an_conn)      # sees topic_label + L2 + law
-            an_conn.close()
-            if not dry_run:
-                # Persist rank fields + effective_date (upsert on source_id/url/hash_signature).
-                from configurations.config_loader import add_news_item as _add_item
-                from agents.compare_news import _build_item_record
-                for _it in filtered_items:
-                    try:
-                        _rec = _build_item_record(_it)
-                        _add_item(_it.get("profile_id") or profile_id, _rec)
-                    except Exception:
-                        pass
-                # Persist topic_label + law matches, then flag glossary gaps.
-                w_conn = get_connection()
-                save_topic_labels(filtered_items, w_conn, profile_id)
-                save_law_matches(filtered_items, w_conn, profile_id)
-                flag_glossary_gaps(filtered_items, w_conn, profile_id)
-                w_conn.close()
-            ranked = sum(1 for i in filtered_items if (i.get("significance_rank") or 0) > 0)
-            tagged = sum(1 for i in filtered_items if i.get("topic_label") and i["topic_label"] != '["General"]')
-            gaps = sum(1 for i in filtered_items if i.get("glossary_gap"))
-            print(f"📊 Rank stage complete — {tagged}/{len(filtered_items)} glossary-matched · {ranked}/{len(filtered_items)} ranked > 0")
-            if gaps:
-                print(f"⚠️  Glossary gap check — {gaps}/{len(filtered_items)} rank≥3 item(s) had NO glossary match (candidates to add)")
-            else:
-                print(f"✅ Glossary gap check — 0 gaps (all rank≥3 items matched a glossary term)")
-        except Exception as e:
-            from agents.l2_fetcher import L2FetchError
-            if isinstance(e, L2FetchError):
-                # L2 is mandatory — do not swallow. Abort the run loudly.
-                print(f"❌ L2 Fetch failed (run aborted): {e}")
-                raise
-            print(f"⚠️ Analyzing stage failed: {e}")
+                from agents.l2_fetcher import L2FetchError
+                if isinstance(e, L2FetchError):
+                    # L2 is mandatory — do not swallow. Abort the run loudly.
+                    print(f"❌ L2 Fetch failed (run aborted): {e}")
+                    raise
+                print(f"⚠️ Analyzing stage failed: {e}")
 
 
-        # v3.3: EMAIL RANK GATE — set email_eligible=1 for items with rank >= threshold and not duplicate.
+        # v3.3: EMAIL RANK GATE — set email_eligible=1 for items with rank >= threshold.
+        # Only NEW items are in scope; DUPLICATE items are never email-eligible.
         try:
             email_threshold = int(get_setting_value(profile_id, "email_rank_threshold", "3") or 3)
             gate_conn = get_connection()
-            for _it in filtered_items:
+            for _it in new_items:
                 _rank = int(_it.get("significance_rank") or 0)
                 _tier = (_it.get("rank_tier") or "").lower()
                 _eligible = 1 if (_rank >= email_threshold and _tier != "duplicate") else 0
@@ -777,8 +781,8 @@ def run_profile_once(
                     )
             gate_conn.commit()
             gate_conn.close()
-            eligible_count = sum(1 for i in filtered_items if i.get("email_eligible"))
-            print(f"✉️  Email gate complete — {eligible_count}/{len(filtered_items)} items email-eligible (rank ≥ {email_threshold})")
+            eligible_count = sum(1 for i in new_items if i.get("email_eligible"))
+            print(f"✉️  Email gate complete — {eligible_count}/{len(new_items)} new item(s) email-eligible (rank ≥ {email_threshold})")
         except Exception as e:
             print(f"⚠️ Email gate failed: {e}")
 
