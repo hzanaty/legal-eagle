@@ -9,6 +9,10 @@ DUPLICATE items returned by Comparing now stop before all expensive downstream s
 - `agents/agents_controller.py` — after Comparing, only `new_items` is routed to the analyzing stage and email rank gate; obsolete `update_items` wiring removed (was permanently `[]` after Task 4A); all-duplicate input skips the analyzing block without errors or unnecessary AI calls; `final_items` for the email digest is now `new_items` only
 - `tests/test_controller_4b.py` — 6 focused integration tests covering: new+dup routing (mandatory), duplicate not email-eligible, all-duplicate no-AI-calls, all-new full pipeline, skip_comparison=True, update_items not routed; 6/6 passing; Task 4A regression suite 11/11 passing
 
+**Blocking correction (DUPLICATE rank persistence):**
+- `configurations/db.py` — `upsert_news_item()` now unconditionally enforces `significance_rank=0`, `rank_tier='duplicate'`, `email_eligible=0` for any item with `dedup_status='duplicate'`, on both INSERT and UPDATE paths; this prevents a previously-ranked article from retaining its old rank when re-collected as a duplicate
+- `tests/test_duplicate_rank_persistence.py` — 4 regression tests using a real in-memory SQLite DB: previously-ranked article reset to rank=0 (mandatory), NEW article retains rank, fresh DUPLICATE insert has rank=0, News Review query returns rank=0; 4/4 passing
+
 ### Task 4A — Restrict Comparing to NEW/DUPLICATE only
 
 Step 4 (Comparing) now classifies strictly as **NEW** or **DUPLICATE** using reliable technical identity only (source_id, URL, content hash). Cosine similarity, entity fingerprinting, and the `is_fp_intrarun` path are removed — legal-event identity belongs to Reconcile (Step 8). REPEATED and UPDATE are never assigned by Step 4.

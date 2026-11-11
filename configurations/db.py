@@ -1315,6 +1315,16 @@ def upsert_news_item(conn: sqlite3.Connection, profile_id: int, item: Dict[str, 
     topic_label = item.get("topic_label")
     email_eligible = item.get("email_eligible") or 0
     email_sent = item.get("email_sent") or 0
+
+    # v3.91 (Task 4B): DUPLICATE items must ALWAYS have rank=0, rank_tier='duplicate',
+    # email_eligible=0 — unconditionally, so that a previously-ranked record cannot
+    # retain its old rank when it is re-collected as a duplicate.  The COALESCE guards
+    # in the UPDATE branch protect fields that legitimately carry forward; these three
+    # must not carry forward.
+    if dedup_status == "duplicate":
+        significance_rank = 0
+        rank_tier = "duplicate"
+        email_eligible = 0
     # v3.8 effective date (optional; stamped by ranker / effective-date step)
     effective_date = item.get("effective_date")
     # v3.13 L2 deep-fetch + grouping fields (optional; stamped by l2_fetcher / glossary_match)
