@@ -251,9 +251,11 @@ Respond with JSON:
             when = str(parsed.get("when", "")).strip()
             when_not = str(parsed.get("when_not", "")).strip()
             if why and when and when_not:
-                ai_readiness = str(parsed.get("readiness", "ok")).strip().lower()
+                # Default to "insufficient" — a missing or unrecognised readiness signal
+                # means the AI did not confirm the rule was ready; treat as not ready.
+                ai_readiness = str(parsed.get("readiness", "insufficient")).strip().lower()
                 if ai_readiness not in ("ok", "insufficient"):
-                    ai_readiness = "ok"
+                    ai_readiness = "insufficient"
                 # The text-prefix check is the definitive gate — AI readiness is advisory
                 suffix_ok = is_rule_sufficient(why, when, when_not)
                 readiness = ai_readiness if suffix_ok else "insufficient"

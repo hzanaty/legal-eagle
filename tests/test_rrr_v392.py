@@ -617,3 +617,237 @@ def test_route_override_rejects_invalid_transition():
         assert not data["ok"], "/override rank 2→3 must be rejected"
     finally:
         cleanup()
+
+
+# ─── Final patch P1: readiness defaults ──────────────────────────────────────
+
+def test_generate_rrr_rule_missing_readiness_defaults_to_insufficient():
+    """AI response with no readiness key must default to insufficient, not ok."""
+    from agents.rrr_generator import generate_rrr_rule
+
+    item = {"title": "Some regulation", "significance_rank": 3}
+    mock_response = json.dumps({
+        # readiness key intentionally absent
+        "why": "This affects payroll.",
+        "when": "- Effective date present",
+        "when_not": "- Consultation only",
+    })
+
+    mock_client = MagicMock()
+    mock_client.chat.completions.create.return_value = MagicMock(
+        choices=[MagicMock(message=MagicMock(content=mock_response))]
+    )
+
+    with patch("agents.rrr_generator._ai_client", return_value=mock_client), \
+         patch("agents.rrr_generator.cached_chat", side_effect=lambda p, fn: fn()):
+        rule = generate_rrr_rule(item, override_rank=4, human_reason="reason")
+
+    assert rule["readiness"] == "insufficient", (
+        f"Missing readiness must default to 'insufficient', got {rule['readiness']!r}"
+    )
+    assert rule["sufficient"] is False
+
+
+def test_generate_rrr_rule_invalid_readiness_defaults_to_insufficient():
+    """AI response with unrecognised readiness value must default to insufficient, not ok."""
+    from agents.rrr_generator import generate_rrr_rule
+
+    item = {"title": "Regulation update", "significance_rank": 2}
+    mock_response = json.dumps({
+        "readiness": "yes",  # unrecognised value
+        "why": "Affects HCM payroll.",
+        "when": "- Article contains rate change",
+        "when_not": "- No effective date",
+    })
+
+    mock_client = MagicMock()
+    mock_client.chat.completions.create.return_value = MagicMock(
+        choices=[MagicMock(message=MagicMock(content=mock_response))]
+    )
+
+    with patch("agents.rrr_generator._ai_client", return_value=mock_client), \
+         patch("agents.rrr_generator.cached_chat", side_effect=lambda p, fn: fn()):
+        rule = generate_rrr_rule(item, override_rank=4, human_reason="reason")
+
+    assert rule["readiness"] == "insufficient", (
+        f"Unknown readiness must default to 'insufficient', got {rule['readiness']!r}"
+    )
+    assert rule["sufficient"] is False
+
+
+def test_generate_rrr_rule_ai_exception_returns_failed():
+    """An AI call exception must produce readiness='failed', not readiness='ok'."""
+    from agents.rrr_generator import generate_rrr_rule
+
+    item = {"title": "Some regulation", "significance_rank": 3}
+
+    with patch("agents.rrr_generator.cached_chat", side_effect=RuntimeError("AI down")):
+        rule = generate_rrr_rule(item, override_rank=4, human_reason="reason")
+
+    assert rule["readiness"] == "failed"
+    assert rule["sufficient"] is False
+
+
+def test_route_confirm_rejects_failed_content():
+    """A rule whose WHY begins with a failure marker must be blocked at save."""
+    client, get_conn, cleanup = _app_with_test_db()
+    try:
+        item_id = _seed_item(get_conn, rank=3)
+        resp = client.post(
+            f"/admin/news/{item_id}/confirm-challenge",
+            json={
+                "override_rank": 4,
+                "override_reason": "Payroll impact",
+                "create_rule": True,
+                "why": "Rule generation failed — AI unavailable or parse error.",
+                "when": "- N/A",
+                "when_not": "- N/A",
+            },
+        )
+        data = json.loads(resp.data)
+        assert not data["ok"], "Failed-content rule must be blocked at save"
+        assert "error" in data
+    finally:
+        cleanup()
+
+
+def test_route_confirm_accepts_lpm_edited_insufficient_draft():
+    """After LPM resolves insufficient content, the cleaned rule must be saveable."""
+    client, get_conn, cleanup = _app_with_test_db()
+    try:
+        item_id = _seed_item(get_conn, rank=3)
+        resp = client.post(
+            f"/admin/news/{item_id}/confirm-challenge",
+            json={
+                "override_rank": 4,
+                "override_reason": "Mandatory rate change confirmed",
+                "create_rule": True,
+                "why": "Affects payroll — minimum wage rate change with stated effective date.",
+                "when": "- Article sets a new minimum wage rate\n- Effective date is specified",
+                "when_not": "- Consultation or proposal only\n- No effective date stated",
+            },
+        )
+        data = json.loads(resp.data)
+        assert data["ok"], f"Cleaned LPM draft must be saveable, got: {data}"
+        assert data.get("rule_id") is not None
+    finally:
+        cleanup()
+
+
+# ─── Final patch P2: product-scope evidence in matcher ───────────────────────
+
+def test_rrr_matcher_prompt_contains_product_scope_instruction():
+    """Matcher prompt must explicitly distinguish regulatory context from SAP product-scope."""
+    import inspect
+    from agents import rrr_matcher
+    src = inspect.getsource(rrr_matcher._evaluate_rules_for_item)
+    assert "PRODUCT-SCOPE EVIDENCE" in src, \
+        "Matcher must include a PRODUCT-SCOPE EVIDENCE section"
+    assert "regulatory context" in src, \
+        "Matcher must clarify that law refs / authority / RCM are regulatory context, not product scope"
+    assert "SAP product coverage" in src or "SAP product" in src, \
+        "Matcher must mention SAP product coverage explicitly"
+
+
+def test_rrr_match_regulatory_context_alone_cannot_justify_scope_dependent_downgrade():
+    """Topic similarity + RCM status alone must not produce APPLY for a scope-dependent rule.
+
+    Rule requires: 'SAP Payroll localises this social insurance contribution type'.
+    Item has: law reference matched, RCM tracked — but no operative-clause confirmation
+    of SAP product scope. AI returns INSUFFICIENT_EVIDENCE; rank must be preserved.
+    """
+    from agents.rrr_matcher import run_rrr_match
+
+    conn = _mem_db()
+    insert_rrr_rule(
+        conn, PROFILE_ID, None, 5, 3,
+        "SAP product not in scope",
+        "Social insurance contribution NOT directly processed by SAP Payroll for this jurisdiction.",
+        "- Article covers a social insurance contribution type\n"
+        "- SAP Payroll is confirmed to localise this specific contribution for the jurisdiction",
+        "- Article covers a contribution type already excluded from SAP scope\n"
+        "- Filing is handled by a third-party add-on, not standard SAP",
+    )
+    conn.commit()
+
+    item = {
+        "id": None,
+        "profile_id": PROFILE_ID,
+        "significance_rank": 5,
+        "title": "Social insurance contribution rate update — XN region",
+        "l2_summary": "Ministry announces a new contribution rate effective Q1 2027.",
+        "impact_evidence_json": "[]",   # no operative clauses confirming SAP product scope
+        "law_references_json": json.dumps([{"type": "decree", "number": "2027-55", "label": ""}]),
+        "rcm_match_status": "tracked",
+        "authority_status": "configured",
+        "authority_name": "Ministry of Finance XN",
+        "topic_label": json.dumps(["Social Insurance"]),
+        "dedup_status": "new",
+    }
+
+    # AI correctly returns INSUFFICIENT_EVIDENCE because product-scope is unconfirmed
+    rules = list_rrr_rules(conn, PROFILE_ID)
+    mock_response = json.dumps([{
+        "rule_id": rules[0]["id"],
+        "verdict": "INSUFFICIENT_EVIDENCE",
+        "reasoning": "Article confirms regulatory change and RCM tracking but operative clauses "
+                     "do not confirm SAP Payroll localises this contribution type for XN.",
+    }])
+    mock_client = MagicMock()
+    mock_client.chat.completions.create.return_value = MagicMock(
+        choices=[MagicMock(message=MagicMock(content=mock_response))]
+    )
+
+    with patch("agents.rrr_matcher._ai_client", return_value=mock_client), \
+         patch("agents.rrr_matcher.cached_chat", side_effect=lambda p, fn: fn()):
+        run_rrr_match([item], PROFILE_ID, conn)
+
+    assert item["significance_rank"] == 5, \
+        f"INSUFFICIENT_EVIDENCE must not change rank; got {item['significance_rank']}"
+    assert item.get("rrr_match_outcome") is None, \
+        f"No outcome must be set for INSUFFICIENT_EVIDENCE; got {item.get('rrr_match_outcome')}"
+
+
+# ─── Final patch P3: Original Rank template rendering ────────────────────────
+
+def _render_orig_rank(item: dict, score: int) -> str:
+    """Render the Jinja2 snippet that controls Original Rank / RRR ID display.
+
+    The snippet is kept in sync with admin/templates/review_news.html lines 514-519.
+    Three scenarios are tested: new unchanged item, RRR-adjusted item, legacy human override.
+    """
+    from jinja2 import Environment
+    tmpl = Environment().from_string(
+        "{% if item.pre_rrr_rank or item.rrr_rule_id or (score >= 1 and item.rank_tier != 'human') %}"
+        "<div>"
+        "{% if item.pre_rrr_rank %}<span>Orig: {{ item.pre_rrr_rank }}</span>"
+        "{% elif score >= 1 and item.rank_tier != 'human' %}<span>Orig: {{ score }}</span>{% endif %}"
+        "{% if item.rrr_rule_id %}<span>RRR #{{ item.rrr_rule_id }}</span>{% endif %}"
+        "</div>"
+        "{% endif %}"
+    )
+    return tmpl.render(item=item, score=score)
+
+
+def test_template_orig_rank_shows_for_new_unchanged_item():
+    """New item with no pre_rrr_rank and no rrr_rule_id must still show Orig: score."""
+    item = {"pre_rrr_rank": None, "rrr_rule_id": None, "rank_tier": "auto"}
+    rendered = _render_orig_rank(item, score=3)
+    assert "Orig: 3" in rendered, \
+        f"New unchanged item must show 'Orig: 3' via fallback, got: {rendered!r}"
+
+
+def test_template_orig_rank_shows_for_rrr_adjusted_item():
+    """RRR-adjusted item must show pre_rrr_rank and RRR ID."""
+    item = {"pre_rrr_rank": 3, "rrr_rule_id": 7, "rank_tier": "rrr"}
+    rendered = _render_orig_rank(item, score=4)
+    assert "Orig: 3" in rendered, f"RRR item must show pre_rrr_rank, got: {rendered!r}"
+    assert "RRR #7" in rendered, f"RRR item must show rule ID, got: {rendered!r}"
+
+
+def test_template_orig_rank_hidden_for_human_overridden_legacy_item():
+    """Human-overridden legacy item (rank_tier='human', no pre_rrr_rank) must not show Orig."""
+    item = {"pre_rrr_rank": None, "rrr_rule_id": None, "rank_tier": "human"}
+    rendered = _render_orig_rank(item, score=4)
+    assert "Orig:" not in rendered, \
+        f"Legacy human-override item must not show unknown original rank, got: {rendered!r}"

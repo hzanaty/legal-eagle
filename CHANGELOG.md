@@ -73,6 +73,30 @@
 - New tests: `persist_rrr_outcomes` integration tests (real in-memory DB), `validate_rule_sections` structural validation (4 tests), `readiness` field contract, `inspect.getsource()` SELECT column verification, and Flask test-client route tests for eligibility enforcement (rank 1 block, invalid transition, missing reason) on both `/challenge`, `/confirm-challenge`, and `/override`.
 - All 32 V3.92 tests pass. All 51 V3.91 regression tests pass.
 
+## v3.92 final patch — 2026-11-12
+### Three defects fixed after independent code review of 36be6cb
+
+**1. Generator readiness defaults (`agents/rrr_generator.py`):**
+- Missing `readiness` key in AI response now defaults to `"insufficient"` (was `"ok"`). An AI that does not explicitly signal readiness must not produce an approvable rule automatically.
+- Unrecognised `readiness` values now default to `"insufficient"` (was `"ok"`). Unknown states are treated as unconfirmed.
+- Deliberate LPM approval path preserved: `readiness="insufficient"` produces an editable draft; after the LPM resolves missing information and edits the sections, `validate_rule_sections()` (not `readiness`) gates the save — so a corrected draft saves without a second AI call.
+- AI call exceptions continue to return `readiness="failed"` with unusable content; `validate_rule_sections()` blocks those at save via `_FAILURE_PREFIXES`.
+
+**2. Product-scope evidence in RRR Match (`agents/rrr_matcher.py`):**
+- Added explicit `PRODUCT-SCOPE EVIDENCE` section to the matcher prompt: law references, configured authority status, and RCM tracking are regulatory context — they confirm what regulation requires, not whether SAP supports the relevant payroll process, report, or interface.
+- Prompt now instructs: if a WHEN condition requires a product-scope fact (e.g., "SAP Payroll localises this contribution type") and no such confirmation appears in the article's operative clauses, use `INSUFFICIENT_EVIDENCE` — do not infer SAP product coverage from regulatory context alone.
+
+**3. Original Rank display (`admin/templates/review_news.html`):**
+- Outer condition changed from `{% if item.pre_rrr_rank or item.rrr_rule_id %}` to `{% if item.pre_rrr_rank or item.rrr_rule_id or (score >= 1 and item.rank_tier != 'human') %}`.
+- Previously the historical fallback (`Orig: {{ score }}`) was unreachable for new unchanged items because the outer guard required at least one RRR field to be set.
+- Human-overridden legacy records (no `pre_rrr_rank`, `rank_tier='human'`) are correctly excluded — the original rank before the human override is unknown and must not be fabricated.
+
+**Tests added (`tests/test_rrr_v392.py`, 32 → 42 tests):**
+- P1 readiness: `test_generate_rrr_rule_missing_readiness_defaults_to_insufficient`, `test_generate_rrr_rule_invalid_readiness_defaults_to_insufficient`, `test_generate_rrr_rule_ai_exception_returns_failed`, `test_route_confirm_rejects_failed_content`, `test_route_confirm_accepts_lpm_edited_insufficient_draft`
+- P2 product-scope: `test_rrr_matcher_prompt_contains_product_scope_instruction`, `test_rrr_match_regulatory_context_alone_cannot_justify_scope_dependent_downgrade`
+- P3 template: `test_template_orig_rank_shows_for_new_unchanged_item`, `test_template_orig_rank_shows_for_rrr_adjusted_item`, `test_template_orig_rank_hidden_for_human_overridden_legacy_item`
+- All 42 V3.92 tests pass. All 51 V3.91 regression tests pass.
+
 ## v3.91 — 2026-11-11
 ### Task 4D — News Review Status Compatibility & Repetition Counter
 

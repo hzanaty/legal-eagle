@@ -156,7 +156,15 @@ def _evaluate_rules_for_item(
         "- Topic similarity alone is NOT proof that WHEN conditions are met. "
           "A new social insurance article may cover a different filing, authority, or product scope than the rule assumed.\n"
         "- When a WHEN condition requires specific product-scope evidence (e.g., SAP payroll reporting, "
-          "statutory calculation) and the article does not confirm it, use INSUFFICIENT_EVIDENCE.\n\n"
+          "statutory calculation) and the article does not confirm it, use INSUFFICIENT_EVIDENCE.\n"
+        "PRODUCT-SCOPE EVIDENCE:\n"
+        "- Law references, configured authority status, and RCM tracking are regulatory context — "
+          "they confirm what the regulation requires, NOT whether SAP supports the relevant payroll "
+          "process, report, or interface.\n"
+        "- If a WHEN condition requires a product-scope fact (e.g., 'SAP Payroll localises this "
+          "contribution type', 'a standard SAP report covers this filing') and no such confirmation "
+          "appears in the article's operative clauses, use INSUFFICIENT_EVIDENCE — do not infer "
+          "SAP product coverage from regulatory context alone.\n\n"
         "Respond with a JSON array:\n"
         '[{"rule_id": <int>, "verdict": "<APPLY|DO_NOT_APPLY|INSUFFICIENT_EVIDENCE>", '
         '"reasoning": "<one sentence citing which specific condition determined the verdict>"}, ...]'

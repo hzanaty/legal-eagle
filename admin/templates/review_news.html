@@ -511,7 +511,7 @@
         {% else %}
         <div style="font-size:10px;color:#aaa;text-align:right;line-height:1.8">Rank 0<br>Not evaluated</div>
         {% endif %}
-        {% if item.pre_rrr_rank or item.rrr_rule_id %}
+        {% if item.pre_rrr_rank or item.rrr_rule_id or (score >= 1 and item.rank_tier != 'human') %}
         <div style="font-size:10px;color:#555;text-align:right;line-height:1.8;margin-top:2px">
           {% if item.pre_rrr_rank %}<span title="Original system rank before RRR Match">Orig: {{ item.pre_rrr_rank }}</span>{% elif score >= 1 and item.rank_tier != 'human' %}<span title="Original rank (pre-V3.92 record)">Orig: {{ score }}</span>{% endif %}
           {% if item.rrr_rule_id %}<span title="RRR Rule ID that caused this adjustment" style="margin-left:6px">RRR #{{ item.rrr_rule_id }}</span>{% endif %}
