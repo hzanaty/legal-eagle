@@ -635,6 +635,21 @@
       .then(function(r){ return r.json(); })
       .then(function(d){
         if (!d.ok) { alert(d.error || 'Cannot re-rank this item.'); closeChallenge(); return; }
+        // Strict contract validation — surface incompatible server immediately rather than rendering undefined
+        if (typeof d.initial_rank !== 'number' || d.initial_rank < 1) {
+          alert(
+            'Re-rank unavailable: server returned an invalid rank (“' + d.initial_rank + '”).\n' +
+            'The server may be running an older version. Please reload the page.'
+          );
+          closeChallenge(); return;
+        }
+        if (!Array.isArray(d.allowed_targets) || d.allowed_targets.length === 0) {
+          alert(
+            'Re-rank unavailable: server returned no valid override targets.\n' +
+            'The server may be running an older version. Please reload the page.'
+          );
+          closeChallenge(); return;
+        }
         document.getElementById('chTitle').textContent = d.title || '';
         document.getElementById('chOrigRank').textContent = d.initial_rank + ' — ' + (_RANK_LABELS[d.initial_rank] || '?');
         _challengeInitialRank = d.initial_rank;

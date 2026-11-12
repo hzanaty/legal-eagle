@@ -47,6 +47,20 @@
 - 16 acceptance tests covering all 14 criteria: DB schema, rule CRUD, generator contract (including insufficient detection), matcher verdict logic (APPLY/DO_NOT_APPLY/INSUFFICIENT_EVIDENCE), conflict handling, pipeline persist, and direction guard.
 - All 16 V3.92 tests pass. All 51 V3.91 regression tests pass.
 
+## v3.92 live hotfix — 2026-11-12
+### Re-rank dialog showing `undefined — ?` on first Xanadu test
+
+**Root cause:** The LaunchAgent-managed server process was never restarted after V3.92 Python edits. The file on disk contained the V3.92 challenge route (returning `initial_rank` / `allowed_targets`), but the running process held the pre-V3.92 code in memory and continued returning the old contract (`original_rank`, `suggested_rank`, `agrees`). Frontend JS expected `initial_rank`; the old server returned `original_rank` → `undefined` in the dialog.
+
+**Confirmed by:** `curl -X POST http://127.0.0.1:5001/admin/news/9/challenge` returned `{"original_rank":5,"suggested_rank":3,"agrees":false,...}` before restart; returns `{"initial_rank":5,"allowed_targets":[2,3,4],...}` after.
+
+**Fix:**
+- Restarted server via `launchctl kickstart -k gui/<uid>/com.legaleagle.admin`. Live endpoint now returns the correct V3.92 contract; rank 5 → `allowed_targets: [2,3,4]`.
+- Added strict frontend contract validation in `openChallenge()` (`admin/templates/review_news.html`): if `initial_rank` is missing or not a number, or `allowed_targets` is missing or empty, a clear error message is shown and the dialog closes — no silent `undefined` rendering.
+- Added `test_route_challenge_rank5_exact_contract` (`tests/test_rrr_v392.py`): exercises the production challenge endpoint via Flask test client, asserts all required frontend fields (`initial_rank`, `allowed_targets`, `title`) are present with correct values for rank 5, and explicitly asserts the absence of old-contract fields (`original_rank`, `suggested_rank`, `agrees`).
+
+**Tests:** 43/43 V3.92 tests pass. 51/51 V3.91 regressions pass.
+
 ## v3.92 corrective patch — 2026-11-12
 ### Five defects fixed before release acceptance
 

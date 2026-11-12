@@ -851,3 +851,47 @@ def test_template_orig_rank_hidden_for_human_overridden_legacy_item():
     rendered = _render_orig_rank(item, score=4)
     assert "Orig:" not in rendered, \
         f"Legacy human-override item must not show unknown original rank, got: {rendered!r}"
+
+
+# ─── Hotfix HF1: challenge endpoint response contract ────────────────────────
+
+def test_route_challenge_rank5_exact_contract():
+    """Rank 5 challenge must return the exact fields and values the frontend requires.
+
+    Regression guard: the live server returned the old V3.91 contract
+    (original_rank, suggested_rank, agrees) after V3.92 was deployed because the
+    server process was not restarted. This test validates the new contract and
+    explicitly asserts the absence of old-contract fields.
+    """
+    client, get_conn, cleanup = _app_with_test_db()
+    try:
+        item_id = _seed_item(get_conn, rank=5)
+
+        resp = client.post(f"/admin/news/{item_id}/challenge",
+                           content_type="application/json")
+        assert resp.status_code == 200
+        data = json.loads(resp.data)
+
+        # Required fields
+        assert data.get("ok") is True, f"Challenge must succeed for rank 5, got: {data}"
+        assert "initial_rank" in data, "Frontend requires initial_rank — missing from response"
+        assert isinstance(data["initial_rank"], int), \
+            f"initial_rank must be int, got {type(data['initial_rank'])}"
+        assert data["initial_rank"] == 5, \
+            f"initial_rank must equal item rank (5), got {data['initial_rank']}"
+        assert "allowed_targets" in data, "Frontend requires allowed_targets — missing"
+        assert isinstance(data["allowed_targets"], list), \
+            f"allowed_targets must be list, got {type(data['allowed_targets'])}"
+        assert sorted(data["allowed_targets"]) == [2, 3, 4], \
+            f"Rank 5 must permit only targets [2,3,4], got {data['allowed_targets']}"
+        assert "title" in data, "Frontend requires title — missing"
+
+        # Old-contract fields must be absent (regression guard)
+        assert "original_rank" not in data, \
+            "Old V3.91 field 'original_rank' must not appear in V3.92 response"
+        assert "suggested_rank" not in data, \
+            "Old V3.91 field 'suggested_rank' must not appear in V3.92 response"
+        assert "agrees" not in data, \
+            "Old V3.91 field 'agrees' must not appear in V3.92 response"
+    finally:
+        cleanup()
