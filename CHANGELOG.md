@@ -111,6 +111,32 @@
 - P3 template: `test_template_orig_rank_shows_for_new_unchanged_item`, `test_template_orig_rank_shows_for_rrr_adjusted_item`, `test_template_orig_rank_hidden_for_human_overridden_legacy_item`
 - All 42 V3.92 tests pass. All 51 V3.91 regression tests pass.
 
+## v3.92 duplicate persistence patch — 2026-11-12
+### Canonical record protection: duplicate re-fetches must never overwrite completed analysis
+
+**Root cause:** V3.91 Task 4B introduced a code block in `upsert_news_item()` that set `significance_rank=0`, `rank_tier="duplicate"`, `email_eligible=0` for ALL incoming articles classified as duplicates — including articles that already existed in the DB with completed analysis (rank, RRR history, human decisions, email state). Because these were non-NULL values, `COALESCE(?, significance_rank)` in the UPDATE preserved them over the stored canonical rank, silently overwriting it.
+
+**Confirmed incident:** Three Rank 5/Urgent social insurance articles and one Rank 2/Signal MOU article from the Xanadu profile were reduced to Rank 0/DUPLICATE by a source rerun on 2026-11-12. Original rankings are confirmed in the server log (`admin-stdout.log`); production DB data was already cleared by an LPM reset before the fix was applied.
+
+**Fix (`configurations/db.py` — `upsert_news_item()`):**
+- Removed the V3.91 Task 4B pre-set block that unconditionally forced rank=0 for any incoming duplicate before the row lookup.
+- Added early-return inside the `with conn:` block: when an existing row is found AND `dedup_status=="duplicate"`, only `UPDATE news_items SET last_seen_at=? WHERE id=?` is executed. All business state (rank, tier, analysis, RRR history, human override, email state, repetition/grouping) is preserved.
+- Added guard before the INSERT path: when no canonical row exists AND `dedup_status=="duplicate"`, returns -1 without inserting any row. The first genuine NEW occurrence in the same run will create the canonical record normally.
+
+**Downstream safety verified:** `save_topic_labels`, `save_law_matches`, `flag_glossary_gaps`, `persist_rrr_outcomes`, and the L2 update all operate on `new_items` only (items returned by `compare_news`), not on `current_items`. No second code path can re-apply a rank-0 overwrite through pipeline saves.
+
+**Phase E — recovery proposal (for PM decision, no automatic execution):**
+- Affected Xanadu articles cannot be recovered from the current DB: production DB was cleared by LPM reset before the fix was applied.
+- Original rankings confirmed from server log: three articles at Rank 5/Urgent (social insurance contribution rates, social insurance circular, late-payment obligations), one article at Rank 2/Signal (MOU on workforce).
+- Recovery options: (a) Re-seed the Xanadu demo by running the full pipeline with the fixed code — articles will be re-analyzed and ranked fresh; (b) Accept the cleared state as the new baseline if demo re-seeding is not required before next session. **No data modification will be executed without explicit PM authorization.**
+
+**Tests:**
+- New file: `tests/test_dup_canonical_protection.py` — 15 regression tests covering D1–D11 (Rank 5/4/3 preservation, human override, RRR history, email state, repetition/grouping, same-run duplicates, genuine new article, review visibility, idempotence, transaction safety) plus the orphan-duplicate and last_seen_at-advances cases.
+- Updated contradictory legacy tests:
+  - `tests/test_duplicate_rank_persistence.py`: three tests renamed and updated to reflect V3.92 correct behavior; `test_new_article_retains_rank` unchanged.
+  - `tests/test_review_status_v391.py`: `test_2_duplicate_rank_zero_in_review` updated to `test_2_duplicate_rank_preserved_in_review` — verifies that a canonical article retains its rank in the review list after a duplicate re-fetch.
+- All 109 tests across all V3.91/V3.92 suites pass.
+
 ## v3.91 — 2026-11-11
 ### Task 4D — News Review Status Compatibility & Repetition Counter
 

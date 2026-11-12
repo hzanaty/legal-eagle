@@ -1351,15 +1351,10 @@ def upsert_news_item(conn: sqlite3.Connection, profile_id: int, item: Dict[str, 
     email_eligible = item.get("email_eligible") or 0
     email_sent = item.get("email_sent") or 0
 
-    # v3.91 (Task 4B): DUPLICATE items must ALWAYS have rank=0, rank_tier='duplicate',
-    # email_eligible=0 — unconditionally, so that a previously-ranked record cannot
-    # retain its old rank when it is re-collected as a duplicate.  The COALESCE guards
-    # in the UPDATE branch protect fields that legitimately carry forward; these three
-    # must not carry forward.
-    if dedup_status == "duplicate":
-        significance_rank = 0
-        rank_tier = "duplicate"
-        email_eligible = 0
+    # v3.91 (Task 4B) set rank=0 here unconditionally for duplicates — REMOVED in v3.92
+    # corrective patch.  That logic overrode the canonical record's significance_rank with 0
+    # whenever the same article was re-fetched.  Protection now lives in the row-lookup block
+    # below: duplicate observations of an existing canonical record only touch last_seen_at.
     # v3.8 effective date (optional; stamped by ranker / effective-date step)
     effective_date = item.get("effective_date")
     # v3.13 L2 deep-fetch + grouping fields (optional; stamped by l2_fetcher / glossary_match)
@@ -1395,6 +1390,18 @@ def upsert_news_item(conn: sqlite3.Connection, profile_id: int, item: Dict[str, 
         # 2) Update existing
         if row:
             news_id = int(row["id"])
+
+            # v3.92 corrective patch: duplicate-observation protection.
+            # An incoming duplicate is a technical re-fetch of an existing canonical article.
+            # Only advance the observation timestamp; never overwrite business state
+            # (rank, analysis, RRR, human decisions, email state).
+            if dedup_status == "duplicate":
+                conn.execute(
+                    "UPDATE news_items SET last_seen_at=? WHERE id=?",
+                    (now_iso, news_id),
+                )
+                return news_id
+
             conn.execute(
                 """
                 UPDATE news_items
@@ -1463,6 +1470,13 @@ def upsert_news_item(conn: sqlite3.Connection, profile_id: int, item: Dict[str, 
             return news_id
 
         # 3) Insert new
+        # v3.92 corrective patch: if this is a duplicate observation but no canonical row
+        # exists, do not create a misleading Rank 0 placeholder.  The first (NEW) occurrence
+        # in the same run will insert the canonical record; this duplicate observation is
+        # safely skipped.
+        if dedup_status == "duplicate":
+            return -1
+
         conn.execute(
             """
             INSERT INTO news_items(profile_id, source_type, source_id, url, domain, title, content, published_at, first_seen_at, last_seen_at, hash_signature, publisher, authority_id, authority_status, dedup_status, significance_rank, rank_tier, rank_reasoning, repetition_status, repetition_count, topic_label, email_eligible, email_sent, effective_date, l2_summary, l2_fetched_at, act_ref, law_primary, law_secondary, law_reference, announce_state)

@@ -1,11 +1,28 @@
 """
-V3.91 Task 4B — Blocking Correction: DUPLICATE rank persistence.
+V3.91 Task 4B — Duplicate rank persistence.
 
-Business rule: every article that reaches the DB as DUPLICATE must have
-significance_rank=0, rank_tier='duplicate', and email_eligible=0,
-even if the same article was previously stored with a non-zero rank.
+## V3.92 corrective patch history
 
-Uses a temporary in-memory SQLite database — no mocking of persistence.
+Three tests in this file were written under the V3.91 Task 4B assumption that
+a duplicate re-fetch should unconditionally overwrite the canonical record's
+significance_rank with 0.  That assumption was wrong:
+
+  Wrong assumption (V3.91 Task 4B):
+    A duplicate re-fetch of an article that was previously ranked MUST reset its
+    rank to 0.  The COALESCE(?, significance_rank) pattern with a pre-set 0 value
+    would "win" over the stored rank.
+
+  Correct behavior (V3.92 corrective patch):
+    A duplicate observation is only a re-fetch from the source.  It must NEVER
+    overwrite the canonical analysis, rank, RRR history, human decision, or email
+    state.  Only last_seen_at may advance.  The V3.92 fix removes the pre-set-0
+    block and replaces it with an early-return that only touches last_seen_at.
+
+The three tests that expected rank=0 after a duplicate re-fetch have been
+updated to reflect the correct V3.92 behavior.  Comments on each test explain
+why the old expectation was wrong.
+
+Uses an in-memory SQLite database — no mocking of persistence.
 """
 import sys
 import os
@@ -49,18 +66,31 @@ def _fetch(conn, url, profile_id=1):
         "FROM news_items WHERE url=? AND profile_id=?",
         (url, profile_id),
     ).fetchone()
-    assert row is not None, f"No row found for url={url}"
-    return dict(row)
+    return dict(row) if row else None
 
 
 # ---------------------------------------------------------------------------
-# Mandatory regression test
+# Corrected: previously-ranked article PRESERVES rank on duplicate re-fetch
 # ---------------------------------------------------------------------------
-def test_previously_ranked_article_resets_to_zero_when_duplicate():
+def test_previously_ranked_article_preserves_rank_when_duplicate():
     """
+    V3.92 CORRECTED BEHAVIOR (was: test_previously_ranked_article_resets_to_zero_when_duplicate).
+
+    Why the old expectation was wrong:
+      A duplicate re-fetch is a technical signal — the source's RSS feed served
+      the same article again.  It is NOT a new business event.  The canonical
+      article was already fully analyzed and ranked (rank=4 here).  Overwriting
+      its rank with 0 silently destroyed completed legal analysis and could
+      suppress email delivery on a rank-eligible article.
+
+    V3.92 correct behavior:
+      When upsert_news_item finds an existing row AND the incoming observation
+      has dedup_status='duplicate', it performs only an UPDATE SET last_seen_at
+      and returns immediately — leaving all business state intact.
+
     Step 1: Persist article as NEW with rank=4.
-    Step 2: Re-collect the same article as DUPLICATE (rank not set).
-    Step 3: DB record must show rank=0, rank_tier='duplicate', email_eligible=0.
+    Step 2: Re-collect the same article as DUPLICATE.
+    Step 3: DB record must PRESERVE rank=4, rank_tier='tier2', email_eligible=1.
     """
     conn = _fresh_conn()
     url = "https://example.com/law-article"
@@ -81,34 +111,33 @@ def test_previously_ranked_article_resets_to_zero_when_duplicate():
     assert stored["rank_tier"] == "tier2",          "Precondition: rank_tier must be tier2"
     assert stored["email_eligible"] == 1,           "Precondition: email_eligible must be 1"
 
-    # --- Step 2: Re-collect as DUPLICATE (rank fields not set — bypassed ranking) ---
+    # --- Step 2: Re-collect as DUPLICATE ---
     dup_item = _item(
         "Payroll Law Update",
         url,
         dedup_status="duplicate",
-        significance_rank=None,   # bypassed ranking → not set
-        rank_tier=None,           # bypassed ranking → not set
+        significance_rank=None,
+        rank_tier=None,
         email_eligible=0,
     )
     upsert_news_item(conn, 1, dup_item)
 
-    # --- Step 3: Verify DB enforces business rule ---
+    # --- Step 3: Verify canonical state is preserved ---
     stored = _fetch(conn, url)
-    assert stored["dedup_status"] == "duplicate", (
-        f"Expected dedup_status='duplicate', got '{stored['dedup_status']}'"
+    assert stored["dedup_status"] == "new", (
+        f"Canonical dedup_status must stay 'new'; got '{stored['dedup_status']}'"
     )
-    assert stored["significance_rank"] == 0, (
-        f"DUPLICATE article retained rank {stored['significance_rank']} — must be 0"
+    assert stored["significance_rank"] == 4, (
+        f"Canonical rank must stay 4; got {stored['significance_rank']}"
     )
-    assert stored["rank_tier"] == "duplicate", (
-        f"DUPLICATE article has rank_tier='{stored['rank_tier']}' — must be 'duplicate'"
+    assert stored["rank_tier"] == "tier2", (
+        f"Canonical rank_tier must stay 'tier2'; got '{stored['rank_tier']}'"
     )
-    assert stored["email_eligible"] == 0, (
-        f"DUPLICATE article has email_eligible={stored['email_eligible']} — must be 0"
+    assert stored["email_eligible"] == 1, (
+        f"Canonical email_eligible must stay 1; got {stored['email_eligible']}"
     )
 
     conn.close()
-    print("✅ Mandatory regression passed: previously-ranked article reset to rank=0 on DUPLICATE upsert")
 
 
 # ---------------------------------------------------------------------------
@@ -138,15 +167,26 @@ def test_new_article_retains_rank():
     assert stored["dedup_status"] == "new",     "NEW article must retain dedup_status='new'"
 
     conn.close()
-    print("✅ NEW article retains rank=3, rank_tier='tier1', email_eligible=1")
 
 
 # ---------------------------------------------------------------------------
-# DUPLICATE insert (first time, no prior record)
+# Corrected: orphan duplicate (no prior canonical row) produces NO row
 # ---------------------------------------------------------------------------
-def test_fresh_duplicate_insert_has_rank_zero():
+def test_fresh_duplicate_without_prior_row_creates_no_row():
     """
-    An article inserted for the first time as DUPLICATE must also have rank=0.
+    V3.92 CORRECTED BEHAVIOR (was: test_fresh_duplicate_insert_has_rank_zero).
+
+    Why the old expectation was wrong:
+      Inserting a rank-0 'duplicate' row for an article that has never been
+      analyzed is meaningless — there is no canonical record to reference it,
+      no ranking, no legal analysis.  The row would silently block any future
+      genuine occurrence of the same article (COALESCE would preserve the
+      placeholder rank=0).
+
+    V3.92 correct behavior:
+      When no existing canonical row is found AND the incoming observation is a
+      duplicate, upsert_news_item returns -1 without inserting any row.  The
+      first genuine NEW occurrence will create the canonical record normally.
     """
     conn = _fresh_conn()
     url = "https://example.com/fresh-dup"
@@ -159,25 +199,32 @@ def test_fresh_duplicate_insert_has_rank_zero():
         rank_tier=None,
         email_eligible=0,
     )
-    upsert_news_item(conn, 1, dup_item)
+    result = upsert_news_item(conn, 1, dup_item)
 
-    stored = _fetch(conn, url)
-    assert stored["significance_rank"] == 0,         "Fresh DUPLICATE insert must have rank=0"
-    assert stored["rank_tier"] == "duplicate",        "Fresh DUPLICATE insert must have rank_tier='duplicate'"
-    assert stored["email_eligible"] == 0,             "Fresh DUPLICATE insert must have email_eligible=0"
+    assert result == -1, f"Orphan duplicate must return -1; got {result}"
+
+    row = _fetch(conn, url)
+    assert row is None, f"No row must be created for an orphan duplicate; found: {row}"
 
     conn.close()
-    print("✅ Fresh DUPLICATE insert has rank=0, rank_tier='duplicate', email_eligible=0")
 
 
 # ---------------------------------------------------------------------------
-# News Review query returns correct rank for DUPLICATE records
+# Corrected: news review query sees preserved rank after duplicate re-fetch
 # ---------------------------------------------------------------------------
-def test_news_review_query_returns_rank_zero_for_duplicate():
+def test_news_review_query_returns_original_rank_after_duplicate():
     """
-    Simulate the News Review SELECT (list_all_news_for_review path).
-    After a ranked article is re-stored as DUPLICATE, the significance_rank
-    returned by the review query must be 0.
+    V3.92 CORRECTED BEHAVIOR (was: test_news_review_query_returns_rank_zero_for_duplicate).
+
+    Why the old expectation was wrong:
+      The review page showing rank=0 after a source rerun for a rank-5 article
+      is wrong — it was displaying destroyed analysis.  The PM would see a
+      rank-5 article demoted to noise by a routine source refresh, with no
+      ability to recover without a full re-run.
+
+    V3.92 correct behavior:
+      After a duplicate re-fetch, the review query (SELECT from news_items)
+      must return the original rank=5 and rank_tier='tier1'.
     """
     conn = _fresh_conn()
     url = "https://example.com/review-check"
@@ -197,12 +244,20 @@ def test_news_review_query_returns_rank_zero_for_duplicate():
         (url,),
     ).fetchone()
     assert row is not None
-    assert row["significance_rank"] == 0,    f"News Review query returned rank={row['significance_rank']}"
-    assert row["rank_tier"] == "duplicate",   f"News Review query returned rank_tier={row['rank_tier']}"
-    assert row["email_eligible"] == 0,        f"News Review query returned email_eligible={row['email_eligible']}"
+    assert row["significance_rank"] == 5, (
+        f"Review query must return original rank=5; got {row['significance_rank']}"
+    )
+    assert row["rank_tier"] == "tier1", (
+        f"Review query must return original rank_tier='tier1'; got '{row['rank_tier']}'"
+    )
+    assert row["email_eligible"] == 1, (
+        f"Review query must return email_eligible=1; got {row['email_eligible']}"
+    )
+    assert row["dedup_status"] == "new", (
+        f"Review query must return canonical dedup_status='new'; got '{row['dedup_status']}'"
+    )
 
     conn.close()
-    print("✅ News Review query returns rank=0 for DUPLICATE record")
 
 
 # ---------------------------------------------------------------------------
@@ -210,10 +265,10 @@ def test_news_review_query_returns_rank_zero_for_duplicate():
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
     tests = [
-        test_previously_ranked_article_resets_to_zero_when_duplicate,
+        test_previously_ranked_article_preserves_rank_when_duplicate,
         test_new_article_retains_rank,
-        test_fresh_duplicate_insert_has_rank_zero,
-        test_news_review_query_returns_rank_zero_for_duplicate,
+        test_fresh_duplicate_without_prior_row_creates_no_row,
+        test_news_review_query_returns_original_rank_after_duplicate,
     ]
     passed = failed = 0
     for t in tests:
