@@ -47,6 +47,32 @@
 - 16 acceptance tests covering all 14 criteria: DB schema, rule CRUD, generator contract (including insufficient detection), matcher verdict logic (APPLY/DO_NOT_APPLY/INSUFFICIENT_EVIDENCE), conflict handling, pipeline persist, and direction guard.
 - All 16 V3.92 tests pass. All 51 V3.91 regression tests pass.
 
+## v3.92 corrective patch — 2026-11-12
+### Five defects fixed before release acceptance
+
+**1. Review audit fields (`configurations/db.py`, `agents/agents_controller.py`):**
+- `list_all_news_for_review()` SELECT now includes `pre_rrr_rank`, `rrr_rule_id`, `rrr_match_outcome` so Review page can display all three fields.
+- `pre_rrr_rank` is now stamped on ALL non-duplicate newly-ranked items (not just those matched by a rule) before `run_rrr_match()` is called, preserving the immutable initial system rank.
+- Extracted `persist_rrr_outcomes(conn, items, profile_id)` helper in `configurations/db.py`: writes `pre_rrr_rank` for all stamped items and RRR outcome columns only for rule-matched items; replaces the inline 30-line persist loop in `agents_controller.py`.
+
+**2. Rank eligibility enforcement (`admin/app.py`, `admin/templates/review_news.html`):**
+- Re-rank button (&#128681;) is now hidden in HTML for Rank 0/1 items (`{% if score >= 2 %}`).
+- Legacy `POST /admin/news/<id>/override` endpoint retrofitted with the same eligibility guard and mandatory `reason` requirement as `confirm_challenge_news_item`; previously bypassed both with no validation.
+
+**3. RRR Match grounding (`agents/rrr_matcher.py`):**
+- Matcher prompt now includes law references (from Law Match stage), configured authority name (only when `authority_status == "configured"`), RCM scope signal, and rule direction context (`original_rank→override_rank`).
+- INSUFFICIENT_EVIDENCE vs DO_NOT_APPLY distinction strengthened: explicit "CRITICAL REMINDERS" section prevents topic-similarity from triggering APPLY; evidence must be positively established, not merely absent.
+
+**4. Generator readiness validation (`agents/rrr_generator.py`, `admin/app.py`):**
+- `generate_rrr_rule()` now returns a machine-readable `readiness` field (`"ok" | "insufficient" | "failed"`); prompt requests explicit `"readiness": "ok | insufficient"` from AI.
+- New `validate_rule_sections(why, when, when_not) -> Optional[str]` checks for empty sections, failure prefixes, and placeholder patterns (`tbd`, `[insert`, etc.) before a rule is saved.
+- `confirm_challenge_news_item` route now calls `validate_rule_sections()` instead of the weaker prefix-only `is_rule_sufficient()` check.
+
+**5. Tests replaced (`tests/test_rrr_v392.py`):**
+- Rewritten from 16 to 32 tests. Previous tests simulated SQL persistence manually and lacked Flask route coverage.
+- New tests: `persist_rrr_outcomes` integration tests (real in-memory DB), `validate_rule_sections` structural validation (4 tests), `readiness` field contract, `inspect.getsource()` SELECT column verification, and Flask test-client route tests for eligibility enforcement (rank 1 block, invalid transition, missing reason) on both `/challenge`, `/confirm-challenge`, and `/override`.
+- All 32 V3.92 tests pass. All 51 V3.91 regression tests pass.
+
 ## v3.91 — 2026-11-11
 ### Task 4D — News Review Status Compatibility & Repetition Counter
 

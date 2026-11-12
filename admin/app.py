@@ -3255,14 +3255,12 @@ def confirm_challenge_news_item(item_id: int):
     if create_rule and (not why or not when or not when_not):
         return jsonify({"ok": False, "error": "why/when/when_not required when create_rule=true"}), 400
 
-    # Guard: rule sections must not contain generation failure markers
+    # Guard: rule sections must not contain generation failure markers or unresolved placeholders
     if create_rule:
-        from agents.rrr_generator import is_rule_sufficient
-        if not is_rule_sufficient(why, when, when_not):
-            return jsonify({
-                "ok": False,
-                "error": "Rule contains insufficient or failed generation output. Regenerate or save as a one-off correction.",
-            }), 400
+        from agents.rrr_generator import validate_rule_sections
+        err = validate_rule_sections(why, when, when_not)
+        if err:
+            return jsonify({"ok": False, "error": err}), 400
 
     conn = get_connection()
     try:
@@ -3311,30 +3309,50 @@ def confirm_challenge_news_item(item_id: int):
 
 @app.route("/admin/news/<int:item_id>/override", methods=["POST"])
 def override_news_item_rank(item_id: int):
-    """Manual rank override from the Review override strip (no reason needed).
+    """Single-field rank override — enforces the same V3.92 eligibility and requires a reason.
 
-    Sets the human override AND the effective significance_rank so the badge + downstream reflect it.
+    Body: {rank: int, reason: str}  (reason is mandatory for audit; rank must satisfy
+    _RRR_ALLOWED_TARGETS — same policy as confirm_challenge_news_item).
+
+    This endpoint is retained for external callers that pre-date the re-rank dialog but must
+    obey the same human-explanation and transition-matrix requirements introduced in V3.92.
     """
     data = request.json or {}
     try:
         rank = int(data.get("rank", 0))
     except Exception:
         return jsonify({"ok": False, "error": "invalid rank"}), 400
+
+    reason = str(data.get("reason") or data.get("override_reason") or "").strip()
+    if not reason:
+        return jsonify({"ok": False, "error": "reason is required for a rank override"}), 400
+
     conn = get_connection()
     try:
-        row = conn.execute("SELECT id, profile_id FROM news_items WHERE id=?", (item_id,)).fetchone()
+        row = conn.execute("SELECT * FROM news_items WHERE id=?", (item_id,)).fetchone()
         if not row:
             return jsonify({"ok": False, "error": "Item not found"}), 404
-        # Refresh email_eligible so a rank upgrade qualifies the item for the email digest
-        # too (announce inclusion is gated on rank directly, not this flag).
-        email_threshold = int(get_setting_value(row["profile_id"], "email_rank_threshold", "3") or 3)
+        item = dict(row)
+        profile_id = item.get("profile_id")
+        current_rank = item.get("significance_rank") or 0
+
+        # Eligibility guard — same policy as confirm_challenge_news_item
+        if current_rank <= 1:
+            return jsonify({"ok": False, "error": "Rank 0 and Rank 1 items cannot be re-ranked."}), 400
+        allowed = _RRR_ALLOWED_TARGETS.get(current_rank, set())
+        if rank not in allowed:
+            return jsonify({
+                "ok": False,
+                "error": f"Rank {rank} is not a valid target for rank {current_rank} items.",
+            }), 400
+
+        email_threshold = int(get_setting_value(profile_id, "email_rank_threshold", "3") or 3)
         email_eligible = 1 if rank >= email_threshold else 0
         conn.execute(
             "UPDATE news_items SET human_rank_override=?, significance_rank=?, rank_tier='human', "
-            "rank_reasoning='Manual override', email_eligible=? WHERE id=?",
-            (rank, rank, email_eligible, item_id),
+            "human_override_reason=?, email_eligible=? WHERE id=?",
+            (rank, rank, reason, email_eligible, item_id),
         )
-        # v3.13: rank changed → re-evaluate grouping membership.
         from configurations.db import mark_items_pending
         mark_items_pending(conn, [item_id])
         conn.commit()

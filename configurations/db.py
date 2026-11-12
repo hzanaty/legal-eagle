@@ -1997,6 +1997,7 @@ def list_all_news_for_review(
                    law_id, law_ref_status, cited_article, proposed_rcm_title, rcm_match_status,
                    law_references_json, impact_evidence_json, primary_authority,
                    operational_impact, timing_class,
+                   pre_rrr_rank, rrr_rule_id, rrr_match_outcome,
                    (SELECT name FROM authorities WHERE authorities.id = news_items.authority_id) AS authority_name
             FROM news_items
             WHERE profile_id = ?
@@ -2392,6 +2393,59 @@ def deactivate_rrr_rule(conn: sqlite3.Connection, rule_id: int) -> None:
     """Soft-delete a rule (active=0). Does not remove the row."""
     with conn:
         conn.execute("UPDATE rrr_rules SET active=0 WHERE id=?", (rule_id,))
+
+
+def persist_rrr_outcomes(
+    conn: sqlite3.Connection,
+    items: List[Dict[str, Any]],
+    profile_id: int,
+) -> None:
+    """Persist RRR audit columns for all newly ranked items.
+
+    Writes pre_rrr_rank for EVERY item that has it set (including items that received
+    no RRR adjustment), so the original system rank is always preserved in the DB.
+    Writes rrr_rule_id + rrr_match_outcome + rank_tier='rrr' only when a rule fired.
+
+    Matches rows by source_id → url → hash_signature (same priority as the email gate).
+    """
+    for _it in items:
+        pre = _it.get("pre_rrr_rank")
+        if pre is None:
+            continue  # item was not stamped (rank 0 or duplicate) — skip
+
+        _src_type = _it.get("source_type", "RSS")
+        _src_id   = _it.get("source_id") or _it.get("guid") or _it.get("tweet_id")
+        _url      = _it.get("url") or _it.get("link")
+        _hash     = _it.get("hash_signature")
+
+        outcome = _it.get("rrr_match_outcome")
+        rule_id = _it.get("rrr_rule_id")
+        final_rank = _it.get("significance_rank")
+        # rank_tier='rrr' only when an actual rank change occurred
+        tier = "rrr" if outcome in ("upgraded", "downgraded") else None
+
+        if _src_id:
+            _key = "profile_id=? AND source_type=? AND source_id=?"
+            _vals = (profile_id, _src_type, _src_id)
+        elif _url:
+            _key = "profile_id=? AND source_type=? AND url=?"
+            _vals = (profile_id, _src_type, _url)
+        elif _hash:
+            _key = "profile_id=? AND source_type=? AND hash_signature=?"
+            _vals = (profile_id, _src_type, _hash)
+        else:
+            continue
+
+        if tier:
+            conn.execute(
+                f"UPDATE news_items SET significance_rank=?,pre_rrr_rank=?,rrr_rule_id=?,rrr_match_outcome=?,rank_tier=? WHERE {_key}",
+                (final_rank, pre, rule_id, outcome, tier) + _vals,
+            )
+        else:
+            conn.execute(
+                f"UPDATE news_items SET pre_rrr_rank=?,rrr_rule_id=?,rrr_match_outcome=? WHERE {_key}",
+                (pre, rule_id, outcome) + _vals,
+            )
 
 
 def get_announcements_for_run_with_sources(

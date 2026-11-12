@@ -89,6 +89,8 @@ def _evaluate_rules_for_item(
     title = (item.get("title") or "").strip()
     l2_summary = (item.get("l2_summary") or "").strip()
     content = l2_summary or (item.get("content") or "")[:1500]
+
+    # Operative clauses from the Impact attributor (verbatim article excerpts)
     evidence_raw = item.get("impact_evidence_json") or "[]"
     try:
         evidence = json.loads(evidence_raw)
@@ -96,8 +98,31 @@ def _evaluate_rules_for_item(
     except Exception:
         evidence_text = "  (none)"
 
+    # Law references from the Law Match stage (authoritative — not AI-generated)
+    law_raw = item.get("law_references_json") or "[]"
+    try:
+        law_refs = json.loads(law_raw)
+        law_text = "; ".join(
+            f"{r.get('type','?')} {r.get('number','?')} {r.get('label','') or ''}".strip()
+            for r in law_refs
+        ) if law_refs else "(none)"
+    except Exception:
+        law_text = "(none)"
+
+    # Authority — only include when status is 'configured' (verified, not AI-inferred)
+    auth_status = item.get("authority_status") or ""
+    auth_name = item.get("authority_name") or item.get("primary_authority") or ""
+    auth_text = f"{auth_name} (configured)" if auth_name and auth_status == "configured" else "(not confirmed)"
+
+    # RCM match status (SAP Regulatory Change Management scope signal)
+    rcm = item.get("rcm_match_status") or ""
+    rcm_text = {
+        "tracked": "change tracked in SAP RCM scope",
+        "net-new": "change NOT yet in SAP RCM scope",
+    }.get(rcm, "(unknown)") if rcm else "(not evaluated)"
+
     rules_text = "\n".join(
-        f'Rule {r["id"]}:\n'
+        f'Rule {r["id"]} (original correction: {r["original_rank"]}→{r["override_rank"]}):\n'
         f'  WHY: {r["why_text"]}\n'
         f'  WHEN: {r["when_text"]}\n'
         f'  WHEN NOT: {r["when_not_text"]}'
@@ -105,22 +130,36 @@ def _evaluate_rules_for_item(
     )
 
     prompt = (
-        "You are evaluating whether approved re-rank rules apply to a news article.\n"
-        "Evaluate APPLICABILITY (WHEN/WHEN NOT conditions), not topic similarity.\n\n"
-        f"News Article:\n"
-        f"  Title: \"{title}\"\n"
-        f"  Summary: \"{content[:800]}\"\n"
-        f"  Operative clauses:\n{evidence_text}\n\n"
-        f"Rules to evaluate:\n{rules_text}\n\n"
-        "For each rule return one of three verdicts:\n"
-        "  APPLY               — all WHEN conditions are met AND no WHEN NOT exception fires\n"
-        "  DO_NOT_APPLY        — at least one WHEN condition is not met, or a WHEN NOT exception fires\n"
-        "  INSUFFICIENT_EVIDENCE — the article lacks enough information to evaluate this rule reliably\n\n"
-        "Consider WHEN NOT exceptions carefully — they override WHEN conditions.\n"
-        "INSUFFICIENT_EVIDENCE means the article is genuinely ambiguous, not just 'no match'.\n\n"
+        "You are evaluating whether approved re-rank rules apply to a new news article.\n"
+        "Your task is to check WHEN/WHEN NOT conditions against verifiable evidence — NOT to judge topic similarity.\n\n"
+        "## New Article\n"
+        f"Title: \"{title}\"\n"
+        f"Summary: \"{content[:800]}\"\n"
+        f"Operative clauses (verbatim from article):\n{evidence_text}\n"
+        f"Law references (from Law Match stage): {law_text}\n"
+        f"Issuing authority: {auth_text}\n"
+        f"RCM scope signal: {rcm_text}\n\n"
+        f"## Rules to evaluate:\n{rules_text}\n\n"
+        "## Verdict definitions\n"
+        "  APPLY               — every WHEN condition is positively established from the article evidence "
+                               "AND no WHEN NOT exception fires. Evidence must be present, not merely absent.\n"
+        "  DO_NOT_APPLY        — at least one WHEN condition is demonstrably false from the evidence, "
+                               "OR a WHEN NOT exception is clearly met.\n"
+        "  INSUFFICIENT_EVIDENCE — you cannot determine whether a required WHEN condition is true or false "
+                               "because the article lacks the specific information needed. "
+                               "Use this when topic similarity exists but the evidence needed to confirm "
+                               "a condition (e.g., product scope, specific filing type, jurisdictional applicability) "
+                               "is absent or ambiguous.\n\n"
+        "CRITICAL REMINDERS:\n"
+        "- Absence of a WHEN NOT exception does NOT mean all WHEN conditions are satisfied. "
+          "Evaluate each WHEN condition independently.\n"
+        "- Topic similarity alone is NOT proof that WHEN conditions are met. "
+          "A new social insurance article may cover a different filing, authority, or product scope than the rule assumed.\n"
+        "- When a WHEN condition requires specific product-scope evidence (e.g., SAP payroll reporting, "
+          "statutory calculation) and the article does not confirm it, use INSUFFICIENT_EVIDENCE.\n\n"
         "Respond with a JSON array:\n"
         '[{"rule_id": <int>, "verdict": "<APPLY|DO_NOT_APPLY|INSUFFICIENT_EVIDENCE>", '
-        '"reasoning": "<one sentence>"}, ...]'
+        '"reasoning": "<one sentence citing which specific condition determined the verdict>"}, ...]'
     )
 
     def _call() -> str:

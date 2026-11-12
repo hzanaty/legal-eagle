@@ -513,12 +513,14 @@
         {% endif %}
         {% if item.pre_rrr_rank or item.rrr_rule_id %}
         <div style="font-size:10px;color:#555;text-align:right;line-height:1.8;margin-top:2px">
-          {% if item.pre_rrr_rank %}<span title="Original system rank before RRR Match">Orig: {{ item.pre_rrr_rank }}</span>{% endif %}
+          {% if item.pre_rrr_rank %}<span title="Original system rank before RRR Match">Orig: {{ item.pre_rrr_rank }}</span>{% elif score >= 1 and item.rank_tier != 'human' %}<span title="Original rank (pre-V3.92 record)">Orig: {{ score }}</span>{% endif %}
           {% if item.rrr_rule_id %}<span title="RRR Rule ID that caused this adjustment" style="margin-left:6px">RRR #{{ item.rrr_rule_id }}</span>{% endif %}
         </div>
         {% endif %}
         <div class="item-act-row">
+          {% if score >= 2 %}
           <button class="act-btn" onclick="openChallenge({{ item.id }})" title="Re-rank (dispute the AI rank with a reason)">&#128681;</button>
+          {% endif %}
           <button class="act-btn" onclick="rematchItem(this, {{ item.id }})" title="Re-match against the glossary">&#128278;</button>
           <button class="act-btn" onclick="translateItem(this, {{ item.id }})" title="Translate this item">&#127760;</button>
         </div>

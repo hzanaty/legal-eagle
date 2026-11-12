@@ -3,13 +3,18 @@ RRR Generator (v3.92) — derive structured re-rank rules from human override de
 
 Public interface:
     generate_rrr_rule(item, override_rank, human_reason, db_conn, profile_id) -> dict
-        Returns {"why": str, "when": str, "when_not": str, "sufficient": bool}
-        - sufficient=True  → safe to offer as a reusable rule
-        - sufficient=False → generation failed or evidence too thin; why begins with
-                             "INSUFFICIENT: " listing missing decision-critical facts
+        Returns {"why": str, "when": str, "when_not": str, "sufficient": bool,
+                 "readiness": "ok" | "insufficient" | "failed"}
+        - readiness="ok"           → valid draft; safe to offer as a reusable rule
+        - readiness="insufficient" → evidence too thin; LPM can fill gaps and approve manually
+        - readiness="failed"       → technical generation error; why/when/when_not unusable
 
     is_rule_sufficient(why, when, when_not) -> bool
-        True when none of the three sections contain failure markers.
+        True when none of the three sections contain failure markers AND all are non-empty.
+
+    validate_rule_sections(why, when, when_not) -> str | None
+        Returns an error message string if the sections fail structural checks, else None.
+        Used before saving a rule to block empty sections, stale drafts, and failure text.
 """
 import json
 import re
@@ -21,8 +26,8 @@ from configurations.config_loader import creds
 
 _RANK_LABELS = {1: "Noise", 2: "Signal", 3: "Watch", 4: "Legal Change", 5: "Urgent"}
 
-# Patterns that indicate a generation failure or unresolvable insufficiency.
-# A rule section containing any of these must not be saved as an active reusable rule.
+# Text patterns that mark a section as containing a generation failure or unresolvable insufficiency.
+# A rule containing any of these must not be saved as an active reusable rule.
 _FAILURE_PREFIXES = (
     "insufficient:",
     "rule generation failed",
@@ -30,9 +35,12 @@ _FAILURE_PREFIXES = (
     "not applicable",
 )
 
+# Placeholder strings that indicate an unresolved draft (common in AI outputs)
+_PLACEHOLDER_PATTERNS = ("tbd", "to be determined", "to be confirmed", "[insert", "<insert")
+
 
 def is_rule_sufficient(why: str, when: str, when_not: str) -> bool:
-    """Return False if any rule section contains a failure or insufficiency marker."""
+    """Return False if any rule section is empty or contains a failure/insufficiency marker."""
     for text in (why, when, when_not):
         lower = (text or "").strip().lower()
         if not lower:
@@ -40,6 +48,26 @@ def is_rule_sufficient(why: str, when: str, when_not: str) -> bool:
         if any(lower.startswith(p) for p in _FAILURE_PREFIXES):
             return False
     return True
+
+
+def validate_rule_sections(why: str, when: str, when_not: str) -> Optional[str]:
+    """Structural validation before saving a rule.
+
+    Returns an error message string if validation fails, else None.
+    This runs on both AI-generated drafts and LPM-edited text.
+    It blocks obviously broken content without claiming the LPM's legal conclusion is correct.
+    """
+    for label, text in (("WHY", why), ("WHEN", when), ("WHEN NOT", when_not)):
+        stripped = (text or "").strip()
+        if not stripped:
+            return f"{label} section is required."
+        lower = stripped.lower()
+        if any(lower.startswith(p) for p in _FAILURE_PREFIXES):
+            return f"{label} section contains a generation failure marker and cannot be saved."
+        for pat in _PLACEHOLDER_PATTERNS:
+            if pat in lower:
+                return f"{label} section contains an unresolved placeholder ('{pat}'). Edit before saving."
+    return None
 
 
 def _ai_client() -> SAPAICoreClient:
@@ -186,7 +214,9 @@ Summary: "{content[:1000]}"
 9. Why does rank {override_rank} ({override_rank_label}) fit the significance criteria for this type?
 10. When should this rule be revisited or retired?
 
-If you cannot write a reliable, testable rule because critical information is missing from the article and grounding, begin the WHY section with "INSUFFICIENT: " and list the missing facts.
+If you cannot write a reliable, testable rule because critical information is missing from the article
+and grounding, set "readiness" to "insufficient" and begin the WHY section with "INSUFFICIENT: " listing
+the missing decision-critical facts. The LPM can then fill in the gaps and approve the rule manually.
 
 ## Output Requirements
 - SPECIFIC: name the regulatory type, jurisdiction, and affected population
@@ -196,6 +226,7 @@ If you cannot write a reliable, testable rule because critical information is mi
 
 Respond with JSON:
 {{
+  "readiness": "ok | insufficient",
   "why": "1–2 sentences: what change type this is and why it warrants rank {override_rank}.",
   "when": "Conditions that must ALL be present in the article for this rule to apply. Each on its own line starting with '- '.",
   "when_not": "Exceptions that override the WHEN conditions. Each on its own line starting with '- '."
@@ -220,8 +251,19 @@ Respond with JSON:
             when = str(parsed.get("when", "")).strip()
             when_not = str(parsed.get("when_not", "")).strip()
             if why and when and when_not:
-                sufficient = is_rule_sufficient(why, when, when_not)
-                return {"why": why, "when": when, "when_not": when_not, "sufficient": sufficient}
+                ai_readiness = str(parsed.get("readiness", "ok")).strip().lower()
+                if ai_readiness not in ("ok", "insufficient"):
+                    ai_readiness = "ok"
+                # The text-prefix check is the definitive gate — AI readiness is advisory
+                suffix_ok = is_rule_sufficient(why, when, when_not)
+                readiness = ai_readiness if suffix_ok else "insufficient"
+                return {
+                    "why": why,
+                    "when": when,
+                    "when_not": when_not,
+                    "sufficient": readiness == "ok",
+                    "readiness": readiness,
+                }
     except Exception:
         pass
 
@@ -230,4 +272,5 @@ Respond with JSON:
         "when": "N/A",
         "when_not": "N/A",
         "sufficient": False,
+        "readiness": "failed",
     }
