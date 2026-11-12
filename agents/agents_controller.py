@@ -715,6 +715,26 @@ def run_profile_once(
                     print(f"⚠️ Timing skipped: {type(e).__name__}: {e}")
                 print("📊 Rank: deterministic signal-fusion (significance 1–5)…")
                 rank_items(new_items, profile_id, an_conn)      # sees topic_label + L2 + law
+
+                # v3.92: RRR Match — evaluate approved re-rank rules against eligible items.
+                # Runs after initial ranking so pre_rrr_rank captures the system rank.
+                # Runs before an_conn.close() so the matcher can read rrr_rules from the same DB.
+                try:
+                    from agents.rrr_matcher import run_rrr_match
+                    _rrr_eligible = [
+                        i for i in new_items
+                        if (i.get("significance_rank") or 0) > 1
+                        and i.get("dedup_status") != "duplicate"
+                    ]
+                    if _rrr_eligible:
+                        print(f"🔄 RRR Match: evaluating {len(_rrr_eligible)} eligible item(s)…")
+                        run_rrr_match(_rrr_eligible, profile_id, an_conn)
+                        _rrr_changed = sum(1 for i in _rrr_eligible if i.get("rrr_match_outcome") in ("upgraded", "downgraded"))
+                        _rrr_conflicts = sum(1 for i in _rrr_eligible if i.get("rrr_match_outcome") == "conflict")
+                        print(f"✅ RRR Match complete — {_rrr_changed} rank change(s), {_rrr_conflicts} conflict(s) for review")
+                except Exception as _rrr_e:
+                    print(f"⚠️ RRR Match skipped: {type(_rrr_e).__name__}: {_rrr_e}")
+
                 an_conn.close()
                 if not dry_run:
                     # Persist rank fields + effective_date (upsert on source_id/url/hash_signature).
@@ -731,6 +751,40 @@ def run_profile_once(
                     save_topic_labels(new_items, w_conn, profile_id)
                     save_law_matches(new_items, w_conn, profile_id)
                     flag_glossary_gaps(new_items, w_conn, profile_id)
+                    # v3.92: persist RRR audit columns for items that were matched/conflicted.
+                    for _it in new_items:
+                        if _it.get("rrr_match_outcome"):
+                            _src_type = _it.get("source_type", "RSS")
+                            _src_id   = _it.get("source_id") or _it.get("guid") or _it.get("tweet_id")
+                            _url      = _it.get("url") or _it.get("link")
+                            _hash     = _it.get("hash_signature")
+                            _cols = (
+                                _it.get("significance_rank"),
+                                _it.get("pre_rrr_rank"),
+                                _it.get("rrr_rule_id"),
+                                _it.get("rrr_match_outcome"),
+                            )
+                            # rank_tier='rrr' only for actual rank changes, not conflicts
+                            _tier = "rrr" if _it.get("rrr_match_outcome") in ("upgraded", "downgraded") else None
+                            if _src_id:
+                                w_conn.execute(
+                                    "UPDATE news_items SET significance_rank=?,pre_rrr_rank=?,rrr_rule_id=?,rrr_match_outcome=?"
+                                    + (",rank_tier=?" if _tier else "") + " WHERE profile_id=? AND source_type=? AND source_id=?",
+                                    _cols + ((_tier,) if _tier else ()) + (profile_id, _src_type, _src_id),
+                                )
+                            elif _url:
+                                w_conn.execute(
+                                    "UPDATE news_items SET significance_rank=?,pre_rrr_rank=?,rrr_rule_id=?,rrr_match_outcome=?"
+                                    + (",rank_tier=?" if _tier else "") + " WHERE profile_id=? AND source_type=? AND url=?",
+                                    _cols + ((_tier,) if _tier else ()) + (profile_id, _src_type, _url),
+                                )
+                            elif _hash:
+                                w_conn.execute(
+                                    "UPDATE news_items SET significance_rank=?,pre_rrr_rank=?,rrr_rule_id=?,rrr_match_outcome=?"
+                                    + (",rank_tier=?" if _tier else "") + " WHERE profile_id=? AND source_type=? AND hash_signature=?",
+                                    _cols + ((_tier,) if _tier else ()) + (profile_id, _src_type, _hash),
+                                )
+                    w_conn.commit()
                     w_conn.close()
                 ranked = sum(1 for i in new_items if (i.get("significance_rank") or 0) > 0)
                 tagged = sum(1 for i in new_items if i.get("topic_label") and i["topic_label"] != '["General"]')

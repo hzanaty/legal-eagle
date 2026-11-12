@@ -86,6 +86,8 @@ from configurations.db import (
     reset_review_data,
     insert_ranking_grounding,
     insert_ranking_signal,
+    insert_rrr_rule,
+    list_rrr_rules,
 )
 
 # Flask app
@@ -3136,38 +3138,87 @@ def reset_review_data_route():
         conn.close()
 
 
+# v3.92 — RRR: allowed human override targets per initial rank (approved product decision).
+# Rank 1 is never overrideable. This constant is the single source of truth for both
+# the challenge route (eligibility check) and the confirm-challenge route (guard).
+_RRR_ALLOWED_TARGETS: Dict[int, set] = {
+    2: {4, 5},
+    3: {4, 5},
+    4: {2, 3, 5},
+    5: {2, 3, 4},
+}
+
+
 @app.route("/admin/news/<int:item_id>/challenge", methods=["POST"])
 def challenge_news_item(item_id: int):
-    """Re-run Tier 1 + Tier 2 ranking on this item; return comparison JSON."""
+    """Return item context for the re-rank dialog (v3.92 — no AI call at this stage)."""
     conn = get_connection()
     try:
-        row = conn.execute(
-            "SELECT * FROM news_items WHERE id=?", (item_id,)
-        ).fetchone()
+        row = conn.execute("SELECT * FROM news_items WHERE id=?", (item_id,)).fetchone()
         if not row:
             return jsonify({"ok": False, "error": "Item not found"}), 404
         item = dict(row)
-        profile_id = item.get("profile_id")
+        initial_rank = item.get("significance_rank") or item.get("human_rank_override") or 0
+        allowed_targets = sorted(_RRR_ALLOWED_TARGETS.get(initial_rank, set()))
 
-        from agents.news_ranker import _load_signals, _load_grounding, _tier1_score, _tier2_score
-        signals = _load_signals(conn, profile_id)
-        grounding = _load_grounding(conn, profile_id)
-
-        text = f"{item.get('title', '')} {item.get('content', '') or ''}"
-        t1_rank = _tier1_score(text, signals)
-        t2_rank, t2_reasoning, _eff_date = _tier2_score(item, grounding)
-        suggested_rank = max(t1_rank or 0, t2_rank)
-        original_rank = item.get("significance_rank") or item.get("human_rank_override") or 0
+        if not allowed_targets:
+            return jsonify({
+                "ok": False,
+                "error": f"Rank {initial_rank} items cannot be re-ranked.",
+            }), 400
 
         return jsonify({
             "ok": True,
             "item_id": item_id,
             "title": item.get("title", ""),
-            "original_rank": original_rank,
-            "suggested_rank": suggested_rank,
-            "reasoning": t2_reasoning,
-            "agrees": (suggested_rank == original_rank),
+            "initial_rank": initial_rank,
+            "allowed_targets": allowed_targets,
         })
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/admin/news/<int:item_id>/generate-rule", methods=["POST"])
+def generate_rule_for_item(item_id: int):
+    """Generate AI rule sections (WHY/WHEN/WHEN NOT) for a proposed rank override.
+
+    Body: {override_rank: int, human_reason: str}
+    Returns: {ok: bool, why: str, when: str, when_not: str, sufficient: bool}
+    """
+    data = request.json or {}
+    try:
+        override_rank = int(data.get("override_rank", 0))
+        human_reason = str(data.get("human_reason", "")).strip()
+    except Exception:
+        return jsonify({"ok": False, "error": "invalid parameters"}), 400
+
+    if not human_reason:
+        return jsonify({"ok": False, "error": "human_reason required"}), 400
+
+    conn = get_connection()
+    try:
+        row = conn.execute("SELECT * FROM news_items WHERE id=?", (item_id,)).fetchone()
+        if not row:
+            return jsonify({"ok": False, "error": "Item not found"}), 404
+        item = dict(row)
+        profile_id = item.get("profile_id")
+        initial_rank = item.get("significance_rank") or 0
+
+        allowed = _RRR_ALLOWED_TARGETS.get(initial_rank, set())
+        if override_rank not in allowed:
+            return jsonify({
+                "ok": False,
+                "error": f"Rank {override_rank} is not a valid target for rank {initial_rank} items.",
+            }), 400
+
+        from agents.rrr_generator import generate_rrr_rule
+        rule_sections = generate_rrr_rule(
+            item, override_rank=override_rank, human_reason=human_reason,
+            db_conn=conn, profile_id=profile_id,
+        )
+        return jsonify({"ok": True, **rule_sections})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
     finally:
@@ -3176,24 +3227,62 @@ def challenge_news_item(item_id: int):
 
 @app.route("/admin/news/<int:item_id>/confirm-challenge", methods=["POST"])
 def confirm_challenge_news_item(item_id: int):
-    """Write human override + grounding/signal rows from a confirmed challenge."""
+    """Save a rank override with an optional reusable rule (v3.92).
+
+    Body:
+      override_rank:    int   (required)
+      override_reason:  str   (required; stored as human_override_reason)
+      create_rule:      bool  (true = create reusable rule; false = one-off correction)
+      why:              str   (required when create_rule=true)
+      when:             str   (required when create_rule=true)
+      when_not:         str   (required when create_rule=true)
+
+    Returns: {ok: bool, override_rank: int, rule_id: int|null}
+    """
     data = request.json or {}
-    override_rank = int(data.get("override_rank", 0))
-    override_reason = str(data.get("override_reason", "")).strip()
+    try:
+        override_rank = int(data.get("override_rank", 0))
+        override_reason = str(data.get("override_reason", "")).strip()
+        create_rule = bool(data.get("create_rule", False))
+        why = str(data.get("why", "")).strip()
+        when = str(data.get("when", "")).strip()
+        when_not = str(data.get("when_not", "")).strip()
+    except Exception:
+        return jsonify({"ok": False, "error": "invalid parameters"}), 400
+
+    if not override_reason:
+        return jsonify({"ok": False, "error": "override_reason required"}), 400
+    if create_rule and (not why or not when or not when_not):
+        return jsonify({"ok": False, "error": "why/when/when_not required when create_rule=true"}), 400
+
+    # Guard: rule sections must not contain generation failure markers
+    if create_rule:
+        from agents.rrr_generator import is_rule_sufficient
+        if not is_rule_sufficient(why, when, when_not):
+            return jsonify({
+                "ok": False,
+                "error": "Rule contains insufficient or failed generation output. Regenerate or save as a one-off correction.",
+            }), 400
 
     conn = get_connection()
     try:
-        row = conn.execute(
-            "SELECT * FROM news_items WHERE id=?", (item_id,)
-        ).fetchone()
+        row = conn.execute("SELECT * FROM news_items WHERE id=?", (item_id,)).fetchone()
         if not row:
             return jsonify({"ok": False, "error": "Item not found"}), 404
         item = dict(row)
         profile_id = item.get("profile_id")
+        initial_rank = item.get("significance_rank") or 0
 
-        # Write override back to news_items (update significance_rank so badge reflects it).
-        # Also refresh email_eligible so a rank upgrade qualifies the item for the email
-        # digest too (announce inclusion is gated on rank directly, not this flag).
+        # Eligibility guard (backend enforcement)
+        if initial_rank <= 1:
+            return jsonify({"ok": False, "error": "Rank 1 items cannot be re-ranked."}), 400
+        allowed = _RRR_ALLOWED_TARGETS.get(initial_rank, set())
+        if override_rank not in allowed:
+            return jsonify({
+                "ok": False,
+                "error": f"Rank {override_rank} is not a valid target for rank {initial_rank} items.",
+            }), 400
+
         email_threshold = int(get_setting_value(profile_id, "email_rank_threshold", "3") or 3)
         email_eligible = 1 if override_rank >= email_threshold else 0
         conn.execute(
@@ -3202,30 +3291,17 @@ def confirm_challenge_news_item(item_id: int):
             (override_rank, override_rank, override_reason, email_eligible, item_id),
         )
 
-        # Write few-shot grounding example (with rank so AI prompt is useful)
-        title = item.get("title") or ""
-        summary = f"{title} — {override_reason}" if override_reason else title
-        grounding_id = insert_ranking_grounding(
-            conn, profile_id, item_id, summary,
-            source_label=item.get("publisher") or None,
-            rank=override_rank,
-        )
+        rule_id = None
+        if create_rule:
+            rule_id = insert_rrr_rule(
+                conn, profile_id, item_id, initial_rank, override_rank,
+                override_reason, why, when, when_not,
+            )
 
-        # Write Tier 1 signal (keyword extracted from override_reason or title)
-        keyword = override_reason.split()[0].lower() if override_reason else (title.split()[0].lower() if title else "")
-        if keyword:
-            insert_ranking_signal(conn, profile_id, keyword, override_rank, reason=override_reason or None)
-
-        # v3.13: rank changed → re-evaluate grouping membership.
         from configurations.db import mark_items_pending
         mark_items_pending(conn, [item_id])
         conn.commit()
-        return jsonify({
-            "ok": True,
-            "override_rank": override_rank,
-            "grounding_id": grounding_id,
-            "reflection": f"Understood — future items about \"{keyword}\" → Rank {override_rank}",
-        })
+        return jsonify({"ok": True, "override_rank": override_rank, "rule_id": rule_id})
     except Exception as e:
         conn.rollback()
         return jsonify({"ok": False, "error": str(e)}), 500

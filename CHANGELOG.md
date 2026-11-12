@@ -1,5 +1,52 @@
 # CHANGELOG
 
+## v3.92 — 2026-11-12
+### RRR Learning & Matching
+
+**What it does:** Legal Eagle can now learn from meaningful human rank corrections, store them as approved reusable rules (Re-rank Rules / RRR), and automatically apply those rules to future pipeline items after initial ranking.
+
+**New pipeline stage — RRR Match (`agents/rrr_matcher.py`):**
+- Runs after `rank_items()` (deterministic signal-fusion, unchanged) and before the email gate.
+- Evaluates all active LPM-approved rules for the profile against eligible non-rank-1 items.
+- One AI call per item (GPT-4o) returns `APPLY / DO_NOT_APPLY / INSUFFICIENT_EVIDENCE` per rule.
+- Only `APPLY` verdicts change the rank. `INSUFFICIENT_EVIDENCE` is logged for investigation and ignored.
+- Direction guard: upgrade rules (`override_rank > original_rank`) are never used to downgrade a higher-ranked item; downgrade rules are never used to upgrade. A rule learned from rank 3→4 cannot downgrade a rank 5 item to 4.
+- Conflict handling: when two `APPLY` verdicts disagree on the target rank, the initial rank is preserved and `rrr_match_outcome='conflict'` flags the item for human review.
+- Original system rank is preserved in `pre_rrr_rank`; no initial ranking logic was changed.
+
+**Rule generation (`agents/rrr_generator.py`):**
+- Takes an item, a human-selected override rank, and a human reason; returns structured WHY / WHEN / WHEN NOT sections grounded in SAP localization evidence (law references from Law Match stage, RCM match status, configured authority name, impact evidence clauses, profile country/LoB).
+- Failure detection: rules containing "insufficient:", "n/a", or other failure markers return `sufficient=False` and are blocked from being saved as active rules (`is_rule_sufficient()` guard in both generator and confirm-challenge route).
+- Stale rule invalidation: if the LPM changes the override rank or human reason after generating a rule, the JS draft is cleared — the rule must be regenerated before it can be saved.
+
+**Review UI — re-rank dialog (`admin/templates/review_news.html`):**
+- Replaced the legacy "AI SUGGESTS" two-panel modal (dead code since v3.19 deterministic ranking) with a four-step dialog:
+  1. Current Rank display (read-only).
+  2. Override Rank dropdown (dynamically filtered to allowed targets only; rank 1 is excluded entirely).
+  3. Human Reason textarea (required for both one-off corrections and rule creation).
+  4. Generate Rule button → WHY / WHEN / WHEN NOT textareas (editable before saving).
+- "Confirm & Learn" creates a reusable rule + saves the override. "Save one-off" saves only the override without creating a rule.
+- Item cards now display Original Rank (`pre_rrr_rank`) and RRR ID (`rrr_rule_id`) alongside the existing rank; both fields are blank when no RRR adjustment occurred.
+
+**Eligibility enforcement:**
+- Rank 1 items have no allowed override targets (RRR skips them entirely).
+- Ranks 2–3: targets 4, 5. Ranks 4–5: targets 2, 3, (5 or 4). Enforced in both the challenge route and the confirm-challenge route (backend guard).
+- `_RRR_ALLOWED_TARGETS` constant is the single source of truth.
+
+**Routes (`admin/app.py`):**
+- `POST /admin/news/<id>/challenge` — simplified: returns item data + allowed targets; no AI call at this stage.
+- `POST /admin/news/<id>/generate-rule` — new: generates WHY/WHEN/WHEN NOT via SAP-grounded AI call.
+- `POST /admin/news/<id>/confirm-challenge` — redesigned: enforces eligibility, validates rule sufficiency, saves override + optional rule. No longer writes to legacy `ranking_grounding` / `ranking_signals` tables.
+
+**DB changes (`configurations/db.py`):**
+- New table: `rrr_rules` (profile_id, source_item_id, original_rank, override_rank, human_reason, why_text, when_text, when_not_text, active, created_at).
+- New columns on `news_items`: `pre_rrr_rank INTEGER`, `rrr_rule_id INTEGER`, `rrr_match_outcome TEXT` (added via idempotent ALTER, safe for existing DBs).
+- New CRUD helpers: `insert_rrr_rule`, `list_rrr_rules`, `deactivate_rrr_rule`.
+
+**Tests (`tests/test_rrr_v392.py`):**
+- 16 acceptance tests covering all 14 criteria: DB schema, rule CRUD, generator contract (including insufficient detection), matcher verdict logic (APPLY/DO_NOT_APPLY/INSUFFICIENT_EVIDENCE), conflict handling, pipeline persist, and direction guard.
+- All 16 V3.92 tests pass. All 51 V3.91 regression tests pass.
+
 ## v3.91 — 2026-11-11
 ### Task 4D — News Review Status Compatibility & Repetition Counter
 

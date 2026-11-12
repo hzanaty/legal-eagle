@@ -529,6 +529,30 @@ def create_schema_if_needed(conn: sqlite3.Connection) -> None:
             """
         )
 
+        # v3.92: RRR (Re-rank Rules) — LPM-approved structured learning rules
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS rrr_rules (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                profile_id      INTEGER NOT NULL,
+                source_item_id  INTEGER,
+                original_rank   INTEGER NOT NULL,
+                override_rank   INTEGER NOT NULL,
+                human_reason    TEXT NOT NULL,
+                why_text        TEXT NOT NULL,
+                when_text       TEXT NOT NULL,
+                when_not_text   TEXT NOT NULL,
+                active          INTEGER NOT NULL DEFAULT 1,
+                created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY(profile_id) REFERENCES profiles(id) ON DELETE CASCADE,
+                FOREIGN KEY(source_item_id) REFERENCES news_items(id) ON DELETE SET NULL
+            );
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_rrr_rules_profile ON rrr_rules(profile_id, active)"
+        )
+
         # Tagging + email gate columns (v3.3)
         # topic_label: JSON array of glossary terms matching item text
         # email_eligible: 1 if significance_rank >= threshold and not duplicate
@@ -736,6 +760,17 @@ def create_schema_if_needed(conn: sqlite3.Connection) -> None:
             ("law_references_json", "TEXT"),   # JSON array of {type, number, label}
             ("impact_evidence_json", "TEXT"),  # JSON array of verbatim operative clauses
             ("primary_authority", "TEXT"),     # AI responsible-authority name (mapped → authority_id)
+        ):
+            try:
+                conn.execute(f"ALTER TABLE news_items ADD COLUMN {_col} {_decl}")
+            except Exception:
+                pass
+
+        # v3.92: RRR Match audit trail on news_items
+        for _col, _decl in (
+            ("pre_rrr_rank", "INTEGER"),       # system rank before RRR Match; null = no RRR applied
+            ("rrr_rule_id", "INTEGER"),        # FK to rrr_rules; null = no rule caused adjustment
+            ("rrr_match_outcome", "TEXT"),     # 'upgraded'|'downgraded'|'conflict'; null = no match
         ):
             try:
                 conn.execute(f"ALTER TABLE news_items ADD COLUMN {_col} {_decl}")
@@ -2310,6 +2345,53 @@ def insert_ranking_signal(
         (profile_id, "human_confirmed", pattern, rank, 1.0, "challenge_modal", reason),
     )
     return cur.lastrowid
+
+
+# v3.92 — RRR (Re-rank Rules) CRUD
+
+def insert_rrr_rule(
+    conn: sqlite3.Connection,
+    profile_id: int,
+    source_item_id: Optional[int],
+    original_rank: int,
+    override_rank: int,
+    human_reason: str,
+    why_text: str,
+    when_text: str,
+    when_not_text: str,
+) -> int:
+    """Insert a new approved RRR rule. Returns the new rule id."""
+    with conn:
+        cur = conn.execute(
+            """
+            INSERT INTO rrr_rules
+              (profile_id, source_item_id, original_rank, override_rank,
+               human_reason, why_text, when_text, when_not_text)
+            VALUES (?,?,?,?,?,?,?,?)
+            """,
+            (profile_id, source_item_id, original_rank, override_rank,
+             human_reason, why_text, when_text, when_not_text),
+        )
+        return cur.lastrowid
+
+
+def list_rrr_rules(
+    conn: sqlite3.Connection, profile_id: int, active_only: bool = True
+) -> List[Dict[str, Any]]:
+    """Return RRR rules for a profile, most-recently-created first."""
+    sql = "SELECT * FROM rrr_rules WHERE profile_id=?"
+    params: list = [profile_id]
+    if active_only:
+        sql += " AND active=1"
+    sql += " ORDER BY id DESC"
+    rows = conn.execute(sql, params).fetchall()
+    return [dict(r) for r in rows]
+
+
+def deactivate_rrr_rule(conn: sqlite3.Connection, rule_id: int) -> None:
+    """Soft-delete a rule (active=0). Does not remove the row."""
+    with conn:
+        conn.execute("UPDATE rrr_rules SET active=0 WHERE id=?", (rule_id,))
 
 
 def get_announcements_for_run_with_sources(

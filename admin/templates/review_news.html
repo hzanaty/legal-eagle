@@ -321,37 +321,64 @@
     </div>
   </div>
 
-  <!-- Re-rank modal (formerly Challenge, v3.4) -->
+  <!-- Re-rank modal (v3.92 — RRR Learning) -->
   <div class="challenge-overlay" id="challengeOverlay">
-    <div class="challenge-modal" id="challengeModal">
-      <div class="ch-loading" id="chLoading">Re-ranking item…</div>
-      <div id="chContent" style="display:none">
+    <div class="challenge-modal" id="challengeModal" style="width:560px">
+      <div class="ch-loading" id="chLoading" style="display:none">Loading…</div>
+      <div id="chContent">
         <h3>&#128681; Re-rank</h3>
         <div class="ch-subtitle" id="chTitle"></div>
+
         <div class="ch-rank-row">
           <div class="ch-rank-cell">
             <label>CURRENT RANK</label>
             <div class="ch-rank-val" id="chOrigRank">—</div>
           </div>
-          <div class="ch-rank-cell suggested">
-            <label>AI SUGGESTS</label>
-            <div class="ch-rank-val" id="chSugRank">—</div>
+          <div class="ch-rank-cell">
+            <label>OVERRIDE RANK</label>
+            <select class="ch-rank-select" id="chOverrideRank" onchange="_syncChConfirm()">
+              <option value="">— select —</option>
+            </select>
           </div>
         </div>
-        <div class="ch-reasoning" id="chReasoning"></div>
-        <div class="ch-reason-label">Override rank &amp; reason (required)</div>
-        <select class="ch-rank-select" id="chOverrideRank">
-          <option value="1">1 — Noise</option>
-          <option value="2">2 — Signal</option>
-          <option value="3">3 — Watch</option>
-          <option value="4">4 — Legal Change</option>
-          <option value="5">5 — Urgent</option>
-        </select>
-        <textarea class="ch-reason-input" id="chOverrideReason" rows="2" oninput="_syncChConfirm()" placeholder="Why does this rank matter? (required — saved as a future Tier-1 signal)"></textarea>
-        <div class="ch-footer">
+
+        <div class="ch-reason-label">Human Reason <span style="color:#bb0000">*</span></div>
+        <textarea class="ch-reason-input" id="chOverrideReason" rows="2"
+                  oninput="_syncChConfirm()"
+                  placeholder="Why does this rank change matter? (required)"></textarea>
+
+        <div style="margin:4px 0 8px;text-align:right">
+          <button onclick="generateRule()" id="chGenerateBtn"
+                  style="background:#f0f4ff;border:1px solid #b0c4e8;color:#1a4060;font-size:11px;font-weight:700;padding:4px 10px;border-radius:3px;cursor:pointer">
+            &#9889; Generate Rule
+          </button>
+        </div>
+
+        <div id="chRuleSection" style="display:none">
+          <div style="margin:4px 0 4px;font-size:11px;font-weight:700;color:#1a4060;border-top:1px solid #e5e5e5;padding-top:10px;">
+            REUSABLE RULE — edit before confirming
+          </div>
+          <div class="ch-reason-label">WHY: Why adjust the rank?</div>
+          <textarea class="ch-reason-input" id="chRuleWhy" rows="2" oninput="_syncChConfirm()" placeholder="Rationale for this rank level…"></textarea>
+          <div class="ch-reason-label">WHEN: Under which specific conditions does this rule apply?</div>
+          <textarea class="ch-reason-input" id="chRuleWhen" rows="3" oninput="_syncChConfirm()" placeholder="Specific observable conditions (list with - )…"></textarea>
+          <div class="ch-reason-label">WHEN NOT: Which conditions or exceptions invalidate it?</div>
+          <textarea class="ch-reason-input" id="chRuleWhenNot" rows="2" oninput="_syncChConfirm()" placeholder="Exceptions that override the WHEN conditions…"></textarea>
+          <div id="chRuleError" style="color:#bb0000;font-size:11px;margin-top:4px;display:none"></div>
+        </div>
+
+        <div class="ch-footer" style="margin-top:12px">
           <span class="ch-reflection" id="chReflection"></span>
           <button class="ch-btn-cancel" onclick="closeChallenge()">Cancel</button>
-          <button class="ch-btn-confirm" id="chConfirmBtn" onclick="confirmChallenge()">Confirm &amp; Learn</button>
+          <button class="ch-btn-cancel" id="chOneOffBtn"
+                  style="display:none;background:#f5f5f5;border:1px solid #d9d9d9;color:#333"
+                  onclick="confirmChallenge(false)"
+                  title="Save override without creating a reusable rule">
+            Save one-off
+          </button>
+          <button class="ch-btn-confirm" id="chConfirmBtn" disabled onclick="confirmChallenge(true)">
+            Confirm &amp; Learn
+          </button>
         </div>
       </div>
     </div>
@@ -484,8 +511,14 @@
         {% else %}
         <div style="font-size:10px;color:#aaa;text-align:right;line-height:1.8">Rank 0<br>Not evaluated</div>
         {% endif %}
+        {% if item.pre_rrr_rank or item.rrr_rule_id %}
+        <div style="font-size:10px;color:#555;text-align:right;line-height:1.8;margin-top:2px">
+          {% if item.pre_rrr_rank %}<span title="Original system rank before RRR Match">Orig: {{ item.pre_rrr_rank }}</span>{% endif %}
+          {% if item.rrr_rule_id %}<span title="RRR Rule ID that caused this adjustment" style="margin-left:6px">RRR #{{ item.rrr_rule_id }}</span>{% endif %}
+        </div>
+        {% endif %}
         <div class="item-act-row">
-          <button class="act-btn" onclick="openChallenge({{ item.id }}, '{{ item.title|replace("'", "\\'") }}')" title="Re-rank (dispute the AI rank with a reason)">&#128681;</button>
+          <button class="act-btn" onclick="openChallenge({{ item.id }})" title="Re-rank (dispute the AI rank with a reason)">&#128681;</button>
           <button class="act-btn" onclick="rematchItem(this, {{ item.id }})" title="Re-match against the glossary">&#128278;</button>
           <button class="act-btn" onclick="translateItem(this, {{ item.id }})" title="Translate this item">&#127760;</button>
         </div>
@@ -543,70 +576,166 @@
     icon.classList.toggle('collapsed', !collapsed);
   }
 
-  // ── Re-rank modal (formerly Challenge) ──
+  // ── Re-rank modal (v3.92 — RRR Learning) ──
   var _challengeItemId = null;
-  var _challengePreRank = null;
+  var _challengeInitialRank = null;
+  var _challengeAllowedTargets = [];
+  var _ruleSnapshot = null;  // {rank, reason} captured when generateRule() succeeds
+  var _RANK_LABELS = {1:'Noise',2:'Signal',3:'Watch',4:'Legal Change',5:'Urgent'};
+
   function _syncChConfirm() {
-    // Reason is mandatory — Confirm stays disabled until a reason is typed.
+    var rank = parseInt(document.getElementById('chOverrideRank').value || '0', 10);
     var reason = (document.getElementById('chOverrideReason').value || '').trim();
-    document.getElementById('chConfirmBtn').disabled = reason.length === 0;
+    var ruleVisible = document.getElementById('chRuleSection').style.display !== 'none';
+    var why = (document.getElementById('chRuleWhy').value || '').trim();
+    var when_ = (document.getElementById('chRuleWhen').value || '').trim();
+    var whenNot = (document.getElementById('chRuleWhenNot').value || '').trim();
+
+    // Stale rule invalidation: if rank or reason changed after generateRule(), clear the draft
+    if (_ruleSnapshot && (rank !== _ruleSnapshot.rank || reason !== _ruleSnapshot.reason)) {
+      document.getElementById('chRuleWhy').value = '';
+      document.getElementById('chRuleWhen').value = '';
+      document.getElementById('chRuleWhenNot').value = '';
+      document.getElementById('chRuleSection').style.display = 'none';
+      document.getElementById('chRuleError').style.display = 'none';
+      _ruleSnapshot = null;
+      ruleVisible = false; why = ''; when_ = ''; whenNot = '';
+    }
+
+    var canOneOff = rank > 0 && reason.length > 0;
+    var canConfirm = canOneOff && ruleVisible && why && when_ && whenNot;
+    document.getElementById('chConfirmBtn').disabled = !canConfirm;
+    document.getElementById('chOneOffBtn').style.display = canOneOff ? 'inline-block' : 'none';
   }
-  function openChallenge(itemId, title, preRank) {
+
+  function openChallenge(itemId) {
     _challengeItemId = itemId;
-    _challengePreRank = preRank || null;
-    document.getElementById('challengeOverlay').classList.add('open');
-    document.getElementById('chLoading').style.display = 'block';
-    document.getElementById('chContent').style.display = 'none';
+    _challengeInitialRank = null;
+    _challengeAllowedTargets = [];
+    _ruleSnapshot = null;
+    document.getElementById('chLoading').style.display = 'none';
+    document.getElementById('chContent').style.display = 'block';
+    document.getElementById('chRuleSection').style.display = 'none';
+    document.getElementById('chRuleError').style.display = 'none';
+    document.getElementById('chOverrideReason').value = '';
+    document.getElementById('chRuleWhy').value = '';
+    document.getElementById('chRuleWhen').value = '';
+    document.getElementById('chRuleWhenNot').value = '';
     document.getElementById('chReflection').textContent = '';
     document.getElementById('chConfirmBtn').disabled = true;
-    fetch('/admin/news/' + itemId + '/challenge', { method: 'POST' })
+    document.getElementById('chOneOffBtn').style.display = 'none';
+    document.getElementById('chTitle').textContent = '';
+    document.getElementById('chOrigRank').textContent = '…';
+    document.getElementById('chOverrideRank').innerHTML = '<option value="">Loading…</option>';
+    document.getElementById('challengeOverlay').classList.add('open');
+
+    fetch('/admin/news/' + itemId + '/challenge', {method: 'POST'})
       .then(function(r){ return r.json(); })
       .then(function(d){
-        document.getElementById('chLoading').style.display = 'none';
-        document.getElementById('chContent').style.display = 'block';
+        if (!d.ok) { alert(d.error || 'Cannot re-rank this item.'); closeChallenge(); return; }
         document.getElementById('chTitle').textContent = d.title || '';
-        document.getElementById('chOrigRank').textContent = d.original_rank || '?';
-        document.getElementById('chSugRank').textContent = d.suggested_rank || '?';
-        document.getElementById('chReasoning').textContent = d.reasoning || '';
+        document.getElementById('chOrigRank').textContent = d.initial_rank + ' — ' + (_RANK_LABELS[d.initial_rank] || '?');
+        _challengeInitialRank = d.initial_rank;
+        _challengeAllowedTargets = d.allowed_targets || [];
         var sel = document.getElementById('chOverrideRank');
-        sel.value = _challengePreRank || d.suggested_rank || 2;
-        document.getElementById('chOverrideReason').value = '';
+        sel.innerHTML = '<option value="">— select —</option>';
+        _challengeAllowedTargets.forEach(function(r){
+          var opt = document.createElement('option');
+          opt.value = r;
+          opt.textContent = r + ' — ' + (_RANK_LABELS[r] || '?');
+          sel.appendChild(opt);
+        });
         _syncChConfirm();
       })
-      .catch(function(e){
-        document.getElementById('chLoading').textContent = 'Error: ' + e;
-      });
+      .catch(function(e){ alert('Error loading item: ' + e); closeChallenge(); });
   }
+
+  function generateRule() {
+    var rank = parseInt(document.getElementById('chOverrideRank').value || '0', 10);
+    var reason = (document.getElementById('chOverrideReason').value || '').trim();
+    if (!rank || !reason) { alert('Select an override rank and enter a reason first.'); return; }
+
+    document.getElementById('chLoading').style.display = 'block';
+    document.getElementById('chContent').style.display = 'none';
+
+    fetch('/admin/news/' + _challengeItemId + '/generate-rule', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({override_rank: rank, human_reason: reason})
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      document.getElementById('chLoading').style.display = 'none';
+      document.getElementById('chContent').style.display = 'block';
+      document.getElementById('chRuleSection').style.display = 'block';
+      if (!d.ok) {
+        document.getElementById('chRuleError').textContent = d.error || 'Generation failed.';
+        document.getElementById('chRuleError').style.display = 'block';
+        return;
+      }
+      document.getElementById('chRuleError').style.display = 'none';
+      document.getElementById('chRuleWhy').value = d.why || '';
+      document.getElementById('chRuleWhen').value = d.when || '';
+      document.getElementById('chRuleWhenNot').value = d.when_not || '';
+      _ruleSnapshot = {rank: rank, reason: reason};
+      _syncChConfirm();
+    })
+    .catch(function(e){
+      document.getElementById('chLoading').style.display = 'none';
+      document.getElementById('chContent').style.display = 'block';
+      alert('Rule generation error: ' + e);
+    });
+  }
+
   function closeChallenge() {
     document.getElementById('challengeOverlay').classList.remove('open');
     _challengeItemId = null;
   }
-  function confirmChallenge() {
+
+  function confirmChallenge(createRule) {
     if (!_challengeItemId) return;
-    var rank = parseInt(document.getElementById('chOverrideRank').value);
-    var reason = document.getElementById('chOverrideReason').value.trim();
-    if (!reason) { _syncChConfirm(); return; }  // reason is mandatory
+    var rank = parseInt(document.getElementById('chOverrideRank').value || '0', 10);
+    var reason = (document.getElementById('chOverrideReason').value || '').trim();
+    if (!rank || !reason) { alert('Override rank and reason are required.'); return; }
+
+    var body = {override_rank: rank, override_reason: reason, create_rule: createRule};
+    if (createRule) {
+      body.why = (document.getElementById('chRuleWhy').value || '').trim();
+      body.when = (document.getElementById('chRuleWhen').value || '').trim();
+      body.when_not = (document.getElementById('chRuleWhenNot').value || '').trim();
+      if (!body.why || !body.when || !body.when_not) {
+        alert('All rule sections are required when creating a reusable rule.'); return;
+      }
+    }
+
     document.getElementById('chConfirmBtn').disabled = true;
+    document.getElementById('chOneOffBtn').disabled = true;
     fetch('/admin/news/' + _challengeItemId + '/confirm-challenge', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({override_rank: rank, override_reason: reason})
-    }).then(function(r){ return r.json(); })
-      .then(function(d){
-        if (d.ok) {
-          document.getElementById('chReflection').textContent = d.reflection || 'Saved.';
-          // Reload so the AI › You label and effective rank render from the DB.
-          setTimeout(function(){ location.reload(); }, 1200);
-        } else {
-          document.getElementById('chReflection').textContent = 'Error: ' + (d.error || 'unknown');
-          document.getElementById('chConfirmBtn').disabled = false;
-        }
-      })
-      .catch(function(e){
-        document.getElementById('chReflection').textContent = 'Network error: ' + e;
+      body: JSON.stringify(body)
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d.ok) {
+        var msg = createRule
+          ? 'Override saved + reusable rule created (Rank ' + d.override_rank + ').'
+          : 'One-off override saved (Rank ' + d.override_rank + ').';
+        document.getElementById('chReflection').textContent = msg;
+        setTimeout(function(){ closeChallenge(); location.reload(); }, 1200);
+      } else {
+        document.getElementById('chReflection').textContent = 'Error: ' + (d.error || 'unknown');
         document.getElementById('chConfirmBtn').disabled = false;
-      });
+        document.getElementById('chOneOffBtn').disabled = false;
+      }
+    })
+    .catch(function(e){
+      document.getElementById('chReflection').textContent = 'Network error: ' + e;
+      document.getElementById('chConfirmBtn').disabled = false;
+      document.getElementById('chOneOffBtn').disabled = false;
+    });
   }
+
   // Close on overlay click outside modal
   document.getElementById('challengeOverlay').addEventListener('click', function(e){
     if (e.target === this) closeChallenge();
